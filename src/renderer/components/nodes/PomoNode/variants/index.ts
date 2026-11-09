@@ -5,3 +5,4 @@ export { Blocks } from './Blocks';
 export { Vapor } from './Vapor';
 export { Vu } from './Vu';
 export { Outline } from './Outline';
+export { Minimal } from './Minimal';

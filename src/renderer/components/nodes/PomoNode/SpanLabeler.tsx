@@ -4,6 +4,7 @@
 // from the name), "+ new category", and your tasks: picking a task counts the
 // time toward that task instead. One choice, not two concepts.
 
+import { LineGlyph } from '../../ui/LineGlyph';
 import { useRef, useState } from 'react';
 import type { TagDef } from '../../../../shared/tags/classify';
 import { Popover } from '../../ui/Popover';
@@ -26,7 +27,7 @@ export interface SpanLabelerProps {
 type Pick = { kind: 'tag'; id: string } | { kind: 'task'; id: string } | null;
 // The dropdown is the shared TaskTagPicker (search, tasks first, category chips).
 
-const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' };
+const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' };
 
 export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSave, onSkip, onAddCategory }: SpanLabelerProps) {
   const [text, setText] = useState(initialText);
@@ -64,7 +65,7 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
           onClick={onSkip}
           style={{ background: 'transparent', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 11, padding: 0, lineHeight: 1 }}
         >
-          ✕
+          <LineGlyph name="close" size={10} />
         </button>
       </div>
 
@@ -94,14 +95,14 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: 120, padding: '0 8px', cursor: 'pointer',
             background: 'var(--paper-2)', border: `1px solid ${tag ? tag.color : 'var(--paper-3)'}`, borderRadius: 5,
-            color: tag || task ? 'var(--ink)' : 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 10,
+            color: tag || task ? 'var(--ink)' : 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11,
           }}
         >
-          {task ? <span aria-hidden>☑</span> : tag ? <CategoryIcon id={tag.id} color={tag.color} size={11} /> : null}
+          {task ? <span aria-hidden style={{ display: 'inline-flex' }}><LineGlyph name="task" size={11} /></span> : tag ? <CategoryIcon id={tag.id} color={tag.color} size={11} /> : null}
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {task ? 'task' : tag ? tag.label : 'category'}
           </span>
-          <span aria-hidden style={{ opacity: 0.6, fontSize: 8 }}>▾</span>
+          <span aria-hidden style={{ opacity: 0.6, fontSize: 11 }}><LineGlyph name="caretDown" size={9} /></span>
         </button>
         <button
           type="button"
@@ -115,7 +116,7 @@ export function SpanLabeler({ minutes, initialText, tasks, library, guess, onSav
             background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', opacity: canSave ? 1 : 0.4, fontSize: 13, fontWeight: 700,
           }}
         >
-          ✓
+          <LineGlyph name="check" size={11} weight={2.6} />
         </button>
       </div>
 

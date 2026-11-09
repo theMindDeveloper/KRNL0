@@ -142,7 +142,7 @@ export function PenWheel({ x, y, onClose }: { x: number; y: number; onClose: () 
           <title>Done (Esc)</title>
         </circle>
         {hover && hover !== 'Done'
-          ? <text y={4} textAnchor="middle" fontSize={9.5} fontFamily="var(--font-sans)" fontWeight={600} fill="#e8ebee" pointerEvents="none">{hover.replace('Colour ', '').slice(0, 11)}</text>
+          ? <text y={4} textAnchor="middle" fontSize={11} fontFamily="var(--font-sans)" fontWeight={600} fill="#e8ebee" pointerEvents="none">{(() => { const t = hover.replace('Colour ', ''); return t.length > 8 ? `${t.slice(0, 7)}…` : t; })()}</text>
           : icon(CHECK, '#e8ebee')(0, 0)}
       </svg>
     </div>,

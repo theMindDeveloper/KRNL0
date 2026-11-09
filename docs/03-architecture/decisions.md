@@ -2496,3 +2496,136 @@ Every new version meant: open GitHub, download the installer, uninstall, reinsta
 - Every release is a version bump: patch (`0.10.x`) for fixes, minor (`0.x.0`) for feature releases (RELEASING.md).
 - A newer app must keep opening an older `board.json`; the board migrations already guarantee that and stay mandatory for every schema change.
 - The update can't be proven end to end until two updater-enabled releases are published.
+
+---
+
+## Decision 37 — A floating "pocket" Pomo window, a view of the node, never a second timer (2026-11-06)
+
+**Status:** Accepted (maintainer, 2026-11-06). Requirements: docs/06-requirements/pocket-timer.md.
+
+### Context
+Minimising KRNL0 hides the running timer. Users wanted the Pomo node visible over other apps, in both of its modes (Pomodoro and Observe). Electron can show a second, always-on-top window; the risk is a second copy of the timer logic and a second writer of `board.json`.
+
+### Decision
+- **A second `BrowserWindow`, same bundle.** Main opens a frameless, non-resizable, `alwaysOnTop('floating')`, `skipTaskbar` window that loads the renderer with `?pocket=1`. `index.tsx` mounts `PocketApp` for that URL instead of `App`, and skips everything that loads, saves or logs the board.
+- **Snapshot in, commands out.** The main window's renderer sends a snapshot of the Pomo mother (state, config, tag colours, face, theme, easy, away) over `pocket:state`; main keeps the last one and forwards it. Pocket buttons send `pocket:command`; main accepts only `pomo.start|pause|resume|break|stop|discard|extend` and relays them to the main window, which runs them through `makeCommandHandler(pomoMotherId)` — the node's own path.
+- **One derivation.** Live work time, remaining time, break time, the done prompt, today's cycle count and the control set per mode/status move into `PomoNode/derive.ts`, used by the node and the pocket.
+- **Time is computed in the pocket** from the snapshot's timestamps, so it stays exact while the minimised main window is throttled. The main window keeps default background throttling: its board save and done notification may lag by up to a minute while minimised, which is acceptable for a save that is already debounced and a prompt the pocket shows on time.
+- **Main window is explicit.** `src/main/mainWindow.ts` holds the main window; CLI dispatch, second-instance focus, `activate`, window-size queries and update broadcasts use it instead of `getAllWindows()[0]` / the focused window. Closing it closes the pocket.
+- **Preferences outside the board** in `userData/pocket.json` (`enabled`, `x`, `y`, `collapsed`), per worktree in dev.
+- **CLI** `krnl mini status|show|hide|on|off` through a `PocketPort` injected into `SysFacade`, like the updater.
+
+### Consequences
+- The pocket can never write the board or disagree with the node about time or controls.
+- The Observe "what was this?" tagger and the menu bar / taskbar extras are follow-ups; the node still asks when KRNL0 is opened.
+
+## Decision 38 — Launch experience: app state outside the board, a backup before every new version (2026-11-06)
+
+**Status:** Accepted (maintainer, 2026-11-06). Requirements: docs/06-requirements/launch-experience.md.
+
+### Context
+The splash, What's new, the patch notice, Welcome back and milestone cards all need to know things about the *app* across launches: which version last opened this board, when KRNL0 was last used, which release notes were read, whether celebrations are on. None of it is board data. Separately, Windows now installs updates silently on quit (Decision 36), so a bad migration would reach every user with no copy of their board from before it ran.
+
+### Decision
+- **`userData/app-state.json`, owned by main** (`src/main/appState.ts`, pure rules in `src/shared/appState.ts`): `lastVersion`, `lastActiveAt`, `whatsNewSeen`, `celebrations`, `milestonesSeen`, `skippedVersion`. Not `localStorage`: the packaged renderer origin is `127.0.0.1:<random port>`, so origin storage is not guaranteed to survive a restart. Per worktree in dev (rule 10), like `pocket.json`.
+- **Runs first.** `initAppState(boardDir)` is called at startup before the time-log backfill, the RPC handlers and the window, so the board is copied before any code path can load-and-save it. A changed version copies `board.json` to `<board dir>/backups/board-v<prev>-before-v<cur>.json` (never overwritten, newest 3 kept).
+- **One read for the window.** `app:launch` returns `LaunchInfo` (version, previous version, update kind feature/patch/same/first-run/downgrade, backup file, backups, time away, system, prefs). The renderer asks once; prefs changes go through `app:prefs:set`, which only accepts the renderer-owned fields.
+- **Last use** is written on main-window focus / blur, every 5 minutes while focused, and on quit — not on every board change.
+- **Release notes are code** (`src/shared/whatsnew.ts`), keyed by major.minor; a feature release adds an entry in its release PR.
+- **Outside links** (`app:open-external`) are limited to `https://github.com/theMindDeveloper/KRNL0…`.
+- **Taskbar / menu bar** (`src/main/taskbar.ts`) are views of the same Pomo snapshot as the pocket (Decision 37), with the pure `systemTimerView`, and send only the node's control commands.
+- **Previews** use `KRNL0_SIMULATE_UPDATE=feature|patch` and `KRNL0_SIMULATE_AWAY_DAYS=<n>`; they fake the launch info only.
+- **CLI** `krnl whatsnew|feedback|catchup|share|app` through an `AppStatePort` injected into `SysFacade`; anything that opens a dialog goes to the window via `cliDispatch`.
+
+### Consequences
+- An update can always be rolled back by hand from `backups/`.
+- Deleting `app-state.json` is harmless: the next launch treats the board as updated (one extra backup) and may show What's new again.
+- Welcome back measures "away" from the last time the window was used, so a crash or a sleeping laptop with KRNL0 open still counts the days correctly from the last focus.
+
+---
+
+## Decision 39 — Routines: a repeating item you don't tick; habits may have no time (2026-11-08)
+
+**Status:** Accepted (maintainer, 2026-11-08; node design "B · Two shelves" picked on the design canvas). Requirements: docs/06-requirements/routines.md. Issue: #217.
+
+### Context
+Only habits repeat, and a habit is always tickable and (ADR 0002) always timed. A class every Monday modelled as a habit gets a tick circle, a streak and reads "missed"; a habit like "No sugar" must invent an hour. People ask two questions of anything that repeats — *do I tick it?* and *is it at a time?* — and the model welded both answers together.
+
+### Decision
+- **One record, one editor.** A routine is a `Habit` with `kind: 'routine'` (absent = a habit). The Repeat editor's first control is the switch *Routine · it just happens / Habit · I tick it*. No new node, add row or object type; Todo stays one-off tasks.
+- **Routines** always have days, a time and a length. They are never ticked, never "missed", never in streaks, repair prompts, Welcome back, milestones or habit analytics. Optional `endsOn` (YYYY-MM-DD, last day shown) ends one without deleting it; `exceptions: { date, skip?: true, at?: 'HH:MM' }[]` skips or moves one occurrence.
+- **Habits** may repeat with no time: `schedule.timeOfDay` becomes optional for habits ("Any time"). An untimed habit is not drawn on the Calendar or the Clock dial; it is ticked in the Habit grid (and listed with today's items on the Clock).
+- **Node:** two shelves — HABITS (the week grid, unchanged) above ROUTINES (one line each: icon, name, day letters, next/now/skipped or time range).
+- **Calendar:** a routine is a soft band behind plans in its slot, every week, with its name and a repeat icon; a skipped occurrence is a dashed outline; a **Routines** layer switch sits beside Recorded and Habits. **Clock:** an outlined arc, no tick.
+- **One guard:** `isRoutine(h)` (HabitNode/types.ts) — every consumer of habits that ticks, counts or flags checks it.
+- **Data:** all new fields are optional and additive; board `schemaVersion` stays 2 (node state is not schema-validated field by field). Old boards load unchanged: every existing entry is a habit.
+- **CLI** (rule 8): `krnl routine add|list|skip|move|end|restart`, `krnl habit kind <ref> routine|habit`, `krnl habit add` / `habit schedule` without `--at` = any time.
+
+### Consequences
+- Turning a habit into a routine (or back) is one switch and keeps its log.
+- Ships in a minor release with its tour (AGENTS.md "Design and tutorial gates") and designed release notes.
+
+---
+
+## Decision 40 — Plans have one When and an optional Deadline; routines become repeating events on the Calendar (2026-11-08)
+
+**Status:** Accepted (maintainer, 2026-11-08, after using the branch: "imagine yourself as someone using the app for the first time"). End design: canvas "KRNL0 launch designs", row "End design" (End-Plans, End-Calendar, End-Habits). Requirements: docs/06-requirements/plans-when-deadline.md. Issues: #219–#221. Supersedes the user-facing parts of Decision 39.
+
+### Context
+"Due" meant two things (a deadline from the row menu, and "on this day, no time" from quick add), so a plan could be "scheduled Sun 16:05, due Sat 21" with nothing saying which is which. There was no way to put a plan on a day with no time by hand, deadlines and plans looked the same on the Calendar, and routines (repeating events that are never ticked) lived in the Habits window next to things you tick, under a name that in English means a habit.
+
+### Decision
+- **A plan has one When**: a day + time (`task.scheduledFor`, a block in the hours) or a day at **any time** (`TodoItem.onDay`, the ANY TIME strip under the day names). Giving it a time clears `onDay`; moving a block into the strip unschedules it and sets `onDay`.
+- **Deadline** is `TodoItem.dueOn` and means only that. Optional, drawn as a dashed flag mark on its day.
+- **Migration** (on load, idempotent): an item with `dueOn` and no Calendar time had it as its day → `onDay = dueOn`, `dueOn` removed. An item with both keeps `dueOn` as its deadline.
+- **Quick add**: a day alone ("fri", "15.11") → When, any time; "by / due / before / deadline <day>" → Deadline; "every …" → a hint, nothing read.
+- **Habits window holds only habits** (things you tick). **Repeating events** (stored as before: `Habit` with `kind: 'routine'`) are created on the Calendar (drag on empty hours → Once / Repeats), managed from their band and the Calendar's Events list. The word "routine" leaves the UI; `krnl routine` stays and `krnl event` is added.
+- Calendar shapes: timed plan = filled block; any-time plan = solid chip; deadline = dashed flag; timed habit = stadium with a ring; repeating event = hatched band.
+
+### Consequences
+- One editor (the When popover) replaces Edit time, Due date… and Reminder…; the Todo add flow has one step.
+- Board data is additive (`onDay`) plus one load-time migration; schemaVersion unchanged.
+
+---
+
+## Decision 41 — The orb answers through the Claude CLI (2026-11-08)
+
+**Status:** Accepted (maintainer, 2026-11-08: "when you go and ask anything, I want it to connect to the Claude CLI and take the output here as a text"). Requirements: docs/06-requirements/orb-ask.md. Issue: #224.
+
+### Context
+The orb's "ask anything" box answered with canned text (`submitMock`), and hold-Space-to-talk only animated the orb. The terminal already runs Claude Code inside the app's `claude/` folder (so it reads the in-app assistant instructions, `claude/CLAUDE.md`) with `krnl` on its PATH and the app's RPC credentials, so it can read and change the board.
+
+### Decision
+- A question typed in the orb runs **`claude -p`** in the main process, in the same folder and with the same environment as the terminal (`claude/`, `krnl` on PATH, RPC credentials). The answer streams back as text (`--output-format stream-json --include-partial-messages`) and is shown in the orb panel as it arrives.
+- **Tools:** only `Bash(krnl:*)` is allowed: Claude can read and change the board through `krnl`, nothing else on the computer. Each `krnl` call shows as a quiet line ("krnl todo list") under the answer.
+- **The prompt goes in on stdin**, never as a command-line argument (no quoting or shell-injection risk; on Windows `claude` is a `.cmd` and runs through the shell).
+- **A conversation** continues with `--resume <session id>` until the user starts a new one (×). One question at a time; Stop cancels it. 3-minute limit.
+- **Errors say what to do:** Claude Code not installed (link to install), not signed in (run `claude` once in the terminal), timed out, or failed (its last line).
+- **Local flows first:** a message that names a built-in flow ("focus session") still starts it without Claude.
+- Speech (hold Space) is a separate choice: no speech-to-text exists in the app yet (Whisper is a stub, Electron has no built-in recognition).
+
+### Consequences
+- The orb needs Claude Code installed and signed in; without it the orb says so instead of pretending to answer.
+- Answers cost the user's Claude usage; the orb never sends anything on its own.
+
+---
+
+## Decision 42 — Habits and repeating events get board cards in the task-card style (2026-11-08)
+
+**Status:** Accepted (maintainer picked draft A "Same card" on the canvas board "Board cards for habits and events · three drafts"). Requirements: docs/06-requirements/board-cards.md. Issue: #229.
+
+### Context
+Plans get a card on the board (TaskNode, CardParts: 220 × 120, name + box, kind + when, a meter). Habits had an older-style board card (`habit.lane`, LifeOS look, 280 wide) that appeared only on request; repeating events had none.
+
+### Decision
+- **One node kind, two faces.** `habit.lane` keeps pointing at a habit by id; it draws a **habit card** for a habit and an **event card** for a repeating event (`kind: 'routine'`). Both use the task card's frame (CardParts), size and ports, so they line up and read as one family.
+- **Habit card:** the box ticks today (an amount: + adds one); row 2 is the kind and its days and time; the meter is the week (seven bars, today ringed) and the streak — for an amount, today's count filling to its goal.
+- **Event card:** never ticked — a repeat mark instead of the box and the Calendar's faint hatch; row 2 is its days and time; the meter is the week's days (hatched) and when it is next — while it happens, how much is left (and the running border).
+- **Cards appear on their own** when a habit or a repeating event is added (the Habits window, the Calendar, `+ Habit` on the board), next to the other habit cards; the board's `+ Habit` puts it where you clicked. Archiving or deleting removes the card, as before. "Put a card on the canvas" / `krnl habit pin|unpin` still add and remove it by hand.
+
+### Consequences
+- No new node kind and no migration: existing lanes redraw in the new style.
+- Older habits get their card only when pinned (nothing is added to boards on load).
+
+### Round two (2026-11-09)
+The user found the cards unclear (a bare "0" in a circle, no clear click target, an event with nothing to do, a time tile without a day) and questioned the wire dots. Picked draft A of "Habit and event cards, round two": **no wire dots** on either card (wires mean "this plan, then that one"; a habit or an event never sits in that order — old wires are not drawn but kept); the **habit** keeps its week as seven lettered squares and **today's square is the button** (tick, or "+1 · 1/2" for an amount); the **event** carries a calendar page with the **next date** it happens, its time span and rule, and two buttons — **Skip this one** (`habit.lane.skip|unskip`) and **Show** (rings its block on the Calendar; `krnl show <event>`).

@@ -11,6 +11,9 @@ export function calcRemainingPct(
   totalMs: number,
 ): number {
   if (status === 'running' || status === 'break' || status === 'paused') {
+    // A zero or broken length (a hand-edited board.json) would make 0/0 = NaN
+    // and blank every ring and fill; read it as nothing left.
+    if (!(totalMs > 0) || !Number.isFinite(remainingMs)) return 0;
     return Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
   }
   return status === 'idle' ? 100 : 0;

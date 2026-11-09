@@ -122,7 +122,7 @@ export function taskMenuItems(
     { label: 'Show on canvas', onSelect: () => focusNode(task.id) },
     {
       // A chain successor is placed by its anchor: unscheduling it takes the chain off.
-      label: scheduleAnchorOf(task.id) === task.id ? 'Unschedule' : 'Unschedule chain',
+      label: 'Unschedule',
       danger: true,
       onSelect: () => { void unscheduleTask(task.id); },
     },

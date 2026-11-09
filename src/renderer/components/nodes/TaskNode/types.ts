@@ -33,6 +33,9 @@ export interface TaskState {
   kind: TaskKind;
   // Free-form text note shown under the task body. Empty/missing = no note.
   note?: string;
+  // Review 4.1 — remind this many minutes before it starts (0 = at the start).
+  // Absent = no reminder. Fires only while it is on the Calendar.
+  remindMin?: number;
 }
 
 export interface TaskConfig {

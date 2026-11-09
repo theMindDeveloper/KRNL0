@@ -38,13 +38,14 @@ export function Radar({
 }: RadarProps) {
   const cx = width / 2;
   const cy = height / 2 + 6; // shift down to leave room for label at top
-  const r = Math.min(width, height) / 2 - 36;
+  const small = width < 260;
+  const r = Math.min(width, height) / 2 - (small ? 48 : 40);
 
   const n = axes.length;
   if (n < 3) {
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <text x={cx} y={cy} fontSize={10} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
+        <text x={cx} y={cy} fontSize={11} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
           need at least 3 axes
         </text>
       </svg>
@@ -102,7 +103,22 @@ export function Radar({
       {/* Axis spokes + labels */}
       {axes.map((a, i) => {
         const tip = pointAt(i, 1);
-        const labelP = pointAt(i, 1.18);
+        const labelP = pointAt(i, small ? 1.34 : 1.18);
+        // Keep the label inside the chart: an 11px mono capital with 0.06em
+        // tracking is ~7.3px wide;
+        // near an edge it is anchored to that edge instead of centred.
+        // Small chart: short names so neighbouring labels don't collide.
+        const SHORT: Record<string, string> = { 'longest streak': 'Streak', 'active days': 'Active', 'focus min': 'Focus' };
+        const label = small ? (SHORT[a.label.toLowerCase()] ?? a.label) : a.label;
+        const half = (label.length * 7.3) / 2;
+        // Side labels grow away from the centre (never back over the shape);
+        // top/bottom ones stay centred. Each is kept inside the chart.
+        const w2 = half * 2;
+        let anchor: 'start' | 'middle' | 'end';
+        let lx: number;
+        if (labelP.x < cx - 2) { anchor = 'end'; lx = Math.max(labelP.x, 2 + w2); if (lx - w2 < 2) { anchor = 'start'; lx = 2; } }
+        else if (labelP.x > cx + 2) { anchor = 'start'; lx = Math.min(labelP.x, width - 2 - w2); if (lx + w2 > width - 2) { anchor = 'end'; lx = width - 2; } }
+        else { anchor = 'middle'; lx = Math.min(Math.max(labelP.x, 2 + half), width - 2 - half); }
         return (
           <g key={a.key}>
             <line
@@ -115,21 +131,22 @@ export function Radar({
               opacity={0.7}
             />
             <text
-              x={labelP.x}
+              x={lx}
               y={labelP.y + 3}
-              fontSize={9}
-              textAnchor="middle"
+              fontSize={11}
+              textAnchor={anchor}
               fill={COLOR_LABEL}
               fontFamily="var(--font-mono)"
               style={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}
             >
-              {a.label}
+              <title>{a.label}</title>
+              {label}
             </text>
             <text
-              x={labelP.x}
-              y={labelP.y + 13}
-              fontSize={8}
-              textAnchor="middle"
+              x={lx}
+              y={labelP.y + 16}
+              fontSize={11}
+              textAnchor={anchor}
               fill="var(--k-an-ink-4, #7d848b)"
               fontFamily="var(--font-mono)"
             >

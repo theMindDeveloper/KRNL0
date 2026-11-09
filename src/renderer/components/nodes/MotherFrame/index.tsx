@@ -230,7 +230,7 @@ export function MotherFrame({
               background: 'var(--paper-2)',
               color: 'var(--ink-2)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 9,
+              fontSize: 11,
               padding: '2.5px 8px 3px',
               borderRadius: 2,
               letterSpacing: '0.14em',
@@ -267,7 +267,7 @@ function MotherDragHandle({ nodeId }: { nodeId: string }) {
   return (
     <div
       role="button"
-      aria-label="Drag to swap with another mother"
+      aria-label="Drag to swap with another window"
       className="station-drag-handle"
       onPointerDown={onPointerDown}
       onMouseDown={stop}

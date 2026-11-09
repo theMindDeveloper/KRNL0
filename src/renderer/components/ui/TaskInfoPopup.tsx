@@ -3,18 +3,19 @@
 // planned time, time actually tracked on it, and quick actions. Mirrors the
 // tracked-span popup so tasks, habits and observed time behave the same on click.
 
+import { LineGlyph } from './LineGlyph';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
 import { selectPomoReality } from '../../store/pomoReality';
 import { boardTagLibrary } from '../../store/spanTags';
-import { focusNode, scheduleAnchorOf, startFocusOnTask, toggleHabitToday, toggleTaskDone, unscheduleTask } from '../../store/scheduleActions';
+import { focusNode, habitMotherCommand, scheduleAnchorOf, startFocusOnTask, toggleHabitToday, toggleTaskDone, unscheduleTask } from '../../store/scheduleActions';
 import { tagDisplay } from '../../../shared/tags/classify';
 import { toneVarForTask } from '../../utils/taskColor';
 import type { TaskState } from '../nodes/TaskNode/types';
 import type { TodoState } from '../nodes/TodoNode/types';
-import { calcStreak } from '../nodes/HabitNode/commands';
+import { habitStreak } from '../nodes/HabitNode/commands';
 import { todayLocal, type HabitState } from '../nodes/HabitNode/types';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { useEasyMode } from '../../store/uiMode';
@@ -32,6 +33,10 @@ export interface TaskInfoPopupProps {
   onClose: () => void;
 }
 
+const ymdOf = (ms: number): string => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const hm = (ms: number) => {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -40,7 +45,7 @@ const fmtMin = (m: number) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 6
 
 const btn: React.CSSProperties = {
   flex: 1, padding: '5px 6px', background: 'transparent', border: '1px solid var(--paper-3)', borderRadius: 4,
-  color: 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer',
+  color: 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer',
 };
 
 export function TaskInfoPopup(props: TaskInfoPopupProps) {
@@ -132,10 +137,10 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: info.done ? 'line-through' : 'none' }}>
           {info.text || 'Untitled task'}
         </span>
-        {info.done && <span style={{ fontSize: 8, color: 'var(--acid-ink, var(--acid))' }}>✓ DONE</span>}
+        {info.done && <span style={{ fontSize: 11, color: 'var(--acid-ink, var(--acid))' }} ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><LineGlyph name="check" size={9} weight={2.6} />DONE</span></span>}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--ink-3)', marginBottom: 8 }}>{when}</div>
-      {!easy && <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--ink-2)', marginBottom: 10, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>{when}</div>
+      {!easy && <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--ink-2)', marginBottom: 10, flexWrap: 'wrap' }}>
         {info.catId && info.catColor && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <CategoryIcon id={info.catId} color={info.catColor} size={11} />{info.catLabel}
@@ -165,20 +170,46 @@ function HabitInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps
       const h = (node?.state as HabitState | undefined)?.habits.find((x) => x.id === habitId);
       if (!h) return null;
       const today = todayLocal();
-      return { name: h.name, color: h.color, doneToday: h.log.includes(today), streak: calcStreak(h.log, today, h.schedule) };
+      const date = startMs !== undefined ? ymdOf(startMs) : today;
+      return {
+        name: h.name, color: h.color, doneToday: h.log.includes(today), streak: habitStreak(h, today).current, streakUnit: habitStreak(h, today).unit,
+        routine: h.kind === 'routine', date, skipped: !!h.exceptions?.some((e) => e.date === date && e.skip),
+      };
     }),
   );
   if (!info) return null;
+  // Decision 39 — a routine is never ticked: say when, and offer to skip this one.
+  if (info.routine) {
+    return (
+      <Shell x={x} y={y} onClose={onClose}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, boxShadow: `inset 0 0 0 2px var(--${info.color})` }} />
+          <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.08em' }}>ROUTINE</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>
+          {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''} · `}
+          {info.skipped ? 'skipped this time' : 'every week'}
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button type="button" data-testid="routine-info-skip" style={btn}
+            onClick={() => { void habitMotherCommand(info.skipped ? 'routine.unskip' : 'routine.skip', { id: habitId, date: info.date }); onClose(); }}>
+            {info.skipped ? 'Undo skip' : 'Skip this one'}
+          </button>
+        </div>
+      </Shell>
+    );
+  }
   return (
     <Shell x={x} y={y} onClose={onClose}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: `var(--${info.color})` }} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
-        <span style={{ fontSize: 8, color: 'var(--ink-4)', letterSpacing: '0.08em' }}>HABIT</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.08em' }}>HABIT</span>
       </div>
-      <div style={{ fontSize: 10, color: 'var(--ink-3)', marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>
         {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''} · `}
-        streak {info.streak} day{info.streak === 1 ? '' : 's'}
+        streak {info.streak} {info.streakUnit ?? 'day'}{info.streak === 1 ? '' : 's'}
         {' · '}
         <span style={{ color: info.doneToday ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)' }}>{info.doneToday ? 'done today' : 'not done today'}</span>
       </div>

@@ -24,7 +24,7 @@ export function Histogram({
   color = 'var(--cyan)',
   xLabel,
 }: HistogramProps) {
-  const pad = { left: 28, right: 10, top: 14, bottom: 28 };
+  const pad = { left: 28, right: 10, top: 16, bottom: 34 };
   const innerW = Math.max(40, width - pad.left - pad.right);
   const innerH = Math.max(40, height - pad.top - pad.bottom);
 
@@ -56,7 +56,7 @@ export function Histogram({
   if (buckets.length === 0) {
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <text x={width / 2} y={height / 2} fontSize={10} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
+        <text x={width / 2} y={height / 2} fontSize={11} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
           no data
         </text>
       </svg>
@@ -107,7 +107,7 @@ export function Histogram({
               <text
                 x={x + barW / 2}
                 y={y - 3}
-                fontSize={7.5}
+                fontSize={11}
                 textAnchor="middle"
                 fill="var(--k-an-ink-2, #c8cdd3)"
                 fontFamily="var(--font-mono)"
@@ -131,9 +131,9 @@ export function Histogram({
       />
       {(() => {
         const t = `μ ${mean.toFixed(0)}`;
-        const c = clampLabelX(xAt(mean), t, 8, pad.left, pad.left + innerW);
+        const c = clampLabelX(xAt(mean), t, 11, pad.left, pad.left + innerW);
         return (
-          <text x={c.x} y={pad.top - 3} fontSize={8} textAnchor={c.anchor} fill="var(--acid)" fontFamily="var(--font-mono)" fontWeight={700}>
+          <text x={c.x} y={pad.top - 3} fontSize={11} textAnchor={c.anchor} fill="var(--acid)" fontFamily="var(--font-mono)" fontWeight={700}>
             {t}
           </text>
         );
@@ -150,9 +150,9 @@ export function Histogram({
       />
       {(() => {
         const t = `med ${median.toFixed(0)}`;
-        const c = clampLabelX(xAt(median), t, 8, pad.left, pad.left + innerW);
+        const c = clampLabelX(xAt(median), t, 11, pad.left, pad.left + innerW);
         return (
-          <text x={c.x} y={pad.top + innerH + 14} fontSize={8} textAnchor={c.anchor} fill="#8a7bff" fontFamily="var(--font-mono)">
+          <text x={c.x} y={pad.top + innerH + 14} fontSize={11} textAnchor={c.anchor} fill="#8a7bff" fontFamily="var(--font-mono)">
             {t}
           </text>
         );
@@ -162,7 +162,7 @@ export function Histogram({
       <text
         x={pad.left}
         y={height - 4}
-        fontSize={8}
+        fontSize={11}
         textAnchor="start"
         fill={COLOR_LABEL}
         fontFamily="var(--font-mono)"
@@ -172,7 +172,7 @@ export function Histogram({
       <text
         x={pad.left + innerW}
         y={height - 4}
-        fontSize={8}
+        fontSize={11}
         textAnchor="end"
         fill={COLOR_LABEL}
         fontFamily="var(--font-mono)"
@@ -185,7 +185,7 @@ export function Histogram({
         <text
           x={pad.left + innerW / 2}
           y={height - 4}
-          fontSize={8.5}
+          fontSize={11}
           textAnchor="middle"
           fill={COLOR_LABEL}
           fontFamily="var(--font-mono)"
@@ -214,7 +214,7 @@ export function Histogram({
             <text
               x={pad.left - 3}
               y={y + 3}
-              fontSize={7.5}
+              fontSize={11}
               textAnchor="end"
               fill={COLOR_LABEL}
               fontFamily="var(--font-mono)"

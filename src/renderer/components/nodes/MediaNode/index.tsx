@@ -11,6 +11,7 @@ import { NodeResizeControl } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { MEDIA_SIZE, mediaUrl, type MediaConfig, type MediaState } from './types';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 const ReactPlayer = lazy(() => import('react-player/lazy'));
 
@@ -214,7 +215,7 @@ function AudioPlayer({ url, tone }: { url: string; tone: string }) {
           onChange={(e) => { const a = ref.current; if (a) a.currentTime = Number(e.target.value); }}
           style={{ width: '100%', accentColor: tone, height: 4 }}
         />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: error ? 'var(--rust)' : 'var(--ink-3)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: error ? 'var(--rust)' : 'var(--ink-3)' }}>
           {error ? "Can't play this audio format here" : `${fmt(t)} / ${fmt(dur)}`}
         </span>
       </div>
@@ -236,7 +237,7 @@ function WebPreview({ url }: { url: string }) {
         referrerPolicy="no-referrer"
         style={{ flex: 1, border: 'none', background: '#fff' }}
       />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
         <img alt="" width={12} height={12} src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} style={{ borderRadius: 3 }} />
         <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{url}</span>
         <span style={{ opacity: 0.7 }}>blank? use ↗</span>
@@ -253,11 +254,11 @@ function FileCard({ name, size, tone }: { name: string; size: number | undefined
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px' }}>
       <div aria-hidden style={{ position: 'relative', width: 38, height: 46, flexShrink: 0, borderRadius: 6, background: 'var(--paper-3)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)' }}>
-        <span style={{ position: 'absolute', left: -4, bottom: 7, padding: '2px 5px', borderRadius: 4, background: tone, color: '#0e1012', fontFamily: 'var(--font-mono)', fontSize: 8.5, fontWeight: 700 }}>{ext}</span>
+        <span style={{ position: 'absolute', left: -4, bottom: 7, padding: '2px 5px', borderRadius: 4, background: tone, color: '#0e1012', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700 }}>{ext}</span>
       </div>
       <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>{fmtBytes(size) || 'file'} · download from ↓</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{fmtBytes(size) || 'file'} · download below</span>
       </div>
     </div>
   );
@@ -346,9 +347,9 @@ function PdfView({ url, page, onPage, onAspect }: { url: string; page: number; o
       </div>
       {pages > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '5px 0', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', background: 'var(--paper-2)' }}>
-          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)} style={pageBtn(page <= 1)}>‹</button>
+          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)} style={pageBtn(page <= 1)}><LineGlyph name="chevronLeft" /></button>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.min(page, pages)} / {pages}</span>
-          <button type="button" aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)} style={pageBtn(page >= pages)}>›</button>
+          <button type="button" aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)} style={pageBtn(page >= pages)}><LineGlyph name="chevron" /></button>
         </div>
       )}
     </div>

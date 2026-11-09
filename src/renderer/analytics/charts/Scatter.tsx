@@ -126,19 +126,19 @@ export function Scatter({
       <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + innerH} stroke={COLOR_AXIS} strokeWidth={0.6} />
 
       {/* Y axis ticks (0, max) */}
-      <text x={pad.left - 4} y={pad.top + innerH + 3} fontSize={8} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">0</text>
-      <text x={pad.left - 4} y={pad.top + 7} fontSize={8} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">{Math.round(yPeak)}</text>
+      <text x={pad.left - 4} y={pad.top + innerH + 3} fontSize={11} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">0</text>
+      <text x={pad.left - 4} y={pad.top + 7} fontSize={11} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">{Math.round(yPeak)}</text>
 
       {/* X axis ticks */}
-      <text x={pad.left} y={pad.top + innerH + 14} fontSize={8} textAnchor="start" fill={COLOR_LABEL} fontFamily="var(--font-mono)">0</text>
-      <text x={pad.left + innerW} y={pad.top + innerH + 14} fontSize={8} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">{Math.round(xPeak)}</text>
+      <text x={pad.left} y={pad.top + innerH + 14} fontSize={11} textAnchor="start" fill={COLOR_LABEL} fontFamily="var(--font-mono)">0</text>
+      <text x={pad.left + innerW} y={pad.top + innerH + 14} fontSize={11} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">{Math.round(xPeak)}</text>
 
       {/* Axis labels */}
       {xLabel && (
         <text
           x={pad.left + innerW / 2}
           y={height - 6}
-          fontSize={8.5}
+          fontSize={11}
           textAnchor="middle"
           fill={COLOR_LABEL}
           fontFamily="var(--font-mono)"
@@ -151,7 +151,7 @@ export function Scatter({
         <text
           x={10}
           y={pad.top + innerH / 2}
-          fontSize={8.5}
+          fontSize={11}
           textAnchor="middle"
           fill={COLOR_LABEL}
           fontFamily="var(--font-mono)"
@@ -165,8 +165,8 @@ export function Scatter({
       {/* Correlation badge — top-right */}
       <g transform={`translate(${pad.left + innerW - 70}, ${pad.top - 2})`}>
         <rect x={0} y={0} width={70} height={14} rx={3} fill="rgba(20,22,24,0.7)" stroke={COLOR_GRID} />
-        <text x={4} y={10} fontSize={8} fill="var(--k-an-ink-3, #9aa1a8)" fontFamily="var(--font-mono)">r =</text>
-        <text x={66} y={10} fontSize={8.5} textAnchor="end" fontFamily="var(--font-mono)" fontWeight={700}
+        <text x={4} y={10} fontSize={11} fill="var(--k-an-ink-3, #9aa1a8)" fontFamily="var(--font-mono)">r =</text>
+        <text x={66} y={10} fontSize={11} textAnchor="end" fontFamily="var(--font-mono)" fontWeight={700}
           fill={Math.abs(correlation) > 0.5 ? 'var(--acid)' : 'var(--k-an-ink-2, #c8cdd3)'}>
           {correlation.toFixed(2)}
         </text>

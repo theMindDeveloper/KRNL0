@@ -20,8 +20,8 @@
 | F12 | Calendar day view narrower than 360 px switches to an **agenda**: a day strip (plan line + reality line) and one full-width row per task or habit (start/end, title, planned/tracked, +over, missed, "overlaps N"). It has a NOW divider, opens at now, and accepts drops (placed after the row dropped on). "▦ time grid" / "≡ list" toggle the layout. |
 | F13 | Calendar time grid: blocks show only what fits their measured size (bar / title / title + time). Lanes are packed by drawn height. Lane capping follows F15. The default scale is 56 px per hour, and the grid opens scrolled to now. |
 | F14 | Clock list: only done tasks are struck through. Past open tasks are dimmed. |
-| F15 | **Readable parallel tasks.** Up to 4 parallel tasks always sit side by side in their own lanes, however narrow the day column, so each one shows where it starts and ends and can be clicked (`CalendarNode/dayBlockLayout.ts`, `MIN_SIDE_BY_SIDE`). A lane narrower than 34 px shows its title vertically. Wider columns get ⌊plan width / 64 px⌋ lanes if that is more than 4. Tasks beyond the lane count collapse into a "+N" chip in the last lane. The chip shows the hidden tasks' colour dots. Clicking it lists the tasks, and each row can be dragged back onto the grid. |
-| F16 | **Pomo spans are background highlights.** Recorded and live focus/break spans are bands across the whole plan area, drawn behind habits and tasks (z 0). They take no pointer events, so drops still reach the hour cells. Focus and break look different (F3). |
+| F15 | **Readable parallel tasks.** A day column draws parallel tasks side by side with their names only while each lane stays readable: at least 96 px (`READABLE_LANE_PX`), capped at **2 lanes in the week** and **4 in the day** (`CalendarNode/dayBlockLayout.ts`, `LANE_CAP`). A clash narrower than that becomes **letter bars** (F28); nothing collapses into a "+N" count. **Text is never rotated.** Blocks that touch in time keep a 3 px gap. The grid opens (and pages) on whole hours and never on a block cut in half; the hour pager is two chevrons in the corner above the time gutter (up: earlier hours, down: later), never over a plan; a habit pill cut by the edge of the shown hours waits for its page. A missed task says so once ("Missed · 10:00–11:00", lighter fill); its replan button shows on hover. Done tasks stay readable, with a check. |
+| F16 | **Plan, recorded and habits are separate layers.** Only the plan draws blocks. Recorded focus fills a track at each day's left (F29; breaks are its gaps); habits are small pills at their time, clickable to tick (`habit.toggleDay`). The track takes no pointer events. **Recorded** and **Habits** switch on and off in the header; the choice is calendar state (`calendar.setLayers`, `layers: {recorded, habits}`, missing = both on), so `krnl cal layers [recorded\|habits on\|off]` does the same. |
 | F17 | **Right-click menus.** Right-clicking a day column hit-tests every layer at that minute. One hit opens its menu; several open the picker, and picking a row opens that row's menu. Segment menu: header (kind · times · minutes), **Tag → <task>** for up to 6 root tasks, **Untag** (when tagged), **Details…**, **Delete segment** (disabled for the live span). Task menu: header (title · times), **Details…**, **Start focus**, **Mark done / Mark not done**, **Show on canvas**, **Unschedule**. Menus stay on screen. |
 | F18 | **Clock parity.** The Clock day view offers the same menus from the same builder (`ContextMenu/scheduleMenus.ts`): right-click a task arc or a task-list row for the task menu, and a pomo wedge for the segment menu. The Clock has no task details popup, so its task menu has no **Details…**. |
 | F19 | **CLI twins.** Tag / Untag → `pomo retag <seg> <task|none>`. Delete segment → `pomo delete-segment <seg>`. Start focus → `task pomo <ref>`. Mark done → `task toggle <ref>`. Unschedule → `task unschedule <ref>`. `pomo segments [--date] [--json]` lists segment ids. |
@@ -33,6 +33,8 @@
 | F25 | **One popup for recorded time** (#207, time-log F15): left- and right-click open the same popup on Calendar and Clock; times are edited by double-clicking them; Counts toward uses the compact picker (time-log F16). Right-click on empty time offers **Log time here…** (Calendar) / **Log time at HH:MM…** (Clock). |
 | F26 | **Plan vs reality on the block** (#207, storyboard B): a planned block with tagged work on its day reads "started 20m late / 10m early / on time" next to "+X over" / "X tracked". |
 | F27 | **App open/close markers** (time-log F14) and **month hours** (Calendar month cells show the day's recorded work, top-left). |
+| F28 | **Clashing plans are letter bars.** When a clash does not fit side by side with names (F15), every plan stays its own slim bar at its own time and is named by its first character (`clashLabels.ts`): when two bars of one clash would share a letter they add the first letter of their last word ("Read chapter A/B/C" → RA, RB, RC), then more letters, then a number — never two equal names in one clash. The letter shows when it fits the bar (one line tall, wide enough); a name too wide for a narrow bar stands its letters one above the other (never rotated) when the bar is tall enough, so a bar is never left unnamed. A title with no letter or digit is numbered (#1, #2). It sits centred in a short bar, at the top of a tall one with a tick under it when done; missed bars keep the rust outline. The full name is the bar's tooltip and in its popup. Every bar is clickable and **draggable** like any block. **While any plan from the calendar is dragged, a strip appears at the bottom: "Drop here to unschedule"** — dropping there sends it back to Todo (`unscheduleTask`, CLI `task unschedule`); any other drop or drag end clears the strip. A clash with two or more chains still ahead gets a **Line up** tab just above it (or below), drawn only where it covers no plan or habit pill: the chains go one after another in start order from the first start, never before now; a chain moves as one. CLI: `krnl cal lineup <task> <task> [...]`. |
+| F29 | **Tracked time is the Clock rail** ("Clock rail · refined", version A4). Each day has a track at its left, 4 px inside its own day line (3 px in a Station-width day), drawn like the Clock's ring track: one shade lighter than the day (`--paper-3`; halved on light paper), rounded at both ends, 5 px wide (6 px day view, 4 px Station). The track only covers time that has passed: the whole day before today, up to now today, nothing on days still ahead, and nothing on a past day with no recorded time (a week of bare tracks read as scrollbars) — it fills up as the day goes, and the grey left is time you did not record. Each focus span fills the track at its full width with round caps, in its tag or task colour (untagged lime uses a deeper mix on light paper); a span still running has crawling stripes (still under reduced motion); a break is the empty track. Today's "now" is a knob on the track in the now line's red; the now line then draws no dot of its own. Plans start 5 px after the track (3 px Station) and never sit on it. The day header shows the day's tracked total when the column has room (>= 110 px). The other versions stay one constant away (`RAIL_STYLE` in WeekView: A1 full ring track, A2 with hour marks, A3 thin 4 px). In a day too narrow for names (under 64 px), every block shows its first character instead of a cut name (F28). |
 
 ## Gherkin Scenarios (ATDD)
 
@@ -59,16 +61,34 @@ Tests: `tests/unit/renderer/laneLayout.test.ts`, `src/renderer/components/nodes/
 ```gherkin
 Feature: Readable parallel tasks and pomo highlights
 
-  Scenario: F15 — five parallel tasks in a narrow week column
-    Given five tasks overlap between 10:00 and 11:30 in a 90 px week column
-    Then the first task is drawn at full width with its title
-    And a "+4" chip sits on its top-right corner
-    When I click the chip
-    Then the four hidden tasks are listed and each can be dragged onto the grid
+  Scenario: F28 — clashing plans in a narrow week column
+    Given Read chapter A, Read chapter B, Read chapter C and Call with Sam overlap in a 136 px week column
+    Then each is its own bar at its own time
+    And the bars read RA, RB, RC and C
+    And there is no "+N" chip and no plan is hidden
+
+  Scenario: F28 — drag a bar to unschedule it
+    Given the bar "C" for "Call with Sam"
+    When I start dragging it
+    Then "Drop here to unschedule" appears at the bottom of the calendar
+    When I drop it there
+    Then "Call with Sam" has no time and is back in Todo
+    And the drop zone is gone
+
+  Scenario: F28 — line up plans that clash
+    Given Email, Pay rent and Plan week all start tomorrow at 14:00 (20, 20 and 30 minutes)
+    When I click the "Line up" tab above them
+    Then Email is at 14:00, Pay rent at 14:20 and Plan week at 14:40
+    And `krnl cal lineup Email "Pay rent" "Plan week"` does the same
+
+  Scenario: F29 — tracked time fills a track
+    Given 2h35 of focus recorded on Saturday
+    Then Saturday's track at its left is filled where I worked, next to Saturday's plans
+    And the header reads "SAT 7 2h35"
 
   Scenario: F15 — no block narrower than a readable lane
     Given any column width
-    Then every drawn task block is at least 64 px wide (or the full column, if narrower)
+    Then every block with a name is at least 96 px wide, or it is a letter bar (F28)
 
   Scenario: F16 — pomo spans sit behind the plan
     Given a 25 minute focus span and a 5 minute break

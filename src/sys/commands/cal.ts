@@ -10,7 +10,11 @@ import type { Board } from '../../shared/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode } from '../../shared/dispatch/types';
 import { isValidYMD } from '../../shared/ymd';
-import { calendarSetZoom } from '../../renderer/components/nodes/CalendarNode/commands';
+import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
+import { lineUp } from '../../renderer/components/nodes/CalendarNode/lineUp';
+import { taskSchedule } from './task';
+import { calendarSetLayers, calendarSetZoom } from '../../renderer/components/nodes/CalendarNode/commands';
+import { calendarLayersOf } from '../../renderer/components/nodes/CalendarNode/types';
 import { CAL_ZOOM_MAX, CAL_ZOOM_MIN, granularityFor, type CalendarState } from '../../renderer/components/nodes/CalendarNode/types';
 
 export interface CalCtx {
@@ -126,6 +130,33 @@ export function calZoom(ctx: CalCtx & { onBoardChanged?: () => void }, zoom: num
   return { ok: true, message: `calendar zoom ${zoom} (${granularityFor(zoom)}-minute grid)`, data: { zoom } };
 }
 
+/**
+ * krnl cal layers                     → show both layers' state
+ * krnl cal layers recorded|habits|routines on|off
+ * The recorded rail and the habit pills over the plan (calendar F-layers).
+ */
+export function calLayers(
+  ctx: CalCtx & { onBoardChanged?: () => void },
+  layer: string | undefined,
+  on: string | undefined,
+  json = false,
+): SysResult {
+  const board = loadBoard(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const cal = board.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return { ok: false, message: 'No calendar on the board' };
+  const cur = calendarLayersOf(cal.state as CalendarState);
+  const show = (l: typeof cur): string => `recorded ${l.recorded ? 'on' : 'off'} · habits ${l.habits ? 'on' : 'off'} · routines ${l.routines ? 'on' : 'off'}`;
+  if (layer === undefined) return { ok: true, message: json ? JSON.stringify(cur) : show(cur), data: cur };
+  if (layer !== 'recorded' && layer !== 'habits' && layer !== 'routines') return { ok: false, message: 'cal layers <recorded|habits|routines> <on|off>' };
+  if (on !== 'on' && on !== 'off') return { ok: false, message: `cal layers ${layer} needs on or off` };
+  cal.state = calendarSetLayers(cal.state as CalendarState, { [layer]: on === 'on' });
+  saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  const next = calendarLayersOf(cal.state as CalendarState);
+  return { ok: true, message: show(next), data: next };
+}
+
 export function calView(
   ctx: CalCtx & { onBoardChanged?: () => void },
   view: string | undefined,
@@ -143,4 +174,51 @@ export function calView(
   saveBoardTo(ctx.boardPath, { ...board, savedAt: new Date().toISOString() });
   ctx.onBoardChanged?.();
   return { ok: true, message: `calendar → ${view}${date ? ` (${date})` : ''}` };
+}
+
+/**
+ * `krnl cal lineup <task> <task> [...] [--json]` (calendar-clock-visuals F28)
+ * Puts the plans one after another, in start order, from the first of them
+ * (never before now), as the Calendar shelf's "Line up" button. A chain moves
+ * as one (its anchor carries the time); a done plan stays where it is.
+ */
+export async function calLineup(
+  ctx: CalCtx & { onBoardChanged?: () => void },
+  refs: string[],
+  json = false,
+  nowMs: number = Date.now(),
+): Promise<SysResult> {
+  if (refs.length < 2) return { ok: false, message: 'cal lineup needs at least two tasks: cal lineup <task> <task> [...]' };
+  const board = loadBoard(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const placements = selectSchedule(board).placements;
+  const items: Array<{ taskId: string; startMs: number; lengthMin: number }> = [];
+  for (const ref of refs) {
+    const r = resolveNodeRef(board as never, ref, 'todo.task');
+    if (!r.ok) return { ok: false, message: `cal lineup: no single task matches "${ref}"` };
+    const node = board.nodes.find((n) => n.id === r.id);
+    const p = placements.get(r.id);
+    if (!node || !p) return { ok: false, message: `cal lineup: "${ref}" is not on the calendar` };
+    if ((node.state as TaskState).done) continue;
+    // A chain moves as one: its anchor carries the time, its followers come along.
+    const anchor = p.anchorTaskId;
+    if (items.some((it) => it.taskId === anchor)) continue;
+    const members = [...placements.values()].filter((q) => q.anchorTaskId === anchor);
+    const startMs = Math.min(...members.map((q) => new Date(q.startISO).getTime()));
+    const endMs = Math.max(...members.map((q) => new Date(q.endISO).getTime()));
+    items.push({ taskId: anchor, startMs, lengthMin: Math.round((endMs - startMs) / 60_000) });
+  }
+  const moves = lineUp(items, nowMs);
+  for (const [i, mv] of moves.entries()) {
+    const res = await taskSchedule({ boardPath: ctx.boardPath }, mv.taskId, mv.scheduledFor);
+    if (!res.ok) {
+      // Moves before this one are already saved: show them, and say so.
+      if (i > 0) ctx.onBoardChanged?.();
+      const why = res.message ?? 'cal lineup: a move failed';
+      return { ok: false, message: i > 0 ? `${why} (${i} of ${moves.length} moved before this)` : why };
+    }
+  }
+  if (moves.length) ctx.onBoardChanged?.();
+  const text = moves.length === 0 ? 'Already lined up.' : moves.map((m) => `${m.taskId.slice(0, 8)} -> ${m.scheduledFor.replace('T', ' ')}`).join('\n');
+  return { ok: true, message: json ? JSON.stringify(moves) : text, data: moves };
 }

@@ -16,6 +16,7 @@
  * strip shows only the high-level state to avoid 1Hz re-renders here.
  */
 
+import { LineGlyph } from '../ui/LineGlyph';
 import { useStore } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
@@ -88,7 +89,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
         gap: 14,
         flexShrink: 0,
         fontFamily: 'var(--font-mono)',
-        fontSize: 10.5,
+        fontSize: 11,
         letterSpacing: '0.04em',
         textTransform: 'uppercase' as const,
         zIndex: Z.chrome,
@@ -101,9 +102,9 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
           ~/krnl0/{boardName}
         </StatusItem>
         <StatusItem label="claude" testId="statusbar-claude" valueColor="var(--k-status-ok, var(--accent-on-dark))">
-          ● connected
+          <LineGlyph name="dot" size={9} /> connected
         </StatusItem>
-        <StatusItem label="pomo" testId="statusbar-pomo" valueColor="var(--k-status-warn, var(--rust))">
+        <StatusItem label="pomo" testId="statusbar-pomo" valueColor="var(--k-status-warn, color-mix(in srgb, var(--rust) 75%, var(--ink)))">
           {pomoText}
         </StatusItem>
         <StatusItem label="day" testId="statusbar-day">
@@ -114,7 +115,7 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
             data-testid="statusbar-station-fallback"
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 10.5,
+              fontSize: 11,
               color: 'var(--k-status-label, #8a8270)',
               letterSpacing: '0.04em',
               textTransform: 'uppercase' as const,
@@ -187,7 +188,13 @@ function VersionItem() {
   if (state?.status === 'downloading') {
     return (
       <StatusItem testId="statusbar-version">
-        {BOARD_VERSION} · ↓ {Math.round(state.percent ?? 0)}%
+        <span title={`Downloading KRNL0 ${state.latestVersion ?? ''} in the background`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <LineGlyph name="caretDown" size={10} /> {state.latestVersion}
+          <span aria-hidden style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--paper-3)', overflow: 'hidden', display: 'inline-block' }}>
+            <span style={{ display: 'block', height: '100%', width: `${Math.round(state.percent ?? 0)}%`, background: 'var(--acid)', borderRadius: 2 }} />
+          </span>
+          {Math.round(state.percent ?? 0)}% · {BOARD_VERSION}
+        </span>
       </StatusItem>
     );
   }

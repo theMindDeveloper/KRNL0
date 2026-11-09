@@ -16,6 +16,9 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
   | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
+  | { kind: 'todo'; sub: 'due'; ref: string | undefined; when: string | undefined }
+  | { kind: 'todo'; sub: 'when'; ref: string | undefined; day: string | undefined; time: string | undefined }
+  | { kind: 'todo'; sub: 'drop' | 'undrop'; ref: string | undefined }
   | { kind: 'todo'; sub: 'tags'; action: string | undefined; label: string | undefined; keywords: string | undefined; color: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'archive' | 'clear-archive' }
   | { kind: 'todo'; sub: 'check'; id: string | undefined }
@@ -34,6 +37,7 @@ export type SysCommand =
   | { kind: 'task'; sub: 'chain'; refs: string[] }
   | { kind: 'task'; sub: 'schedule'; id: string | undefined; at: string | undefined; durationMin: number | undefined }
   | { kind: 'task'; sub: 'unschedule'; id: string | undefined }
+  | { kind: 'task'; sub: 'remind'; ref: string | undefined; value: string | undefined }
   | { kind: 'task'; sub: 'addNext'; sourceRef: string | undefined; text: string | undefined; durationMin: number | undefined }
   | { kind: 'cal'; sub: 'show'; from: string | undefined; to: string | undefined; json: boolean }
   | { kind: 'cal'; sub: 'view'; view: string | undefined; date: string | undefined }
@@ -44,6 +48,8 @@ export type SysCommand =
   | { kind: 'clock'; sub: 'now' }
   | { kind: 'clock'; sub: 'week'; arg: string | undefined }
   | { kind: 'cal'; sub: 'zoom'; zoom: number | undefined }
+  | { kind: 'cal'; sub: 'layers'; layer: string | undefined; on: string | undefined; json: boolean }
+  | { kind: 'cal'; sub: 'lineup'; refs: string[]; json: boolean }
   // Decision 35 — durable time log reads (time-log F13)
   | { kind: 'time'; sub: 'log'; from: string | undefined; to: string | undefined; json: boolean }
   | { kind: 'time'; sub: 'report'; month: string | undefined; by: string | undefined; json: boolean }
@@ -72,9 +78,24 @@ export type SysCommand =
   | { kind: 'info'; json: boolean }
   | { kind: 'update'; sub: 'status' | 'check'; json: boolean }
   | { kind: 'update'; sub: 'install' | 'open' }
+  | { kind: 'mini'; sub: 'status'; json: boolean }
+  | { kind: 'mini'; sub: 'show' | 'hide' | 'on' | 'off' }
+  | { kind: 'mini'; sub: 'look'; look: string | undefined }
+  // Decision 38 — launch experience
+  | { kind: 'whatsnew'; sub: 'print'; json: boolean }
+  | { kind: 'whatsnew'; sub: 'show' }
+  | { kind: 'feedback'; title: string; feedbackKind: string | undefined; link: boolean }
+  | { kind: 'catchup'; sub: 'print'; json: boolean }
+  | { kind: 'catchup'; sub: 'show' }
+  | { kind: 'share'; sub: 'streak'; habit: string | undefined }
+  | { kind: 'share'; sub: 'sessions' }
+  | { kind: 'share'; sub: 'list'; json: boolean }
+  | { kind: 'app'; sub: 'status' | 'backups'; json: boolean }
+  | { kind: 'app'; sub: 'celebrations'; on: boolean | undefined }
   | { kind: 'settings'; sub: 'show'; json: boolean }
   | { kind: 'settings'; sub: 'mode'; mode: string | undefined }
   | { kind: 'settings'; sub: 'layout'; layout: string | undefined }
+  | { kind: 'settings'; sub: 'grid'; value: string | undefined }
   | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
   | { kind: 'text'; sub: 'resize'; id: string | undefined; w: number | undefined; h: number | undefined }
@@ -88,6 +109,8 @@ export type SysCommand =
   | { kind: 'term'; sub: 'clear' }
   | { kind: 'term'; sub: 'setShell'; shell: string | undefined }
   | { kind: 'term'; sub: 'claude'; bypass: boolean }
+  | { kind: 'show'; sub: 'clear' }
+  | { kind: 'show'; sub: 'target'; scope: 'auto' | 'plan' | 'node' | 'day' | 'ui'; ref: string; note: string | undefined; seconds: number | undefined }
   | { kind: 'tour'; sub: 'list' }
   | { kind: 'tour'; sub: 'start'; id: string | undefined }
   | { kind: 'node'; sub: 'move'; id: string | undefined; to: { x: number; y: number } | undefined }
@@ -105,6 +128,13 @@ export type SysCommand =
   | { kind: 'sfx'; sub: 'play'; clipId: string | undefined }
   | { kind: 'sfx'; sub: 'stop' }
   | { kind: 'sfx'; sub: 'list' }
+  | { kind: 'finished'; sub: 'status' | 'show' | 'hide' }
+  | { kind: 'finished'; sub: 'policy'; policy: string }
+  | { kind: 'recap'; sub: 'today' | 'yesterday' | 'week' | 'show' }
+  | { kind: 'sound'; sub: 'status' | 'list' | 'on' | 'off' }
+  | { kind: 'sound'; sub: 'pack'; pack: string | undefined }
+  | { kind: 'sound'; sub: 'volume'; volume: number | undefined }
+  | { kind: 'sound'; sub: 'play'; moment: string | undefined }
   | { kind: 'radio'; sub: 'list' | 'status' | 'stop' }
   | { kind: 'radio'; sub: 'play'; preset: string | undefined }
   | { kind: 'radio'; sub: 'remove'; preset: string | undefined }
@@ -129,9 +159,21 @@ export type SysCommand =
     }
   | { kind: 'habit'; sub: 'unschedule'; ref: string | undefined }
   | { kind: 'habit'; sub: 'archive'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'unarchive'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'target'; ref: string | undefined; value: string | undefined }
+  | { kind: 'habit'; sub: 'amount'; ref: string | undefined; value: string | undefined; unit: string | undefined }
+  | { kind: 'habit'; sub: 'count'; ref: string | undefined; value: string | undefined; on: string | undefined }
+  | { kind: 'habit'; sub: 'rest'; ref: string | undefined; on: string | undefined; to: string | undefined; off: boolean }
   | { kind: 'habit'; sub: 'show'; ref: string | undefined; json: boolean }
   | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
+  | { kind: 'habit'; sub: 'kind'; ref: string | undefined; habitKind: string | undefined }
+  | { kind: 'routine'; sub: 'add'; name: string | undefined; days: string | undefined; at: string | undefined; forMin: number | undefined }
+  | { kind: 'routine'; sub: 'list'; json: boolean }
+  | { kind: 'routine'; sub: 'skip' | 'unskip' | 'end'; ref: string | undefined; on: string | undefined }
+  | { kind: 'routine'; sub: 'move'; ref: string | undefined; on: string | undefined; at: string | undefined }
+  | { kind: 'routine'; sub: 'restart'; ref: string | undefined }
+  | { kind: 'routine'; sub: 'remind'; ref: string | undefined; value: string | undefined }
   | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined; mode?: string | undefined }
   | {
       kind: 'frame';
@@ -317,12 +359,63 @@ export class SysParser {
       return { kind: 'invalid', message: `Unknown subcommand: update ${sub}. Try: update status | check | install | open` };
     }
 
+    // Decision 37 — the floating pocket timer. Bare `mini` (or `mini --json`) = status.
+    if (cmd === 'mini') {
+      if (sub === undefined || sub.startsWith('--')) {
+        return { kind: 'mini', sub: 'status', json: hasFlag([sub ?? '', ...rest], 'json') };
+      }
+      if (sub === 'status') return { kind: 'mini', sub, json: hasFlag(rest, 'json') };
+      if (sub === 'show' || sub === 'hide' || sub === 'on' || sub === 'off') return { kind: 'mini', sub };
+      if (sub === 'look') return { kind: 'mini', sub: 'look', look: rest[0] };
+      return { kind: 'invalid', message: `Unknown subcommand: mini ${sub}. Try: mini status | show | hide | on | off | look <dial|capsule|box>` };
+    }
+
+    // Decision 38 — launch experience (launch-experience.md F7, F15, F19, F23, F24).
+    if (cmd === 'whatsnew') {
+      if (sub === undefined || sub.startsWith('--')) return { kind: 'whatsnew', sub: 'print', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'show') return { kind: 'whatsnew', sub: 'show' };
+      return { kind: 'invalid', message: `Unknown subcommand: whatsnew ${sub}. Try: whatsnew [--json] | whatsnew show` };
+    }
+    if (cmd === 'feedback') {
+      const args = [sub ?? '', ...rest].filter((a) => a !== '');
+      const words: string[] = [];
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i]!;
+        if (a === '--kind') { i++; continue; }
+        if (a.startsWith('--')) continue;
+        words.push(a);
+      }
+      return { kind: 'feedback', title: words.join(' '), feedbackKind: flag(args, 'kind'), link: hasFlag(args, 'link') };
+    }
+    if (cmd === 'catchup') {
+      if (sub === undefined || sub.startsWith('--')) return { kind: 'catchup', sub: 'print', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'show') return { kind: 'catchup', sub: 'show' };
+      return { kind: 'invalid', message: `Unknown subcommand: catchup ${sub}. Try: catchup [--json] | catchup show` };
+    }
+    if (cmd === 'share') {
+      if (sub === undefined || sub === 'list' || sub.startsWith('--')) return { kind: 'share', sub: 'list', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'streak') return { kind: 'share', sub: 'streak', habit: rest.filter((a) => !a.startsWith('--')).join(' ') || undefined };
+      if (sub === 'sessions') return { kind: 'share', sub: 'sessions' };
+      return { kind: 'invalid', message: `Unknown subcommand: share ${sub}. Try: share list | share streak ["habit"] | share sessions` };
+    }
+    if (cmd === 'app') {
+      if (sub === undefined || sub === 'status' || sub.startsWith('--')) return { kind: 'app', sub: 'status', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'backups') return { kind: 'app', sub: 'backups', json: hasFlag(rest, 'json') };
+      if (sub === 'celebrations') {
+        const v = rest[0];
+        if (v !== undefined && v !== 'on' && v !== 'off') return { kind: 'invalid', message: 'Usage: app celebrations [on|off]' };
+        return { kind: 'app', sub: 'celebrations', on: v === undefined ? undefined : v === 'on' };
+      }
+      return { kind: 'invalid', message: `Unknown subcommand: app ${sub}. Try: app status | backups | celebrations [on|off]` };
+    }
+
     if (cmd === 'settings') {
       if (sub === 'show' || sub === undefined) {
         return { kind: 'settings', sub: 'show', json: hasFlag(rest, 'json') };
       }
       if (sub === 'mode') return { kind: 'settings', sub: 'mode', mode: rest[0] };
       if (sub === 'layout') return { kind: 'settings', sub: 'layout', layout: rest[0] };
+      if (sub === 'grid') return { kind: 'settings', sub: 'grid', value: rest[0] };
     }
 
     if (cmd === 'pomo') {
@@ -375,6 +468,9 @@ export class SysParser {
       }
       // ADR 0016 — tags + archive.
       if (sub === 'tag') return { kind: 'todo', sub: 'tag', ref: rest[0], tag: rest[1] };
+      if (sub === 'due' || sub === 'deadline') return { kind: 'todo', sub: 'due', ref: rest[0], when: rest[1] };
+      if (sub === 'when') return { kind: 'todo', sub: 'when', ref: rest[0], day: rest[1], time: rest[2] };
+      if (sub === 'drop' || sub === 'undrop') return { kind: 'todo', sub, ref: rest[0] };
       if (sub === 'tags') {
         return {
           kind: 'todo', sub: 'tags',
@@ -465,6 +561,9 @@ export class SysParser {
       if (sub === 'unschedule') {
         return { kind: 'task', sub: 'unschedule', id: rest[0] };
       }
+      if (sub === 'remind') {
+        return { kind: 'task', sub: 'remind', ref: rest[0], value: rest[1] };
+      }
       if (sub === 'addNext') {
         const durRaw = flag(rest, 'duration');
         return {
@@ -490,6 +589,8 @@ export class SysParser {
 
     if (cmd === 'cal') {
       if (sub === 'view') return { kind: 'cal', sub: 'view', view: rest[0], date: flag(rest, 'date') };
+      if (sub === 'lineup') return { kind: 'cal', sub: 'lineup', refs: rest.filter((r) => !r.startsWith('--')), json: hasFlag(rest, 'json') };
+      if (sub === 'layers') return { kind: 'cal', sub: 'layers', layer: rest.find((r) => !r.startsWith('--')), on: rest.filter((r) => !r.startsWith('--'))[1], json: hasFlag(rest, 'json') };
       if (sub === 'zoom') {
         const z = rest[0] !== undefined ? Number(rest[0]) : NaN;
         return { kind: 'cal', sub: 'zoom', zoom: Number.isFinite(z) ? z : undefined };
@@ -593,6 +694,22 @@ export class SysParser {
       if (sub === 'archive') {
         return { kind: 'habit', sub: 'archive', ref: rest[0] };
       }
+      if (sub === 'unarchive') {
+        return { kind: 'habit', sub: 'unarchive', ref: rest[0] };
+      }
+      if (sub === 'target') {
+        return { kind: 'habit', sub: 'target', ref: rest[0], value: rest[1] };
+      }
+      if (sub === 'amount') {
+        const words = rest.slice(2).filter((w) => !w.startsWith('--'));
+        return { kind: 'habit', sub: 'amount', ref: rest[0], value: rest[1], unit: words.length ? words.join(' ') : undefined };
+      }
+      if (sub === 'count') {
+        return { kind: 'habit', sub: 'count', ref: rest[0], value: rest[1], on: flag(rest, 'on') };
+      }
+      if (sub === 'rest') {
+        return { kind: 'habit', sub: 'rest', ref: rest[0], on: flag(rest, 'on'), to: flag(rest, 'to'), off: hasFlag(rest, 'off') };
+      }
       if (sub === 'show') {
         return { kind: 'habit', sub: 'show', ref: rest[0], json: hasFlag(rest, 'json') };
       }
@@ -602,6 +719,25 @@ export class SysParser {
       if (sub === 'unpin') {
         return { kind: 'habit', sub: 'unpin', ref: rest[0] };
       }
+      // Decision 39 — habit kind <ref> routine|habit
+      if (sub === 'kind') {
+        return { kind: 'habit', sub: 'kind', ref: rest[0], habitKind: rest[1] };
+      }
+    }
+
+    // Decision 39 / 40 — repeating events (stored as routines): never ticked.
+    // `event` is the name people see; `routine` keeps working.
+    if (cmd === 'routine' || cmd === 'event') {
+      if (sub === 'delete') return { kind: 'habit', sub: 'remove', name: rest[0] };
+      if (sub === 'add') {
+        const forRaw = flag(rest, 'for');
+        return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: flag(rest, 'at'), forMin: forRaw !== undefined && /^\d+$/.test(forRaw) ? Number(forRaw) : undefined };
+      }
+      if (sub === 'list' || sub === undefined) return { kind: 'routine', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'skip' || sub === 'unskip' || sub === 'end') return { kind: 'routine', sub, ref: rest[0], on: flag(rest, 'on') };
+      if (sub === 'move') return { kind: 'routine', sub: 'move', ref: rest[0], on: flag(rest, 'on'), at: flag(rest, 'at') };
+      if (sub === 'restart') return { kind: 'routine', sub: 'restart', ref: rest[0] };
+      if (sub === 'remind') return { kind: 'routine', sub: 'remind', ref: rest[0], value: rest[1] };
     }
 
     if (cmd === 'edge') {
@@ -720,6 +856,23 @@ export class SysParser {
       if (sub === 'clear') {
         return { kind: 'image', sub: 'clear', id: rest[0] };
       }
+    }
+
+    // `krnl show <thing>` (alias highlight): point at something in the window.
+    if (cmd === 'show' || cmd === 'highlight') {
+      if (sub === 'clear') return { kind: 'show', sub: 'clear' };
+      const scoped = sub === 'plan' || sub === 'node' || sub === 'day' || sub === 'ui';
+      const args = scoped ? rest : [...(sub !== undefined ? [sub] : []), ...rest];
+      const firstFlag = args.findIndex((a) => a.startsWith('--'));
+      const ref = (firstFlag < 0 ? args : args.slice(0, firstFlag)).join(' ').trim();
+      if (!ref) return { kind: 'invalid', message: 'show needs something to show. Try: show "<plan name>" | show calendar | show today | show ui "<button label>" | show clear' };
+      return {
+        kind: 'show', sub: 'target',
+        scope: scoped ? sub : 'auto',
+        ref,
+        note: flag(rest, 'note'),
+        seconds: positiveNum(flag(rest, 'for'), '--for'),
+      };
     }
 
     if (cmd === 'tour') {
@@ -871,6 +1024,31 @@ export class SysParser {
       if (sub === 'play') return { kind: 'sfx', sub: 'play', clipId: rest[0] };
       if (sub === 'stop') return { kind: 'sfx', sub: 'stop' };
       if (sub === 'list') return { kind: 'sfx', sub: 'list' };
+    }
+
+    // Finished task cards on the canvas (engagement.md F6).
+    if (cmd === 'finished') {
+      if (sub === undefined || sub === 'status') return { kind: 'finished', sub: 'status' };
+      if (sub === 'show' || sub === 'hide') return { kind: 'finished', sub };
+      return { kind: 'finished', sub: 'policy', policy: sub };
+    }
+
+    // Close the day (engagement.md F11).
+    if (cmd === 'recap') {
+      if (sub === undefined || sub === 'today') return { kind: 'recap', sub: 'today' };
+      if (sub === 'yesterday' || sub === 'week' || sub === 'show') return { kind: 'recap', sub };
+    }
+
+    // UI sounds (docs/06-requirements/ui-sounds.md F7).
+    if (cmd === 'sound') {
+      if (sub === undefined || sub === 'status') return { kind: 'sound', sub: 'status' };
+      if (sub === 'list' || sub === 'on' || sub === 'off') return { kind: 'sound', sub };
+      if (sub === 'pack') return { kind: 'sound', sub: 'pack', pack: rest[0] };
+      if (sub === 'play') return { kind: 'sound', sub: 'play', moment: rest[0] };
+      if (sub === 'volume') {
+        const v = rest[0] !== undefined ? Number(rest[0]) : NaN;
+        return { kind: 'sound', sub: 'volume', volume: Number.isFinite(v) ? v : undefined };
+      }
     }
 
     // Ambient Radio — the mix in the open window.

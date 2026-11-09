@@ -14,6 +14,23 @@ export interface CalendarState {
   // higher values stretch the grid so pomo/task blocks are easier to read and
   // the gutter shows :30 / :15 sub-marks. Clamped to [CAL_ZOOM_MIN, CAL_ZOOM_MAX].
   zoom?: number;
+  /** Layers over the plan (calendar-clock-visuals F-layers): the recorded rail
+   *  and the habit pills. Missing = both on. */
+  layers?: CalendarLayers;
+}
+
+export interface CalendarLayers {
+  recorded: boolean;
+  habits: boolean;
+  /** Decision 39 — routine bands behind the plans. */
+  routines: boolean;
+}
+
+export const DEFAULT_CAL_LAYERS: CalendarLayers = { recorded: true, habits: true, routines: true };
+
+export function calendarLayersOf(state: { layers?: Partial<CalendarLayers> | undefined } | null | undefined): CalendarLayers {
+  const l = state?.layers;
+  return { recorded: l?.recorded !== false, habits: l?.habits !== false, routines: l?.routines !== false };
 }
 
 export const CAL_ZOOM_MIN = 1;
@@ -46,6 +63,7 @@ export const CalendarStateSchema = z.object({
   selectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   anchorDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   zoom: z.number().min(CAL_ZOOM_MIN).max(CAL_ZOOM_MAX).optional(),
+  layers: z.object({ recorded: z.boolean(), habits: z.boolean() }).optional(),
 });
 
 export const defaultCalendarState = (): CalendarState => ({

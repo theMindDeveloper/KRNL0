@@ -65,7 +65,7 @@ describe('fitArcLabel — every label it places is inside its slice', () => {
       const start = -Math.PI / 2 + rand() * Math.PI * 2;
       const sweep = rand() ** 2 * Math.PI * 2;
       const text = `${Math.round((sweep / (Math.PI * 2)) * 100)}%`;
-      const fit = fitArcLabel({ text, rOuter, rInner, start, end: start + sweep, maxFont: 10 });
+      const fit = fitArcLabel({ text, rOuter, rInner, start, end: start + sweep, maxFont: 12 });
       if (!fit) continue;
       placed++;
       expect(fit.fontSize).toBeGreaterThanOrEqual(MIN_LABEL_FONT);
@@ -75,22 +75,23 @@ describe('fitArcLabel — every label it places is inside its slice', () => {
   });
 
   it('hides a label that cannot fit even at the minimum font', () => {
-    expect(fitArcLabel({ text: '3%', rOuter: 100, rInner: 55, start: 0, end: 0.05, maxFont: 10 })).toBeNull();
+    expect(fitArcLabel({ text: '3%', rOuter: 100, rInner: 55, start: 0, end: 0.05, maxFont: 12 })).toBeNull();
   });
 
   it('places the reported 31% label (220px donut, 0.55 ring) inside its slice', () => {
     const rOuter = 104;
     const rInner = rOuter * 0.55;
-    const fit = fitArcLabel({ text: '31%', rOuter, rInner, start: -Math.PI / 2, end: -Math.PI / 2 + 1.95, maxFont: 10 });
+    const fit = fitArcLabel({ text: '31%', rOuter, rInner, start: -Math.PI / 2, end: -Math.PI / 2 + 1.95, maxFont: 12 });
     expect(fit).not.toBeNull();
     expect(boxInsideSlice(fit!.x, fit!.y, '31%', fit!.fontSize, rOuter, rInner, -Math.PI / 2, -Math.PI / 2 + 1.95)).toBe(true);
   });
 
   it('shrinks before it hides', () => {
-    // Band just too thin for 10px with clearance, wide enough for a smaller font.
-    const fit = fitArcLabel({ text: '31%', rOuter: 60, rInner: 33, start: 0, end: 1.9, maxFont: 10 });
+    // Band too thin for 12px with clearance, wide enough for the 11px floor.
+    const fit = fitArcLabel({ text: '31%', rOuter: 60, rInner: 26, start: 0, end: 1.9, maxFont: 12 });
     expect(fit).not.toBeNull();
-    expect(fit!.fontSize).toBeLessThan(10);
+    expect(fit!.fontSize).toBeLessThan(12);
+    expect(fit!.fontSize).toBeGreaterThanOrEqual(11);
   });
 });
 

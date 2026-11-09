@@ -225,7 +225,7 @@ export function TelemetryChrome() {
               key={b.kind}
               type="button"
               className={`md-tel-bay md-tel-bay-interactive${b.warn ? ' warn' : ''}`}
-              title={`Jump to ${b.kind} mother`}
+              title={`Jump to the ${b.kind} window`}
               onClick={() => jumpTo(b.kind)}
             >
               <div className="id">{b.id}</div>

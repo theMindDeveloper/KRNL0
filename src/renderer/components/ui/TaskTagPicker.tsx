@@ -12,6 +12,7 @@
 // Search filters both lists; ↑ ↓ move, Enter picks, Esc closes. Tasks come
 // first because they are what time is usually counted toward.
 
+import { LineGlyph } from './LineGlyph';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { TagDef } from '../../../shared/tags/classify';
 import { slugifyTag } from '../../../shared/tags/classify';
@@ -39,7 +40,7 @@ export interface TaskTagPickerProps {
 
 const MAX_OPEN = 6;
 const MAX_DONE = 3;
-const caption: CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 8.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-4)', padding: '6px 8px 2px' };
+const caption: CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-4)', padding: '6px 8px 2px' };
 
 type Item =
   | { key: string; kind: 'task'; id: string; label: string; done: boolean }
@@ -92,7 +93,7 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
   });
   const chipStyle = (it: Item & { kind: 'tag' }): CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, cursor: 'pointer',
-    padding: '3px 6px', borderRadius: 5, fontFamily: 'var(--font-mono)', fontSize: 10,
+    padding: '3px 6px', borderRadius: 5, fontFamily: 'var(--font-mono)', fontSize: 11,
     border: `1px solid ${isOn(it) ? it.tag.color : `color-mix(in srgb, ${it.tag.color} 40%, transparent)`}`,
     background: idx(it) === active ? 'var(--paper-2)' : `color-mix(in srgb, ${it.tag.color} 10%, transparent)`, color: 'var(--ink-2)',
   });
@@ -117,7 +118,7 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
     const t = lib.find((x) => x.id === taskTag[taskId]);
     if (!t) return null;
     return (
-      <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, fontSize: 9,
+      <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, fontSize: 11,
         color: t.color, background: `color-mix(in srgb, ${t.color} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${t.color} 45%, transparent)` }}>
         <CategoryIcon id={t.id} color={t.color} size={9} />{t.label}
       </span>
@@ -170,7 +171,7 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
       )}
       {taskItems.filter((t) => t.done).map((it) => (
         <button key={it.key} type="button" data-testid={`${testIdPrefix}-task-${it.id}`} style={{ ...rowStyle(it), color: 'var(--ink-3)' }} onMouseEnter={() => setActive(idx(it))} onClick={() => choose(it)}>
-          <span aria-hidden style={{ width: 10, color: 'var(--acid-ink, var(--acid))' }}>✓</span>
+          <span aria-hidden style={{ width: 10, color: 'var(--acid-ink, var(--acid))', display: 'inline-flex' }}><LineGlyph name="check" size={10} /></span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'line-through', textDecorationColor: 'var(--ink-4)' }}>{it.label}</span>
           {pill(it.id)}
         </button>
@@ -188,7 +189,7 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
         </div>
       )}
       {items.filter((i) => i.kind === 'add' || i.kind === 'untag').map((it) => (
-        <button key={it.key} type="button" data-testid={`${testIdPrefix}-${it.kind}`} style={{ ...rowStyle(it), color: 'var(--ink-3)', fontSize: 10 }} onMouseEnter={() => setActive(idx(it))} onClick={() => choose(it)}>
+        <button key={it.key} type="button" data-testid={`${testIdPrefix}-${it.kind}`} style={{ ...rowStyle(it), color: 'var(--ink-3)', fontSize: 11 }} onMouseEnter={() => setActive(idx(it))} onClick={() => choose(it)}>
           {it.label}
         </button>
       ))}

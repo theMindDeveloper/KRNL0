@@ -109,6 +109,11 @@ export interface Board {
   // Easy / Advanced (docs/06-requirements/easy-mode.md). UI only — Easy hides
   // the links between features; data is identical. Absent = advanced.
   uiMode?: 'easy' | 'advanced';
+  // Align to grid: what you drop on the canvas settles on an invisible 80 px
+  // grid, never on top of something (Canvas/alignGrid.ts). Absent = off.
+  // 'cards' = plan, habit and event cards; 'all' = also notes, shapes,
+  // images and frames.
+  alignGrid?: 'cards' | 'all';
   // ADR 0008 § 2.1 / § 4.1: layout mode, required (migration sets to 'canvas' for legacy)
   layoutMode: LayoutMode;
   // ADR 0008 § 4.1: station geometry; absent until user resizes panels

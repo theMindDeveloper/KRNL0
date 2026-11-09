@@ -8,6 +8,7 @@ import type { RealitySegment } from '../../../store/pomoReality';
 import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskState, TaskKind } from '../TaskNode/types';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
+import { hasTimeOfDay, isRoutine, routineOccurrence, routineSpansOn } from '../HabitNode/types';
 import type { TagDef } from '../../../../shared/tags/classify';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { spanTone } from '../../../store/spanTags';
@@ -43,6 +44,8 @@ export interface TaskEntry {
   source: 'task' | 'habit';
   /** No duration set — the arc fades out toward its end. */
   timeOpen?: boolean;
+  /** Decision 39 — a routine: drawn as an outline, never ticked. */
+  routine?: boolean;
 }
 
 export interface TaskInfo {
@@ -58,7 +61,10 @@ export interface ScheduledHabit {
   id: string;
   name: string;
   color: string;
-  schedule: HabitSchedule;
+  schedule: HabitSchedule & { timeOfDay: string };
+  /** Decision 39 — a routine: drawn as an outline, never ticked; its own
+   *  record so skips, moves and its end apply. */
+  routine?: Habit;
 }
 
 export type DaySegment = RealitySegment & { startH: number; endH: number };
@@ -140,8 +146,9 @@ export function collectScheduledHabits(board: Pick<Board, 'nodes'> | null): Sche
     const hs = n.state as { habits?: Habit[] } | null;
     if (!hs?.habits) continue;
     for (const h of hs.habits) {
-      if (h.archived || !h.schedule) continue;
-      out.push({ id: h.id, name: h.name, color: h.color ?? 'acid', schedule: h.schedule });
+      // Untimed ("Any time") habits are not on the dial (Decision 39).
+      if (h.archived || !hasTimeOfDay(h)) continue;
+      out.push({ id: h.id, name: h.name, color: h.color ?? 'acid', schedule: h.schedule, ...(isRoutine(h) ? { routine: h } : {}) });
     }
   }
   return out;
@@ -193,13 +200,26 @@ export function planForDay(
   const dow = isoDowOf(ymd);
   for (const h of habits) {
     if (!habitOnDow(h.schedule, dow)) continue;
-    const [hhStr, mmStr] = h.schedule.timeOfDay.split(':');
-    const hh = Number.parseInt(hhStr ?? '0', 10);
-    const mm = Number.parseInt(mmStr ?? '0', 10);
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
-    const durMin = h.schedule.durationMin && h.schedule.durationMin > 0 ? h.schedule.durationMin : 30;
-    const startH = hh + mm / 60;
-    const endH = startH + durMin / 60;
+    let startH: number;
+    let endH: number;
+    let durMin: number;
+    if (h.routine) {
+      // A routine's own occurrence: its days, end, and a skip or move for this date.
+      // (The after-midnight part of last night's is added below.)
+      const occ = routineOccurrence(h.routine, ymd);
+      if (!occ || occ.skipped) continue;
+      startH = occ.startMin / 60;
+      endH = occ.endMin / 60;
+      durMin = occ.endMin - occ.startMin;
+    } else {
+      const [hhStr, mmStr] = h.schedule.timeOfDay.split(':');
+      const hh = Number.parseInt(hhStr ?? '0', 10);
+      const mm = Number.parseInt(mmStr ?? '0', 10);
+      if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
+      durMin = h.schedule.durationMin && h.schedule.durationMin > 0 ? h.schedule.durationMin : 30;
+      startH = hh + mm / 60;
+      endH = startH + durMin / 60;
+    }
     if (endH <= winLo || startH >= winHi) continue;
     out.push({
       id: `habit-${h.id}`,
@@ -214,7 +234,34 @@ export function planForDay(
       parallelGroupId: null,
       parallelBranchIndex: null,
       source: 'habit',
+      ...(h.routine ? { routine: true } : {}),
     });
+  }
+
+  // A routine that ran past midnight last night (a night shift): its rest, from 00:00.
+  for (const h of habits) {
+    if (!h.routine) continue;
+    for (const sp of routineSpansOn(h.routine, ymd)) {
+      if (!sp.spill || sp.skipped) continue;
+      const startH = 0;
+      const endH = sp.endMin / 60;
+      if (endH <= winLo || startH >= winHi) continue;
+      out.push({
+        id: `habit-${h.id}-spill`,
+        start: Math.max(startH, winLo),
+        end: Math.min(endH, winHi),
+        realStart: startH,
+        realEnd: endH,
+        name: h.name,
+        colorVar: `var(--${h.color})`,
+        plannedMin: sp.endMin,
+        breakdown: null,
+        parallelGroupId: null,
+        parallelBranchIndex: null,
+        source: 'habit',
+        routine: true,
+      });
+    }
   }
 
   out.sort((a, b) => a.start - b.start);

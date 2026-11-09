@@ -16,6 +16,8 @@ interface Props {
   onEnter?: (value: string) => void;
   /** Escape in the field (when its picker is closed). */
   onEscape?: () => void;
+  /** Shown while the field is empty (e.g. a time still to be chosen). */
+  placeholder?: string;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -40,7 +42,7 @@ export function parseTime(raw: string): string | null {
   return `${pad(h)}:${pad(min)}`;
 }
 
-export function TimeField({ value, onChange, testId, minuteStep = 5, style, onEnter, onEscape }: Props) {
+export function TimeField({ value, onChange, testId, minuteStep = 5, style, onEnter, onEscape, placeholder }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -69,6 +71,7 @@ export function TimeField({ value, onChange, testId, minuteStep = 5, style, onEn
         data-testid={testId}
         type="text"
         inputMode="numeric"
+        placeholder={placeholder}
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
@@ -114,7 +117,7 @@ function Column({ label, items, selected, onPick }: { label: string; items: numb
   }, []);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 54 }}>
-      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-4)', padding: '4px 6px 4px', textAlign: 'center' }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', padding: '4px 6px 4px', textAlign: 'center' }}>{label}</span>
       <div ref={list} style={{ maxHeight: 216, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1, position: 'relative', scrollbarWidth: 'thin' }}>
         {items.map((n) => {
           const on = n === selected;

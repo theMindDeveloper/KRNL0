@@ -370,7 +370,7 @@ describe('WeekView — drop to schedule', () => {
 });
 
 describe('WeekView — empty state hint', () => {
-  it('shows empty-state hint when no tasks are scheduled this week', () => {
+  it('an empty week shows no overlay, and the ANY TIME strip is always there (Decision 40)', () => {
     setEmptyBoard();
     render(
       <WeekView
@@ -379,7 +379,8 @@ describe('WeekView — empty state hint', () => {
         onCommand={noop}
       />,
     );
-    expect(screen.getByTestId('week-empty-hint')).toBeTruthy();
+    expect(screen.queryByTestId('week-empty-hint')).toBeNull();
+    expect(screen.getByTestId('calendar-day-only-row')).toBeTruthy();
   });
 
   it('hides empty-state hint when at least one task is scheduled in the week', () => {
@@ -435,7 +436,8 @@ describe('WeekView — early-morning task (PR #122 24h grid)', () => {
     expect(block?.textContent ?? '').not.toContain('↑');
     // Row height is 28px and the task starts at hour 3 → top = 3 * 28 = 84px.
     const style = (block as HTMLElement)?.style;
-    expect(style?.top).toBe('84px');
+    // + half the 3px gap kept between stacked blocks.
+    expect(style?.top).toBe('85.5px');
   });
 });
 

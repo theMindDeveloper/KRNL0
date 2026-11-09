@@ -14,9 +14,12 @@ import type { TimerFaceProps } from './types';
 /** Bars per scale: one per minute, kept between 5 and 60. */
 const barsFor = (total: number) => Math.max(5, Math.min(60, Math.round(total)));
 
-export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
+export function Blocks({ m, s, elapsedPct, total = 25, running }: TimerFaceProps) {
   const TOTAL_BARS = barsFor(total);
   const minsElapsed = Math.floor((elapsedPct / 100) * TOTAL_BARS);
+  // Not started yet: no minute is "now" (a lit first bar and "min 1 / 25"
+  // read as already running to a new user). Paused keeps its progress.
+  const idle = !running && elapsedPct <= 0;
 
   return (
     <div
@@ -52,7 +55,7 @@ export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
       >
         {Array.from({ length: TOTAL_BARS }, (_, i) => {
           const isPast = i < minsElapsed;
-          const isNow = i === minsElapsed;
+          const isNow = !idle && i === minsElapsed;
 
           let barStyle: React.CSSProperties;
           if (isPast) {
@@ -69,7 +72,8 @@ export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
               background: 'var(--acid)',
               borderRadius: 1,
               height: '100%',
-              boxShadow: '0 0 10px var(--acid)',
+              // The blink marks "now"; a crisp edge instead of a blurred glow.
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--acid-ink, var(--acid)) 55%, transparent)',
               animation: 'pomo-blink 1.4s ease infinite',
               transition: 'background 0.2s, height 0.4s ease',
             };
@@ -128,13 +132,13 @@ export function Blocks({ m, s, elapsedPct, total = 25 }: TimerFaceProps) {
           className="label"
           style={{
             marginLeft: 'auto',
-            fontSize: 9.5,
+            fontSize: 'var(--face-label, 11px)',
             color: 'var(--ink-3)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
           }}
         >
-          min {minsElapsed + 1} / {TOTAL_BARS}
+          {idle ? `${TOTAL_BARS} min session` : `min ${minsElapsed + 1} / ${TOTAL_BARS}`}
         </span>
       </div>
     </div>

@@ -12,7 +12,9 @@ export interface StackedAreaProps {
   height?: number;
 }
 
-export function StackedArea({ data, width = 480, height = 140 }: StackedAreaProps) {
+export function StackedArea({ data, width = 480, height: totalH = 140 }: StackedAreaProps) {
+  // The legend row above the chart takes ~18 px of the given height.
+  const height = Math.max(70, totalH - 18);
   const pad = { left: 26, right: 8, top: 10, bottom: 22 };
   const innerW = Math.max(40, width - pad.left - pad.right);
   const innerH = Math.max(40, height - pad.top - pad.bottom);
@@ -20,7 +22,7 @@ export function StackedArea({ data, width = 480, height = 140 }: StackedAreaProp
   if (data.length === 0) {
     return (
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <text x={width / 2} y={height / 2} fontSize={10} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
+        <text x={width / 2} y={height / 2} fontSize={11} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
           no data
         </text>
       </svg>
@@ -75,6 +77,16 @@ export function StackedArea({ data, width = 480, height = 140 }: StackedAreaProp
   };
 
   return (
+    <div style={{ width }}>
+    {/* Legend — HTML so it wraps at any width (at the 11 px floor the labels
+        no longer fit fixed 64 px steps inside the chart). */}
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '2px 12px', paddingBottom: 4, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--k-an-ink-2, #c8cdd3)' }}>
+      {seriesDefs.map((sd) => (
+        <span key={sd.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+          <span aria-hidden style={{ width: 8, height: 8, borderRadius: 1, background: sd.color, opacity: 0.8, flexShrink: 0 }} />{sd.label}
+        </span>
+      ))}
+    </div>
     <svg
       data-testid="analytics-stacked-area"
       width={width}
@@ -101,34 +113,24 @@ export function StackedArea({ data, width = 480, height = 140 }: StackedAreaProp
       {/* x-axis tick labels */}
       {data.length > 0 && (
         <>
-          <text x={pad.left} y={height - 6} fontSize={8} textAnchor="start" fill={COLOR_LABEL} fontFamily="var(--font-mono)">
+          <text x={pad.left} y={height - 6} fontSize={11} textAnchor="start" fill={COLOR_LABEL} fontFamily="var(--font-mono)">
             {dateLabel(0)}
           </text>
-          <text x={pad.left + innerW / 2} y={height - 6} fontSize={8} textAnchor="middle" fill={COLOR_LABEL} fontFamily="var(--font-mono)">
+          <text x={pad.left + innerW / 2} y={height - 6} fontSize={11} textAnchor="middle" fill={COLOR_LABEL} fontFamily="var(--font-mono)">
             {dateLabel(Math.floor(data.length / 2))}
           </text>
-          <text x={pad.left + innerW} y={height - 6} fontSize={8} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">
+          <text x={pad.left + innerW} y={height - 6} fontSize={11} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">
             {dateLabel(data.length - 1)}
           </text>
         </>
       )}
 
       {/* y-axis peak label */}
-      <text x={pad.left - 3} y={pad.top + 6} fontSize={8} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">
+      <text x={pad.left - 3} y={pad.top + 6} fontSize={11} textAnchor="end" fill={COLOR_LABEL} fontFamily="var(--font-mono)">
         {Math.round(stackMax)}
       </text>
 
-      {/* legend strip — top-right */}
-      <g transform={`translate(${pad.left + innerW - 8}, ${pad.top + 2})`}>
-        {seriesDefs.map((sd, i) => (
-          <g key={sd.key} transform={`translate(${-i * 64}, 0)`}>
-            <rect x={-58} y={0} width={6} height={6} fill={sd.color} fillOpacity={0.8} />
-            <text x={-48} y={6} fontSize={8} fill="var(--k-an-ink-2, #c8cdd3)" fontFamily="var(--font-mono)" textAnchor="start">
-              {sd.label}
-            </text>
-          </g>
-        ))}
-      </g>
     </svg>
+    </div>
   );
 }

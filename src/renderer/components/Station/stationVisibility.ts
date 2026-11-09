@@ -10,8 +10,15 @@ import type { Node } from '../../../shared/types/node';
 // Terminal mother is default-hidden across every dock variant — users opt in
 // via the StationToolbar toggle. Other mothers (Analytics included) stay
 // default-visible.
+// easy-mode D23 — Easy never shows the Terminal (set from store/uiMode.ts).
+let easy = false;
+export function setStationEasy(on: boolean): void {
+  easy = on;
+}
+
 export function isStationHidden(node: Node | undefined): boolean {
   if (!node) return true; // missing == hidden
+  if (easy && node.kind === 'term') return true;
   const cfg = (node.config ?? {}) as MotherNodeConfig;
   if (cfg.stationHidden !== undefined) return !!cfg.stationHidden;
   if (node.kind === 'term') return true;

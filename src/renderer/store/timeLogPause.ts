@@ -18,6 +18,15 @@ export function withoutTimeLog<T>(fn: () => T): T {
   }
 }
 
+// A guided tour with practice steps: what the user makes during it is
+// practice, so it is not logged while the tour runs. At the end it is either
+// removed (nothing to log) or kept and logged in one go (store/tourPractice.ts).
+let practice = false;
+
+export function setPracticePause(on: boolean): void {
+  practice = on;
+}
+
 export function isTimeLogPaused(): boolean {
-  return depth > 0;
+  return depth > 0 || practice;
 }

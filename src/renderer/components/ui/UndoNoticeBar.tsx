@@ -11,7 +11,8 @@ const SHOW_MS = 6000;
 export function UndoNoticeBar() {
   const notice = useUndoNotice((s) => s.notice);
   const board = useBoardStore((s) => s.board);
-  const stale = notice !== null && board !== notice.after;
+  // A revert notice runs its own reverse step, which is safe on any board.
+  const stale = notice !== null && !notice.revert && board !== notice.after;
 
   useEffect(() => {
     if (!notice) return;
@@ -43,7 +44,7 @@ export function UndoNoticeBar() {
           flexShrink: 0, height: 24, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
           border: '1px solid var(--btn-primary-ring)',
           background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)',
-          fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.08em',
+          fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
         }}
       >
         UNDO

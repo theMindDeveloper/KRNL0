@@ -296,7 +296,7 @@ export function SynthesizerChrome() {
                 className="indicator"
                 style={{
                   transform: `translateX(-50%) rotate(${indicatorAngle(k.idx, k.total)}deg)`,
-                  transition: 'transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  transition: 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
               />
               <span className="label">{k.label}</span>

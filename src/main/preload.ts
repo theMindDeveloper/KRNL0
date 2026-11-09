@@ -74,6 +74,17 @@ contextBridge.exposeInMainWorld('krnl', {
   sysRun: (argv: string[]): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('sys:run', argv),
   clipboardWriteText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:writeText', text),
 
+  // Decision 41 — the orb asks Claude Code; the answer streams back as events.
+  assistantAsk: (id: string, prompt: string, resume?: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('assistant:ask', id, prompt, resume),
+  assistantCancel: (id: string): Promise<void> => ipcRenderer.invoke('assistant:cancel', id),
+  assistantStatus: (): Promise<string> => ipcRenderer.invoke('assistant:status'),
+  onAssistantEvent: (callback: (id: string, event: unknown) => void) => {
+    const listener = (_e: unknown, id: string, event: unknown) => callback(id, event)
+    ipcRenderer.on('assistant:event', listener)
+    return () => { ipcRenderer.removeListener('assistant:event', listener) }
+  },
+
   // Decision 35 — durable time log (renderer/store/timeLog.ts wraps these).
   timelogAppend: (entries: unknown[]): Promise<{ ok: boolean; written: number }> =>
     ipcRenderer.invoke('timelog:append', entries),
@@ -91,4 +102,42 @@ contextBridge.exposeInMainWorld('krnl', {
     ipcRenderer.on('update:state', listener)
     return () => { ipcRenderer.removeListener('update:state', listener) }
   },
+
+  // Decision 37 — pocket timer. Main window side: send the Pomo snapshot, run
+  // the pocket's buttons. Pocket side: read the snapshot, send a button.
+  pocketSendState: (snapshot: unknown) => ipcRenderer.send('pocket:state', snapshot),
+  onPocketRun: (callback: (command: string, args?: unknown) => void) => {
+    const listener = (_event: unknown, command: string, args?: unknown) => callback(command, args)
+    ipcRenderer.on('pocket:run', listener)
+    return () => { ipcRenderer.removeListener('pocket:run', listener) }
+  },
+  pocketGet: (): Promise<unknown> => ipcRenderer.invoke('pocket:get'),
+  onPocketSnapshot: (callback: (snapshot: unknown) => void) => {
+    const listener = (_event: unknown, snapshot: unknown) => callback(snapshot)
+    ipcRenderer.on('pocket:snapshot', listener)
+    return () => { ipcRenderer.removeListener('pocket:snapshot', listener) }
+  },
+  onPocketPrefs: (callback: (prefs: unknown) => void) => {
+    const listener = (_event: unknown, prefs: unknown) => callback(prefs)
+    ipcRenderer.on('pocket:prefs', listener)
+    return () => { ipcRenderer.removeListener('pocket:prefs', listener) }
+  },
+  pocketCommand: (command: string, args?: unknown): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:command', command, args),
+  pocketOpenMain: () => ipcRenderer.send('pocket:open'),
+  pocketCollapse: (collapsed: boolean) => ipcRenderer.send('pocket:collapse', collapsed),
+  pocketResize: (size: { width: number; height: number }) => ipcRenderer.send('pocket:resize', size),
+  onPocketHover: (callback: (over: boolean) => void) => {
+    const listener = (_event: unknown, over: boolean) => callback(over)
+    ipcRenderer.on('pocket:hover', listener)
+    return () => { ipcRenderer.removeListener('pocket:hover', listener) }
+  },
+  pocketLookSet: (look: string): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:look:set', look),
+  pocketSettingsGet: (): Promise<unknown> => ipcRenderer.invoke('pocket:settings:get'),
+  pocketSettingsSet: (on: boolean): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('pocket:settings:set', on),
+
+  // Decision 38 — launch experience: version, backup, time away, app prefs.
+  appLaunch: (): Promise<unknown> => ipcRenderer.invoke('app:launch'),
+  appPrefsSet: (patch: unknown): Promise<unknown> => ipcRenderer.invoke('app:prefs:set', patch),
+  appBackupsOpen: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('app:backups:open'),
+  appOpenExternal: (url: string): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('app:open-external', url),
 })

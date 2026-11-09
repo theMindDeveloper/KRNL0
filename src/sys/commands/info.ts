@@ -126,6 +126,31 @@ export function settingsMode(
 }
 
 /**
+ * `krnl settings grid [off|cards|all]` — show or set Align to grid: things
+ * moved on the canvas settle on an invisible grid, never on top of each other
+ * (Settings → General → Canvas). `cards` = plan, habit and event cards only;
+ * `all` = also notes, shapes, images and frames; `on` means `cards`.
+ * Turning it on tidies the canvas once.
+ */
+export function settingsGrid(
+  ctx: { boardPath: string; onBoardChanged?: () => void },
+  value: string | undefined,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { alignGrid?: unknown }) | null;
+  if (!raw) return { ok: false, message: 'No board found' };
+  const current = raw.alignGrid === 'all' ? 'all' : raw.alignGrid === 'cards' || raw.alignGrid === true ? 'cards' : 'off';
+  if (value === undefined) return { ok: true, message: `grid: ${current}`, data: { grid: current } };
+  const asked = value.toLowerCase();
+  const v = asked === 'on' ? 'cards' : asked;
+  if (v !== 'off' && v !== 'cards' && v !== 'all') return { ok: false, message: `settings grid: expected off, cards or all, got "${value}"` };
+  const { alignGrid: _old, ...rest } = raw;
+  void _old;
+  saveBoardTo(ctx.boardPath, { ...rest, ...(v === 'off' ? {} : { alignGrid: v }), savedAt: new Date().toISOString() });
+  ctx.onBoardChanged?.();
+  return { ok: true, message: `grid: ${v}${v === 'off' ? '' : v === 'cards' ? ' (plan, habit and event cards settle on the grid)' : ' (everything you move settles on the grid)'}`, data: { grid: v } };
+}
+
+/**
  * `krnl settings layout [station|canvas]` — show or set the layout (ADR 0008):
  * Station docks the windows beside the terminal, Canvas is the free board.
  * The top-bar pill and ⌘⇧L set the same board field.

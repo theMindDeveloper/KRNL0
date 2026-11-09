@@ -129,6 +129,10 @@ interface BoardStore {
   setLayoutMode: (mode: LayoutMode) => void;
   // Easy / Advanced UI mode — a preference, not undoable.
   setUiMode: (mode: 'easy' | 'advanced') => void;
+  /** Align to grid: off (null), cards only, or everything (a preference: no undo slot). */
+  setAlignGrid: (scope: 'cards' | 'all' | null) => void;
+  /** Move several nodes at once — one undo step (the grid tidy). */
+  moveNodes: (moves: ReadonlyArray<{ id: string; x: number; y: number }>) => void;
   setLayoutGeometry: (geom: Board['layoutGeometry']) => void;
   // Decision 33 — free-content canvases. add/rename/delete are undoable;
   // switching is navigation (no history). All persist via saveBoard.
@@ -464,6 +468,26 @@ export const useBoardStore = create<BoardStore>((set) => ({
       return { board: updated };
     });
   },
+
+  setAlignGrid: (scope) => {
+    set((s) => {
+      if (!s.board) return s;
+      const { alignGrid: _old, ...rest } = s.board;
+      void _old;
+      const updated: Board = scope ? { ...rest, alignGrid: scope } : rest;
+      void saveBoard(updated);
+      return { board: updated };
+    });
+  },
+
+  moveNodes: (moves) =>
+    set((s) => {
+      if (!s.board || moves.length === 0) return s;
+      const by = new Map(moves.map((m) => [m.id, m]));
+      const board = { ...s.board, nodes: s.board.nodes.map((n) => { const m = by.get(n.id); return m ? { ...n, position: { x: m.x, y: m.y } } : n; }) };
+      void saveBoard(board);
+      return { ...pushHistory(s), board };
+    }),
 
   setUiMode: (mode) => {
     set((s) => {

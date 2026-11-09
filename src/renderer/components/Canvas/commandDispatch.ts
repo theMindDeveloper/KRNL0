@@ -25,8 +25,11 @@
  * per-task session checkpoint, extended task.toggle and task.delete cascades.
  */
 
+import { detachIfPushed } from '../../store/chainSchedule';
 import { useBoardStore, pushHistory } from '../../store/boardStore';
 import { emit, saveBoard } from '../../store/eventLog';
+import { commandCanSound, momentFromChange, soundSnapshot } from '../../sfx/soundMoments';
+import { uiSounds } from '../../sfx/uiSounds';
 
 /** Dispatch `krnl:ensure-visible` so CanvasFlow can pan the camera if the
  *  spawned rect sits outside the current viewport. No-op outside a browser
@@ -101,6 +104,10 @@ import {
   todoClearArchived,
   todoReclassify,
   todoBuckets,
+  todoSetDue,
+  todoSetOnDay,
+  todoDrop,
+  todoUndrop,
 } from '../nodes/TodoNode/commands';
 import type { TodoState } from '../nodes/TodoNode/types';
 
@@ -116,6 +123,7 @@ import {
   taskClearCurrentSessionElapsedSec,
   taskSetDuration,
   taskSetSchedule,
+  taskSetRemind,
 } from '../nodes/TaskNode/commands';
 import type { TaskState } from '../nodes/TaskNode/types';
 
@@ -126,12 +134,24 @@ import {
   habitMarkDone,
   habitRemove,
   habitArchive,
+  habitUnarchive,
+  habitSetTarget,
+  habitSetRest,
+  habitSetRemind,
+  habitSetCount,
+  habitSetAmount,
   habitRename,
   habitSetColor,
   habitSetIcon,
   habitSetNote,
   habitSetView,
   habitSetSchedule,
+  habitSetKind,
+  routineSkip,
+  routineUnskip,
+  routineMove,
+  routineEnd,
+  routineRestart,
 } from '../nodes/HabitNode/commands';
 import type { HabitState } from '../nodes/HabitNode/types';
 import type { HabitSchedule } from '../nodes/HabitNode/types';
@@ -142,7 +162,7 @@ import {
   calendarSetView,
   calendarSelectDate,
   calendarSetAnchor,
-  calendarSetZoom,
+  calendarSetZoom, calendarSetLayers,
 } from '../nodes/CalendarNode/commands';
 import type { CalendarConfig, CalendarState } from '../nodes/CalendarNode/types';
 
@@ -370,6 +390,10 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'todo.edit':           return { state: todoEdit(s as never, args as never) };
         case 'todo.remove':         return { state: todoRemove(s as never, args as never) };
         case 'todo.clearDone':      return { state: todoClearDone(s as never) };
+        case 'todo.setDue':         return { state: todoSetDue(s as never, args as never) };
+        case 'todo.setOnDay':       return { state: todoSetOnDay(s as never, args as never) };
+        case 'todo.drop':           return { state: todoDrop(s as never, args as never) };
+        case 'todo.undrop':         return { state: todoUndrop(s as never, args as never) };
         // ADR 0016 — tags + Done/Archive lifecycle.
         case 'todo.setItemTag':     return { state: todoSetItemTag(s as never, args as never) };
         case 'todo.addTag':         return { state: todoAddTag(s as never, args as never) };
@@ -398,6 +422,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'task.setDuration':       return { state: taskSetDuration(s as never, args as never) };
         // ADR 0001 — calendar integration: set/clear schedule on a task.
         case 'task.setSchedule':       return { state: taskSetSchedule(s as never, args as never) };
+        case 'task.setRemind':         return { state: taskSetRemind(s as never, args as never) };
       }
       break;
     }
@@ -408,6 +433,12 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.markDone':    return { state: habitMarkDone(s as never, args as never) };
         case 'habit.remove':      return { state: habitRemove(s as never, args as never) };
         case 'habit.archive':     return { state: habitArchive(s as never, args as never) };
+        case 'habit.unarchive':   return { state: habitUnarchive(s as never, args as never) };
+        case 'habit.setTarget':   return { state: habitSetTarget(s as never, args as never) };
+        case 'habit.setRest':     return { state: habitSetRest(s as never, args as never) };
+        case 'habit.setRemind':   return { state: habitSetRemind(s as never, args as never) };
+        case 'habit.setCount':    return { state: habitSetCount(s as never, args as never) };
+        case 'habit.setAmount':   return { state: habitSetAmount(s as never, args as never) };
         case 'habit.rename':      return { state: habitRename(s as never, args as never) };
         case 'habit.setColor':    return { state: habitSetColor(s as never, args as never) };
         case 'habit.setIcon':     return { state: habitSetIcon(s as never, args as never) };
@@ -415,6 +446,13 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'habit.setView':     return { config: habitSetView(c as never, args as never) };
         // ADR 0002 §5 — set/clear schedule on a habit.
         case 'habit.setSchedule': return { state: habitSetSchedule(s as never, args as never) };
+        // Decision 39 — routines.
+        case 'habit.setKind':     return { state: habitSetKind(s as never, args as never) };
+        case 'routine.skip':      return { state: routineSkip(s as never, args as never) };
+        case 'routine.unskip':    return { state: routineUnskip(s as never, args as never) };
+        case 'routine.move':      return { state: routineMove(s as never, args as never) };
+        case 'routine.end':       return { state: routineEnd(s as never, args as never) };
+        case 'routine.restart':   return { state: routineRestart(s as never, args as never) };
       }
       break;
     }
@@ -431,6 +469,8 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
           return { state: calendarSetAnchor(calState, args as never) };
         case 'calendar.setZoom':
           return { state: calendarSetZoom(calState, args as never) };
+        case 'calendar.setLayers':
+          return { state: calendarSetLayers(calState, args) };
         // calendar.schedule: cross-node router (handled in makeCommandHandler).
         // applyCommand returns null here so the router path intercepts it and
         // dispatches task.setSchedule to the target task node.
@@ -774,7 +814,14 @@ function stopPomoOnFinishedTask(taskId: string): void {
 export function makeCommandHandler(nodeId: string) {
   return (command: string, args: Args = {}): void => {
     try {
+      // UI sounds (docs/06-requirements/ui-sounds.md F3): compare the board
+      // before and after, and play the moment that actually happened.
+      const before = commandCanSound(command) ? soundSnapshot(useBoardStore.getState().board) : null;
       _dispatch(nodeId, command, args);
+      if (before) {
+        const moment = momentFromChange(before, soundSnapshot(useBoardStore.getState().board));
+        if (moment) uiSounds.play(moment);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       emit('sys.error', `dispatch '${command}' on ${shortId(nodeId)} failed: ${msg}`, {
@@ -1118,25 +1165,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       // src/sys/layout.ts. Previously this was motherY + 540 which collided
       // with task chains spawning at motherY + 580 — habit lanes and tasks
       // fought for the same horizontal strip (user report 2026-05-17).
-      const laneCount = board.nodes.filter((n) => n.kind === 'habit.lane').length;
-      const HABIT_LANE_OFFSET_Y = 1300; // mirror of src/sys/layout.ts constant
-      const position = {
-        x: node.position.x + (laneCount % 3) * 300,
-        y: node.position.y + HABIT_LANE_OFFSET_Y + Math.floor(laneCount / 3) * 160,
-      };
-      const lane: Node = {
-        id: `habit-lane-${crypto.randomUUID()}`,
-        kind: 'habit.lane',
-        position,
-        isMother: false,
-        state: { habitId },
-        config: { days: 28 },
-      };
-      const { addNode } = useBoardStore.getState();
-      addNode(lane);
-      const updated = useBoardStore.getState().board;
-      if (updated) void saveBoard(updated);
-      emit('node.added', `habit.lane spawned for habit ${habitId.slice(0, 8)}`, { refId: lane.id });
+      spawnHabitCard(board, node, habitId);
       return;
     }
 
@@ -1183,6 +1212,15 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         case 'habit.markDone': {
           mutateMotherHabit(mother.id, (s) => habitMarkDone(s, { id: habitId }));
           emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, { refId: habitId });
+          break;
+        }
+        // Repeating event: skip (or bring back) one date, from its board card.
+        case 'habit.lane.skip':
+        case 'habit.lane.unskip': {
+          const date = args['date'];
+          if (typeof date !== 'string') return;
+          const fn = command === 'habit.lane.skip' ? routineSkip : routineUnskip;
+          mutateMotherHabit(mother.id, (s) => fn(s as never, { id: habitId, date }) as never);
           break;
         }
         case 'habit.lane.rename': {
@@ -1312,6 +1350,17 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           enabled: true,
         }));
         useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges } } : s));
+      }
+
+      // Put somewhere its chain would push it away from (before the task
+      // before it ends, or another day): it leaves the chain and lands where
+      // it was put; the tasks after it still follow it.
+      if (!withTask) {
+        const b0 = useBoardStore.getState().board;
+        if (b0) {
+          const edges = detachIfPushed(b0, taskId, scheduleArgs.scheduledFor);
+          if (edges !== b0.edges) useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges } } : s));
+        }
       }
 
       const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
@@ -1738,6 +1787,10 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       emit('habit.checkin', `habit ${habitId.slice(0, 8)} marked done`, habitId ? { refId: habitId } : {});
     } else if (command === 'habit.add' && node.kind === 'habit') {
       emit('habit.created', `habit added on ${shortId(nodeId)}`);
+    } else if (command === 'habit.archive' && node.kind === 'habit') {
+      // An archived habit is not tracked: its lane goes too (as the CLI does).
+      const habitId = typeof args['id'] === 'string' ? args['id'] : '';
+      if (habitId) removeAllLanesForHabit(habitId);
     } else if (command === 'habit.remove' && node.kind === 'habit') {
       const habitId = typeof args['id'] === 'string' ? args['id'] : '';
       emit('habit.deleted', `habit ${habitId.slice(0, 8)} removed`, { severity: 'warn' });
@@ -1754,9 +1807,50 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     if (result.config !== undefined) patch.config = result.config;
     if (Object.keys(patch).length > 0) updateNode(nodeId, patch);
 
+    // Decision 42 — a new habit or repeating event gets its board card.
+    if (command === 'habit.add' && node.kind === 'habit') {
+      const before = new Set(((node.state as HabitState | null)?.habits ?? []).map((h) => h.id));
+      const after = useBoardStore.getState().board;
+      const mother = after?.nodes.find((n) => n.id === nodeId);
+      const added = ((mother?.state as HabitState | null)?.habits ?? []).filter((h) => !before.has(h.id) && !h.archived);
+      if (after && mother) for (const h of added) spawnHabitCard(after, mother, h.id);
+    }
+
     const updatedBoard = useBoardStore.getState().board;
     if (updatedBoard) void saveBoard(updatedBoard);
   };
+}
+
+/**
+ * Decision 42 — put a habit's (or repeating event's) card on the board, in
+ * the habit cards' own band below the Habits window, three to a row. Never two
+ * cards for one habit. Returns the card's id.
+ */
+export function spawnHabitCard(board: { nodes: Node[] }, habitMother: Node, habitId: string): string {
+  const existing = board.nodes.find(
+    (n) => n.kind === 'habit.lane' && (n.state as HabitLaneState | null)?.habitId === habitId,
+  );
+  if (existing) return existing.id;
+  // Their own Y band, below the task chains (HABIT_LANE_OFFSET_Y, src/sys/layout.ts).
+  const laneCount = board.nodes.filter((n) => n.kind === 'habit.lane').length;
+  const HABIT_LANE_OFFSET_Y = 1300;
+  const position = {
+    x: habitMother.position.x + (laneCount % 3) * 250,
+    y: habitMother.position.y + HABIT_LANE_OFFSET_Y + Math.floor(laneCount / 3) * 150,
+  };
+  const lane: Node = {
+    id: `habit-lane-${crypto.randomUUID()}`,
+    kind: 'habit.lane',
+    position,
+    isMother: false,
+    state: { habitId },
+    config: { days: 28 },
+  };
+  useBoardStore.getState().addNode(lane);
+  const updated = useBoardStore.getState().board;
+  if (updated) void saveBoard(updated);
+  emit('node.added', `habit card for ${habitId.slice(0, 8)}`, { refId: lane.id });
+  return lane.id;
 }
 
 /**

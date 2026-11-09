@@ -3,7 +3,7 @@
 // calendar.schedule is a cross-node router handled in commandDispatch.ts.
 
 import type { CalendarConfig, CalendarState, CalendarView } from './types';
-import { CAL_ZOOM_MIN, CAL_ZOOM_MAX } from './types';
+import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, calendarLayersOf } from './types';
 
 // calendar.setView — mutates config.view.
 export const calendarSetView = (
@@ -32,6 +32,21 @@ export const calendarSetZoom = (
   if (typeof args.zoom !== 'number' || !Number.isFinite(args.zoom)) return state;
   const zoom = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, args.zoom));
   return { ...state, zoom };
+};
+
+// calendar.setLayers — show or hide the recorded rail / habit pills.
+// Only booleans are taken; anything else keeps the current value.
+export const calendarSetLayers = (
+  state: CalendarState,
+  args: { recorded?: unknown; habits?: unknown; routines?: unknown },
+): CalendarState => {
+  const cur = calendarLayersOf(state);
+  const next = {
+    recorded: typeof args.recorded === 'boolean' ? args.recorded : cur.recorded,
+    habits: typeof args.habits === 'boolean' ? args.habits : cur.habits,
+    routines: typeof args.routines === 'boolean' ? args.routines : cur.routines,
+  };
+  return { ...state, layers: next };
 };
 
 // calendar.setAnchor — mutates state.anchorDate.

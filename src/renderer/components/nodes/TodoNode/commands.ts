@@ -89,6 +89,46 @@ export const todoRemove = (
 });
 
 // todo.clearDone — remove all completed items.
+// todo.setDue — the day it must be done by (YYYY-MM-DD), or null to clear.
+export const todoSetDue = (
+  state: TodoState,
+  args: { id: string; dueOn: string | null },
+): TodoState => {
+  if (args.dueOn !== null && !/^\d{4}-\d{2}-\d{2}$/.test(args.dueOn)) return state;
+  return {
+    ...state,
+    items: state.items.map((item) => {
+      if (item.id !== args.id) return item;
+      if (args.dueOn === null) { const { dueOn: _drop, ...rest } = item; return rest; }
+      return { ...item, dueOn: args.dueOn };
+    }),
+  };
+};
+
+// todo.drop — "not doing this any more" (review 6.1). Only open items drop.
+export const todoDrop = (state: TodoState, args: { id: string }, env: TodoEnv = defaultEnv): TodoState => {
+  const stamp = env.now();
+  let changed = false;
+  const items = state.items.map((item) => {
+    if (item.id !== args.id || item.done || item.droppedAt !== undefined) return item;
+    changed = true;
+    return { ...item, droppedAt: stamp };
+  });
+  return changed ? { ...state, items } : state;
+};
+
+// todo.undrop — back on the open list.
+export const todoUndrop = (state: TodoState, args: { id: string }): TodoState => {
+  let changed = false;
+  const items = state.items.map((item) => {
+    if (item.id !== args.id || item.droppedAt === undefined) return item;
+    changed = true;
+    const { droppedAt: _drop, ...rest } = item;
+    return rest;
+  });
+  return changed ? { ...state, items } : state;
+};
+
 export const todoClearDone = (state: TodoState): TodoState => ({
   ...state,
   items: state.items.filter((item) => !item.done),
@@ -120,9 +160,27 @@ export const todoSetItemSchedule = (
       void _sf;
       return rest;
     }
-    return { ...item, scheduledFor: args.scheduledFor };
+    // Decision 40 — a time on the Calendar is its When: no any-time day too.
+    const { onDay: _od, ...timed } = item;
+    void _od;
+    return { ...timed, scheduledFor: args.scheduledFor };
   }),
 });
+
+// todo.setOnDay — Decision 40: the plan's When as a day with no time (the
+// Calendar's ANY TIME strip), or null for no day. The caller takes it off the
+// grid first when it had a time.
+export const todoSetOnDay = (state: TodoState, args: { id: string; onDay: string | null }): TodoState => {
+  if (args.onDay !== null && !/^\d{4}-\d{2}-\d{2}$/.test(args.onDay)) return state;
+  return {
+    ...state,
+    items: state.items.map((item) => {
+      if (item.id !== args.id) return item;
+      if (args.onDay === null) { const { onDay: _o, ...rest } = item; void _o; return rest; }
+      return { ...item, onDay: args.onDay };
+    }),
+  };
+};
 
 // ── ADR 0016 — tags ─────────────────────────────────────────────────────────
 
@@ -241,20 +299,22 @@ export interface TodoBuckets {
 }
 
 export const isArchived = (item: TodoItem, today: string): boolean =>
-  item.done &&
-  (item.archivedAt !== undefined ||
-    (item.completedAt !== null && isoToYMD(item.completedAt) < today));
+  item.droppedAt !== undefined ||
+  (item.done &&
+    (item.archivedAt !== undefined ||
+      (item.completedAt !== null && isoToYMD(item.completedAt) < today)));
 
 export const todoBuckets = (state: TodoState, nowMs: number = Date.now()): TodoBuckets => {
   const today = toYMD(new Date(nowMs));
   const out: TodoBuckets = { active: [], done: [], archived: [] };
   for (const item of state.items) {
-    if (!item.done) out.active.push(item);
+    if (item.droppedAt !== undefined) out.archived.push(item);
+    else if (!item.done) out.active.push(item);
     else if (isArchived(item, today)) out.archived.push(item);
     else out.done.push(item);
   }
   // Archive reads newest-first; the other two keep insertion order.
-  out.archived.sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+  out.archived.sort((a, b) => (b.completedAt ?? b.droppedAt ?? '').localeCompare(a.completedAt ?? a.droppedAt ?? ''));
   return out;
 };
 

@@ -77,4 +77,37 @@ describe('clock half / cal zoom', () => {
     expect(node('mother-calendar').state['zoom']).toBe(4);
     expect((await facade().run(['cal', 'zoom', '9'])).ok).toBe(false);
   });
+
+  it('cal layers shows and switches the recorded rail and habit pills', async () => {
+    seed();
+    const changed = vi.fn();
+    expect((await facade().run(['cal', 'layers'])).message).toBe('recorded on · habits on · routines on');
+    const off = await facade(changed).run(['cal', 'layers', 'habits', 'off']);
+    expect(off.ok).toBe(true);
+    expect(node('mother-calendar').state['layers']).toEqual({ recorded: true, habits: false, routines: true });
+    expect(changed).toHaveBeenCalled();
+    expect((await facade().run(['cal', 'layers', 'habits', 'maybe'])).ok).toBe(false);
+    expect((await facade().run(['cal', 'layers', 'pomo', 'on'])).ok).toBe(false);
+  });
+});
+
+describe('settings grid — Align to grid (align-grid.md F4)', () => {
+  const grid = () => (JSON.parse(readFileSync(boardPath, 'utf-8')) as { alignGrid?: string }).alignGrid;
+  it('is off by default', async () => {
+    expect((await facade().run(['settings', 'grid'])).message).toBe('grid: off');
+  });
+  it('cards only, everything, off — and tells the window', async () => {
+    const changed = vi.fn();
+    expect((await facade(changed).run(['settings', 'grid', 'on'])).ok).toBe(true);
+    expect(grid()).toBe('cards');
+    expect((await facade(changed).run(['settings', 'grid', 'all'])).ok).toBe(true);
+    expect(grid()).toBe('all');
+    expect((await facade(changed).run(['settings', 'grid', 'off'])).ok).toBe(true);
+    expect(grid()).toBeUndefined();
+    expect(changed).toHaveBeenCalledTimes(3);
+  });
+  it('rejects anything else and writes nothing', async () => {
+    expect((await facade().run(['settings', 'grid', 'maybe'])).ok).toBe(false);
+    expect(grid()).toBeUndefined();
+  });
 });

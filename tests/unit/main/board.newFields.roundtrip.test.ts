@@ -1,0 +1,81 @@
+/**
+ * Today's new fields are all optional and must survive a load through the
+ * real loader (migrations included) — an update must never drop a user's
+ * due dates, old repeats (still loaded), reminders, targets, amounts or rest days.
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { loadBoardFrom, seedBoard } from '../../../src/main/persistence/board';
+
+vi.mock('electron', () => ({
+  app: { getName: vi.fn(() => 'krnl0-test'), getAppPath: vi.fn(() => tmpdir()), on: vi.fn() },
+  BrowserWindow: { getAllWindows: vi.fn(() => []) },
+  ipcMain: { handle: vi.fn(), on: vi.fn() },
+}));
+
+describe('new optional fields survive a load', () => {
+  it('todo items, task nodes and habits keep every new field', () => {
+    const board = seedBoard() as unknown as { nodes: Array<{ id: string; kind: string; isMother?: boolean; state: Record<string, unknown> }> };
+    const todo = board.nodes.find((n) => n.kind === 'todo' && n.isMother)!;
+    todo.state['items'] = [{
+      id: 'i1', text: 'Weekly review', done: false, createdAt: '2026-11-01T08:00:00.000Z', completedAt: null, taskNodeId: 't1',
+      dueOn: '2026-11-15', repeat: { kind: 'weekly', day: 7 }, droppedAt: '2026-11-08T09:00:00.000Z',
+    }, {
+      id: 'i2', text: 'Essay', done: false, createdAt: '2026-11-01T08:00:00.000Z', completedAt: null, taskNodeId: 't2', dueOn: '2026-11-21',
+    }];
+    board.nodes.push({ id: 't1', kind: 'todo.task', state: { text: 'Weekly review', done: false, kind: 'event', remindMin: 10 } } as never);
+    board.nodes.push({ id: 't2', kind: 'todo.task', state: { text: 'Essay', done: false, scheduledFor: '2026-11-17T16:00' } } as never);
+    const habit = board.nodes.find((n) => n.kind === 'habit' && n.isMother)!;
+    habit.state['habits'] = [
+      { id: 'h1', name: 'Water', createdAt: '2026-11-01T08:00:00.000Z', log: [], archived: false, color: 'cyan', perWeek: 3, amount: { target: 8, unit: 'glasses' }, counts: { '2026-11-08': 3 }, rest: ['2026-11-06'] },
+      { id: 'r1', name: 'Shift', createdAt: '2026-11-01T08:00:00.000Z', log: [], archived: false, color: 'moss', kind: 'routine', schedule: { kind: 'weekly', days: [5], timeOfDay: '22:00', durationMin: 480 }, remindMin: 15, exceptions: [{ date: '2026-11-13', skip: true }] },
+    ];
+    const dir = mkdtempSync(join(tmpdir(), 'krnl0-roundtrip-'));
+    try {
+      const p = join(dir, 'board.json');
+      writeFileSync(p, JSON.stringify(board), 'utf-8');
+      const loaded = loadBoardFrom(p) as typeof board;
+      const todoState = loaded.nodes.find((n) => n.kind === 'todo' && n.isMother)!.state;
+      const [item, essay] = todoState['items'] as Array<Record<string, unknown>>;
+      // Decision 40 migration: an old "due" with no Calendar time was its day (any time);
+      // one on a plan with a time stays its deadline.
+      expect(item).toMatchObject({ onDay: '2026-11-15', repeat: { kind: 'weekly', day: 7 }, droppedAt: '2026-11-08T09:00:00.000Z' });
+      expect(item!['dueOn']).toBeUndefined();
+      expect(essay).toMatchObject({ dueOn: '2026-11-21' });
+      expect(todoState['whenModel']).toBe(1);
+      // Once migrated, a deadline on a plan with no time stays a deadline on the next load.
+      writeFileSync(p, JSON.stringify({ ...loaded, nodes: loaded.nodes.map((n) => (n.kind === 'todo' && n.isMother ? { ...n, state: { ...n.state, items: [{ ...(n.state['items'] as unknown[])[0] as object, dueOn: '2026-11-30' }] } } : n)) }), 'utf-8');
+      const again = loadBoardFrom(p) as typeof board;
+      expect(((again.nodes.find((n) => n.kind === 'todo' && n.isMother)!.state['items'] as Array<Record<string, unknown>>)[0])).toMatchObject({ dueOn: '2026-11-30', onDay: '2026-11-15' });
+      expect(loaded.nodes.find((n) => n.id === 't1')!.state).toMatchObject({ remindMin: 10, kind: 'event' });
+      const habits = loaded.nodes.find((n) => n.kind === 'habit' && n.isMother)!.state['habits'] as Array<Record<string, unknown>>;
+      expect(habits[0]).toMatchObject({ perWeek: 3, amount: { target: 8, unit: 'glasses' }, counts: { '2026-11-08': 3 }, rest: ['2026-11-06'] });
+      expect(habits[1]).toMatchObject({ kind: 'routine', remindMin: 15, schedule: { durationMin: 480 }, exceptions: [{ date: '2026-11-13', skip: true }] });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('the release fields survive a load (Align to grid, board cards)', () => {
+  it('alignGrid (old true and new scope), habit/event cards and wires to them load unchanged', () => {
+    for (const alignGrid of [true, 'cards', 'all'] as const) {
+      const board = seedBoard() as unknown as { nodes: Array<Record<string, unknown>>; edges: unknown[]; alignGrid?: unknown };
+      board.alignGrid = alignGrid;
+      board.nodes.push({ id: 'lane-1', kind: 'habit.lane', isMother: false, position: { x: 160, y: 80 }, state: { habitId: 'h1' }, config: { days: 28 } });
+      board.edges.push({ id: 'e-old', from: { nodeId: 'mother-pomo', event: 'onComplete' }, to: { nodeId: 'lane-1', command: 'habit.markDone' } });
+      const dir = mkdtempSync(join(tmpdir(), 'krnl0-release-'));
+      try {
+        const p = join(dir, 'board.json');
+        writeFileSync(p, JSON.stringify(board), 'utf-8');
+        const loaded = loadBoardFrom(p) as typeof board;
+        expect(loaded.alignGrid).toBe(alignGrid);
+        const lane = loaded.nodes.find((n) => n['id'] === 'lane-1')!;
+        expect(lane['position']).toEqual({ x: 160, y: 80 });
+        expect((loaded.edges as Array<{ id: string }>).some((e) => e.id === 'e-old')).toBe(true);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    }
+  });
+});

@@ -1,82 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
 import { ContextMenu } from '../../ContextMenu';
+import { MenuIcon } from '../../ui/menuIcons';
+import { useEasyMode } from '../../../store/uiMode';
 import { useBoardStore } from '../../../store/boardStore';
 import { selectSchedule } from '../../../store/scheduleSelector';
 import { useShallow } from 'zustand/react/shallow';
-import { useTick } from '../../../hooks/useTick';
 import type { PomoState } from '../PomoNode/types';
-import { trackedSecondsForTask, planStatus, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
-import { formatElapsed } from './format';
+import { trackedSecondsForTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
+import { DoneCard } from './DoneCard';
+import { CardIcon, CardMetaRow, CardMeter, cardFrameStyle, fmtDayAnyTime, fmtDur, fmtWhen } from './CardParts';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
-
-function fmtMin(totalMin: number): string {
-  const m = Math.max(0, Math.round(totalMin));
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  if (h === 0) return `${r}m`;
-  return r === 0 ? `${h}h` : `${h}h${String(r).padStart(2, '0')}`;
-}
-
-/**
- * Plan vs reality — "PLAN 1h · TRACKED 52m" strip at the bottom of a task
- * card. Tracked time is the sum of pomo work spans tagged with this task
- * (store/trackedTime.ts); the bar fills tracked / planned and turns rust when
- * more time was spent than planned. Hidden until something was tracked.
- */
-function PlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean }) {
-  // Only the card the pomo is running on ticks; every other card re-renders
-  // just when the pomo node changes.
-  return props.live ? <LivePlanTrackedBar {...props} /> : <PlanTrackedBarView {...props} nowMs={null} />;
-}
-
-function LivePlanTrackedBar(props: { taskId: string; plannedMin: number; live: boolean; open?: boolean }) {
-  const tick = useTick();
-  return <PlanTrackedBarView {...props} nowMs={tick} />;
-}
-
-function PlanTrackedBarView({ taskId, plannedMin, live, open = false, nowMs }: { taskId: string; plannedMin: number; live: boolean; open?: boolean; nowMs: number | null }) {
-  const pomoNode = useBoardStore(selectPomoNode);
-  const trackedSec = useMemo(
-    () => trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now()),
-    // nowMs only changes for the live card (tick), forcing a fresh total.
-    [pomoNode, taskId, nowMs],
-  );
-  // An open-ended task has no plan to run over: show what was tracked only.
-  const status = open ? (trackedSec > 0 ? 'on-track' : 'untracked') : planStatus(trackedSec, plannedMin);
-  if (status === 'untracked' && !live) return null;
-  const ratio = open ? 0 : plannedMin > 0 ? trackedSec / (plannedMin * 60) : 0;
-  const color = status === 'overrun' ? 'var(--rust)' : live ? 'var(--acid)' : 'var(--ink-3)';
-  return (
-    <div data-testid="task-plan-tracked" style={{ padding: '4px 10px 6px' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 9,
-          letterSpacing: '0.06em',
-          color: 'var(--ink-3)',
-          marginBottom: 3,
-        }}
-      >
-        <span>{open ? 'NO SET TIME' : `PLAN ${fmtMin(plannedMin)}`}</span>
-        <span style={{ color }}>
-          {status === 'overrun' ? '+' + fmtMin(trackedSec / 60 - plannedMin) + ' OVER · ' : ''}
-          TRACKED {fmtMin(trackedSec / 60)}
-        </span>
-      </div>
-      <div style={{ height: 3, background: 'var(--paper-3)', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${Math.min(1, ratio) * 100}%`, background: color }} />
-      </div>
-    </div>
-  );
-}
+import { toneVarForTask } from '../../../utils/taskColor';
 
 // TaskNode — child task card spawned when a todo item is added.
 // No slot tag, no corner brackets (those are mother-only, Decision #8).
@@ -86,15 +26,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const _config = (node.config as TaskConfig | null) ?? defaultTaskConfig();
   void _config;
 
-  const seqNum = String(state.sequenceNumber ?? 1).padStart(2, '0');
-  const layer = state.layer ?? 0;
   const tag = state.tag ?? '';
   const taskId = node.id;
 
-  // B.2 — live ETA display: use plannedMin (writable) rather than the stale eta string
-  // An open-ended task (added without a duration) has no estimate to show —
-  // the calendar says "no set time" too.
-  const etaDisplay = state.timeOpen ? 'no set time' : `~${state.plannedMin ?? state.durationMin} min`;
 
   // Decision 22 F15 — subscribe to the pomo mother's runtime state. The
   // selector returns a fresh object every call, so we use `useShallow` to
@@ -116,6 +50,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   );
 
   const isActive = pomoRuntime?.activeTaskId === taskId;
+  const easy = useEasyMode();
   const isActiveRunning = isActive && pomoRuntime?.status === 'running' && pomoRuntime?.startedAt !== null;
   const isActivePaused = isActive && pomoRuntime?.status === 'paused';
 
@@ -139,6 +74,9 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     if (!state.scheduledFor) return;
+    // Fresh clock on every (re)schedule: the card may have sat unscheduled
+    // since it mounted, and a plan put into a past slot reads "missed" at once.
+    setNowMs(Date.now());
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
   }, [state.scheduledFor]);
@@ -148,7 +86,25 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       (state.scheduledDurationMin ?? state.plannedMin ?? state.durationMin ?? 25) * 60_000
     : null;
   const isPastScheduled = scheduledEndMs !== null && scheduledEndMs <= nowMs;
-  const isGrayed = state.done || isPastScheduled;
+  // Decision 40 — a plan on a day at any time is on the Calendar too (ANY TIME strip).
+  const onDay = useBoardStore((s) => {
+    const todo = s.board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+    const items = (todo?.state as { items?: Array<{ taskNodeId: string | null; onDay?: string }> } | undefined)?.items;
+    return items?.find((i) => i.taskNodeId === taskId)?.onDay ?? null;
+  });
+
+  // engagement.md F1–F2 — the done moment: ticking turns the card into the
+  // done card and plays its one-shot reward. Reopening restores the full card.
+  const wasDone = useRef(state.done);
+  const [popping, setPopping] = useState(false);
+  useEffect(() => {
+    const justTicked = state.done && !wasDone.current;
+    wasDone.current = state.done;
+    if (!justTicked) return;
+    setPopping(true);
+    const t = setTimeout(() => setPopping(false), 900);
+    return () => clearTimeout(t);
+  }, [state.done]);
 
   // Corner timer: tracked time on this task, derived from the pomo spans
   // tagged with it (live while the pomo is running on it).
@@ -159,41 +115,6 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const elapsedSec = useMemo(
     () => trackedSecondsForTask(pomoOnlyBoard(pomoNode), taskId, Date.now()),
     [pomoNode, taskId, liveKey],
-  );
-  const showTimer = elapsedSec > 0 || isActive;
-
-  // ── Task chain prev/next display ───────────────────────────────────────────
-  // Shows ALL adjacent task.next neighbours; forks are highlighted in cyan.
-  const { prevTexts, nextTexts } = useBoardStore(
-    useShallow((s) => {
-      const idx = s.selectTaskChain();
-      const entry = idx.get(node.id);
-      const resolve = (ids: readonly string[]): string[] =>
-        ids
-          .map((id) => {
-            const n = s.board?.nodes.find((nd) => nd.id === id);
-            if (!n) return '';
-            if (n.kind === 'habit.lane') {
-              const habitId = (n.state as { habitId?: string })?.habitId ?? '';
-              for (const mn of (s.board?.nodes ?? [])) {
-                if (mn.kind !== 'habit' || !mn.isMother) continue;
-                const ms = mn.state as { habits?: Array<{ id: string; name: string }> } | null;
-                const h = ms?.habits?.find((x) => x.id === habitId);
-                if (h) {
-                  return h.name.length > 14 ? h.name.slice(0, 12) + '…' : h.name;
-                }
-              }
-              return 'HBT';
-            }
-            const txt = (n.state as { text?: string } | undefined)?.text ?? '';
-            return txt.length > 14 ? txt.slice(0, 12) + '…' : txt;
-          })
-          .filter((t) => t.length > 0);
-      return {
-        prevTexts: resolve(entry?.prevs ?? []),
-        nextTexts: resolve(entry?.nexts ?? []),
-      };
-    }),
   );
 
   // ── inline edit ────────────────────────────────────────────────────────────
@@ -401,7 +322,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       onSelect: startEtaEdit,
       disabled: state.done,
     },
-    {
+    // easy-mode D21 — making chains is Advanced; existing chains keep working.
+    ...(easy ? [] : [{
       // ADR 0004 §2 — sequential successor: same chain level as source,
       // single task.next edge.
       label: 'Add next task',
@@ -425,14 +347,14 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         setInlineDurationInvalid(false);
       },
       disabled: state.done,
-    },
+    }]),
     {
       label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
       onSelect: startNoteEdit,
     },
-    // Only for tasks that are on the calendar (anchors and chain successors).
-    ...(onCalendar
-      ? [{ label: 'Show on calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTaskOnCalendar(taskId)); } }]
+    // The eye: this card and its place on the Calendar, at once.
+    ...(onCalendar || onDay
+      ? [{ label: 'Show', icon: <MenuIcon name="show" />, hint: 'card + Calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTask(taskId)); } }]
       : []),
     {
       label: 'Delete',
@@ -449,146 +371,62 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   };
 
   // B.4 — ring colour reacts to paused status (solid acid, no glow)
-  const borderColor = isActiveRunning
-    ? 'var(--acid)'
-    : isActivePaused
-      ? 'var(--acid)'
-      : 'var(--paper-3)';
-  const boxShadow = isActiveRunning
-    ? '0 0 0 2px var(--acid), 0 0 24px color-mix(in srgb, var(--acid) 45%, transparent)'
-    : isActivePaused
-      ? '0 0 0 2px var(--acid)'
-      : 'var(--shadow-1)';
+
+  // engagement.md F2 — a done task shows the done card (design 9B): the
+  // result, the plan, the time, today's progress. Just ticked → the reward.
+  if (state.done) {
+    return (
+      <DoneCard
+        taskId={taskId}
+        state={state}
+        trackedSec={elapsedSec}
+        celebrate={popping}
+        onReopen={() => onCommand('task.toggle')}
+        onContextMenu={handleContextMenu}
+      >
+        {ctxMenu !== null && (
+          <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxItems} onDismiss={() => setCtxMenu(null)} />
+        )}
+      </DoneCard>
+    );
+  }
+
+  // One card shape for every state (CardParts.tsx): nothing moves on tick.
+  const cardTone = isActiveRunning ? 'running' : isActivePaused ? 'paused' : isPastScheduled ? 'missed' : 'open';
+  const tagTone = toneVarForTask(taskId);
+  const when = fmtWhen(state.scheduledFor, nowMs) ?? (onDay ? fmtDayAnyTime(onDay, nowMs) : null);
+  // Icons show state: green = set (on the Calendar / has a length), grey = not yet, rust = missed.
+  const planCol = isPastScheduled ? 'var(--rust)' : when ? 'var(--planned)' : 'var(--ink-4)';
+  const plannedMin = state.plannedMin ?? state.durationMin ?? 25;
+  const trackedMin = elapsedSec / 60;
+  const over = !state.timeOpen && trackedMin > plannedMin + 0.5;
 
   return (
     <div
       data-testid="task-node-root"
-      data-done={state.done ? 'true' : undefined}
+      data-done={undefined}
       data-active={isActive ? 'true' : undefined}
-      className={`${state.done ? 'done' : ''}${isActive ? ' active' : ''}`.trim()}
+      data-card-tone={cardTone}
+      className={isActive ? 'active' : undefined}
       onContextMenu={handleContextMenu}
-      style={{
-        position: 'relative',
-        width: 220,
-        border: `1px solid ${borderColor}`,
-        borderRadius: 'var(--radius-lg)',
-        background: 'var(--node-bg)',
-        boxShadow,
-        overflow: 'visible',
-        opacity: isGrayed ? 0.4 : 1,
-        transition: 'opacity 0.15s, box-shadow 0.2s, border-color 0.2s',
-        cursor: isGrayed ? 'default' : 'pointer',
-      }}
+      // The card moves: grab everywhere on it; its buttons show the pointer (#226).
+      style={{ ...cardFrameStyle(cardTone), opacity: 1, cursor: 'grab', overflow: 'visible' }}
       onDoubleClick={handleBodyDoubleClick}
     >
-      {/* Decision 22 F16 — corner timer (top-left) */}
-      {showTimer && (
-        <span
-          data-testid="task-corner-timer"
-          data-running={isActiveRunning ? 'true' : 'false'}
-          style={{
-            position: 'absolute',
-            top: -8,
-            left: -2,
-            padding: '1px 6px',
-            background: 'var(--paper)',
-            border: `1px solid ${isActiveRunning ? 'var(--acid)' : 'var(--paper-3)'}`,
-            borderRadius: 4,
-            fontFamily: 'var(--font-mono)',
-            fontVariantNumeric: 'tabular-nums',
-            fontSize: 9.5,
-            color: isActiveRunning ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
-            letterSpacing: '0.04em',
-            pointerEvents: 'none',
-            boxShadow: isActiveRunning
-              ? '0 0 6px color-mix(in srgb, var(--acid) 40%, transparent)'
-              : '0 0 0 1px var(--paper-2)',
-            zIndex: 1,
-          }}
-        >
-          {formatElapsed(elapsedSec)}
-        </span>
-      )}
-
-      {/* Header row */}
-      <div
-        style={{
-          padding: '6px 10px 5px',
-          borderBottom: '1px solid var(--paper-3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        {/* Drag to the Calendar: the grip starts an HTML5 drag with the
-            same payload the Todo rows use; the rest of the node still moves
-            on the canvas (React Flow ignores .nodrag). */}
-        {!state.done && (
-          <span
-            data-testid="task-calendar-grip"
-            className="nodrag"
-            draggable
-            title="Drag onto the Calendar to schedule"
-            onDragStart={(e) => {
-              e.stopPropagation();
-              e.dataTransfer.setData(
-                'application/krnl-task',
-                JSON.stringify({ taskId, durationMin: state.plannedMin }),
-              );
-              e.dataTransfer.effectAllowed = 'move';
-            }}
-            style={{
-              cursor: 'grab',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12,
-              lineHeight: 1,
-              color: 'var(--ink-3)',
-              padding: '0 6px 0 0',
-              userSelect: 'none',
-            }}
-          >
-            ⠿
-          </span>
-        )}
-        {/* F1: "task · #NN L{layer}" */}
-        <span
-          data-testid="task-header"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
-            color: 'var(--ink-3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-          }}
-        >
-          <span style={{ color: 'var(--cyan)' }}>●</span>
-          {` task · #${seqNum} L${layer}`}
-        </span>
-
-        {/* #180 — Tasks are events. They carry no kind toggle and no
-            START/PAUSE timer controls; the Pomodoro is a separate, independent
-            observer that no task can load into or drive. */}
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} />
-      </div>
-
-      {/* Body */}
-      <div style={{ padding: '8px 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {/* F3: checkbox + title row */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+      {/* Row 1: check · title · the one action (drag onto the Calendar) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
           <button
             type="button"
-            className={`task-check${state.done ? ' task-check--done' : ''}`}
+            className={`task-check${popping ? ' task-check--pop' : ''}`}
+            style={{ marginTop: 0 }}
             onClick={(e) => {
               e.stopPropagation();
               onCommand('task.toggle');
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            aria-label={state.done ? 'Mark undone' : 'Mark done'}
-          >
-            {state.done && <span className="task-check__mark">✓</span>}
-          </button>
+            aria-label="Mark done"
+          />
 
-          {/* F4: done text styling; double-click enters inline edit */}
           {isEditing ? (
             <input
               type="text"
@@ -600,40 +438,60 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
-                flex: 1,
-                background: 'transparent',
-                border: 'none',
-                borderBottom: '1px solid var(--ink-3)',
-                outline: 'none',
-                fontFamily: 'var(--font-sans)',
-                fontSize: 13,
-                lineHeight: 1.4,
-                color: 'var(--ink)',
-                caretColor: 'var(--acid)',
-                padding: '1px 0',
+                flex: 1, minWidth: 0, background: 'transparent', border: 'none', borderBottom: '1px solid var(--ink-3)', outline: 'none',
+                fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: 1.4, color: 'var(--ink)', caretColor: 'var(--acid)', padding: '1px 0',
               }}
             />
           ) : (
             <span
               className="task-text"
+              title={state.text}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                if (!state.done) startEdit();
+                startEdit();
               }}
               style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: 13,
-                lineHeight: 1.4,
-                color: state.done ? 'var(--ink-4)' : 'var(--ink)',
-                textDecorationLine: state.done ? 'line-through' : 'none',
-                textDecorationColor: 'var(--ink-4)',
-                flex: 1,
+                fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: '18px', color: 'var(--ink)', flex: 1, minWidth: 0,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}
             >
               {state.text}
             </span>
           )}
-        </div>
+
+          {/* Drag to the Calendar: the grip starts an HTML5 drag with the
+              same payload the Todo rows use; the rest of the node still moves
+              on the canvas (React Flow ignores .nodrag). */}
+          <span
+            data-testid="task-calendar-grip"
+            className="nodrag task-card-action"
+            draggable
+            title={isPastScheduled ? 'Missed — drag onto the Calendar to move it' : when ? `On the Calendar (${when}) — drag to move it` : 'Not on the Calendar — drag it there to plan it'}
+            onDragStart={(e) => {
+              e.stopPropagation();
+              e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId, durationMin: state.plannedMin }));
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            style={{
+              width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'grab',
+              color: planCol,
+              background: isPastScheduled || when ? `color-mix(in srgb, ${planCol} 14%, transparent)` : 'var(--paper-2)',
+            }}
+          >
+            <CardIcon name={isPastScheduled ? 'replan' : 'grip'} size={13} />
+          </span>
+      </div>
+
+      {/* Row 2: tag · when */}
+      <CardMetaRow
+        // Easy hides tags (easy-mode D8) — on the card too, like the Todo list (#228).
+        tag={easy ? '' : tag}
+        tone={tagTone}
+        icon={isActiveRunning ? 'clock' : 'calendar'}
+        when={isActiveRunning ? 'Focusing now' : isActivePaused ? 'Paused' : when ? (isPastScheduled ? `Was ${when}` : when) : 'Not on the calendar'}
+        whenColor={isActiveRunning ? 'var(--acid-ink, var(--acid))' : isPastScheduled ? 'color-mix(in srgb, var(--rust) 72%, var(--ink))' : undefined}
+        iconColor={isActiveRunning || isActivePaused ? undefined : planCol}
+      />
 
         {/* Note — free-form text under the task body. Click to edit.
             window.prompt() is blocked in Electron renderer, so we use an
@@ -680,14 +538,13 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               style={{
                 fontFamily: 'var(--font-sans)',
                 fontSize: 11,
-                lineHeight: 1.4,
+                lineHeight: '15px',
                 color: 'var(--ink-3)',
                 fontStyle: 'italic',
-                padding: '4px 0 2px',
-                borderTop: '1px dashed var(--paper-3)',
                 cursor: 'text',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
               title="Click to edit note"
             >
@@ -696,23 +553,13 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           )
         )}
 
-        {/* F5: footer — tag + ETA (B.2: ETA is double-click editable) */}
-        <div
-          className="task-foot"
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
-            color: 'var(--ink-4)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            paddingTop: 4,
-            borderTop: '1px dashed var(--paper-3)',
-          }}
-        >
-          <span className="task-tag">{tag}</span>
-          {isEditingEta ? (
+        {/* Meter: what was recorded against the plan. The right label is the
+            estimate — double-click to change it. */}
+        <CardMeter
+          ratio={state.timeOpen ? (trackedMin > 0 ? 1 : 0) : plannedMin > 0 ? trackedMin / plannedMin : 0}
+          color={over ? 'var(--rust)' : isActive ? 'var(--acid)' : 'var(--ink-3)'}
+          left={trackedMin >= 1 ? fmtDur(trackedMin) + (over ? ` · +${fmtDur(trackedMin - plannedMin)}` : '') : isActive ? 'Started' : 'Not started'}
+          rightNode={isEditingEta ? (
             <input
               type="number"
               min={1}
@@ -724,55 +571,21 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               onBlur={commitEtaEdit}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                width: 60,
-                background: 'var(--paper-2)',
-                border: '1px solid var(--ink-3)',
-                borderRadius: 3,
-                outline: 'none',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9.5,
-                color: 'var(--ink-3)',
-                textAlign: 'right',
-                padding: '1px 4px',
-              }}
+              style={{ width: 54, background: 'var(--paper-2)', border: '1px solid var(--ink-3)', borderRadius: 4, outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)', textAlign: 'right', padding: '1px 4px' }}
             />
           ) : (
             <span
               className="task-eta"
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                startEtaEdit();
-              }}
-              style={{ cursor: 'text' }}
+              title="Your estimate — double-click to change"
+              onDoubleClick={(e) => { e.stopPropagation(); startEtaEdit(); }}
+              // Part of the card: grab like the rest of it (#226).
+              style={{ cursor: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
-              {etaDisplay}
+              <span style={{ display: 'inline-flex', color: state.timeOpen ? 'var(--ink-4)' : 'var(--planned)' }}><CardIcon name="clock" size={11} /></span>
+              {state.timeOpen ? 'no set time' : trackedMin >= 1 ? `of ${fmtDur(plannedMin)}` : fmtDur(plannedMin)}
             </span>
           )}
-        </div>
-
-        {/* F5b: chain hint — prev/next task labels. Forks (>1) get cyan accent. */}
-        {(prevTexts.length > 0 || nextTexts.length > 0) && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 6,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 8.5,
-              color: 'var(--ink-4)',
-              paddingTop: 3,
-              letterSpacing: '0.03em',
-            }}
-          >
-            <span style={{ color: prevTexts.length > 1 ? 'var(--cyan)' : 'var(--ink-4)' }}>
-              {prevTexts.length > 0 ? `← ${prevTexts.join(', ')}` : ''}
-            </span>
-            <span style={{ color: nextTexts.length > 1 ? 'var(--cyan)' : 'var(--ink-4)', textAlign: 'right' }}>
-              {nextTexts.length > 0 ? `${nextTexts.join(', ')} →` : ''}
-            </span>
-          </div>
-        )}
+        />
 
         {/* Two-phase inline input for subtask / sibling */}
         {inlineMode !== null && (
@@ -827,8 +640,6 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             }}
           />
         )}
-      </div>
-
       {/* Context menu */}
       {ctxMenu !== null && (
         <ContextMenu
@@ -838,13 +649,6 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           onDismiss={() => setCtxMenu(null)}
         />
       )}
-
-      <PlanTrackedBar
-        taskId={node.id}
-        plannedMin={state.plannedMin ?? state.durationMin ?? 25}
-        live={isActiveRunning}
-        open={state.timeOpen === true}
-      />
     </div>
   );
 }

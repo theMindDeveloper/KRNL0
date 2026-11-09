@@ -284,7 +284,7 @@ describe('MonthView — task chips', () => {
     expect(cell?.textContent).toContain('Write tests');
   });
 
-  it('renders "+N more" when more than 3 tasks are scheduled on same day', () => {
+  it('a full day keeps every plan as its own chip (scrolling in the cell), never "+N more"', () => {
     const makeTask = (id: string, text: string) => ({
       id,
       kind: 'todo.task',
@@ -339,8 +339,9 @@ describe('MonthView — task chips', () => {
 
     const cell = document.querySelector('[data-testid="month-cell-2026-05-10"]');
     expect(cell).toBeTruthy();
-    // Should show "+2 more" (5 tasks, max 3 visible)
-    expect(cell?.textContent).toContain('+2 more');
+    // All five plans stay readable and draggable; nothing is hidden behind a count.
+    expect(cell?.querySelectorAll('[data-testid="month-task-chip"]').length).toBe(5);
+    expect(cell?.textContent).not.toMatch(/\+\d/);
   });
 });
 
@@ -369,11 +370,11 @@ describe('MonthView — habit dots', () => {
     expect(dotText('2026-05-12')).not.toMatch(/\+/);
   });
 
-  it('seven habits show five dots and "+2" (the two that are hidden)', () => {
+  it('seven habits show seven dots (wrapping), never "+N"', () => {
     habitBoard(7);
     render(<MonthView state={makeState()} config={makeConfig()} onCommand={noop} />);
-    expect(dots('2026-05-12')).toBe(5);
-    expect(dotText('2026-05-12')).toContain('+2');
+    expect(dots('2026-05-12')).toBe(7);
+    expect(dotText('2026-05-12')).not.toMatch(/\+/);
   });
 
   it('no dots before the habit existed, and none when habits are switched off', () => {
@@ -408,7 +409,7 @@ describe('MonthView — drops (ADR 0001 §9)', () => {
     fireEvent.drop(cell, { dataTransfer });
   };
 
-  it('a scheduled task keeps its time of day on the new date; a Todo row starts at 09:00', () => {
+  it('a scheduled task keeps its time of day on the new date; a Todo row is not given a made-up 09:00 (Decision 40: any time that day)', () => {
     useBoardStore.setState({
       board: {
         version: 1, schemaVersion: 2, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 }, edges: [], layoutMode: 'canvas',
@@ -420,6 +421,6 @@ describe('MonthView — drops (ADR 0001 §9)', () => {
     drop(document.querySelector('[data-testid="month-cell-2026-05-12"]')!, { taskId: 't1' });
     expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't1', scheduledFor: '2026-05-12T14:30' });
     drop(document.querySelector('[data-testid="month-cell-2026-05-13"]')!, { itemId: 'row1', durationMin: 25 });
-    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { itemId: 'row1', scheduledFor: '2026-05-13T09:00', scheduledDurationMin: 25 });
+    expect(onCommand).not.toHaveBeenCalledWith('calendar.schedule', expect.objectContaining({ itemId: 'row1' }));
   });
 });

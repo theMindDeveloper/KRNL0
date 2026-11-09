@@ -9,14 +9,28 @@
  * glow toward purple.
  *
  * Behaviour:
- * - Space (push-to-talk) preserves the previous FSM (idle -> listening on
- *   keydown; listening -> thinking on keyup).
+ * - No push-to-talk: questions are typed (they go to Claude Code, Decision 41).
  * - Click toggles a chat panel anchored above the orb.
  * - Orb is draggable. Position is persisted to localStorage.
  * - Quick-action buttons trigger pre-recorded voice flows with live camera
  *   movement and krnl command execution.
  */
 
+import { useLaunchStore } from '../../launch/launchStore';
+
+/** Lines that only make sense after a real absence. */
+const AWAY_LINES = new Set(['pa_been_a_minute', 'pa_welcome_back']);
+/**
+ * The opening line: "been a minute" / "welcome back" only after 4 h or more
+ * away (said 30 s after a restart they read as a mistake). `r` in [0, 1).
+ */
+export function pickGreeting<T extends { clip: string }>(pool: readonly T[], awayMs: number | null, r: number): T {
+  const longAway = awayMs !== null && awayMs >= 4 * 3_600_000;
+  const fits = longAway ? pool : pool.filter((p) => !AWAY_LINES.has(p.clip));
+  const from = fits.length > 0 ? fits : pool;
+  return from[Math.min(from.length - 1, Math.floor(r * from.length))]!;
+}
+import { LineGlyph } from '../ui/LineGlyph';
 import {
   useState,
   useEffect,
@@ -28,25 +42,43 @@ import {
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../renderer/store/boardStore';
 import { isFreshBoard } from './freshBoard';
+
+const FIRST_DAY_KEY = 'krnl0-first-day-offered';
+function firstDayOffered(): boolean {
+  try { return localStorage.getItem(FIRST_DAY_KEY) === '1'; } catch { return true; }
+}
+function markFirstDayOffered(): void {
+  try { localStorage.setItem(FIRST_DAY_KEY, '1'); } catch { /* no storage */ }
+}
+/** Automated browsers (our own UI checks) don't get the first-run tour unless asked (?firstrun). */
+function autoFirstRunAllowed(): boolean {
+  if (import.meta.env.MODE === 'test') return false;
+  try { return !navigator.webdriver || location.search.includes('firstrun'); } catch { return true; }
+}
 import { voicePlayer } from '../Assistant/VoicePlayer';
 import { ScriptRunner } from '../Assistant/ScriptRunner';
 import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
 import { CLICK_CLIPS } from '../Assistant/clipMap';
+import { ORB_LINES } from '../Assistant/orbLines';
 import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
 import { launchClaudeInTerminal } from '../../store/claudeLaunch';
-import { TOURS } from '../Tour/tours';
+import { toursIn } from '../Tour/tours';
+import { useEasyMode } from '../../store/uiMode';
+import { useTourAnchor } from '../Tour/tourAnchor';
 
 /** Voice flows not offered in the chat for now. */
-const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
-import { startTour } from '../Tour/TourHost';
+const HIDDEN_FLOW_IDS = new Set(['focus-session']);
+import { activeTour, startTour } from '../Tour/TourHost';
+import { askClaude, claudeStatus, type ClaudeStatus } from '../../store/askClaude';
+import { launchDialogOpen } from '../../launch/launchStore';
 import { emit } from '../../store/eventLog';
 import { Z } from '../ui/layers';
-import { isTypingTarget, isControlTarget, isModalOpen } from '../../utils/keyboardTargets';
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'running';
-interface ChatMsg { role: 'user' | 'ai'; text: string }
+/** An answer may carry the krnl commands Claude ran (tools) and be an error. */
+interface ChatMsg { role: 'user' | 'ai'; text: string; tools?: string[]; error?: boolean }
 
 const MOCK_REPLIES: readonly string[] = [
   "noted — i'll surface that when the next pomo wraps.",
@@ -199,6 +231,7 @@ function getBoardSnapshot(): BoardSnapshot {
 }
 
 export function Orb() {
+  const easyMode = useEasyMode();
   const { setViewport } = useReactFlow();
 
   const [orbState, setOrbState] = useState<OrbState>('idle');
@@ -206,6 +239,10 @@ export function Orb() {
   const [history, setHistory]   = useState<ChatMsg[]>([]);
   const [input, setInput]       = useState('');
   const [thinking, setThinking] = useState(false);
+  // The menu (tours, quick actions) shows before the chat starts; "Tours" brings it back.
+  const [showMenu, setShowMenu] = useState(false);
+  // Is Claude Code ready? Checked when the panel opens, so the orb says so before you ask.
+  const [claudeState, setClaudeState] = useState<ClaudeStatus | null>(null);
   const [caption, setCaption]   = useState<string | null>(null);
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null);
   const [commanderOpen, setCommanderOpen] = useState(false);
@@ -213,11 +250,43 @@ export function Orb() {
 
   // ── Drag state ────────────────────────────────────────────────────────────
   const [pos, setPos]           = useState<OrbPos>(loadPos);
+  // During a guided tour the orb itself rides on the tour card (no copy).
+  const tourAt = useTourAnchor((s) => s.at);
+  const tourActive = useTourAnchor((s) => s.active);
+  const guideSpeaking = useTourAnchor((s) => s.speaking);
+  const [tourGlide, setTourGlide] = useState(false);
+  useEffect(() => {
+    // Glide while a tour moves it and on the way back home, never while dragging.
+    setTourGlide(true);
+    const t = window.setTimeout(() => setTourGlide(tourAt !== null), 520);
+    return () => window.clearTimeout(t);
+  }, [tourAt]);
   const [settleKey, setSettleKey] = useState(0);
   const draggingRef    = useRef(false);
   const dragMovedRef   = useRef(false);
   const dragOffsetRef  = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const dragStartRef   = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // ── First run ─────────────────────────────────────────────────────────────
+  // A brand-new board starts "Your first day" by itself, once — after the
+  // window settles and no launch dialog (What's new, Welcome back) is open.
+  // Its first step says what it is; "End tour" says no. The orb menu always
+  // offers it again.
+  useEffect(() => {
+    if (!autoFirstRunAllowed() || firstDayOffered()) return;
+    let tries = 0;
+    const id = window.setInterval(() => {
+      tries++;
+      const board = useBoardStore.getState().board;
+      if (tries > 40 || firstDayOffered()) { window.clearInterval(id); return; }
+      if (!board || launchDialogOpen() || activeTour()) return;
+      window.clearInterval(id);
+      if (!isFreshBoard(board)) return;
+      markFirstDayOffered();
+      startTour('first-day');
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, []);
 
   // ── ScriptRunner ──────────────────────────────────────────────────────────
   const runnerRef = useRef<ScriptRunner | null>(null);
@@ -283,8 +352,8 @@ export function Orb() {
       // A brand-new board gets an introduction and a pointer to the tour,
       // not "welcome back". Read here: the board loads after the orb mounts.
       const pick = isFreshBoard(useBoardStore.getState().board)
-        ? { clip: 'intro_01', text: "Welcome to KRNL0. I'm your system assistant. Click me for a tour." }
-        : pool[Math.floor(Math.random() * pool.length)]!;
+        ? { clip: 'intro_01', text: ORB_LINES.intro_01!.text }
+        : pickGreeting(pool, useLaunchStore.getState().info?.awayMs ?? null, Math.random());
       setOrbState('speaking');
       setCaption(pick.text);
       voicePlayer.play(pick.clip).catch(() => { /* missing clip → caption only */ });
@@ -381,10 +450,18 @@ export function Orb() {
       return;
     }
 
+    // engagement.md F12 — the promised tour: the first click on a fresh
+    // board starts "Your first day" instead of opening the menu (once).
+    if (!open && isFreshBoard(useBoardStore.getState().board) && !firstDayOffered()) {
+      markFirstDayOffered();
+      startTour('first-day');
+      return;
+    }
+
     // Play a random acknowledgment clip and toggle the panel.
     voicePlayer.playRandom(CLICK_CLIPS).catch(() => {});
     setOpen((o) => !o);
-  }, [activeFlowId]);
+  }, [activeFlowId, open]);
 
   // ── Flow launcher ─────────────────────────────────────────────────────────
   const launchFlow = useCallback((flow: Flow) => {
@@ -393,35 +470,21 @@ export function Orb() {
     runnerRef.current.run(flow);
   }, []);
 
-  // ── Space push-to-talk ────────────────────────────────────────────────────
+  // Escape closes the chat. (Hold Space to talk was removed: there is no
+  // speech-to-text, and a "listening" animation that hears nothing misleads.)
   useEffect(() => {
-    // Space belongs to whatever has focus: a field, the terminal, or a
-    // button / radio / switch it activates. Push-to-talk only takes a Space
-    // nothing else would use, and never behind a modal.
-    const spaceTaken = (t: EventTarget | null): boolean => isTypingTarget(t) || isControlTarget(t) || isModalOpen();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Escape' && open) { setOpen(false); return; }
-      if (spaceTaken(e.target)) return;
-      if (e.code === 'Space' && orbState === 'idle') {
-        e.preventDefault();
-        setOrbState('listening');
-      }
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return;
-      if (e.code === 'Space' && orbState === 'listening') {
-        e.preventDefault();
-        setOrbState('thinking');
-        window.setTimeout(() => setOrbState('idle'), 600);
-      }
-    };
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => { if (e.code === 'Escape') setOpen(false); };
     window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-    };
-  }, [orbState, open]);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void claudeStatus().then((st) => { if (live) setClaudeState(st); });
+    return () => { live = false; };
+  }, [open]);
 
   // Focus the chat input when panel opens.
   useEffect(() => {
@@ -439,7 +502,40 @@ export function Orb() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [history.length, thinking]);
 
+  // Decision 41 — the answer comes from Claude Code (claude -p), streamed in.
+  const sessionRef = useRef<string | undefined>(undefined);
+  const askRef = useRef<{ cancel: () => void } | null>(null);
+  const updateLast = (f: (m: ChatMsg) => ChatMsg) =>
+    setHistory((h) => (h.length && h[h.length - 1]!.role === 'ai' ? [...h.slice(0, -1), f(h[h.length - 1]!)] : h));
+  const askClaudeNow = (text: string) => {
+    setHistory((h) => [...h, { role: 'ai', text: '' }]);
+    const handle = askClaude(text, sessionRef.current, (e) => {
+      if (e.type === 'session') sessionRef.current = e.sessionId;
+      else if (e.type === 'text') updateLast((m) => ({ ...m, text: m.text + e.text }));
+      else if (e.type === 'tool') updateLast((m) => ({ ...m, tools: [...(m.tools ?? []), e.label] }));
+      else if (e.type === 'done') {
+        if (e.sessionId) sessionRef.current = e.sessionId;
+        updateLast((m) => ({ ...m, text: m.text.trim() ? m.text : e.text }));
+        askRef.current = null;
+        setThinking(false);
+      } else if (e.type === 'error') {
+        updateLast((m) => (e.code === 'cancelled' && m.text.trim() ? { ...m, text: `${m.text}\n(stopped)` } : { ...m, text: e.message, error: e.code !== 'cancelled' }));
+        askRef.current = null;
+        setThinking(false);
+      }
+    });
+    if (!handle) {
+      updateLast((m) => ({ ...m, text: 'I answer through Claude Code in the KRNL0 desktop app.', error: true }));
+      setThinking(false);
+      return;
+    }
+    askRef.current = handle;
+  };
+  const stopAsking = () => { askRef.current?.cancel(); };
+  const newChat = () => { stopAsking(); sessionRef.current = undefined; setHistory([]); setThinking(false); };
+
   const submitMock = (text: string) => {
+    setShowMenu(false);
     setHistory((h) => [...h, { role: 'user', text }]);
     setInput('');
     setThinking(true);
@@ -452,16 +548,16 @@ export function Orb() {
       said.includes(f.label.toLowerCase()) || said.includes(f.id.replace(/-/g, ' '))
     );
 
-    window.setTimeout(() => {
-      if (matchingFlow) {
+    // A built-in flow still starts locally; everything else goes to Claude.
+    if (matchingFlow) {
+      window.setTimeout(() => {
         setThinking(false);
         setHistory((h) => [...h, { role: 'ai', text: `launching: ${matchingFlow.label}` }]);
         setTimeout(() => launchFlow(matchingFlow), 400);
-      } else {
-        setHistory((h) => [...h, { role: 'ai', text: mockReply() }]);
-        setThinking(false);
-      }
-    }, 500 + Math.random() * 400);
+      }, 300);
+      return;
+    }
+    askClaudeNow(text);
   };
 
   const onSubmit = (e: FormEvent) => {
@@ -473,7 +569,8 @@ export function Orb() {
   // ── Visual state ──────────────────────────────────────────────────────────
   const isPurple  = orbState === 'thinking' || thinking;
   const isHot     = orbState === 'listening';
-  const isSpeaking = orbState === 'speaking';
+  // The tour guide's voice makes the orb speak too.
+  const isSpeaking = orbState === 'speaking' || guideSpeaking;
   const isRunning = orbState === 'running';
 
   const glowFilter = isHot
@@ -500,7 +597,7 @@ export function Orb() {
     display: 'block',
     filter: glowFilter,
     animation: (open || activeFlowId) ? 'none' : 'ai-float 6s ease-in-out infinite',
-    transition: 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease',
+    transition: 'transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), filter 0.25s ease',
     willChange: 'filter, transform',
   };
 
@@ -533,17 +630,23 @@ export function Orb() {
       )}
     <div
       key={settleKey}
+      data-orb-root
       style={{
         position: 'fixed',
-        left: pos.x,
-        top: pos.y,
-        zIndex: Z.widget,
+        left: tourAt ? tourAt.x : pos.x,
+        top: tourAt ? tourAt.y : pos.y,
+        // Above a tour's dimming, at its own place and size.
+        zIndex: tourAt || tourActive ? Z.tour + 1 : Z.widget,
         fontFamily: 'var(--font-mono)',
-        animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+        transform: tourAt ? 'scale(0.6)' : 'none',
+        transition: tourGlide
+          ? 'left 460ms cubic-bezier(0.22, 1, 0.36, 1), top 460ms cubic-bezier(0.22, 1, 0.36, 1), transform 460ms cubic-bezier(0.22, 1, 0.36, 1)'
+          : 'none',
+        animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.22, 1, 0.36, 1)' : 'none',
       }}
     >
       {/* Voice caption — shown during flows */}
-      {caption !== null && !open && (
+      {caption !== null && !open && !tourAt && !tourActive && (
         <div
           style={{
             position: 'absolute',
@@ -563,18 +666,18 @@ export function Orb() {
             lineHeight: 1.5,
             pointerEvents: 'none',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            animation: 'ai-panel-in 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+            animation: 'ai-panel-in 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           <span style={{ color: isRunning ? '#c9f158' : 'var(--accent-on-dark)', marginRight: 6, opacity: 0.8 }}>
-            {isRunning ? '▶' : '◆'}
+            <LineGlyph name={isRunning ? 'play' : 'diamond'} size={9} />
           </span>
           {caption}
         </div>
       )}
 
       {/* Chat panel */}
-      {open && (
+      {open && !tourAt && (
         <div
           data-testid="orb-chat-panel"
           style={{
@@ -595,7 +698,7 @@ export function Orb() {
               '0 20px 60px rgba(0, 0, 0, 0.6)',
               '0 0 80px rgba(201, 241, 88, 0.15)',
             ].join(', '),
-            animation: 'ai-panel-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            animation: 'ai-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
           {/* Panel header */}
@@ -606,18 +709,30 @@ export function Orb() {
               justifyContent: 'space-between',
               padding: '10px 14px',
               borderBottom: '1px solid rgba(201, 241, 88, 0.15)',
-              fontSize: 10.5,
+              fontSize: 11,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: '#8a8270',
             }}
           >
-            <span data-testid="orb-chat-title">
+            <span data-testid="orb-chat-title" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               <span style={{ color: 'var(--accent-on-dark)', marginRight: 8, textShadow: '0 0 8px var(--accent-on-dark)' }}>
                 ◆
               </span>
               krnl0 · assistant
             </span>
+            {history.length > 0 && (
+              <button type="button" data-testid="orb-chat-menu" onClick={() => setShowMenu((v) => !v)} aria-pressed={showMenu} title="Tours and quick actions"
+                style={{ flexShrink: 0, whiteSpace: 'nowrap', marginLeft: 'auto', marginRight: 6, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: showMenu ? 'rgba(201,241,88,0.12)' : 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                Tours
+              </button>
+            )}
+            {history.length > 0 && (
+              <button type="button" data-testid="orb-chat-new" onClick={newChat} title="Start a new conversation"
+                style={{ flexShrink: 0, whiteSpace: 'nowrap', marginRight: 8, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                New chat
+              </button>
+            )}
             <CloseButton tone="dark" testId="orb-chat-close" label="Close assistant" onClick={() => setOpen(false)} />
           </div>
 
@@ -632,9 +747,28 @@ export function Orb() {
               lineHeight: 1.5,
             }}
           >
-            {/* Quick actions stay after the first message (they used to vanish
-                until a reload). */}
-            {!thinking && (
+            {/* Claude isn't ready: say so before anything is asked, with the way out. */}
+            {(claudeState === 'not-installed' || claudeState === 'not-signed-in') && (
+              <div data-testid="orb-claude-status" style={{ border: '1px solid rgba(238,132,102,0.45)', background: 'rgba(238,132,102,0.08)', borderRadius: 8, padding: '8px 10px', color: '#e8d9c6', fontSize: 12, lineHeight: 1.5 }}>
+                {claudeState === 'not-installed'
+                  ? <>Claude Code isn't installed, so I can't answer questions yet. Install it from <b>claude.com/claude-code</b>, then open me again.</>
+                  : <>Claude Code isn't signed in, so I can't answer questions yet. Sign in once in the Terminal.</>}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  {claudeState === 'not-signed-in' && (
+                    <button type="button" data-testid="orb-claude-signin" onClick={() => { setOpen(false); void launchClaudeInTerminal(false); }}
+                      style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.45)', background: 'rgba(201,241,88,0.12)', color: '#d4cfc0', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                      Sign in
+                    </button>
+                  )}
+                  <button type="button" data-testid="orb-claude-recheck" onClick={() => { setClaudeState(null); void claudeStatus().then(setClaudeState); }}
+                    style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                    Check again
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* The menu shows before the chat starts; during a chat "Tours" brings it back. */}
+            {!thinking && (history.length === 0 || showMenu) && (
               <div style={{ color: '#8a8270' }}>
                 <div style={{ marginBottom: 8 }}>how can i help?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -657,7 +791,7 @@ export function Orb() {
                       marginBottom: 4,
                     }}
                   >
-                    {'▸ commander · plan a session'}
+                    <><LineGlyph name="chevron" size={10} /> commander · plan a session</>
                   </button>
                   {/* Claude Code in the board terminal, permission prompts off (#206). */}
                   <button
@@ -685,7 +819,7 @@ export function Orb() {
                       boxShadow: '0 0 10px rgba(217,119,87,0.35), inset 0 0 8px rgba(217,119,87,0.12)',
                     }}
                   >
-                    {'▸ claude code'}
+                    <><LineGlyph name="chevron" size={10} /> claude code</>
                   </button>
                   {/* Voice flows are hidden until proper voice tutorials exist — the
                       text Tutorials below replace them (maintainer, 2026-11-05). */}
@@ -710,9 +844,28 @@ export function Orb() {
                     </button>
                   ))}
                   {/* Guided tours — one short text tutorial per part of the app. */}
-                  <div style={{ marginTop: 8, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8270' }}>Tutorials</div>
+                  <div style={{ marginTop: 8, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8a8270' }}>Tutorials</div>
+                  {/* engagement.md F12 — the whole loop, first. */}
+                  <button
+                    type="button"
+                    data-testid="orb-tour-first-day"
+                    onClick={() => { setOpen(false); startTour('first-day'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%', boxSizing: 'border-box',
+                      background: 'rgba(201, 241, 88, 0.12)', border: '1px solid rgba(201, 241, 88, 0.4)', color: '#d4cfc0',
+                      padding: '8px 10px', borderRadius: 8, fontFamily: 'inherit', cursor: 'pointer',
+                    }}
+                  >
+                    <span aria-hidden style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--accent-on-dark)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="#0e1012"><path d="M8 5v14l11-7z" /></svg>
+                    </span>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>Start here · Your first day</span>
+                      <span style={{ fontSize: 11, color: '#8a8270' }}>plan one real thing and do it · 4 min</span>
+                    </span>
+                  </button>
                   <div data-testid="orb-tours" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4 }}>
-                    {TOURS.map((t) => (
+                    {toursIn(easyMode ? 'easy' : 'advanced').filter((t) => t.id !== 'first-day').map((t) => (
                       <button
                         key={t.id}
                         type="button"
@@ -732,15 +885,21 @@ export function Orb() {
                 </div>
               </div>
             )}
-            {history.map((m, i) => (
-              <div key={i} style={{ color: m.role === 'user' ? '#8a8270' : '#d4cfc0' }}>
-                <span style={{ color: m.role === 'user' ? '#8a8270' : 'var(--accent-on-dark)', marginRight: 4 }}>
+            {history.map((m, i) => (m.role === 'ai' && !m.text && !m.tools?.length ? null : (
+              <div key={i} data-testid={m.role === 'ai' ? 'orb-chat-answer' : 'orb-chat-question'} style={{ color: m.role === 'user' ? '#8a8270' : m.error ? '#ee8466' : '#d4cfc0', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                <span style={{ color: m.role === 'user' ? '#8a8270' : m.error ? '#ee8466' : 'var(--accent-on-dark)', marginRight: 4 }}>
                   {m.role === 'user' ? '›' : '◆'}
                 </span>
-                {m.text}
+                {m.text.replace(/\*\*(.+?)\*\*/g, '$1')}
+                {/* What it did on the board (the krnl commands it ran), quietly. */}
+                {m.tools && m.tools.length > 0 && (
+                  <div data-testid="orb-chat-tools" style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11, color: '#8a8270', fontFamily: 'var(--font-mono)' }}>
+                    {m.tools.map((t, j) => <span key={j} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>· {t}</span>)}
+                  </div>
+                )}
               </div>
-            ))}
-            {thinking && (
+            )))}
+            {thinking && !(history.length && history[history.length - 1]!.role === 'ai' && history[history.length - 1]!.text) && (
               <div data-testid="orb-chat-thinking">
                 <span style={{ color: 'var(--accent-on-dark)', marginRight: 6 }}>◆</span>
                 <span style={{ display: 'inline-flex', gap: 3, marginLeft: 4 }}>
@@ -771,13 +930,13 @@ export function Orb() {
               background: 'rgba(0, 0, 0, 0.2)',
             }}
           >
-            <span style={{ color: 'var(--accent-on-dark)', fontWeight: 700 }}>›</span>
+            <span style={{ color: 'var(--accent-on-dark)', fontWeight: 700 }}><LineGlyph name="chevron" /></span>
             <input
               ref={inputRef}
               data-testid="orb-chat-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={thinking ? 'thinking…' : 'ask anything · hold Space to talk'}
+              placeholder={thinking ? 'thinking…' : 'ask anything'}
               disabled={thinking}
               autoComplete="off"
               spellCheck={false}
@@ -786,6 +945,12 @@ export function Orb() {
                 color: '#d4cfc0', fontFamily: 'inherit', fontSize: 12.5, padding: '4px 0',
               }}
             />
+            {thinking && (
+              <button type="button" data-testid="orb-chat-stop" onClick={stopAsking}
+                style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.35)', background: 'transparent', color: '#d4cfc0', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                Stop
+              </button>
+            )}
           </form>
         </div>
       )}
@@ -794,7 +959,7 @@ export function Orb() {
       <button
         type="button"
         data-testid="orb-button"
-        aria-label={`AI assistant — ${orbState}. Click to ${open ? 'close' : 'open'} chat, hold Space to talk.`}
+        aria-label={`AI assistant — ${orbState}. Click to ${open ? 'close' : 'open'} chat.`}
         aria-live="polite"
         onMouseDown={onMouseDown}
         onClick={onOrbClick}

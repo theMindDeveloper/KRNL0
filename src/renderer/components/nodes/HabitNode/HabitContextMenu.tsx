@@ -7,8 +7,9 @@
 // viewport (client) coords. Position is rounded → crisp text, no blur on
 // nested sub-pickers (color/icon grid).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { MenuIcon, type MenuIconName } from '../../ui/menuIcons';
 import type { Habit, HabitColor } from './types';
 import { HABIT_COLORS } from './types';
 import { HabitIcon, HABIT_ICON_IDS, habitIconId } from './HabitIcon';
@@ -23,6 +24,8 @@ interface Props {
   onSetIcon: (icon: string) => void;
   onSetNote: (note: string) => void;
   onDelete: () => void;
+  /** Hide it but keep its history; it comes back from the node's settings. */
+  onArchive?: () => void;
   onClose: () => void;
   // v2.2 — only the parent HabitNode passes this; the lane's own menu omits
   // it (the lane node itself can't pin another lane to its own habit).
@@ -31,6 +34,8 @@ interface Props {
   laneExists?: boolean;
   // Only a lane's own menu passes this: remove the lane, keep the habit.
   onUnpinLane?: () => void;
+  /** Decision 39 — routine / habit actions (Edit repeat, Skip next, End, Turn into …). */
+  extraItems?: ReadonlyArray<{ label: string; onClick: () => void; testId?: string; icon?: MenuIconName; hint?: string }>;
 }
 
 const MENU_WIDTH = 232;
@@ -43,10 +48,12 @@ export function HabitContextMenu({
   onSetIcon,
   onSetNote,
   onDelete,
+  onArchive,
   onClose,
   onPinAsLane,
   laneExists,
   onUnpinLane,
+  extraItems,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,7 +100,15 @@ export function HabitContextMenu({
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const clampedX = Math.round(Math.min(Math.max(0, anchor.x), Math.max(0, vw - MENU_WIDTH)));
-  const clampedY = Math.round(Math.min(Math.max(0, anchor.y), Math.max(0, vh - estHeight)));
+  // The real height once drawn (routine items and pickers make it taller than
+  // any fixed guess): a menu opened low on the screen moves up to fit.
+  const [measured, setMeasured] = useState(0);
+  useLayoutEffect(() => {
+    const h = ref.current?.offsetHeight ?? 0;
+    if (h && Math.abs(h - measured) > 1) setMeasured(h);
+  });
+  const height = Math.min(Math.max(estHeight, measured), vh - 16);
+  const clampedY = Math.round(Math.min(Math.max(8, anchor.y), Math.max(8, vh - height - 8)));
 
   const commitRename = () => {
     if (cancelledRef.current) return;
@@ -113,6 +128,9 @@ export function HabitContextMenu({
         left: clampedX,
         top: clampedY,
         width: MENU_WIDTH,
+        maxHeight: vh - 16,
+        overflowY: 'auto',
+        boxSizing: 'border-box',
         // Same shell as the shared ContextMenu.
         background: 'var(--paper)',
         border: '1px solid var(--paper-3)',
@@ -121,8 +139,6 @@ export function HabitContextMenu({
         padding: 8,
         zIndex: Z.contextMenu,
         fontFamily: 'var(--font-sans)',
-        maxHeight: `calc(100vh - ${clampedY + 16}px)`,
-        overflowY: 'auto',
       }}
     >
       {/* Header: icon + name (or rename input) */}
@@ -184,8 +200,18 @@ export function HabitContextMenu({
         )}
       </div>
 
+      {/* Decision 40 — what you change most often first: days & time, rest today. */}
+      {extraItems && extraItems.length > 0 && (
+        <>
+          {extraItems.map((it) => (
+            <MenuItem key={it.label} label={it.label} {...(it.icon ? { icon: it.icon } : {})} {...(it.hint ? { trailing: <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{it.hint}</span> } : {})} {...(it.testId ? { testId: it.testId } : {})} onClick={() => { it.onClick(); onClose(); }} />
+          ))}
+          <div style={{ margin: '4px -8px 4px', borderTop: '1px solid var(--paper-2)' }} />
+        </>
+      )}
       <MenuItem
         label="Rename"
+        icon="rename"
         onClick={() => {
           setDraft(habit.name);
           cancelledRef.current = false;
@@ -195,6 +221,7 @@ export function HabitContextMenu({
       />
       <MenuItem
         label="Color"
+        icon="color"
         trailing={
           <span
             aria-hidden
@@ -249,6 +276,7 @@ export function HabitContextMenu({
 
       <MenuItem
         label="Icon"
+        icon="icon"
         trailing={
           <span
             aria-hidden
@@ -323,7 +351,7 @@ export function HabitContextMenu({
               borderRadius: 3,
               color: 'var(--ink-3)',
               fontFamily: 'var(--font-mono)',
-              fontSize: 10,
+              fontSize: 11,
               cursor: 'pointer',
             }}
           >
@@ -334,6 +362,7 @@ export function HabitContextMenu({
 
       <MenuItem
         label={habit.note && habit.note.length > 0 ? 'Edit note' : 'Add note'}
+        icon="note"
         onClick={() => {
           if (pickerOpen === 'note') {
             setPickerOpen(null);
@@ -391,7 +420,7 @@ export function HabitContextMenu({
                 borderRadius: 3,
                 color: 'var(--ink-3)',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontSize: 11,
                 cursor: 'pointer',
               }}
             >
@@ -410,7 +439,7 @@ export function HabitContextMenu({
                 borderRadius: 3,
                 color: 'var(--acid-ink, var(--acid))',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 10,
+                fontSize: 11,
                 cursor: 'pointer',
               }}
             >
@@ -420,11 +449,13 @@ export function HabitContextMenu({
         </div>
       )}
 
+
       {onUnpinLane && (
         <>
           <div style={{ margin: '4px -8px 0', borderTop: '1px solid var(--paper-2)' }} />
           <MenuItem
-            label="Unpin lane (keep the habit)"
+            label="Remove canvas card"
+            icon="canvas"
             onClick={() => { onUnpinLane(); onClose(); }}
           />
         </>
@@ -439,7 +470,8 @@ export function HabitContextMenu({
             }}
           />
           <MenuItem
-            label={laneExists ? 'Lane already pinned' : 'Pin as lane'}
+            label={laneExists ? 'Card is on the canvas' : 'Card on canvas'}
+            icon="canvas"
             disabled={laneExists === true}
             onClick={() => {
               if (laneExists) return;
@@ -456,8 +488,20 @@ export function HabitContextMenu({
           borderTop: '1px solid var(--paper-2)',
         }}
       />
+      {onArchive && (
+        <MenuItem
+          label="Archive"
+          icon="archive"
+          trailing={<span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>keeps history</span>}
+          onClick={() => {
+            onArchive();
+            onClose();
+          }}
+        />
+      )}
       <MenuItem
         label="Delete"
+        icon="delete"
         destructive
         onClick={() => {
           onDelete();
@@ -475,20 +519,25 @@ export function HabitContextMenu({
 
 function MenuItem({
   label,
+  icon,
   trailing,
   destructive,
   disabled,
   onClick,
+  testId,
 }: {
   label: string;
+  icon?: MenuIconName;
   trailing?: React.ReactNode;
   destructive?: boolean;
   disabled?: boolean;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
+      data-testid={testId}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       style={{
@@ -519,6 +568,7 @@ function MenuItem({
         (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
       }}
     >
+      <span aria-hidden style={{ width: 14, display: 'inline-flex', flexShrink: 0, color: destructive ? 'var(--rust)' : 'var(--ink-3)' }}>{icon && <MenuIcon name={icon} />}</span>
       <span style={{ flex: 1 }}>{label}</span>
       {trailing}
     </button>

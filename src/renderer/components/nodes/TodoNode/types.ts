@@ -23,6 +23,17 @@ export interface TodoItem {
   // ADR 0001 — Calendar integration: mirrors TaskState.scheduledFor for items
   // that haven't spawned a TaskNode yet. Optional — absence means unscheduled.
   scheduledFor?: string;      // ISO 8601 local datetime, e.g. "2026-05-20T14:30"
+  // Review 2.1 — the day it must be done by (YYYY-MM-DD), apart from when you
+  // plan to work on it. Absent = no deadline.
+  dueOn?: string;
+  // Review 6.1 — "not doing this any more": set when dropped. A dropped item
+  // is neither done nor deleted; it sits in the Archive marked "dropped" and
+  // can be brought back. Analytics never counts it as done.
+  droppedAt?: string;
+  // Decision 40 — its When as a day with no time (the Calendar's ANY TIME
+  // strip). Set only while the plan has no Calendar time; `dueOn` is its
+  // Deadline and nothing else.
+  onDay?: string;
 }
 
 export interface TodoState {

@@ -195,21 +195,19 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
 
   // ── F4 — Add task on Enter ────────────────────────────────────────────────
   describe('F4 — Add task on Enter', () => {
-    it('dispatches todo.add with text and durationMin after two-phase Enter', () => {
+    it('one Enter adds (Decision 40): a length typed in the words is read, no second step', () => {
       const onCommand = vi.fn();
       renderTodoNode(defaultTodoState(), onCommand);
-      // Phase 1 — name
       const placeholder = screen.getByTestId('add-task-placeholder');
       fireEvent.click(placeholder);
       const input = document.querySelector('input[placeholder]') as HTMLInputElement;
       expect(input).not.toBeNull();
       fireEvent.change(input, { target: { value: 'buy oat milk' } });
-      fireEvent.keyDown(input, { key: 'Enter' }); // transitions to duration phase
-      expect(onCommand).not.toHaveBeenCalled(); // not yet dispatched
-      // Phase 2 — duration
-      fireEvent.change(input, { target: { value: '30' } });
-      fireEvent.keyDown(input, { key: 'Enter' }); // dispatches
-      expect(onCommand).toHaveBeenCalledWith('todo.add', { text: 'buy oat milk', durationMin: 30 });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(onCommand).toHaveBeenCalledWith('todo.add', { text: 'buy oat milk' });
+      fireEvent.change(input, { target: { value: 'read 30 min' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(onCommand).toHaveBeenCalledWith('todo.add', { text: 'read', durationMin: 30 });
     });
 
     it('clears the input after dispatch', () => {
@@ -274,31 +272,11 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
     });
   });
 
-  // ── F6 — Archive done (was "clear done") ─────────────────────────────────
-  // ADR 0016: the header button now archives instead of deleting.
-  describe('F6 — Archive done dispatches todo.archiveDone', () => {
-    it('shows the clear done button when at least one item is done', () => {
-      const state = makeBackground();
-      renderTodoNode(state);
-      const btn = screen.getByTestId('clear-done-btn');
-      expect(btn).not.toBeNull();
-    });
-
-    it('dispatches todo.archiveDone when the button is activated', () => {
-      const onCommand = vi.fn();
-      const state = makeBackground();
-      renderTodoNode(state, onCommand);
-      const btn = screen.getByTestId('clear-done-btn');
-      fireEvent.click(btn);
-      expect(onCommand).toHaveBeenCalledWith('todo.archiveDone');
-    });
-
-    it('does not show the clear done button when no items are done', () => {
-      let s = defaultTodoState();
-      s = todoAdd(s, { text: 'undone' }, envAt(T1, 'id-a'));
-      renderTodoNode(s);
-      const btn = screen.queryByTestId('clear-done-btn');
-      expect(btn).toBeNull();
+  // ── F6 — engagement.md F7: one Done list, no "archive done" button ─────
+  describe('F6 — no archive step in the UI', () => {
+    it('does not show an archive button, even with done items', () => {
+      renderTodoNode(makeBackground());
+      expect(screen.queryByTestId('clear-done-btn')).toBeNull();
     });
   });
 

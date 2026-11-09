@@ -9,6 +9,7 @@
  * first paint — satisfying NF4 / Gherkin F6b.
  */
 
+import { CANVAS_FIT_PADDING } from './components/Canvas/fitPadding';
 import { useEffect, useRef, useState, Component, type ReactNode } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
@@ -23,11 +24,17 @@ import { useBoardChannel } from './store/useBoardChannel';
 import { RadialChooserHost } from './components/ui/RadialChooser';
 import { LogTimeHost, RetagPickerHost } from './components/ui/SpanEditor';
 import { TourHost } from './components/Tour/TourHost';
+import { DayMoments } from './components/DayMoments';
+import { PlanGuide } from './components/PlanGuide';
 import { useCliDispatch } from './store/useCliDispatch';
 import { installTimeLogWriter } from './store/timeLog';
 import { UndoNoticeBar } from './components/ui/UndoNoticeBar';
 import { UpdateNoticeBar } from './components/ui/UpdateNoticeBar';
 import { useUpdateBridge } from './store/updateStore';
+import { usePocketBridge } from './pocket/usePocketBridge';
+import { LaunchHost } from './components/Launch/LaunchHost';
+import { runLaunchFlow, useLaunchBridge, useLaunchStore, useMilestoneWatcher } from './launch/launchStore';
+import { hideSplash, removeNow, splashBoard } from './splash';
 
 // ── Theme bootstrap (runs synchronously at module import, before first render) ─
 // This is the only code path that satisfies "before first paint" for F6b.
@@ -111,13 +118,45 @@ function AppInner() {
       try {
         // maxZoom: 1 keeps fitView from over-zooming when the visible set is
         // small (e.g. a single task node). Matches seedBoard's default zoom.
-        fitView({ padding: 0.18, duration: 400, maxZoom: 1 });
+        // In Free mode, start where reading starts: the first four windows
+        // from the left at a readable size (all six side by side fit at ~34%,
+        // where no text can be read — new-user review). FIT and the minimap
+        // still show everything.
+        const first = effectiveMode === 'canvas'
+          ? (useBoardStore.getState().board?.nodes ?? [])
+              .filter((n) => (n as { isMother?: boolean }).isMother === true)
+              .sort((x, y) => x.position.x - y.position.x)
+              .slice(0, 4)
+              .map((n) => ({ id: n.id }))
+          : [];
+        fitView({ padding: CANVAS_FIT_PADDING, duration: 400, maxZoom: 1, ...(first.length === 4 ? { nodes: first } : {}) });
       } catch {
         /* RF not ready yet — skipped */
       }
     }, 120);
     return () => window.clearTimeout(id);
   }, [effectiveMode, fitView]);
+
+  // Launch experience: the canvas is on screen — finish the splash, then the
+  // patch notice / What's new / Welcome back (launch-experience.md F3, F5).
+  useMilestoneWatcher();
+  useEffect(() => {
+    let raf = 0;
+    let unsubBoard: (() => void) | null = null;
+    let unsubInfo: (() => void) | null = null;
+    const startFlow = (): void => { window.setTimeout(runLaunchFlow, 500); };
+    const onBoard = (): void => {
+      // Two frames: the canvas has painted the board before the splash fades.
+      raf = requestAnimationFrame(() => { raf = requestAnimationFrame(() => hideSplash()); });
+      if (useLaunchStore.getState().info) startFlow();
+      else unsubInfo = useLaunchStore.subscribe((st) => { if (st.info) { unsubInfo?.(); unsubInfo = null; startFlow(); } });
+    };
+    if (useBoardStore.getState().board) onBoard();
+    else unsubBoard = useBoardStore.subscribe((st) => { if (st.board) { unsubBoard?.(); unsubBoard = null; onBoard(); } });
+    // Never leave the splash up if the board somehow never arrives.
+    const failsafe = window.setTimeout(removeNow, 15_000);
+    return () => { cancelAnimationFrame(raf); unsubBoard?.(); unsubInfo?.(); window.clearTimeout(failsafe); };
+  }, []);
 
   return (
     <div
@@ -144,8 +183,11 @@ function AppInner() {
       <LogTimeHost />
       <RetagPickerHost />
       <TourHost />
+      <DayMoments />
+      <PlanGuide />
       <UndoNoticeBar />
       <UpdateNoticeBar />
+      <LaunchHost />
     </div>
   );
 }
@@ -194,6 +236,10 @@ export function App() {
   useBoardChannel();
   useCliDispatch();
   useUpdateBridge();
+  // Decision 38 — version, backup and time away, for the splash and What's new.
+  useLaunchBridge();
+  // Decision 37 — keep the floating pocket timer in step with the Pomo node.
+  usePocketBridge();
   // Decision 35 — log every board change of this window to the time log.
   useEffect(() => installTimeLogWriter(), []);
 
@@ -203,12 +249,21 @@ export function App() {
     // from crashing the tree when running outside Electron or before preload fires.
     window.krnl?.boardLoad()?.then((data) => {
       setLoadError(null);
-      if (data) setBoard(data as Parameters<typeof setBoard>[0]);
+      if (data) {
+        const board = data as Parameters<typeof setBoard>[0];
+        splashBoard({
+          mothers: board.nodes.filter((n) => n.isMother).length,
+          nodes: board.nodes.length,
+          wires: board.edges.length,
+        });
+        setBoard(board);
+      }
     }).catch((err: unknown) => {
       console.error('[krnl] boardLoad failed:', err);
       // Electron prefixes IPC rejections with "Error invoking remote method …".
       const msg = err instanceof Error ? err.message : String(err);
       setLoadError(msg.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
+      removeNow();
     });
   }, [setBoard, attempt]);
 

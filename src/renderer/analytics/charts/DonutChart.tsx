@@ -100,7 +100,7 @@ export function DonutChart({
         <svg width={W} height={chartH} viewBox={`0 0 ${W} ${chartH}`} role="img" aria-label="No data">
           <circle cx={cx} cy={cy} r={rOuter} fill="none" stroke="var(--k-an-line-2, #2a2e33)" strokeWidth={2} />
           <circle cx={cx} cy={cy} r={rOuter - 4} fill="none" stroke="var(--k-an-bg-2b, #1a1d20)" strokeWidth={1} strokeDasharray="3 5" />
-          <text x={cx} y={cy + 4} fontSize={10} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
+          <text x={cx} y={cy + 4} fontSize={11} textAnchor="middle" fill="var(--k-an-ink-4, #7d848b)" fontFamily="var(--font-mono)">
             no data
           </text>
         </svg>
@@ -122,7 +122,7 @@ export function DonutChart({
       const pct = (d.value / total) * 100;
       // Text containment rule (charts/common.ts): the % label is shrunk until
       // it sits wholly inside its slice, or dropped (the legend still has it).
-      const fit = fitArcLabel({ text: `${Math.round(pct)}%`, rOuter, rInner, start, end, maxFont: 10 });
+      const fit = fitArcLabel({ text: `${Math.round(pct)}%`, rOuter, rInner, start, end, maxFont: 12 });
       const pctLabel = fit ? { x: cx + fit.x, y: cy + fit.y, fontSize: fit.fontSize } : null;
       return { ...d, color, path, pct, pctLabel, start, end };
     });
@@ -239,7 +239,7 @@ export function DonutChart({
             gap: '4px 10px',
             justifyContent: 'center',
             fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
+            fontSize: 11,
             color: 'var(--k-an-ink-2, #c8cdd3)',
           }}
         >

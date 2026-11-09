@@ -11,7 +11,10 @@
 // CLI twins (rule 8): pomo retag <seg> <task|none> · pomo delete-segment <seg>
 // · task toggle <ref> · task pomo <ref> · task unschedule <ref>.
 
-import { useBoardStore } from './boardStore';
+import { highlightElement, nodeElement } from './highlight';
+import { useBoardStore, pushHistory } from './boardStore';
+import { unscheduleOne } from './chainSchedule';
+import type { Board } from '../../shared/types';
 import { saveBoard } from './eventLog';
 import { pomoDeleteSegment, pomoRetagSegment, pomoStopAt } from '../components/nodes/PomoNode/commands';
 import { pomoEditSegment, pomoAddSegment, spanProblem } from '../components/nodes/PomoNode/spanEdit';
@@ -68,15 +71,21 @@ export function placementOf(taskId: string): { startISO: string; endISO: string 
 }
 
 /**
- * Take a task off the calendar. A chain successor has no time of its own, so
- * this unschedules the chain's anchor (the whole chain leaves the calendar);
- * the menu says "Unschedule chain" in that case. Goes through the dispatcher
- * so the linked Todo row's time is cleared too (CLI: task unschedule).
+ * Take this task — and only it — off the calendar (CLI: task unschedule).
+ * Tasks timed by the chain keep their current times; this task stops
+ * following its predecessor so the chain cannot pull it back
+ * (chainSchedule.ts). Goes through the dispatcher so linked Todo rows' times
+ * follow.
  */
 export async function unscheduleTask(taskId: string): Promise<void> {
-  const anchor = scheduleAnchorOf(taskId);
-  if (!anchor) return;
-  await dispatchToTask(anchor, 'task.setSchedule', { scheduledFor: null });
+  const board = useBoardStore.getState().board;
+  if (!board) return;
+  const plan = unscheduleOne(board as Board, taskId);
+  if (!plan) return;
+  if (plan.edges !== board.edges) {
+    useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges: plan.edges } } : s));
+  }
+  for (const w of plan.writes) await dispatchToTask(w.taskId, 'task.setSchedule', { scheduledFor: w.scheduledFor });
 }
 
 async function dispatchToTask(taskId: string, command: string, args: Record<string, unknown> = {}): Promise<void> {
@@ -86,6 +95,19 @@ async function dispatchToTask(taskId: string, command: string, args: Record<stri
 
 export function toggleTaskDone(taskId: string): Promise<void> {
   return dispatchToTask(taskId, 'task.toggle');
+}
+
+/** Put a task on the Calendar at a local "YYYY-MM-DDTHH:MM" (quick add). */
+export async function scheduleTaskAt(taskId: string, scheduledFor: string): Promise<void> {
+  const cal = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
+  if (!cal) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  makeCommandHandler(cal.id)('calendar.schedule', { taskId, scheduledFor });
+}
+
+/** Review 4.1 — remind N minutes before a plan starts (null = no reminder). */
+export function setTaskReminder(taskId: string, min: number | null): Promise<void> {
+  return dispatchToTask(taskId, 'task.setRemind', { min });
 }
 
 export function startFocusOnTask(taskId: string): Promise<void> {
@@ -100,11 +122,144 @@ export async function toggleHabitToday(habitId: string): Promise<void> {
   makeCommandHandler(habitNode.id)('habit.toggleDay', { id: habitId });
 }
 
+/** Decision 39 — a command on the habit mother (routines: skip / move / end …). */
+export async function habitMotherCommand(command: string, args: Record<string, unknown>): Promise<void> {
+  const habitNode = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'habit' && n.isMother);
+  if (!habitNode) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  makeCommandHandler(habitNode.id)(command, args);
+}
+
+/**
+ * Delete from the Calendar means gone everywhere: the plan leaves the Todo,
+ * the Calendar and the canvas (todo.remove cascades to its task), with UNDO.
+ * Returns false when the task has no Todo item to delete.
+ */
+export async function deletePlanOfTask(taskId: string): Promise<boolean> {
+  const board = useBoardStore.getState().board;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const item = (todo?.state as { items?: Array<{ id: string; text: string; taskNodeId: string | null }> } | undefined)?.items?.find((i) => i.taskNodeId === taskId);
+  if (!todo || !item) return false;
+  const [{ makeCommandHandler }, { undoable }] = await Promise.all([import('../components/Canvas/commandDispatch'), import('./undoNotice')]);
+  undoable(`Deleted "${item.text}"`, () => makeCommandHandler(todo.id)('todo.remove', { id: item.id }));
+  return true;
+}
+
+/**
+ * Decision 40 — put a plan on a day at any time (the Calendar's ANY TIME
+ * strip): off the grid if it had a time, then `onDay`. UNDO puts it back.
+ * `ref` is what a drag carries: the task id, or a Todo item id.
+ */
+export async function putPlanOnDay(ref: { taskId?: string; itemId?: string }, day: string): Promise<void> {
+  const board = useBoardStore.getState().board;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const items = (todo?.state as { items?: Array<{ id: string; text: string; taskNodeId: string | null; onDay?: string }> } | undefined)?.items ?? [];
+  const item = ref.itemId ? items.find((i) => i.id === ref.itemId) : items.find((i) => i.taskNodeId === ref.taskId);
+  if (!todo || !item) return;
+  const taskId = item.taskNodeId;
+  const wasAt = taskId ? placementOf(taskId)?.startISO ?? null : null;
+  const wasDay = item.onDay ?? null;
+  if (!wasAt && wasDay === day) return;
+  const [{ makeCommandHandler }, { revertible }] = await Promise.all([import('../components/Canvas/commandDispatch'), import('./undoNotice')]);
+  if (taskId && wasAt) await unscheduleTask(taskId);
+  makeCommandHandler(todo.id)('todo.setOnDay', { id: item.id, onDay: day });
+  const label = new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  revertible(`"${item.text}" → ${label}, any time`, () => {
+    makeCommandHandler(todo.id)('todo.setOnDay', { id: item.id, onDay: wasDay });
+    if (taskId && wasAt) void scheduleTaskAt(taskId, wasAt.slice(0, 16));
+  });
+}
+
+/**
+ * Decision 40 — one plan card everywhere (Todo row and Calendar block): what a
+ * plan's When and Deadline are now, read from the board. Null when the task
+ * has no Todo item (a canvas-only task).
+ */
+export interface PlanWhen {
+  itemId: string;
+  taskId: string | null;
+  text: string;
+  value: { day: string | null; time: string | null; lengthMin: number | null; remindMin: number | null; deadline: string | null };
+}
+export function planWhenOf(ref: { taskId?: string; itemId?: string }): PlanWhen | null {
+  const board = useBoardStore.getState().board;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const items = (todo?.state as { items?: Array<{ id: string; text: string; taskNodeId: string | null; onDay?: string; dueOn?: string }> } | undefined)?.items ?? [];
+  const it = ref.itemId ? items.find((i) => i.id === ref.itemId) : items.find((i) => i.taskNodeId === ref.taskId);
+  if (!board || !it) return null;
+  const task = it.taskNodeId ? board.nodes.find((n) => n.id === it.taskNodeId) : undefined;
+  const ts = task?.state as { plannedMin?: number; timeOpen?: boolean; remindMin?: number } | undefined;
+  const at = it.taskNodeId ? placementOf(it.taskNodeId)?.startISO ?? null : null;
+  return {
+    itemId: it.id,
+    taskId: it.taskNodeId,
+    text: it.text,
+    value: {
+      day: at ? at.slice(0, 10) : it.onDay ?? null,
+      time: at ? at.slice(11, 16) : null,
+      lengthMin: ts?.timeOpen || !ts?.plannedMin ? null : ts.plannedMin,
+      remindMin: typeof ts?.remindMin === 'number' ? ts.remindMin : null,
+      deadline: it.dueOn ?? null,
+    },
+  };
+}
+/** Apply what the plan card changed (only what changed). */
+export async function applyPlanWhen(p: PlanWhen, next: PlanWhen['value']): Promise<void> {
+  const prev = p.value;
+  const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  if (!todo) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  const run = makeCommandHandler(todo.id);
+  if (next.deadline !== prev.deadline) run('todo.setDue', { id: p.itemId, dueOn: next.deadline });
+  if (next.lengthMin !== prev.lengthMin && p.taskId) run('todo.setItemPlannedMin', { itemId: p.itemId, minutes: next.lengthMin ?? 0 });
+  if (next.day !== prev.day || next.time !== prev.time) {
+    if (next.day && next.time && p.taskId) await scheduleTaskAt(p.taskId, `${next.day}T${next.time}`);
+    else {
+      if (prev.time && p.taskId) await unscheduleTask(p.taskId);
+      run('todo.setOnDay', { id: p.itemId, onDay: next.day });
+    }
+  }
+  if (p.taskId && next.remindMin !== prev.remindMin) await setTaskReminder(p.taskId, next.time ? next.remindMin : null);
+}
+
+/** Decision 40 — "New here… · Once": a plan at that day and time, with a length. */
+export async function addPlanAt(text: string, day: string, time: string, lengthMin: number): Promise<void> {
+  const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  if (!todo) return;
+  const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
+  makeCommandHandler(todo.id)('todo.add', { text, durationMin: lengthMin });
+  const items = (useBoardStore.getState().board?.nodes.find((n) => n.id === todo.id)?.state as { items?: Array<{ id: string; text: string; done: boolean; createdAt: string; taskNodeId: string | null }> } | undefined)?.items ?? [];
+  const added = [...items].filter((i) => i.text === text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (added?.taskNodeId) await scheduleTaskAt(added.taskNodeId, `${day}T${time}`);
+}
+
+/** A routine deleted from its Calendar band: gone from every day and from Habits & Routines, with UNDO. */
+export async function deleteRoutine(habitId: string): Promise<void> {
+  const habitNode = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'habit' && n.isMother);
+  const h = (habitNode?.state as { habits?: Array<{ id: string; name: string }> } | undefined)?.habits?.find((x) => x.id === habitId);
+  if (!habitNode || !h) return;
+  const [{ makeCommandHandler }, { undoable }] = await Promise.all([import('../components/Canvas/commandDispatch'), import('./undoNotice')]);
+  undoable(`Deleted routine "${h.name}"`, () => makeCommandHandler(habitNode.id)('habit.remove', { id: habitId }));
+}
+
 /** Window event the canvas listens for to centre a node (works from any surface). */
 export const FOCUS_NODE_EVENT = 'krnl:focus-node';
+/** Window event the canvas listens for to fit several nodes on screen (`detail.nodeIds`). */
+export const FIT_NODES_EVENT = 'krnl:fit-nodes';
 
 export function focusNode(nodeId: string): void {
   window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { nodeId } }));
+}
+
+/** "Show on canvas": centre the plan's card on the canvas and make it blink. */
+export function showTaskOnCanvas(taskId: string): void {
+  focusNode(taskId);
+  window.setTimeout(() => blinkCard(taskId), 450);
+}
+
+function blinkCard(taskId: string, note?: string): void {
+  const el = nodeElement(taskId);
+  if (el) highlightElement(el, { note });
 }
 
 /** Window event the Calendar listens for to bring a task block into view and pulse it. */
@@ -116,14 +271,49 @@ export const CALENDAR_REVEAL_EVENT = 'krnl:calendar-reveal';
  * Calendar into view, then let the week view scroll to and pulse the block.
  */
 export async function showTaskOnCalendar(taskId: string): Promise<void> {
+  await revealOnCalendar(taskId, true);
+}
+
+/**
+ * The eye ("Show"): one click shows the plan everywhere it is — its card on
+ * the canvas and its place on the Calendar, both on screen and blinking.
+ * A plan with no day yet is shown on the canvas only.
+ */
+export async function showTask(taskId: string, note?: string): Promise<void> {
+  const board = useBoardStore.getState().board;
+  const calId = await revealOnCalendar(taskId, false);
+  if (calId && board?.layoutMode !== 'station') {
+    window.dispatchEvent(new CustomEvent(FIT_NODES_EVENT, { detail: { nodeIds: [taskId, calId] } }));
+    window.setTimeout(() => blinkCard(taskId, note), 450);
+  } else {
+    focusNode(taskId);
+    window.setTimeout(() => blinkCard(taskId, note), 450);
+  }
+}
+
+/** Is the plan on the Calendar (a time, or a day at any time)? */
+export function taskHasDay(taskId: string): boolean {
+  const board = useBoardStore.getState().board;
+  if (placementOf(taskId)) return true;
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const item = (todo?.state as { items?: Array<{ taskNodeId: string | null; onDay?: string }> } | undefined)?.items?.find((i) => i.taskNodeId === taskId);
+  return !!item?.onDay;
+}
+
+/** Opens the Calendar on the plan's day and blinks it there. Returns the Calendar's id, or null when the plan has no day. */
+async function revealOnCalendar(taskId: string, moveCamera: boolean): Promise<string | null> {
   const board = useBoardStore.getState().board;
   // The block's real start: a chain successor has no scheduledFor, and a
   // pushed anchor (Decision 30) can land on a later day than it stores.
-  const when = placementOf(taskId)?.startISO;
+  const placed = placementOf(taskId)?.startISO;
+  // Decision 40 — a plan on a day at any time sits in the ANY TIME strip.
+  const todo = board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+  const item = (todo?.state as { items?: Array<{ id: string; taskNodeId: string | null; onDay?: string }> } | undefined)?.items?.find((i) => i.taskNodeId === taskId);
+  const when = placed ?? (item?.onDay ? `${item.onDay}T00:00` : undefined);
   const cal = board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
-  if (!when || !cal) return;
+  if (!when || !cal) return null;
   const d = new Date(when);
-  if (Number.isNaN(d.getTime())) return;
+  if (Number.isNaN(d.getTime())) return null;
   const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const { makeCommandHandler } = await import('../components/Canvas/commandDispatch');
   const send = makeCommandHandler(cal.id);
@@ -131,11 +321,12 @@ export async function showTaskOnCalendar(taskId: string): Promise<void> {
   if (view !== 'week' && view !== 'day') send('calendar.setView', { view: 'week' });
   send('calendar.setAnchor', { date: ymd });
   // Station mode shows the Calendar as a fixed panel: don't move the camera.
-  if (board?.layoutMode !== 'station') focusNode(cal.id);
+  if (moveCamera && board?.layoutMode !== 'station') focusNode(cal.id);
   // After the calendar re-renders on the new week.
   window.setTimeout(() => {
-    window.dispatchEvent(new CustomEvent(CALENDAR_REVEAL_EVENT, { detail: { taskId, startISO: when } }));
+    window.dispatchEvent(new CustomEvent(CALENDAR_REVEAL_EVENT, { detail: placed ? { taskId, startISO: when } : { taskId, itemId: item?.id } }));
   }, 120);
+  return cal.id;
 }
 
 // ── #207 corrections — move / add recorded time, stop at an earlier time ──

@@ -119,13 +119,16 @@ describe('F9 — TodoNode row right-click context menu', () => {
     const textEl = document.querySelector('.todo-text') as HTMLElement;
     const rowEl = textEl.closest('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
-    const labels = Array.from(document.querySelectorAll('button')).map((b) => b.textContent);
-    expect(labels).toContain('Edit text');
-    expect(labels).toContain('Start pomo');
+    const labels = Array.from(document.querySelectorAll('button')).map((b) => b.textContent ?? '');
+    // Decision 40 — grouped, with icons: When… Deadline… Rename … Won't do, Delete.
+    expect(labels.some((l) => l.startsWith('When…'))).toBe(true);
+    expect(labels.some((l) => l.startsWith('Deadline…'))).toBe(true);
+    expect(labels).toContain('Rename');
+    expect(labels).toContain("Won't do");
     expect(labels).toContain('Delete');
   });
 
-  it('F9 — "Start pomo" item is disabled when item has no linked taskNodeId', () => {
+  it('F9 — the timer item is not offered when the item has no linked taskNodeId', () => {
     let s = defaultTodoState();
     s = todoAdd(s, { text: 'no task node' }, envAt(T1, 'item-1'));
     // taskNodeId is null by default
@@ -133,9 +136,9 @@ describe('F9 — TodoNode row right-click context menu', () => {
     const rowEl = document.querySelector('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
     const startPomoBtn = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Start pomo',
-    )!;
-    expect(startPomoBtn.disabled).toBe(true);
+      (b) => (b.textContent ?? '').startsWith('Focus on it'),
+    );
+    expect(startPomoBtn).toBeUndefined();
   });
 
   it('F9 — "Start pomo" item is enabled when item has a linked taskNodeId', () => {
@@ -146,7 +149,7 @@ describe('F9 — TodoNode row right-click context menu', () => {
     const rowEl = document.querySelector('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
     const startPomoBtn = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Start pomo',
+      (b) => (b.textContent ?? '').startsWith('Focus on it'),
     )!;
     expect(startPomoBtn.disabled).toBe(false);
   });
@@ -160,7 +163,7 @@ describe('F9 — TodoNode row right-click context menu', () => {
     const rowEl = document.querySelector('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
     const startPomoBtn = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Start pomo',
+      (b) => (b.textContent ?? '').startsWith('Focus on it'),
     )!;
     fireEvent.click(startPomoBtn);
     expect(onCommand).toHaveBeenCalledWith('todo.startPomoForItem', { itemId: 'item-1' });
@@ -200,7 +203,7 @@ describe('F9 — TodoNode row right-click context menu', () => {
     const rowEl = document.querySelector('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
     const editBtn = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Edit text',
+      (b) => b.textContent === 'Rename',
     )!;
     fireEvent.click(editBtn);
     const editInput = document.querySelector('input:not([placeholder])') as HTMLInputElement;
@@ -220,11 +223,11 @@ describe('F9 — TodoNode row right-click context menu', () => {
     const rowEl = document.querySelector('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
     expect(
-      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Edit text'),
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Rename'),
     ).toBeDefined();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(
-      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Edit text'),
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Rename'),
     ).toBeUndefined();
   });
 });

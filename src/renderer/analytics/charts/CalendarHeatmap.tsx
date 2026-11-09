@@ -18,7 +18,7 @@ export interface CalendarHeatmapProps {
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const LABEL_H = 14;
+const LABEL_H = 16;
 const DOW_W = 16;
 
 export function CalendarHeatmap({
@@ -78,7 +78,7 @@ export function CalendarHeatmap({
     const { x, y } = place(c.col);
     const key = String(y);
     if (key === lastKey && x - lastX < 26) continue;
-    monthLabels.push({ x, y: y - 5, label: MONTHS[Number(c.date.slice(5, 7)) - 1] ?? '' });
+    monthLabels.push({ x, y: y - 4, label: MONTHS[Number(c.date.slice(5, 7)) - 1] ?? '' });
     lastKey = key;
     lastX = x;
   }
@@ -92,12 +92,12 @@ export function CalendarHeatmap({
       style={{ display: 'block', margin: '0 auto' }}
     >
       {monthLabels.map((m) => (
-        <text key={`${m.label}-${m.x}-${m.y}`} x={m.x} y={m.y} fontSize={8.5} fill={COLOR_LABEL} fontFamily="var(--font-mono)">
+        <text key={`${m.label}-${m.x}-${m.y}`} x={m.x} y={m.y} fontSize={11} fill={COLOR_LABEL} fontFamily="var(--font-mono)">
           {m.label}
         </text>
       ))}
       {Array.from({ length: bands }, (_, b) => ['M', '', 'W', '', 'F', '', ''].map((d, r) => d && step >= 8 ? (
-        <text key={`${b}-${r}`} x={0} y={b * (bandH + BAND_GAP) + LABEL_H + r * step + cellSize * 0.8} fontSize={Math.min(9, cellSize)} fill={COLOR_LABEL} fontFamily="var(--font-mono)">{d}</text>
+        <text key={`${b}-${r}`} x={0} y={b * (bandH + BAND_GAP) + LABEL_H + r * step + cellSize * 0.8} fontSize={11} fill={COLOR_LABEL} fontFamily="var(--font-mono)">{d}</text>
       ) : null))}
       {cells.map((c) => {
         const intensity = c.value / yMax;

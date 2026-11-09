@@ -370,14 +370,14 @@ describe('sys task delete', () => {
 // ── parity with the canvas: chains and the running pomo ────────────────────────
 
 describe('sys task — chain and pomo parity', () => {
-  it('unschedule on a chain successor takes the chain off via its anchor', async () => {
+  it('unschedule on a chain successor takes only it off; its anchor keeps its time', async () => {
     const a = (await taskAdd(ctx, TODO_MOTHER_ID, 'first', 30)).data as { id: string };
     const b = (await taskAddNext(ctx, a.id, 'second', 30)).data as { id: string };
     expect((await taskSchedule(ctx, a.id, '2026-11-03T09:00')).ok).toBe(true);
     const res = await taskUnschedule(ctx, b.id);
     expect(res.ok).toBe(true);
     const anchor = findTasks().find((t) => t.id === a.id)!.state as TaskState;
-    expect(anchor.scheduledFor ?? null).toBeNull();
+    expect(anchor.scheduledFor).toBe('2026-11-03T09:00');
   });
 
   it('toggling the task the pomo is on done stops and untags the pomo', async () => {

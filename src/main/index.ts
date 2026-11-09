@@ -4,7 +4,9 @@ import { mkdirSync, copyFileSync, existsSync, chmodSync } from 'fs';
 import { readFile, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { createServer, type Server } from 'http';
-import { registerHandlers, getCliDispatch, backfillTimeLogAtStartup, logAppSession } from './ipc/handlers';
+import { registerHandlers, getCliDispatch, backfillTimeLogAtStartup, logAppSession, getBoardDir } from './ipc/handlers';
+import { initAppState, registerAppStateHandlers, trackActivity } from './appState';
+import { initTaskbar } from './taskbar';
 import {
   registerAssetHandlers,
   registerAssetProtocol,
@@ -12,6 +14,9 @@ import {
 import { createRpcServer } from './rpc/server';
 import type { RpcServer } from './rpc/server';
 import { initUpdater } from './updater';
+import { getMainWindow, revealMainWindow, setMainWindow } from './mainWindow';
+import { attachMainWindow, initPocket, registerPocketSettings, setPocketPort } from './pocket';
+import { startReminders } from './reminders';
 
 // Force canonical display name. package.json's `name` stays lowercase per
 // npm convention; this is what shows in the taskbar, window title, About
@@ -37,10 +42,8 @@ if (!gotSingleInstanceLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (!win) return;
-    if (win.isMinimized()) win.restore();
-    win.focus();
+    // The main window by name — the first window may be the pocket timer.
+    revealMainWindow();
   });
 }
 
@@ -216,14 +219,27 @@ function createWindow(): BrowserWindow {
   });
 
   if (process.env['NODE_ENV'] === 'development') {
-    const devPort = process.env['KRNL0_DEV_PORT'] ?? '5173';
-    void win.loadURL(`http://localhost:${devPort}`);
+    void win.loadURL(rendererUrl());
     win.webContents.openDevTools();
   } else {
-    void win.loadURL(`http://127.0.0.1:${rendererPort}/index.html`);
+    void win.loadURL(rendererUrl());
   }
 
+  setMainWindow(win);
+  attachMainWindow(win);
+  trackActivity(win);
+  initTaskbar(win);
   return win;
+}
+
+/** The renderer bundle's URL; `query` picks a view (the pocket timer uses `pocket=1`). */
+function rendererUrl(query = ''): string {
+  const q = query ? `?${query}` : '';
+  if (process.env['NODE_ENV'] === 'development') {
+    const devPort = process.env['KRNL0_DEV_PORT'] ?? '5173';
+    return `http://localhost:${devPort}/${q}`;
+  }
+  return `http://127.0.0.1:${rendererPort}/index.html${q}`;
 }
 
 // ── CLI dir setup + RPC server ─────────────────────────────────────────────
@@ -279,6 +295,11 @@ app.whenReady().then(async () => {
 
   setupCliDir();
 
+  // Decision 38: before anything can load or save the board — copy it aside
+  // when this version differs from the last one that opened it.
+  initAppState(getBoardDir());
+  registerAppStateHandlers();
+
   // TNF1: RPC server starts before any window opens.
   const boardPath = process.env['KRNL0_BOARD_PATH'] ?? '';
   rpcServer = createRpcServer(boardPath, getCliDispatch);
@@ -304,10 +325,22 @@ app.whenReady().then(async () => {
     }
   }
 
+  // Decision 37: the floating pocket timer — a view of the Pomo node.
+  const pocketPort = initPocket({
+    url: () => rendererUrl('pocket=1'),
+    preload: join(__dirname, '../preload/index.js'),
+    icon: resolveWindowIcon(),
+  });
+  setPocketPort(pocketPort);
+  registerPocketSettings(pocketPort);
+  // Review 4.1 — plan reminders, window open or closed to the tray.
+  startReminders();
+
   createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    // A hidden pocket window doesn't count as the app being open.
+    if (!getMainWindow()) createWindow();
   });
 });
 

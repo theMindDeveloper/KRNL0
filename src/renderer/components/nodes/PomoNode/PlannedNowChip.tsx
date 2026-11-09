@@ -34,11 +34,11 @@ export function PlannedNowChip({ state, easy, onCommand }: {
       className="nodrag"
       style={{
         display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '5px 8px',
-        border: '1px dashed var(--paper-3)', borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 10,
+        border: '1px dashed var(--paper-3)', borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 11,
         color: 'var(--ink-2)', minWidth: 0,
       }}
     >
-      <span style={{ color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 8.5, flexShrink: 0 }}>Planned now</span>
+      <span style={{ color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 11, flexShrink: 0 }}>Planned now</span>
       <span title={planned.text} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)' }}>
         {planned.text}
       </span>
@@ -49,7 +49,7 @@ export function PlannedNowChip({ state, easy, onCommand }: {
           ? onCommand('pomo.tag', { taskId: planned.id })
           : onCommand('pomo.start', { activeTaskId: planned.id, label: planned.text }))}
         style={{
-          flexShrink: 0, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.06em',
+          flexShrink: 0, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em',
           textTransform: 'uppercase', padding: '3px 7px', borderRadius: 4,
           border: '1px solid var(--ink)', background: 'var(--ink)', color: 'var(--paper)',
         }}

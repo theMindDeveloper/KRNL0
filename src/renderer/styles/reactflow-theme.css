@@ -3,7 +3,13 @@
    Keeps RF chrome consistent with the cyber design system.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* The empty canvas shows the plain arrow (React Flow's selection mode used the
+   pointing finger, so leaving a card flipped grab to finger) (#226). */
+.react-flow .react-flow__pane.selection { cursor: default; }
+
 /* ── Handles ─────────────────────────────────────────────────────────────── */
+/* easy-mode D24 — Easy has no wires: no connection dots to drag from. */
+[data-ui-mode="easy"] .react-flow__handle { display: none !important; }
 .react-flow__handle {
   width: 12px;
   height: 12px;
@@ -92,21 +98,8 @@
   overflow: visible;
 }
 
-/* PR6 — Habit lane card tilts and lifts while being dragged. The rotation
-   is on the inner card, not the RF wrapper, so the drag-position transform
-   on the wrapper composes cleanly with the rotation here. */
-.react-flow__node.dragging.krnl-kind-habit--lane > div:not(.react-flow__handle) {
-  transform: rotate(-1.4deg);
-  box-shadow:
-    0 0 0 1.5px var(--rust),
-    0 18px 40px rgba(0, 0, 0, 0.35) !important;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
-/* Wave-B — fade the "↘ drop on a calendar day" drop-hint into view only
-   when the lane is being dragged. */
-.react-flow__node.dragging.krnl-kind-habit--lane .habit-lane-drophint {
-  opacity: 1 !important;
-}
+/* (Habit cards used to tilt, turn rust and show a drop hint while dragged;
+   they now move like every other card — Decision 42, one card family.) */
 
 /* Hide React Flow's group-selection bounding box. The user-facing selection
    indicator is the per-node ring; the wrapping rect just adds visual noise
@@ -144,13 +137,13 @@
 .react-flow__node.selected.krnl-kind-terminal > div:not(.react-flow__handle) {
   box-shadow: 0 0 0 2px var(--acid), 0 0 16px rgba(201, 241, 88, 0.35) !important;
 }
-.react-flow__node.selected.krnl-kind-habit > div:not(.react-flow__handle),
-.react-flow__node.selected.krnl-kind-habit--lane > div:not(.react-flow__handle) {
+.react-flow__node.selected.krnl-kind-habit > div:not(.react-flow__handle) {
   box-shadow: 0 0 0 2px var(--rust), 0 0 16px rgba(200, 85, 61, 0.35) !important;
 }
 
-/* Cyan ring for the Todo mother and Task children. */
+/* Cyan ring for the Todo mother and the board cards (tasks, habits, events). */
 .react-flow__node.selected.krnl-kind-todo > div:not(.react-flow__handle),
+.react-flow__node.selected.krnl-kind-habit--lane > div:not(.react-flow__handle),
 .react-flow__node.selected.krnl-kind-todo--task > div:not(.react-flow__handle) {
   box-shadow: 0 0 0 2px var(--cyan), 0 0 16px rgba(34, 211, 238, 0.35) !important;
 }
@@ -277,3 +270,86 @@
 /* See CanvasFlow: embeds ignore the mouse while a button is held, so drags
    that cross a YouTube / website card still end on mouse-up. */
 .krnl-pointer-held iframe { pointer-events: none !important; }
+
+/* Calendar: a missed block's replan button shows on hover or focus only. */
+.cal-block .cal-replan { opacity: 0; transition: opacity 120ms ease; }
+.cal-block:hover .cal-replan,
+.cal-block .cal-replan:focus-visible { opacity: 1; }
+
+/* Clashing plans (calendar-clock-visuals.md F28): slim bars side by side, each
+   named by a letter; a clash still ahead gets a Line up tab. */
+.cal-letter {
+  position: relative; z-index: 1; font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  line-height: 14px; color: var(--ink); letter-spacing: 0; pointer-events: none; white-space: nowrap;
+}
+.cal-letter--stack { writing-mode: horizontal-tb; width: 1ch; white-space: normal; word-break: break-all; line-height: 11px; text-align: center; }
+.cal-block[data-plan-state="missed"] .cal-letter { color: color-mix(in srgb, var(--rust) 70%, var(--ink)); }
+.cal-block[data-plan-state="done"] .cal-letter { color: var(--ink-2); }
+.cal-lineup {
+  display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border-radius: 5px; cursor: pointer;
+  font-family: var(--font-mono); font-size: 11px; white-space: nowrap; color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--acid) 50%, transparent);
+  background: color-mix(in srgb, var(--paper) 80%, var(--acid) 20%);
+}
+.cal-lineup:hover { background: color-mix(in srgb, var(--paper) 65%, var(--acid) 35%); }
+
+/* Unschedule drop zone, shown while a plan is dragged (F28). */
+.cal-unsched {
+  display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 10px;
+  color: var(--acid-ink, var(--acid)); font-family: var(--font-mono);
+  background: color-mix(in srgb, var(--paper) 92%, var(--acid) 8%);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--acid) 55%, transparent), 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.cal-unsched.is-hot { background: color-mix(in srgb, var(--paper) 78%, var(--acid) 22%); box-shadow: inset 0 0 0 2px var(--acid), 0 6px 18px rgba(0, 0, 0, 0.35); }
+/* Decision 40 — ANY TIME strip cells: every cell is a target while a plan is
+   dragged; the one under the pointer fills. */
+.cal-anytime.is-target { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 55%, transparent) !important; }
+.cal-anytime.is-hot { background: color-mix(in srgb, var(--acid) 14%, transparent); box-shadow: inset 0 0 0 1px var(--acid) !important; }
+.cal-unsched__text { display: flex; flex-direction: column; gap: 1px; pointer-events: none; }
+.cal-unsched__text b { font-size: 12px; font-weight: 600; color: var(--ink); }
+.cal-unsched__text span { font-size: 11px; color: var(--ink-2); }
+.cal-unsched > svg { pointer-events: none; flex-shrink: 0; }
+
+/* A tracked span still running: its stripes crawl while it grows. */
+/* 8px stripes at 135deg repeat every 8 * sqrt(2) = 11.31px down the bar. */
+/* The Clock rail's track (calendar F29): the Clock's ring track, one shade
+   lighter than the day; on light paper that shade is halved so the empty
+   track stays a quiet line, not a bar. */
+.cal-rail { background: var(--paper-3); }
+[data-theme="light"] .cal-rail { background: color-mix(in srgb, var(--paper-3) 45%, transparent); }
+.cal-live-seg { animation: cal-live-crawl 1.4s linear infinite; }
+@keyframes cal-live-crawl { to { background-position: 0 11.31px; } }
+@media (prefers-reduced-motion: reduce) { .cal-live-seg { animation: none; } }
+
+/* Analytics header: chips give way to the window's width (the gear stays). */
+.an-head { container-type: inline-size; }
+@container (max-width: 420px) { .an-chip--done { display: none; } }
+@container (max-width: 340px) { .an-chip--focus { display: none; } }
+@container (max-width: 250px) { .an-chip--streak { display: none; } }
+
+/* Top bar: the path gives its room to the canvas name on narrower windows. */
+@media (max-width: 1380px) { .krnl-breadcrumb { display: none; } }
+
+/* Calendar sub-header gives way to the window's width, never wraps. */
+.cal-subhead { container-type: inline-size; }
+@container (max-width: 600px) { .cal-weekof { display: none; } }
+@container (max-width: 470px) { .cal-layer-label { display: none; } }
+/* The Repeating button keeps its icon and drops its word when the header is tight. */
+@container (max-width: 560px) { .cal-repeating-label { display: none; } }
+.cal-wl-short { display: none; }
+@container (max-width: 470px) { .cal-wl-long { display: none; } .cal-wl-short { display: inline; } }
+@container (max-width: 470px) { .cal-zoom { display: none !important; } } /* (its inline display would win otherwise) */
+
+/* Todo rows (Decision 40): a narrow row wraps its meta under the name instead
+   of hiding parts of it; nothing here shrinks or hides. */
+
+
+
+/* Align to grid: a moved node glides onto its grid spot (CanvasFlow settleNodes). */
+.react-flow__node[data-settling] {
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node[data-settling] { transition: none; }
+}
+[data-motion="reduced"] .react-flow__node[data-settling] { transition: none; }

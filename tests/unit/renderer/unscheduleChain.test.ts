@@ -42,12 +42,14 @@ describe('chain successor schedule actions', () => {
     expect(placementOf('b')?.startISO).toBe('2026-11-03T09:30');
   });
 
-  it('labels the menu action and takes the whole chain off the calendar', async () => {
+  it('Unschedule on a successor takes only it off; the chain before it stays (2026-11-07 bug: it took the whole chain)', async () => {
     const items = taskMenuItems({ id: 'b', text: 'b', done: false });
-    expect(items.some((i) => i.label === 'Unschedule chain')).toBe(true);
+    expect(items.some((i) => i.label === 'Unschedule')).toBe(true);
+    expect(items.some((i) => i.label === 'Unschedule chain')).toBe(false);
     await unscheduleTask('b');
     const a = useBoardStore.getState().board!.nodes.find((n) => n.id === 'a')!;
-    expect((a.state as TaskState).scheduledFor ?? null).toBeNull();
+    expect((a.state as TaskState).scheduledFor).toBe('2026-11-03T09:00');
+    expect(placementOf('a')?.startISO).toBe('2026-11-03T09:00');
     expect(placementOf('b')).toBeNull();
   });
 });

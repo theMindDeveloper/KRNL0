@@ -142,17 +142,39 @@ describe('Calendar ↔ Clock right-click parity', () => {
 });
 
 describe('Calendar pomo spans as background highlights', () => {
-  it('renders behind tasks and never takes pointer events', () => {
+  it('fills a thin track beside the plan and never takes pointer events', () => {
     seed();
     render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
     const band = document.querySelector('[data-testid="calendar-reality-block"]') as HTMLElement;
     expect(band).toBeTruthy();
     expect(band.style.pointerEvents).toBe('none');
-    expect(band.style.zIndex).toBe('0');
+    // The recorded rail sits in its own lane beside the plan blocks (z 1), never under them.
+    expect(band.style.zIndex).toBe('1');
     expect(band.getAttribute('data-reality-kind')).toBe('work');
-    // Full plan-area width, not a thin rail.
-    expect(band.style.left).toBe('0px');
-    expect(band.style.right).toBe('0px');
+    // The Clock rail (calendar F29): the fill rides its track inside the day,
+    // 4 px from the day line, as wide as the track, with round caps.
+    const track = document.querySelector('[data-testid="calendar-reality-track"]') as HTMLElement;
+    expect(track).toBeTruthy();
+    expect(band.style.left).toBe('4px');
+    expect(track.style.left).toBe('4px');
+    expect(band.style.width).toBe(track.style.width);
+    expect(band.style.borderRadius).toBe(`${parseFloat(track.style.width) / 2}px`);
+  });
+
+  it('a past day with nothing recorded draws no empty track (a week of bare tracks read as scrollbars)', () => {
+    seed();
+    const y = new Date(d0); y.setDate(y.getDate() - 3);
+    const past = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+    render(<WeekView state={{ ...calState(), anchorDate: past }} config={calConfig()} onCommand={() => {}} singleDay />);
+    expect(document.querySelector('[data-testid="calendar-reality-block"]')).toBeNull();
+    expect(document.querySelector('[data-testid="calendar-reality-track"]')).toBeNull();
+  });
+
+  it('today has one "now" mark: the knob on the track (the now line drops its own dot)', () => {
+    seed();
+    render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
+    expect(document.querySelectorAll('[data-testid="calendar-reality-now"]').length).toBe(1);
+    expect(document.querySelector('[data-testid="now-line-dot"]')).toBeNull();
   });
 
   it('focus and break read differently', () => {
@@ -165,6 +187,7 @@ describe('Calendar pomo spans as background highlights', () => {
     const [work, brk] = Array.from(document.querySelectorAll('[data-testid="calendar-reality-block"]')) as HTMLElement[];
     expect(brk!.getAttribute('data-reality-kind')).toBe('break');
     expect(work!.style.background).not.toEqual(brk!.style.background);
-    expect(brk!.style.background).toMatch(/repeating-linear-gradient/);
+    // A break is the gap in the rail: nothing is drawn (no stripes).
+    expect(brk!.style.background).toBe('transparent');
   });
 });

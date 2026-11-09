@@ -2,7 +2,7 @@
 /** "Deleted … · UNDO" takes back exactly the delete, and only while it is safe. */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
-import { undoable, undoNoticed, useUndoNotice } from '../../../src/renderer/store/undoNotice';
+import { revertible, undoable, undoNoticed, useUndoNotice } from '../../../src/renderer/store/undoNotice';
 import type { Board, Node } from '../../../src/shared/types';
 
 vi.mock('../../../src/renderer/store/eventLog', async (orig) => ({
@@ -35,6 +35,16 @@ describe('undo notice', () => {
     useBoardStore.getState().removeNode('b');
     expect(undoNoticed()).toBe(false);
     expect(ids()).toEqual(['c']);
+  });
+
+  it('a revert notice (Drop) runs its own reverse step, even after later async changes', () => {
+    const revert = vi.fn();
+    revertible('Dropped "Gym"', revert);
+    useBoardStore.getState().removeNode('a'); // e.g. the plan leaving the Calendar a moment later
+    expect(useUndoNotice.getState().notice?.label).toBe('Dropped "Gym"');
+    expect(undoNoticed()).toBe(true);
+    expect(revert).toHaveBeenCalledTimes(1);
+    expect(useUndoNotice.getState().notice).toBeNull();
   });
 
   it('shows nothing when the action changed nothing', () => {

@@ -1238,3 +1238,1375 @@ No DOM reads. The formula holds because the RF canvas wrapper does not move duri
 **Type:** Chore (CI)
 **Files changed:** `.github/workflows/release.yml`, `docs/releases/RELEASING.md`, `docs/releases/v0.10.1.md`, `docs/08-history/HISTORY.md`
 **Summary:** The `macos-15` job of the v0.10.1 tag build sat queued for a shared GitHub Mac runner. By the maintainer's choice the release workflow now builds Windows only (the macOS entry is kept as a comment to restore). The maintainer builds the `.dmg` on a Mac from the same tag and attaches it with `gh release upload` (RELEASING.md → "macOS build"); macOS is notify-only, so no metadata file has to match. The unpublished `v0.10.1` tag moves to this commit.
+
+---
+
+## [2026-11-06] — Pocket timer: the Pomo node floats over other apps
+
+**Type:** Feature
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/main/pocket/index.ts`, `src/main/mainWindow.ts`, `src/main/index.ts`, `src/main/preload.ts`, `src/main/ipc/handlers.ts`, `src/main/rpc/server.ts`, `src/main/boardIo.ts`, `src/shared/pocket.ts`, `src/renderer/pocket/*`, `src/renderer/index.tsx`, `src/renderer/App.tsx`, `src/renderer/env.d.ts`, `src/renderer/components/nodes/PomoNode/derive.ts`, `PomoNode/index.tsx`, `src/renderer/components/TopBar/PocketSection.tsx`, `TopBar/index.tsx`, `src/sys/commands/mini.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, tests (`PomoNode.derive`, `shared/pocket`, `sys/mini.cli`), `docs/06-requirements/pocket-timer.md`, `docs/03-architecture/decisions.md` (Decision 37)
+**Summary:** Minimising KRNL0 while the Pomo node is timing now shows a small always-on-top window with the node in its current mode: Pomodoro (the user's timer face counting down, session pips, Stop · Break · Pause, the "Are you done?" Extend · Break · Stop) or Observe (count-up, today's spans on the day strip, Work today / Breaks / Spans, Break · Stop, Back to work). It collapses to one line, drags anywhere (position remembered and kept on a visible screen), and hides when KRNL0 comes back. It is a view only: the main window sends it a snapshot and runs its buttons through the node's own command path; main forwards only the node's control commands. The node's timing and control rules moved to `PomoNode/derive.ts`, shared by both. The main window is now tracked by name, so CLI dispatch, second-launch focus and app activation never target the pocket. Settings → Floating timer switch; CLI `krnl mini status|show|hide|on|off`. Preferences live in `userData/pocket.json`, not the board. Out of scope: the Observe tagger in the pocket (menu bar / taskbar time shipped in the entry below).
+
+## [2026-11-06] — Launch experience: splash, What's new, board backups, welcome back, feedback, milestones, taskbar time
+
+**Type:** Feature
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/main/appState.ts`, `src/main/taskbar.ts`, `src/main/index.ts`, `src/main/preload.ts`, `src/main/pocket/index.ts`, `src/main/ipc/handlers.ts`, `src/main/rpc/server.ts`, `src/shared/appState.ts`, `src/shared/whatsnew.ts`, `src/shared/feedback.ts`, `src/shared/systemTimer.ts`, `src/renderer/index.html`, `src/renderer/splash.ts`, `src/renderer/launch/*`, `src/renderer/components/Launch/*`, `src/renderer/components/TopBar/LaunchSettings.tsx`, `TopBar/index.tsx`, `src/renderer/components/ui/UpdateNoticeBar.tsx`, `StatusBar/index.tsx`, `src/renderer/store/updateStore.ts`, `src/renderer/store/useCliDispatch.ts`, `src/renderer/styles/launch.css`, `src/renderer/assets/launch/*`, `PomoNode/ObserveDash.tsx`, `src/sys/commands/launch.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, `.github/ISSUE_TEMPLATE/*`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, tests, `docs/06-requirements/launch-experience.md`, `docs/03-architecture/decisions.md` (Decision 38)
+**Summary:** Built the launch designs. A splash card paints before any script loads and lists what is really happening (board, counts, canvas; after an update `Updated · a → b` and `backup saved`), then fades as soon as the board is on screen. Before a new version opens the board, main copies `board.json` into `backups/` (newest 3 kept; Settings › Updates › Show folder). After a feature update a What's new box (draft A) shows three highlights once; after a patch a small "Updated to x.y.z" notice fades after 5 s. Update states follow the designs: download meter in the status bar, "ready" waits while a Pomo session runs, Skip version on Mac/Linux, Retry after a failed manual check, recent versions in Settings. Windows shows Pomo progress on the taskbar icon with Pause / Break / Stop in the preview; macOS shows the time in the menu bar with the same controls. Welcome back lists what slipped after 2+ days away (only the first task of a chain gets buttons: Today, Tomorrow, Unplan, Move all to today) and habit streaks. A Help menu (?) adds Send feedback — a filled-in GitHub issue the user posts themselves — and Copy diagnostics. Milestone cards (streaks 7/30/100/365, focus sessions 10/100/500) render a 1080 px image to save or copy, with a Celebrations switch. The Observe day strip draws breaks as a thin line instead of hatching. App state lives in `userData/app-state.json` (Decision 38). New CLI: `krnl whatsnew [show]`, `krnl feedback`, `krnl catchup [show]`, `krnl share list|streak|sessions`, `krnl app status|backups|celebrations`. Repo: issue forms, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT. Previews: `KRNL0_SIMULATE_UPDATE=feature|patch`, `KRNL0_SIMULATE_AWAY_DAYS=n`.
+
+## [2026-11-06] — Floating timer looks (dial, capsule, box); tour orb; Help › Catch up and Share a milestone
+
+**Type:** Feature + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/pocket.ts`, `src/main/pocket/index.ts`, `src/main/preload.ts`, `src/renderer/env.d.ts`, `src/renderer/pocket/{PocketApp,DialView,CapsuleView,model,parts}.tsx`, `PomoNode/daySpans.ts`, `PomoNode/ObserveDash.tsx`, `TopBar/PocketSection.tsx`, `src/sys/commands/mini.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, `src/renderer/components/Tour/{TourHost.tsx,tourAnchor.ts}`, `src/renderer/components/Orb/index.tsx`, `Launch/HelpMenu.tsx`, `styles/launch.css`, tests, `docs/06-requirements/pocket-timer.md`, `launch-experience.md`
+**Summary:** The floating timer now has all three designed looks, chosen in Settings → Floating timer or with `krnl mini look`: a round **Dial** (the new default; ring = time left in Pomodoro, the day with today's spans in Observe; hover for controls; collapses to a small tab), a **Capsule** pill (hover opens a card with details and controls) and the **Box** (the node itself). The pocket window is transparent and sized to the look; main watches the pointer for hover because drag regions hide it from the page. Bug fix: a guided tour no longer shows a second, fake assistant orb — the real orb glides onto the tour card's corner and back home when the tour ends. Help menu gains **Catch up** (Welcome back any time) and **Share a milestone** (a card for the longest streak, or focus sessions).
+
+## [2026-11-06] — Milestone cards as designed, share window, Settings redesign, pocket shadows
+
+**Type:** Feature + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/launch/{milestoneCard,milestones,launchStore}.ts`, `src/renderer/components/Launch/{MilestoneNotice,ShareDialog,HelpMenu,LaunchHost}.tsx`, `src/renderer/store/useCliDispatch.ts`, `src/renderer/assets/launch/cube-paper.webp`, `src/renderer/components/TopBar/{SettingsModal,index,PocketSection,UpdatesSection,LaunchSettings}.tsx`, `src/renderer/pocket/*`, `src/renderer/index.tsx`, `src/renderer/styles/launch.css`
+**Summary:** The milestone cards are now drawn exactly as the design board: the cream streak card (cube, big number, habit in serif, 4-week day grid), the LCD sessions card (glowing number, 12 weekly bars) and a 1080 × 1920 story card. The in-app notice is the compact designed one (badge, one line, Save image · Copy · Not now, "See card"). A new Share a milestone window (Help menu, the notice, `krnl share`) shows every card full size, with Square / Story, Save image and Copy. Settings is redesigned: a section list with line icons (General, Floating timer, Celebrations, Updates, Reset) and the section on the right in cards; it opens on General so the guided tour still finds Mode; Help › Check for updates opens Updates. Fix: the floating timer's shadow no longer shows as a grey box around the dial and capsule — the transparent window is only 8 px bigger than the shape, so all looks now use one small shadow that fits inside it, and the page is transparent from its first frame.
+
+## [2026-11-06] — Send feedback by email
+
+**Type:** Feature
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/feedback.ts`, `src/main/appState.ts`, `src/renderer/components/Launch/FeedbackDialog.tsx`, `src/sys/commands/launch.ts`, `tests/unit/shared/launch.rules.test.ts`, `docs/06-requirements/launch-experience.md`
+**Summary:** Send feedback gains **Send by email** next to Continue on GitHub, for people without a GitHub account: it opens the user's mail app with the report (kind, title, text, version and system, recent errors if ticked) addressed to theminddevlab@gmail.com; nothing is sent until they press Send. The link is kept under 1,900 characters. Main lets only that mailto address through besides the project's GitHub pages. `krnl feedback --link` prints both links.
+
+## [2026-11-06] — UI sounds: three sound packs, volume and on/off
+
+**Type:** Feature
+**Requirements:** [docs/06-requirements/ui-sounds.md](../06-requirements/ui-sounds.md)
+**Files changed:** `src/renderer/sfx/{soundPacks,soundSettings,soundMoments,uiSounds,soundCli}.ts`, `src/renderer/sfx/packs/` (audio + `CREDITS.md`), `src/renderer/components/Canvas/commandDispatch.ts`, `src/renderer/components/TopBar/{index,SoundSection}.tsx`, `src/sys/{parser,SysFacade}.ts`, `src/renderer/store/useCliDispatch.ts`, `src/shared/cli/commandRegistry.ts`, `docs/06-requirements/{ui-sounds,ai-full-visibility-cli}.md`, `tests/unit/renderer/uiSounds.test.ts`
+**Summary:** Short sounds now confirm actions: add, plan on the Calendar, timer start / pause / resume / break / stop, a finished pomodoro, task done / reopened, habit check-in / removal, delete. Three bundled free packs, picked by ear on `docs/research/free-kits.html`: **SND01 · Sine** (default, snd.dev), **Zen** (UI SFX, CC0) and **Crisp** (Anipixels, CC BY 4.0, credited in Settings and `CREDITS.md`). The moment is read from what changed on the board (`soundMoments.ts`), hooked once in `makeCommandHandler`, so every UI path for the same action sounds the same; view changes and per-second time keeping never take the snapshot. Web Audio engine with decode-on-first-use, a per-pack warm-up and an 80 ms repeat guard. Settings → Sounds: on/off switch, volume 0–100, pack buttons that play a sample. Settings are per install in `localStorage` (`krnl0-sound`), not board data. CLI: `krnl sound status|list|pack <id>|volume <0-100>|on|off|play <moment>`.
+
+---
+
+## [2026-11-06] — Finished tasks read neutrally; Easy calls the timer "Record"
+
+**Type:** Feature (UI copy) + Chore
+**Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/Station/StationToolbar.tsx`, `src/renderer/components/Tour/{TourHost.tsx,tours.ts}`, `src/renderer/components/Assistant/VoicePlayer.ts`, `src/renderer/sfx/{sfxEngine,uiSounds}.ts`, `docs/research/engagement-and-onboarding.md`
+**Summary:** From the engagement research (C6, C11). A task that is done no longer shows the rust "+28m OVER": the card reads `PLAN 1H · TOOK 1H 28` in neutral ink, and its calendar block reads "· took 1h 28" with no rust strip; open tasks still show overruns. In Easy mode the panel toolbar names the Pomo **Record**, and tours write `{pomo}`, shown as "Record" in Easy and "Pomo" in Advanced. The sound and voice loaders use Vite's `query: '?url'` glob form (the `as: 'url'` deprecation warning is gone). Voice reactions were dropped by the maintainer; the research report records it and the final sound choice.
+
+---
+
+## [2026-11-06] — Engagement: finish, close the day, first-day tour
+
+**Type:** Feature
+**Requirements:** [docs/06-requirements/engagement.md](../06-requirements/engagement.md) F1–F19 (designs picked from the "KRNL0 Engagement Drafts" canvas: 1A, 2A+2C, 3A+3B+3C, 4A, 5A+5B, 6A+6B, 7A+7C, 8A)
+**Files changed:**
+- New: `src/renderer/store/{finishedCards,dayRecap,dayProgress,engagementCli}.ts`, `src/renderer/components/{DayMoments,PlanGuide}/index.tsx`, `src/renderer/components/TopBar/FinishedSection.tsx`
+- Changed: `TaskNode`, `TodoNode`, `HabitNode` (+ `commands.ts`), `ClockNode`, `CalendarNode/WeekView.tsx`, `Canvas/CanvasFlow.tsx`, `Orb`, `Tour/{TourHost,tours}`, `ui/Popover.tsx`, `App.tsx`, `styles/tokens.css`, `src/sys/{parser,SysFacade}.ts`, `useCliDispatch.ts`, `commandRegistry.ts`
+- Tests: `tests/unit/renderer/engagement.test.ts`, Todo test updates
+
+**Summary:**
+- **Finishing a task:** a ticked task becomes the **done card** (design 9B, same 220×120 box): how long it took as the big number, what was planned, when it was finished, and a ring for today's planned tasks. Ticking plays a one-shot reward (check pop, a burst of 8 dots, a border glow).
+- **Finished cards leave the canvas:** they go overnight by default, with "after 1 hour" and "keep" as the other options and a "show finished" switch in Settings. A chain, or a task with its subtasks, leaves together when all of it is done. Hiding is render-only, so nothing is deleted.
+- **Only "Done today":** the Todo list keeps today's done items in a "Done today" fold; older ones leave the list (Analytics and `todo list --archived` keep them). The "ARCHIVE DONE" button is gone.
+- **Closing the day:** a recap card appears once a day, when the plan is all done or from 21:00. A morning line reads "yesterday: 4 done · 3h 10m", and a Monday look-back covers last week.
+- **"Your first day" tour:** 16 steps through the whole loop, started by the orb's first click on a fresh board and listed first in the orb menu as "Start here".
+- **Adding and planning to-dos:** estimate chips (15m–2h) appear after a to-do's name. A PLAN button on unplanned rows teaches drag and drop with one small one-shot animation (`components/PlanGuide`): a ghost of the task glides once onto the Calendar, its edge pulses once, and a tiny chip beside the row says "drag it onto the Calendar". Nothing covers the Calendar or repeats.
+- **Habit streaks:** the streak line shows the next milestone and best streak, with a seal at 7/30/100/365 days. A "Missed yesterday? I DID IT" repair replaces the silent reset.
+- **Clock:** an outer ring closes as the day's planned blocks are done, and seven week marks sit under the dial.
+- **Missed calendar blocks:** a dashed outline and a ↻ REPLAN corner badge at any size; REPLAN makes the block hop once with a tiny "drag to a new time" chip beside it.
+- **CLI:** `krnl finished …` and `krnl recap …`.
+- **Fix:** nested popovers (a TimeField inside a popover) no longer close their parent.
+
+## [2026-11-06] — Merge: engagement (sounds, done card, close the day) joined with the launch work
+
+**Type:** Merge + Polish
+**Branch:** `feat/pocket-pomo` (merged `feat/engagement-sounds-done-card`)
+**Files changed:** `src/renderer/components/TopBar/{SettingsModal,SoundSection,FinishedSection}.tsx`, `src/renderer/components/ui/SettingsIcons.tsx`, `src/renderer/launch/{catchup,milestones,launchStore}.ts`, `src/renderer/components/DayMoments/index.tsx`, `src/renderer/components/nodes/HabitNode/index.tsx`, `src/renderer/components/nodes/TaskNode/DoneCard.tsx`, `src/renderer/components/PlanGuide/index.tsx`, `src/renderer/components/Launch/HelpMenu.tsx`, `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/index.tsx`, `src/renderer/styles/launch.css`
+**Summary:** The engagement branch (UI sound packs, the done card, finished cards leaving the board, close the day, the first-day tour, PLAN/REPLAN hints, habit streak repair) is merged into the launch work. Joined so nothing is duplicated or fights: Sounds and Finished cards are sections of the new Settings window, restyled as its cards with line icons and a styled volume slider; one best-streak rule and one milestone list (the Habit node's), and the habit's milestone seal opens the share card; the day recap and morning line wait while a launch dialog is open, and the morning line stays quiet right after Welcome back; the tour host keeps the real orb on the tour card and the `{pomo}` naming; Help › Take the tour starts the first-day tour. Polish: the done card reads as finished (light acid wash, "1h 20m", "done 19:16", softer title); a habit with no streak says "tick today to start a streak" (or "start a new streak today · best N") instead of a rust "▲ 0 day streak"; the PLAN hint's chip sits under its row inside the Todo panel on a solid background instead of over the neighbouring window. The temporary "What's new" review tour from the engagement branch is still in and must be removed before this reaches main.
+
+## [2026-11-06] — Close-the-day redesign; tour, sound and visibility fixes
+
+**Type:** Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/DayMoments/index.tsx`, `src/renderer/styles/launch.css`, `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/components/Orb/index.tsx`, `src/renderer/sfx/{uiSounds,soundPacks}.ts`, `tests/unit/renderer/uiSounds.test.ts`
+**Summary:** The day recap, last-week card and morning line are redesigned in the launch design language: the paper dialog with a scrim, an acid kicker, a serif headline, a done ring and number tiles, one plan-vs-recorded meter with a plan marker and a blame-free verdict ("right on plan", "40m less than planned"), a week of rounded bars with values and the best day in acid, three tiles (done, focused, active days), and a footer with the button on the right; the morning line is a pill with a sun icon. Fixes: a tour step about the orb (or its menu) no longer makes the card and the orb chase each other; a tour's words show as soon as the target holds still (3 px tolerance, at most 0.5 s instead of 1.2 s); a step about a window brings it back if it was hidden from the toolbar and switches the canvas layers on; every UI sound hit fades in (4 ms) and out (14 ms), and pitched-up hits are rolled off above 7 kHz, which removes the glitchy click on ticks; the task-done sparkle is pitched lower.
+
+## [2026-11-06] — Fix: habits below the fold, tour card covering its target
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitNode/index.tsx`, `src/renderer/components/Tour/TourHost.tsx`, `tests/unit/renderer/tourPlaceCard.test.ts`
+**Summary:** Habits lower in the list (e.g. "No sugar") couldn't be reached: the new streak and repair lines made rows taller, the list scrolls, but the wheel over it zoomed the canvas instead. The habit list now keeps the wheel (`nowheel`, contained overscroll), like the Calendar and notes. The tour's guide card no longer covers what it talks about: when no side of the target has room (a tall Settings section), it takes the spot on screen that overlaps it least.
+
+## [2026-11-06] — Fix: tour steps find what they talk about, wherever it is
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Tour/TourHost.tsx`, `src/renderer/styles/launch.css`, `tests/unit/renderer/tourPlaceCard.test.ts`
+**Summary:** A tour step used the first element matching its selector, wherever it sat — a Calendar block hidden under the grid's header, or a REPLAN badge inside a hidden panel — so the ring pointed at empty spots. Targets are now found by what they are, never by position: of all matches, the most visible one wins (inside the window, not hidden, clipped by every scrolling ancestor), preferring those inside the window the step is about; a match scrolled out of sight is scrolled into view once; if nothing is visible the ring goes around the window itself. A floating panel lying on top of the target (the ambient radio, a chat panel) fades aside for that step and comes back after.
+
+## [2026-11-06] — Tour engine rules: right Settings page, named items, no dimming while waiting, every needed window shown
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Tour/{TourHost,tours}.ts(x)`, `src/renderer/components/TopBar/SettingsModal.tsx`, `tests/unit/renderer/tourRules.test.tsx`
+**Summary:** Four rules in the tour engine, so these bugs can't come back step by step: (1) a step that opens Settings opens it on the page that holds what it talks about (Sounds, Finished cards, Floating timer…), so the card no longer sits on an empty General page over the thing it describes; (2) a step can name its item (`targetText`) and the spotlight lands on that item, or on the button in that item's row (Demo · tick me, Demo · plan me, Demo · gym, Demo · read); (3) while a step waits for the user to act, nothing is dimmed, so what they must click never looks disabled; (4) a step lists every window it needs (`also`, e.g. Todo and Calendar for a drag) — each is un-hidden, and a floating panel covering any of them steps aside for that step.
+
+
+## [2026-11-06] — Calendar rebuilt, one task card, Welcome back, pocket span naming, line icons
+
+**Type:** Feature + Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{WeekView.tsx,dayBlockLayout.ts}`, `src/renderer/components/nodes/TaskNode/{index,DoneCard,CardParts}.tsx`, `src/renderer/components/Launch/WelcomeBack.tsx`, `src/renderer/launch/{catchup,launchStore}.ts`, `src/renderer/styles/{launch,reactflow-theme}.css`, `src/renderer/components/nodes/{TodoNode,HabitNode,PomoNode,AnalyticsNode,ClockNode}/index.tsx`, `src/renderer/components/{TopBar/index,AmbientRadio/index,ui/SettingsIcons}.tsx`, `src/renderer/pocket/{PocketApp,parts,usePocketBridge}.ts(x)`, `src/main/{pocket/index,preload}.ts`, `src/renderer/env.d.ts`, `src/renderer/App.tsx`, `src/renderer/components/Tour/tours.ts`, removed `src/renderer/dev/whatsNewDemo.ts`; docs `calendar-clock-visuals.md` F15, `task-node.md` F1/F16, `pocket-timer.md` F13; tests for each.
+**Summary:** Calendar: blocks are only the plan; what was recorded is a thin rail inside each day's left edge (breaks are its gaps); habits are clickable pills on the right edge that tick the habit; Recorded and Habits switch on and off in the header. After review it was rebuilt to fix real layout bugs, checked by measuring every block: text is never rotated (narrow lanes used to show titles sideways), at most 2 tasks side by side in the week and 4 in the day with a "+N" chip for the rest, a 3 px gap between blocks that touch in time, the grid opens and pages on whole hours and never on a block cut in half, a missed task says "Missed" once (the dashed border, REPLAN pill and sentence are gone; replan shows on hover), done tasks stay readable with a check, line icons replace ↑ ↓ ✓ ↻ ← → ▦. Task card: open, running, paused, missed and done share one 220×120 frame, so nothing moves under the click; "#03 L0" and the corner timer are gone. Welcome back: the days away as calendar columns, loose ends with Today and icon buttons, habit weeks. Todo "Done today" pages straight to the done items; habit rows say "N days" with a flame and a plain repair row. The floating timer asks "What were those 25m?" after an Observe span, one click on a category names it (only `pomo.retagSegment` with checked arguments may come from the pocket). The top bar, node headers and Todo use line icons instead of ⚙ ☾ ☀ ☰ ⏱. The temporary branch-review tour and its demo data are removed.
+
+## [2026-11-06] — UI loop batch 1: Analytics fits small windows, Todo and Pomo readable in light mode
+
+**Type:** Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/index.tsx`, `src/renderer/analytics/charts/PlanVsActual.tsx`, `src/renderer/components/nodes/TodoNode/index.tsx`, `src/renderer/components/nodes/PomoNode/index.tsx`, `src/renderer/styles/reactflow-theme.css`
+**Summary:** Found by rendering every window in light and dark and measuring clipped text, contrast and overlaps. Analytics: the "Plan vs actual" tiles cut their text ("ACCU ×1 task") in a small window; they now fit the room they have (four in a row, 2×2, or a plain label/value list). "Estimate vs actual" in a narrow card stacks name and value over full-width bars instead of drawing the value on the bars. The header's chips give way to the window's width (done, then focus) so the gear never leaves the window; the streak value uses the dark acid in light mode. Todo: a task whose planned time passed was faded like a done one; it now stays fully readable (the overdue dot marks it). Time and tag text is 10.5 px at readable contrast, tags are the task card's tinted chips, the overdue dot keeps its slot on every row so checkboxes line up, and the header says "7 overdue". Pomo: the cycles counter was lime on a pale strip (1.2:1) in light mode; it uses the dark acid with readable labels; the task picker's ☐/☑ characters are line icons.
+
+## [2026-11-06] — UI loop batch 2: habit days read right, Welcome back copy, top bar, Settings never blank
+
+**Type:** Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/styles/{tokens,launch,reactflow-theme}.css`, `src/renderer/components/Launch/WelcomeBack.tsx`, `src/renderer/components/TopBar/{index,CanvasSwitcher,PocketSection,LaunchSettings}.tsx`, `src/renderer/dev/previewBridge.ts`, `tests/unit/renderer/AppChrome.scenarios.test.ts`
+**Summary:** Habit week grid: a habit ticked today looked unticked (the "today" rule cleared the fill); done days were a framed two-colour cell that read as an empty box; future days were darker than past ones in light mode. Now done is a solid block in the habit's colour, today is an outline (filled when ticked), a missed day is grey, and future days are a faint empty outline, in both themes. Welcome back says "1 day, still going" (not "1 days") and the "was Tue 3" date is readable on the light dialog. Top bar: the path no longer wraps onto two lines (it hides on narrower windows so the canvas name keeps its room), the canvas name no longer shrinks to "Ma…", and ∷ ◆ ▾ are drawn shapes. Settings: Floating timer and Celebrations never show an empty card (the celebrations switch shows its default until read; the floating timer says it lives in the desktop app when there is none). Dev: `?fixture=rich` preview board with habits in every state and slipped tasks, for render checks.
+
+## [2026-11-06] — UI loop batch 3: calendar header and habit pills at any size, recap wording
+
+**Type:** Polish + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/DayMoments/index.tsx`, `src/renderer/styles/reactflow-theme.css`
+**Summary:** In a small Calendar window (the station layout) the header wrapped "Week of November 2" onto three lines and the zoom "+" sat on the next arrow; the header now gives way to its width ("Week of" goes first, then the layer labels — their icons stay — then the zoom) and never wraps; its labels are 10 px. Habit pills on the calendar: text is always ink (the done pill was dark text on dark teal, 3.4:1); done is the habit's colour as a tint with a check, open is an outline; in narrow day columns a habit is a round icon with its name in the tooltip instead of "R…". The first-day tour was walked step by step headless: the card never covers its target and never leaves the window. Day recap: the ring says "of the plan done" (next to "3 done" it read as a contradiction) and the streak uses the flame icon, not ▲.
+
+## [2026-11-06] — Bug hunt batch 1: safe settings writes, strict external links, calendar layers in the board and the CLI
+
+**Type:** Bug Fix + Feature (CLI parity)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/main/appState.ts`, `src/main/pocket/index.ts`, `src/shared/feedback.ts`, `src/renderer/components/nodes/CalendarNode/{types,commands,WeekView}.ts(x)`, `src/renderer/components/Canvas/commandDispatch.ts`, `src/sys/{parser,SysFacade}.ts`, `src/sys/commands/cal.ts`, `src/shared/cli/commandRegistry.ts`, `docs/06-requirements/calendar-clock-visuals.md` F16, tests `tests/unit/shared/externalUrl.test.ts`, `tests/unit/sys/cal.layers.test.ts`
+**Summary:** `app-state.json` (what's new seen, celebrations, last active) and the floating timer's prefs were written in place; a crash or power cut mid-write left a broken file and the app silently fell back to defaults. Both now use the board's atomic write (temp file, then rename, retried on Windows locks). The "open in browser" check matched by prefix, so `…/KRNL0-anything` or a look-alike host passed; it now parses the URL and allows only `https://github.com/theMindDeveloper/KRNL0[/…]` and the feedback mail. The Calendar's Recorded / Habits switches were kept in the browser's localStorage, out of the store and out of reach of the CLI (rules 5 and 8); they are now calendar state set through `calendar.setLayers`, with `krnl cal layers [recorded|habits on|off] [--json]`. Older boards (no `layers`) show both.
+
+## [2026-11-06] — Bug hunt batch 2: Welcome back never hides a slipped task; milestones survive a jump
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/launch/{catchup,milestones}.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `docs/06-requirements/launch-experience.md` F20, tests `launch.catchup`, `launch.dialogs`
+**Summary:** Welcome back hid every task that had a predecessor, expecting it to come along with its head — but when the head was already done, or not due yet, the slipped task was shown nowhere. A slipped task is now listed under a head only when an earlier task in its chain slipped too; otherwise it is a head itself. A follower that slipped carries its time, and "Today", "Tomorrow", "Unplan" and "Bring all" move it with its head (same day, its own time), so it doesn't come back on the next launch. Milestones fired only when a count was exactly 7, 30, 100…; a repaired day (1 → 8) or logged past time (99 → 101) skipped the card for good. Now the highest milestone reached within 3 days / 5 sessions shows, once; an old long streak does not replay earlier ones.
+
+## [2026-11-06] — Bug hunt batch 3: feedback reports don't publish your account name
+
+**Type:** Bug Fix (privacy)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/feedback.ts`, `tests/unit/shared/externalUrl.test.ts`
+**Summary:** Send feedback can attach the session's recent errors to a public GitHub issue. Error lines often hold file paths such as `C:\Users\<name>\Documents\krnl0\board.json`, which would publish the user's account name. Paths under a home folder now read `~` (Windows, macOS and Linux forms) and email addresses read `<email>`, in both the issue link and "Copy diagnostics".
+
+## [2026-11-06] — UI loop batch 4: Clock schedule readable, last glyphs gone
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`
+**Summary:** The Clock's schedule faded rows that were over to 42 % opacity (3.7:1); they now keep full opacity in a quieter ink, with their colour bar at half strength. Times and durations are 10 px at readable contrast, the active PM/AM chip uses the deeper rust so its label reads in light mode, and the header's ◉ / ▦ / ◷ characters are a dot and line icons. All nine Analytics pages were rendered in both themes and at the small station size; the Insights page still squeezes three cards across a very narrow window (noted for a follow-up: the page grid needs to reflow by width).
+
+## [2026-11-06] — UI loop batch 5: month and year views readable, Pomo chips, steadier test runs
+
+**Type:** Polish + Chore
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{MonthView,YearView}.tsx`, `src/renderer/components/nodes/PomoNode/index.tsx`, `vitest.config.ts`, `tests/unit/renderer/launch.dialogs.test.tsx`
+**Summary:** Month view: days of the neighbouring months were ink-4 at 35 % (2.8:1); now quieter but readable. Year view: days with a light acid fill kept light text (1.1:1); dark text now starts at about a third of the fill. Pomo: the active POMO/OBSERVE and session-length chips use the deeper rust so their paper-coloured label reads in light mode (3.9 → 5:1). Tests: render tests that cold-load the whole station took 15–18 s under a full parallel run with the dev app open and timed out at random; the timeout is 30 s, and the new Welcome back test loads its command module up front.
+
+## [2026-11-06] — UI loop batch 6: Analytics Insights fits a small window
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/{guide,PageNav}.ts(x)`, `src/renderer/analytics/charts/Radar.tsx`
+**Summary:** The Insights page put three charts in a row; in a station-sized Analytics window each was ~110 px wide, so titles were cut ("MULTIVARIATI…") and the radar's and the pie's labels ran off the card. Insights now holds four charts two by two (radar, sources split, tasks × focus, focus by weekday) and the two distributions moved to a new **Day to day** page, one full-width chart per row. The radar keeps every label inside the chart: side labels grow away from the centre, small charts use short names (Streak, Active, Focus; the full name is the tooltip) and leave more room around the shape. Easy mode's page order is unchanged.
+
+## [2026-11-07] — UI loop batch 7: launch dialogs — share list, icons on buttons, readable numerals
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Launch/{ShareDialog,FeedbackDialog}.tsx`, `src/renderer/launch/milestones.ts`, `src/renderer/styles/launch.css`
+**Summary:** Share a milestone: the chosen card wasn't marked (the list uses `aria-checked`, the shared style only knew `aria-pressed`) — it now has a background and an outline; habits with a 0-day streak are no longer offered as cards; Copy and Save image have icons. Send feedback: Copy diagnostics, Send by email and Continue on GitHub have line icons. What's new: the outlined 01/02/03 numbers use ink-3, and the current one the dark acid, so they read on the light dialog.
+
+## [2026-11-07] — UI loop batch 8: Easy mode pass, time log navigation, habit month/year
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/TimeLogHeatmap.tsx`, `src/renderer/components/nodes/HabitNode/{index,HabitPopover}.tsx`
+**Summary:** The whole station was rendered in Easy mode in both themes. Analytics › Time per task: in a small window the week navigation wrapped "›" onto a line of its own, away from the dates; the arrows, the range and "This week" now wrap as one unit, with line chevrons. Habits in Month and Year view showed the streak as a rust "▲ 7"; they use the week view's flame and count (acid when going, grey at 0). The habit view popover now closes with Escape like every other popover.
+
+## [2026-11-07] — UI loop batch 9: task card in light mode
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`
+**Summary:** The task card's open, missed and done states were rendered in light mode: one shape, readable. The missed card's "Was Tue 3 · 18:00" used plain rust (3.9:1 on the light card) and now uses the same darker rust as Welcome back. The first-day tour was walked again in light mode: 14 steps, the card never covers its target, its text reads on the light card.
+
+## [2026-11-07] — UI loop batch 10: line icons in the assistant menu and the ambient radio
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/ui/LineGlyph.tsx` (new), `src/renderer/components/{AmbientRadio/index,Orb/index,Assistant/Commander}.tsx`
+**Summary:** The assistant menu's ▸, the orb's ▶/◆ and the ambient radio's ▶ ★ ☆ ♪ were text characters (the OS symbol font, off the baseline, ignoring the app's stroke). They are now line icons from one small shared `LineGlyph` (play, star, star outline, note, chevron, diamond) that follow the text colour; the radio's empty-saves hint says "tap the star".
+
+## [2026-11-07] — UI loop batch 11: floating timer captions without glyphs
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/pocket/{DialView,CapsuleView,PocketApp}.tsx`
+**Summary:** The dial's caption read "▶ Start", "● Working", "❚❚ Paused" in the OS symbol font; it now says Start, Working, Paused (the ring and colour already show the state). The capsule's Observe count-up arrow is a drawn arrow with an accessible name, and the collapsed box says "time log" without the ↑ character.
+
+## [2026-11-07] — UI loop batch 12: drawn ticks, crosses and dots
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/ui/LineGlyph.tsx`, `src/renderer/components/nodes/{TaskNode/DoneCard,TodoNode/index,HabitNode/index}.tsx`, `src/renderer/components/{StatusBar/index,TopBar/CanvasSwitcher}.tsx`
+**Summary:** The tick inside every done checkbox (Todo rows and the done task card) was the ✓ character; it is now a drawn tick that sits centred in the box in both themes. The Todo row's remove ✕, the canvas switcher's ✓ and ✕, and the ● dots in the Todo and Habit headers and the status bar's "connected" are drawn too (`LineGlyph` gained check, close, dot and an optional stroke weight).
+
+## [2026-11-07] — UI loop batch 13: Pomo pickers and span log
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/ui/{LineGlyph,TaskInfoPopup,TaskTagPicker}.tsx`, `src/renderer/components/nodes/PomoNode/{DoingPicker,SpanLabeler,SpanLog}.tsx`, `src/renderer/components/nodes/TodoNode/TagPicker.tsx`, `src/renderer/components/nodes/AnalyticsNode/TimeLogHeatmap.tsx`
+**Summary:** The Pomo pickers, span labeller and span log used ✕ ☑ ☐ ✓ characters; they are drawn icons now. A span or choice linked to a task shows a small task mark (it used ☐/☑, which read as "done"), and a ticked choice shows a drawn tick. In the span log the unnamed span's "name it…" was lime on a light row (1:1 in light mode) and now uses the dark acid. The tag pickers, the task popup's DONE and the time log's done mark are drawn too.
+
+## [2026-11-07] — UI loop batch 14: capsule card dots
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/pocket/CapsuleView.tsx`
+**Summary:** The floating capsule's hover card labelled "● Time log", "● working" and "● Deep work · pomo.025" with the ● character; the dots are drawn, in the label's colour, on the text's baseline.
+
+## [2026-11-07] — UI loop batch 15: no low-contrast text left on the main screen
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/styles/tokens.css`, `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/components/nodes/{TodoNode/index,AnalyticsNode/index,CalendarNode/WeekView}.tsx`
+**Summary:** The design checker's run on the live app went from 10 low-contrast texts this evening to 0: placeholders now follow the theme (the browser's grey was 3.9:1 on dark windows), and the ambient radio's "v03", "tap a chip to layer" and "tap to layer" are readable. The smallest labels grew about a point: Todo's PLAN (9 → 10 px), Analytics' range chips (9 → 10), the calendar's day headers and hour labels (9 → 10) and half-hour labels (7.5 → 8.5), all still fitting their space.
+
+## [2026-11-07] — UI loop batch 16: the canvas opens clear of the tool rail
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Canvas/fitPadding.ts` (new), `src/renderer/App.tsx`, `src/renderer/components/TopBar/index.tsx`, `docs/06-requirements/app-chrome.md` F7, `tests/unit/renderer/AppChrome.scenarios.test.ts`
+**Summary:** Fitting the board to the window used an even padding, so the left column of cards opened under the floating tool rail (the design checker flagged their "Not started" lines as a third covered). The opening fit and the FIT button now use one padding that leaves 104 px on the left for the rail.
+
+## [2026-11-07] — UI loop batch 17: last contrast misses
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/{AmbientRadio/index,StatusBar/index}.tsx`, `src/renderer/components/nodes/{ClockNode/index,TodoNode/index}.tsx`
+**Summary:** A full re-audit of the canvas, Todo, Habit, Pomo and Calendar in both themes found the last texts under 4.5:1 and fixed them: the ambient radio's unselected chips, header buttons and volume number; the Clock's active AM chip (now the deeper rust, like PM); the Todo's over-plan time; and the status bar's Pomo value in light mode. Only disabled buttons stay dim, as intended.
+
+## [2026-11-07] — UI loop batch 18: nothing opens under the minimap
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Canvas/fitPadding.ts`, `docs/06-requirements/app-chrome.md` F7
+**Summary:** After the tool-rail fix, the design checker's last covered text was a task card's time under the minimap in the bottom-right corner. The fit padding now also leaves the minimap's width on the right; the live page has no covered text left.
+
+## [2026-11-07] — UI loop batch 19: Clock rows lose their left bars
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`
+**Summary:** Each Clock schedule row was marked by a 4 px colour bar on its left edge (the design checker's "side-tab"; our rule is no left accent bars). The task's colour is now a dot, as in the Todo rows, so the same task looks the same in both windows.
+
+## [2026-11-07] — UI loop batch 20: analytics change arrows
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/SummaryHero.tsx`, `src/renderer/analytics/charts/KpiTiles.tsx`
+**Summary:** The change against the previous period read "▲ 217%" / "▼ 12%" with text triangles; it is now a drawn up or down arrow in the same colour. With this the live design check of the main screen has no low-contrast text, no covered text and no left stripes left (184 findings this evening → 156; what remains is the app's 10–10.5 px label size, a design decision to review, not a bug).
+
+## [2026-11-07] — UI loop batch 21: habit lane icons
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`
+**Summary:** The habit lane (a habit placed on the canvas) used ● ✓ ▲ ↻ characters for its colour, today's tick, its streak and its cadence; they are drawn now, and the streak uses the flame like every other habit view. Covered by the lane's tests; not render-checked (the preview board has no lane).
+
+## [2026-11-07] — UI loop batch 22: habit lane checked on screen
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`, `src/renderer/dev/previewBridge.ts`
+**Summary:** The rich preview board now has a habit lane, so batch 21's icons were rendered and checked in both themes. Its running streak was rust; it is acid like every other habit view (grey at 0).
+
+## [2026-11-07] — UI loop batch 23: the morning greeting no longer covers windows
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/DayMoments/index.tsx`, `src/renderer/styles/launch.css`
+**Summary:** "Good morning." floated at the top centre over the Todo and Habit windows (it covered a Todo row and the Habits header) and stayed until dismissed or the board changed. It now sits bottom centre above the status bar and goes by itself after 15 seconds. Its entrance used the shared rise animation, whose transform dropped the -50% centring, so it slid in diagonally from the right; it has its own keyframes now and none under reduced motion.
+
+## [2026-11-07] — UI loop batch 24: an 11px floor for all functional text
+
+**Type:** Polish (readability)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** ~70 renderer files (`fontSize` 9 / 9.5 / 10 / 10.5 → 11 in style objects, `font-size` in CSS), `src/renderer/components/nodes/{PomoNode,TodoNode,AnalyticsNode}/index.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/pocket/parts.tsx`, `src/renderer/styles/reactflow-theme.css`, `docs/04-visual-system/design-tokens.md`
+**Summary:** The app's labels, meta rows, chips and buttons were 9–10.5 px, which the design checker counted as 147 legibility failures on the main screen. All functional text is now at least 11 px; only the Calendar's half-hour ruler marks stay at 10 px to fit their gutter, and SVG chart axes are unchanged. Done in stages with a backup, each measured: no clipped text, no overlapping controls, the Calendar layout check still passes, the tour still never covers its target, the top bar fits at 1280 px. Where bigger text crowded a layout, the layout gave way: the Pomo header keeps one line (the session code shortens first), Todo titles keep at least 72 px (PLAN becomes its icon and tag chips narrow in a small window), and Analytics card toolbars wrap under their title. The light Box look's skip button follows the theme. Live design check: 184 findings this evening → 12 (no low contrast, no covered text, no left stripes, no undersized functional text). The rule is now in design-tokens.md.
+
+## [2026-11-07] — UI loop batch 25: every Pomo timer face checked at the new size
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/variants/{Mac,Outline}.tsx`, `src/renderer/dev/previewBridge.ts`
+**Summary:** After the 11 px floor, all seven timer faces were rendered (`?face=` on the preview board). The Mac face's last axis label wrapped "25 / min" onto two lines; it stays on one. The Outline face's dimension line read "◄ 0 … 25 MIN ►" with text arrows; it reads "0 … 25 MIN". The ASCII face keeps its characters — text art is that face's identity.
+
+## [2026-11-07] — UI loop batch 26: every frame style checked at the new size
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/index.tsx`
+**Summary:** All eight frame styles (Pro, Classic, Synthesizer, Telemetry, KRNL dock, Blueprint, Macintosh, Submarine) were rendered after the 11 px floor: no clipped text. In the narrower Synthesizer frame the Pomo mode switch was squeezed to "OBSERV"; the switch no longer shrinks (the window title gives way instead) and its letter spacing is tighter now that the text is larger.
+
+## [2026-11-07] — UI loop batch 27: the live design check is clean
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/index.tsx`, `src/renderer/analytics/charts/PlanVsActual.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/PomoNode/variants/Blocks.tsx`, `src/renderer/components/{AmbientRadio/index,Assistant/Commander,Orb/index,ChassisLayer/SynthesizerChrome}.tsx`, `src/renderer/components/ui/RadialChooser/RadialChooser.css`, `src/renderer/styles/chassis.css`, `docs/04-visual-system/design-tokens.md`
+**Summary:** The last 12 findings of the design check on the live app are fixed; it now reports none (184 at the start of the evening). Analytics charts were cards inside the window's card; they are sections with a hairline on top (acid when pinned). Chart legends and the time mix are 12 px body text. The Calendar's gutter is 40 px so its half-hour marks are 11 px like everything else. Blurred zero-offset glows (the Blocks face's "now" bar, the radio's slider and dots) are crisp rings or none, and every overshooting "bounce" easing (orb, assistant panel, radio panel, radial chooser, Synthesizer chrome) eases out instead. The rules are in design-tokens.md.
+
+## [2026-11-07] — Bug hunt batch 4: the rest of today's back end
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/{appState,whatsnew}.ts`, `src/main/{taskbar,pocket/index}.ts`, `tests/unit/shared/launch.rules.test.ts`
+**Summary:** Reviewed every main/shared/sys file changed today (app state, backups, taskbar and menu bar, system timer, What's new, pocket window, main-window lookup, IPC and RPC, mini and launch CLI, the finished-cards sweep). Fixed: the board backup's file name was built from versions read out of app-state.json without checking them, so a damaged file could put a path (`../`) into it — only version characters are kept now. The taskbar reset its "what changed" key on every Pomo snapshot, so the thumbnail buttons were rebuilt whenever the snapshot changed but the controls didn't — measured in the real app: 9 rebuilds during three light/dark switches while a timer ran (flicker), 0 after the fix (a Todo edit alone does not change the snapshot, so it never triggered this); it resets only when the buttons are cleared. The floating timer grew down and right without re-fitting the screen, so near the bottom edge its hover controls or the "what was this?" card opened off-screen; it re-fits after every resize, and a first-time pocket opens on the primary display instead of the first one in the list. The 0.11 What's new lists today's visible changes (calendar layers, one task card shape, three pocket looks, readability).
+
+## [2026-11-07] — UI loop batch 28: START is never cut off; nothing clipped at the bottom of a card
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/{index,FaceFit}.tsx`, `src/renderer/analytics/charts/PlanVsActual.tsx`, `tests/unit/renderer/pomoFaceFit.test.ts`
+**Summary:** A new render check (text partly hidden by its clipping container) found that in the default station layout the Pomo's content was taller than its slot: the task picker was cut in half and **START was hidden** — 148 px below the edge at 1280×800, 113 px at 1440×900, still just under it at 1920×1080 (it was like this before today too). Now a short slot sheds secondary rows first ("log past time", then the cycles strip, then the session dots; set by the slot's height, tested) and the timer face is fitted to the room left (scaled as a whole, never below 45 %), so the face, the time, the task picker and START always show — checked with the Blocks, Vapor and LCD faces and in Observe. "Log past time" stays on the Calendar and in the CLI. The same check found "Where the time went" cutting its last line in a narrow Analytics card; there it is one line per part (On a task / Untagged / Break and the share, minutes in the tooltip).
+
+## [2026-11-07] — UI loop batch 29: nothing cut off in a small Analytics window
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/AnalyticsNode/SummaryHero.tsx`, `src/renderer/analytics/charts/TagCharts.tsx`, `src/renderer/components/nodes/PomoNode/FaceFit.tsx`
+**Summary:** The cut-off check, run on every Analytics page at the station size, found the Summary's last sentence cut and the tag ranking wrapping its count onto a second line. The Summary's four tiles are a 2 × 2 grid in a narrow window (never 3 + 1, never "6h / 15m" on two lines) and its sentences scroll inside the card with a soft fade at the edge; each tag's "1h40 · 27% · 2" stays on one line (task count spelled out in the tooltip). The fitted Pomo face keeps 4 px spare so big digits never touch its edge. Every screen now passes the cut-off check (the Calendar's scrolled hour labels under the sticky header are by design).
+
+## [2026-11-07] — Loop close-out: last hour labels, and tests that guard what can't be screenshotted
+
+**Type:** Bug Fix + Tests
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, tests `tests/unit/main/taskbar.test.ts` (new), `tests/unit/shared/pocket.test.ts`, `tests/unit/renderer/uiSounds.test.ts`
+**Summary:** The Calendar's hour window shows whole hours plus a leftover slice, and the slice's hour label ("13", "09") was cut in half at the bottom edge — on the first page, after paging and after wheel paging. Only whole hours in the window are labelled now (the slice keeps its lines); checked by paging through every window at three sizes with the pager and the wheel. Three fixes that a screenshot can't show now have tests, each confirmed to fail against the old code: the Windows taskbar sets its thumbnail buttons once per state (not on every snapshot) and restores them after a stop (also checked in the real built app through a test harness: 9 → 0 rebuilds during three theme switches while timing); a pocket that grows near the screen edge, opens for the first time or was left on an unplugged monitor is placed on screen; every UI sound hit starts at 0, reaches its level 4 ms later and ramps out at its end, and every hit played faster than 1.15× goes through a 7 kHz low-pass (the click-free tick).
+
+## [2026-11-07] — Verified in the real app: taskbar, floating timer, click-free sound
+
+**Type:** Verification (no code change)
+**Branch:** `feat/pocket-pomo`
+**Summary:** The fixes a screenshot can't show were checked against the real thing, each with the old code as a control. **Taskbar** — the built app run through an Electron test harness (isolated board and profile, `KRNL0_BOARD_DIR` / `KRNL0_USER_DATA`), recording every taskbar call: START sets the thumbnail buttons once (Break, Stop), STOP clears them, START again restores them; three light/dark switches while timing rebuilt them 9 times with the old code and 0 times with the fix. **Floating timer** — same harness: it opens on the primary display; parked at the bottom edge and grown by hover (200 → 256 px) it moves up and stays inside the work area; with the old code it ended at y = −248, off screen. **Sound** — the real sound engine rendered in Chromium through an OfflineAudioContext and measured: the first/last 0.18 ms of every hit stay within 5–11 % of peak with the fades, against 47–89 % (audible clicks) with the fades removed.
+
+## [2026-11-07] — macOS menu bar covered
+
+**Type:** Tests
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `tests/unit/main/taskbar.test.ts`
+**Summary:** The menu-bar timer can't be run on this Windows machine, so its code path is exercised with the platform set to macOS and the Electron `Tray` recorded: the time shows while timing and counts down every second, the menu has the state line, the controls, the Floating timer switch and Open KRNL0, the menu is rebuilt only when the state changes (an open menu isn't closed every second), the paused title changes, and the menu-bar item goes away when the timer stops. Only Apple's own drawing of it is left unchecked.
+
+## [2026-11-07] — Calendar: the shelf, drag to unschedule, line up, and a track for tracked time
+
+**Type:** Feature + Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{WeekView.tsx,dayBlockLayout.ts,lineUp.ts}`, `src/renderer/styles/reactflow-theme.css`, `src/sys/{parser.ts,SysFacade.ts,commands/cal.ts}`, `src/shared/cli/commandRegistry.ts`, `src/renderer/components/ui/LineGlyph.tsx`, `src/renderer/components/Tour/tours.ts`, 21 renderer files (11 px floor, drawn arrows), `docs/06-requirements/calendar-clock-visuals.md` (F15, F16, F28, F29), tests (`WeekView.shelf.test.tsx`, `dayBlockLayout.test.ts`, `calendar.lineUp.test.ts`, `cal.lineup.test.ts`)
+**Summary:** The user's report: the "+2" tile looked bugged, and a task hidden in it could not be dragged out. Four drafts were put on the design canvas (A shelf + rail, B spread + day rings, C line up + day tape, D lens + "did" lane); this builds A plus C's line-up. **Shelf (F28):** a clash whose lanes would be under 96 px is one block over the clash's time with a named row per plan (dot, full name, done tick / missed ring) — every row clickable and draggable; rows tighten, then the header goes, before the shelf ever grows over the next plan; no row is ever hidden; a Station-width day draws rows as colour bars. The "+N" chip is gone. **Unschedule:** dragging any plan from the calendar shows "Drop here to unschedule" at the bottom; dropping there sends it back to Todo. **Line up:** when two or more chains in a shelf are still ahead, the header offers Line up — back to back in start order, never before now, a chain moving as one (found by testing: chain followers have no time of their own). CLI twin: `krnl cal lineup <task> <task> [...]`. **Tracked time (F29):** a track on each day's right edge that fills with recorded spans (running span: crawling stripes), and the day's total in the header. **Rule sweep:** every functional label under 11 px raised to 11 (21 files) and text arrows (‹ › ▾ ← → ↘ ↑ ◀ ★ ◆) in controls replaced with drawn icons. Verified in the browser: drag-to-unschedule clears the task's time; line-up gives 15:00 chain, Physics 16:30; measured no cut names, no hidden rows, no overlaps, contrast passes in both themes.
+
+## [2026-11-07] — Year view fits any panel; last contrast fix
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/YearView.tsx`, `src/renderer/components/nodes/TodoNode/index.tsx`, `tests/unit/renderer/calendar.yearLayout.test.ts`
+**Summary:** Found by the post-sweep audit: the year view drew 7.5 px day numbers in 365 cells (some at 1.1:1 contrast) and laid months out 7 + 5. Cells are now a plain heat map (date, minutes and plans in the tooltip and aria-label), and `yearLayout` measures the panel and picks 2, 3, 4 or 6 months across with the biggest square cells that fit both ways — measured at six panel sizes, no month outside the box; the weekday letters (11 px) hide below 12 px cells. The Todo "N overdue" badge mixes rust toward the ink so it passes 4.5:1 in both themes.
+
+## [2026-11-07] — Bug hunt: stuck unschedule strip, "Bring to today" landing in the past
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/launch/catchup.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `docs/06-requirements/launch-experience.md` (F27), tests
+**Summary:** Sweep of every screen (all panels, calendar views, help menu, settings, tour, analytics pages, both layouts) with console capture: no errors. Code review found two bugs. (1) Dropping a plan on another hour can unmount the element it was dragged from, so no `dragend` arrives and the unschedule strip stayed up — any drop or dragend in the window now ends the drag. (2) Welcome back moved slipped tasks to today at their old time: back at 19:00, a 09:00 task landed in the past and read "Missed" at once. `landingTimes` now lines those up from the next quarter hour, in order, each as long as its plan; times still ahead are kept; Tomorrow keeps every time (F27).
+
+## [2026-11-07] — Calendar: clashing plans as letter bars; tracked-time track at the left
+
+**Type:** Feature (revision)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/{WeekView.tsx,dayBlockLayout.ts,clashLabels.ts}`, `src/renderer/styles/reactflow-theme.css`, `src/renderer/components/Tour/tours.ts`, `docs/06-requirements/calendar-clock-visuals.md` (F15, F16, F28, F29), tests (`WeekView.clash.test.tsx`, `dayBlockLayout.test.ts`, `calendar.clashLabels.test.ts`, `schedule-menu-parity.test.tsx`)
+**Summary:** The user's direction after seeing the shelf: no "N at once" list — clashing plans side by side as in draft C, named by their first character, with the rail at the left as in draft A. The shelf is gone: a clash too narrow for names keeps every plan as its own slim bar at its own time, labelled by `clashLabels` (first character; plans of one clash that share it add the first letter of their last word — RA, RB, RC — then more letters, then a number; never two equal names; skips symbols, works for any script). Letters show only where they fit (one line tall, wide enough), centred in short bars. Line up is a tab above the clash (or below), drawn only where it covers no plan or habit pill. The tracked-time track moved to the left and sits 9 px from the day line, 2 px from its own plans, so it reads as part of its own day (the user found the right-edge rail ambiguous). Also: a habit pill cut by the edge of the shown hours waits for its page instead of hiding under the hour pager. Measured at 1100, 1800 and Station width, dark and light: no cut letters (both directions), no overlapping plans, the tab covers nothing, the track never under a plan.
+
+## [2026-11-07] — Tracked-time lane as a slot; Station calendar readable; pocket stays on screen
+
+**Type:** Bug Fix + polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/styles/reactflow-theme.css`, `src/main/pocket/index.ts`, `docs/06-requirements/calendar-clock-visuals.md` (F29), `tests/unit/renderer/schedule-menu-parity.test.tsx`
+**Summary:** The user asked for draft A's rail look back, on the left, "with a hole for the lane": the track is now a recessed slot (darker than the day, inner shadow, hairline edge) 4 px in from the day line, filled by the day's spans 2 px inside its walls; plans start 3 px after it. Station-width days (under 70 px): a 6 px slot, letter bars 1 px apart instead of 2 + 3 px, day names shortened to "S 7" (full names ran into each other), and a block too narrow for a name shows its first character instead of "O…" — measured: no bar under 6 px, no cut letters. Back-end review of the day's main-process work (pocket, app state, taskbar, IPC, CLI): one gap fixed — the floating timer is pulled back on screen when a monitor is removed or the display layout changes.
+
+## [2026-11-07] — Shared/CLI review; real-app check of the calendar
+
+**Type:** Bug Fix + verification
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/feedback.ts`, `src/sys/commands/launch.ts`, `tests/unit/shared/launch.rules.test.ts`
+**Summary:** Review of today's shared and CLI code. Feedback: a title of any length is now cut to 120 characters in the shared link builder (the dialog already stopped there, `krnl feedback` did not) — before, a pasted paragraph made a link the app refuses to open, with no message; a test feeds 15,000 characters and checks both links stay openable. `krnl feedback --kind idae` now says the kind is unknown instead of filing a bug report. Real-app check (production build in an Electron harness on an isolated copy of the worktree board, three tasks set to clash, window captured with `capturePage`): letter bars and the tracked-time lane render, one Line up tab, no "+N" chips, no console errors; the splash leaves 1.5 s after load. Station panel widths measured equal at 1280/1440/1920 (the right-edge overlap seen is the docked radio's edge tab).
+
+## [2026-11-07] — Crash fix: deleting a habit with a lane took the app down
+
+**Type:** Bug Fix (critical)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitLaneNode/index.tsx`, `src/renderer/components/nodes/CalendarNode/MonthView.tsx`, `src/renderer/components/nodes/TodoNode/index.tsx`, `src/renderer/styles/reactflow-theme.css`, tests (`HabitLaneNode.orphan.test.tsx`, `pen-year-clock-optional-time.test.tsx`)
+**Summary:** Found by a worst-case-data sweep (hostile names, 60 extra todos, a 999-day streak, then an empty board, on every screen). Emptying the habits — or deleting any habit that has a lane on the canvas — put the whole app on the "RENDER ERROR" screen (Maximum update depth exceeded). Bisected to the habit lane's orphan cleanup: it wrote a fresh board object on every render even after the lane was gone, and the canvas keeps the lane mounted a moment longer, so each write re-rendered it into the next. It now removes itself only while it is on the board, once; a regression test keeps it mounted through re-renders and checks one write and no loop (it fails on the old code). Also from the sweep: the month cell's fit used 15 px chip rows from the old 10 px text — at 11 px a row is 18 px, so "+N more" ran into the habit dots (now measured; test updated); in a Todo row under 330 px the tag shows its colour dot only so the task name is not cut to a few letters.
+
+## [2026-11-07] — User-flow sweep; "Remove" becomes "Unschedule"
+
+**Type:** UX fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/TaskPopup.tsx`
+**Summary:** Drove the main flows in the preview and checked the board after each: tick a Todo row (task done), tick and untick a habit, open a plan's popup and take it off the calendar, drag a Todo row onto the calendar (scheduled at the drop slot), start and stop the Pomo (a span recorded, idle) — all pass, no console errors. One finding: the popup's action said "Remove" in warning red, which reads as delete, though it keeps the task. It is "Unschedule" everywhere else (drop strip, right-click menu, `krnl task unschedule`), so it now says Unschedule, in the neutral colour, with "Take it off the calendar — the task stays in your Todo" as its tooltip.
+
+## [2026-11-07] — Pomo: a compact face for short windows; pocket names never lost
+
+**Type:** Bug Fix + UX
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/{FaceFit.tsx,index.tsx}`, `src/renderer/pocket/PocketApp.tsx`, `tests/unit/renderer/pocket.askCard.test.tsx`
+**Summary:** Review of the face fitter: measured every face at 1280×720, 1440×900 and 1920×1080 — the scale is stable (no feedback loop) and START is always visible, but at 1280×720 the faces sat at 0.45–0.53 scale, which puts their 11 px labels at about 5 px, and the Vapor glass was clipped. Under 0.85 the panel now shows a compact face (the time at 34 px, a thin progress line, one 11 px state label: Ready / Focus / Paused / Break, or Observing / On break) and returns to the full face when there is room. Floating timer: picking a tag on "What were those 25m?" hid the card even if KRNL0 refused the name; now the card comes back so the name is not lost (UI test for both outcomes).
+
+## [2026-11-07] — Pomo face labels hold the 11 px floor at any scale
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/FaceFit.tsx`, `src/renderer/components/nodes/PomoNode/variants/*.tsx`, `src/renderer/components/nodes/PomoNode/ObserveDash.tsx`
+**Summary:** A face shown between 85 % and 100 % size still drew its 11 px labels at 9–10 px (and Vapor's glass ticks were 7.5 px). The fitter now sets `--face-label` to 11 px ÷ scale, and the faces' labels (17 places) use it, so after the scale they read at 11 px while the big digits scale. Measured every face at 1280×720, 1440×900, 1920×1080: no label under 11 px, the scale holds one value (the bigger labels do not feed back), START always visible.
+
+## [2026-11-07] — Habit repair asks again the next day
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/HabitNode/index.tsx`, `tests/unit/renderer/HabitNode.repair.test.tsx`
+**Summary:** Review of the "Did it yesterday?" row: saying no hid the row with a plain flag that was never reset, so with KRNL0 left open overnight the next missed day was never offered. It now remembers the day that was declined; a later missed day asks again. Test walks the sequence across midnight (fails on the old code).
+
+## [2026-11-07] — Review of the calendar rework; overrun strip on narrow bars
+
+**Type:** Polish
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+**Summary:** Line-by-line review of the session's WeekView changes (drag lifecycle, letter labelling and fit, Line up placement and chain units, track geometry): one flaw — the 3 px overrun strip took half of a 6 px Station letter bar; it now shows on bars 12 px and wider (the tooltip still says "+X over"). Also this session, checked with no change needed: every day-based view rolls over at midnight with the app open; every button, field and image on the main screens and today's dialogs has an accessible name.
+
+## [2026-11-07] — Front-end review: finished cards, day recap, pocket bridge, launch flow; share on a new board
+
+**Type:** Bug Fix + review
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/launch/milestones.ts`, `src/renderer/components/Launch/HelpMenu.tsx`, `src/renderer/styles/launch.css`, `tests/unit/renderer/launch.catchup.test.ts`
+**Summary:** Read through today's logic modules: finished-cards grouping (union-find, all-done rule), the day recap (once a minute, not on every edit), the pocket bridge (sends only when the Pomo, Todo or mode changes), the launch flow (one dialog at a time; milestones can't fire twice) — correct. One finding: on a new board Share offered a "0 focus sessions" card; it now needs at least one session, and with nothing to share the Help menu says "after a streak or focus session" on a disabled item instead of a button that does nothing.
+
+## [2026-11-07] — Task card reads "missed" at once when planned into the past
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/TaskNode/index.tsx`
+**Summary:** Review of the task card: its minute clock only runs while the task has a time, and held the time the card mounted. A card unscheduled since the morning and then planned into an earlier slot showed as not missed for up to a minute. The clock is now refreshed on every (re)schedule. Rest of the card (pomo subscription by field, timers only while needed, the one-shot done pop) is correct.
+
+## [2026-11-07] — Review of the presentational files; no NaN rings
+
+**Type:** Bug Fix (hardening)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/PomoNode/display.ts`, `tests/unit/renderer/pomoFaceFit.test.ts`
+**Summary:** Pass over the presentational files changed today (pocket views and model, settings sections, launch dialogs) for division by zero, unchecked indexing and date parsing. One finding, probed with a zero-length config: `calcRemainingPct` returned NaN for 0/0, which blanks every ring and fill in the faces and the floating timer. The UI and CLI clamp the session length to positive, but board.json loading accepts any number, so a hand-edited 0 could reach it; it now reads as nothing left (test). The rest guard their maths (`Math.max(1, …)`) and their lookups.
+
+## [2026-11-07] — Ambient Radio no longer covers the Calendar; tucking is remembered
+
+**Type:** Bug Fix (first run)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/AmbientRadio/index.tsx`
+**Summary:** Seen in the real-app capture with a fresh profile: the radio opened floating at the top right, exactly over the Station's Calendar, for every new user — and tucking it to the edge was not remembered (the edge state started as floating on every launch), so it came back over the Calendar after each restart. A first run now starts docked as the 14 px edge tab; the docked side is saved (`krnl0-ambient-radio-edge`) and restored against the current window's edge. The header's "−" text glyph is a drawn icon ("Tuck to the edge"). Checked in the preview: first run docked and clear of the Calendar; open → floating; tuck → reload → still tucked.
+
+## [2026-11-07] — Sweep: emoji-safe feedback links, letterless clash names, Welcome back lands in free time
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/feedback.ts`, `src/renderer/components/nodes/CalendarNode/clashLabels.ts`, `src/renderer/launch/catchup.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `src/sys/commands/cal.ts`, tests (`launch.rules`, `calendar.clashLabels`, `launch.catchup`)
+**Summary:** Code sweep of today's merges. (1) Feedback links cut long titles and bodies by UTF-16 units, so an emoji at the cut was split in half and `encodeURIComponent` threw — the Send button did nothing; cuts now land on whole characters. (2) Two clashing plans whose titles have no letter or digit (an emoji-only title) crashed the Calendar's letter naming; they are now numbered `#1`, `#2`. (3) Welcome back's "move to today" lined slipped tasks up from the next quarter hour without looking at plans already there, so it could create a new clash; slipped tasks now land in free time around the day's other open plans. (4) `krnl cal lineup` now refreshes the board and says how many moves landed when a later move fails. (5) Feedback diagnostics cut a Windows account name at its first space, so `C:\Users\John Smith\…` posted "Smith" publicly; the whole name up to the next separator is now replaced. Each fix has a test that fails on the old code.
+
+## [2026-11-07] — Letter bars are never unnamed in a narrow week
+
+**Type:** Bug Fix (visual)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/styles/reactflow-theme.css`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.clash.test.tsx`, `docs/06-requirements/calendar-clock-visuals.md` (F28)
+**Summary:** Seen in a 700 px and a 520 px calendar render: in a Station-width week the clash bars "RA" and "RB" were ~16 px wide, under the 18 px the old check asked for two letters, so they showed as empty bars. The width check now uses the real 11 px mono letter width (6.6 px), and a name still too wide stands its letters one above the other (never rotated) when the bar is tall enough. Checked in the preview at both widths: every bar named. Test stubs a 500 px calendar and fails on the old code.
+
+## [2026-11-07] — Recorded time: a strip on the day line, no dark lane, no gap
+
+**Type:** UI Change
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/styles/reactflow-theme.css`, `tests/unit/renderer/schedule-menu-parity.test.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.clash.test.tsx`, `docs/06-requirements/calendar-clock-visuals.md` (F29)
+**Summary:** User feedback: the recessed dark lane looked heavy, and the 4 px gap before it made it unclear which day it belonged to. Four drafts went to the design canvas ("Recorded time · four ways"); this builds the part drafts A and C share — tracked time is a 5 px strip of colour flush on the day's own left line (6 px day, 4 px Station), drawn only where time was tracked, with no slot and no gap. Plans now start 8 px from the day line (was 16). Untagged time uses a deeper lime in light mode (pale acid vanished on paper). Short 12 px bars now show their letter too ("Call the dentist" was a blank bar). Checked in the preview: wide and narrow week, light and dark — every strip at 0 px from its day line.
+
+## [2026-11-07] — Hour pager moves out of the grid
+
+**Type:** Bug Fix (visual)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.hourPager.test.tsx` (new), `docs/06-requirements/calendar-clock-visuals.md` (F15)
+**Summary:** Seen in the real-app capture: the "‹ 11–17 ›" pill floated over the grid's bottom-right and covered Sunday's letter bars (G, D, P), so they could not be read or clicked. The pager is now two chevrons in the empty corner above the time gutter — up for earlier hours, down for later — next to the hour labels it moves (the range is in their aria-labels; the gutter already shows the hours). Checked in the preview: the corner holds the chevrons and the grid's bottom-right is clear.
+
+## [2026-11-07] — Radio follows window resizes; Welcome back keeps whole chains clear
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/AmbientRadio/index.tsx`, `src/renderer/components/Launch/WelcomeBack.tsx`, `tests/unit/renderer/ambientRadio.resize.test.tsx` (new)
+**Summary:** (1) The Ambient Radio never listened for window resizes: a tab tucked to the right edge stayed at its old x, so after maximising it floated mid-screen and after shrinking it was out of reach. A tucked tab now follows its edge and a floating radio is pulled back into view. (2) Welcome back's "move to today" now reserves room for a slipped task's untimed followers too (they run right after it), so the chain does not land on another plan.
+
+## [2026-11-07] — 11 px floor reaches SVG text: Analytics charts, Clock readout, pie menus
+
+**Type:** UI Fix (readability)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/analytics/charts/*.tsx` (CalendarHeatmap, CumulativeLine, DonutChart, DowBars, DowHourMatrix, Histogram, HourLine, MonthBars, PlanVsActual, Radar, Scatter, StackedArea, TagCharts), `src/renderer/analytics/charts/common.ts`, `src/renderer/components/nodes/ClockNode/index.tsx`, `src/renderer/components/ui/PieMenu.tsx`, `src/renderer/components/Canvas/PenWheel.tsx`
+**Summary:** A panel audit in the preview found SVG text still at 8–9.5 px (the earlier 11 px pass covered CSS only): every Analytics axis, tick and legend label, the Clock's digital readout (8 px × 1.27 scale = 10.2 px), and the canvas wheel's labels and shortcut letters. All now render at 11 px or more; `MIN_LABEL_FONT` is 11 (a label that does not fit is hidden and its value stays in the tooltip, never shrunk). The bigger text then collided in places, each fixed and re-checked by screenshot at 760 and 520 px: the cumulative-line and stacked-area legends moved out of the SVG into wrapping HTML rows (fixed 96/64 px steps no longer fit); heat-map month labels and the Hours "peak" legend got room above their plots; the radar's label fitting uses the real 11 px width (side labels were cut at 520 px) with more space for the number under each; the histogram median no longer sits on the axis title; wheel labels are cut to their wedge and the shortcut letters moved to each wedge's outer corner (they sat on "Media" and "Sticky"). An automated overlap/outside check over every Analytics chart is clean at both widths.
+
+## [2026-11-07] — Recorded time is the Clock rail (A4: a track that fills up to now)
+
+**Type:** UI Change
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/NowLine.tsx`, `src/renderer/styles/reactflow-theme.css`, `tests/unit/renderer/schedule-menu-parity.test.tsx`, `docs/06-requirements/calendar-clock-visuals.md` (F29)
+**Summary:** After the dark recessed lane and then the flush edge strip were both rejected ("cut off from the left side"), ten drafts went to the design canvas; the user liked the Clock rail best, and it was refined into four versions built from the Clock's own parts. A4 ships: a track one shade lighter than the day (the Clock's ring track), 4 px inside the day's own line, rounded at both ends; recorded focus fills it with round caps in its tag colour; the track only covers time that has passed (full on past days, up to a "now" knob today, none on days ahead), so it fills up like the Clock's ring and no empty bar runs down future days (which read as a scrollbar). The now line drops its own dot while the knob shows, and the knob uses the now line's red. On light paper the track is half as strong. All four versions sit behind one constant (`RAIL_STYLE`). Checked in the preview: wide week, Station-width week and day view, dark and light, now knob paged into view. Follow-up check on last week (nothing recorded) showed seven bare tracks reading as scrollbars again, so a past day with no recorded time draws no track at all (today keeps its track for the knob); test added.
+
+## [2026-11-07] — Tall calendar plans show their whole title
+
+**Type:** UI Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+**Summary:** Plans with room for their name and time cut the title at one line ("Outline thesi…", "Draft section…") even in blocks an hour tall. A block at least 48 px tall now gives its title two lines (clamped, never spilling) with the time still under it. Checked in the preview at 1100 and 760 px. Follow-up: the time line under a missed plan was cut ("Missed · 09:30–1…"). The time now comes first and never cuts; "Missed", "started 5m late" and "took 1h20" follow as whole pieces that wrap under it, and a block shows only as many whole lines as fit under its title (no sliver of a wrapped line). Tall title-only blocks (narrow columns) also wrap the title to two lines. Checked at 900, 1100 and 1440 px.
+
+## [2026-11-07] — Month view hides nothing behind "+N"
+
+**Type:** UI Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/MonthView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/MonthView.test.tsx`
+**Summary:** Month view hid plans behind "+10 more" in a cell and "+9" in the TODAY strip, and habit dots behind "+2" — against the rule that every item stays readable and draggable. A full day now keeps every plan as its own chip in a list that scrolls inside the cell (fading at its foot when there is more); the TODAY strip shows every plan of today and scrolls sideways (fading at its right edge); every habit keeps its dot, wrapping to a second row. Days of the month get a faint fill so each cell — and the dots at its foot — reads as one day (before, a row of dots looked like it belonged to the next row's date). Checked at 1100 and 520 px, dark and light; tests updated.
+
+## [2026-11-07] — Design and use-case review of the whole app
+
+**Type:** Docs (research)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `docs/research/design-usecase-review-2026-11-07.md` (new)
+**Summary:** After the user found that repeating habits cannot be untimed (#217), every feature's data model and commands were checked against how people actually plan, not only against their specs. Main findings: time is mandatory where life has none (untimed habits, date-only plans — a Month drop invents 09:00 and the plan reads "missed"), no deadlines or repeating tasks, habits cannot be "3× a week" or have amounts or rest days, the UI can only hard-delete a habit (archive is CLI-only), and there are no reminders. A proposed priority order is in the doc; each item needs an ADR, a requirements doc, a migration and CLI commands.
+
+## [2026-11-07] — CLI sweep: `task list` shows when each task is planned
+
+**Type:** Bug Fix (CLI)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/sys/commands/task.ts`, `tests/unit/sys/task.list.schedule.test.ts` (new)
+**Summary:** End-to-end run of today's CLI commands on a first-run board (`todo add`, `task schedule`, `cal lineup`, `habit add/archive`, `feedback`): all behaved, and bad input was refused with clear messages. One gap: `task list` never said when a task was planned, so a `task schedule` or `cal lineup` could not be checked from the CLI. Each row now ends with `@ YYYY-MM-DD HH:MM` when scheduled. Also found: there is no `habit unarchive` — noted with the "habit archive in the UI" item from the design review.
+
+## [2026-11-07] — 0.11 "what's new" lines match what ships
+
+**Type:** Docs (user-facing text)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/shared/whatsnew.ts`
+**Summary:** The 0.11 notes (`krnl whatsnew`) still described recorded time as "a thin bar beside each day". They now describe the Clock rail (a track at the left of each day that fills up to now), the letter bars with Line up and the drag-to-unschedule strip, and the month view that never hides a plan behind "+N". Main-process changes from today (taskbar button flicker fix, safe backup names, pocket refit) were re-read in the sweep; no issues.
+
+## [2026-11-07] — The orb's greeting fits how long you were away
+
+**Type:** Bug Fix (copy)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/Orb/index.tsx`, `tests/unit/renderer/orb.greeting.test.ts` (new)
+**Summary:** The opening line was drawn at random from a pool that includes "been a minute." and "welcome back. the board's where you left it." — so it could say so 30 seconds after a restart. Those two lines now come up only after 4 hours or more away (`awayMs` from the launch info); otherwise one of the others ("hey.", "need anything?", …). `pickGreeting` is pure and tested.
+
+## [2026-11-07] — Unschedule and move act on the one task, not its chain
+
+**Type:** Bug Fix (critical)
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/store/chainSchedule.ts` (new), `src/renderer/store/scheduleActions.ts`, `src/renderer/components/Canvas/commandDispatch.ts`, `src/renderer/components/ContextMenu/scheduleMenus.ts`, `src/sys/commands/task.ts`, tests (`tests/unit/sys/chain.unschedule-move.test.ts` new; `unscheduleChain.test.ts`, `task.commands.test.ts` updated)
+**Summary:** Reported by the user on their board (a long `task.next` chain: … → Thesis → Team standup → Gym/Demo/…): "Unschedule" on Gym left it on the calendar, a second "Unschedule" took everything off, and dragging Gym to Thursday did nothing ("placed at 12:50"). Cause: every action resolved through the chain. Unschedule cleared the chain's *anchor* (whole chain gone); a task with its own time, once cleared, fell back behind its predecessor (still shown); and a moved task was pushed back behind its predecessor by the "chain never overlaps itself" rule (#168). Now (shared helper `chainSchedule.ts`, used by the Calendar, the right-click menus, the unschedule strip and `krnl task schedule|unschedule`): **Unschedule** takes only that task off — tasks timed by the chain keep their current times and it stops following its predecessor; **moving** a chained task to where its chain would push it away from unlinks it from its predecessor so it lands where it was put (tasks after it still follow it). The menu always says "Unschedule". Checked in the preview: unscheduling "Draft section 3.1" changed only it; moving "Physics exercises" from Sunday to Thursday 10:00 landed it there with "Physics" unchanged. Three new tests fail on the old code.
+
+## [2026-11-07] — Calendar: no unexplained overrun strip, no empty gap, the whole clash in the picker
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+**Summary:** Three reports from the user's board. (1) A plan showed a thick rust strip on its right edge with nothing saying why — it meant "tracked more than planned" (Thesis: 65 min tracked on 2 Nov against a 60 min plan on 6 Nov), while the block also said "Missed". The strip is gone; overrun is said in words ("+5m over" in the time line where it fits, and "(5m over plan)" in the tooltip). (2) Plans kept a 14 px gap at the day's left on days that draw no recorded-time track; the room is now kept only on days with a track (recorded time that day, or today), elsewhere plans start 4 px from the day line. (3) Right-clicking in a clash listed only the plans under the exact minute clicked ("4 items here" with 5 scheduled — a short "TS" chip beside them was left out); it now lists every plan of the clash, in time order. Checked in the preview.
+
+## [2026-11-07] — Resize and typed times go the same path as a drag
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`
+**Summary:** Calendar bug hunt. Dragging a block's top edge and typing an exact time in the task popup wrote the task directly: a chained task was still pushed back behind its predecessor (the same "doesn't move" bug as the drag, fixed earlier today only for drags), and the Todo row kept its old time. Both now set the length on the task and the time through `calendar.schedule`, like a drag. Checked live: typing 08:00 on "Physics exercises" (chained after Physics, 09:30–11:30) lands it at 08:00 and its Todo row reads 08:00 (before: pushed to 11:30, row unchanged). Follow-up (real board, Station width): two-letter names ("TI") in a five-way clash were blank because the stacked-letter check wanted 10 px of estimated width while the bars render ~11 px from an estimate of ~8; stacking now starts at 7 px (one 11 px letter is 6.6 px). A 15-minute chip in such a clash is still too small for two letters either way; its name stays in the tooltip and the right-click list.
+
+## [2026-11-07] — Week header totals count only each day's part of a session over midnight
+
+**Type:** Bug Fix
+**Branch:** `feat/pocket-pomo`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/WeekView.dayTotal.test.tsx` (new)
+**Summary:** Found on the user's board: Monday read "3h48" in the week header and "3h 18m" in the month cell. A session over midnight is split into one piece per day, but each piece keeps the whole session's start and end; the week header summed those, so the session counted in full on both days. It now sums each day's own piece (as the month view does). Test fails on the old code ("2h" instead of "1h").
+
+## [2026-11-08] — Routines and any-time habits (Decision 39, #217)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/types.ts` (`kind`, `endsOn`, `exceptions`, optional `timeOfDay`, `isRoutine`, `routineOccurrence`), `HabitNode/commands.ts` (routine skip/unskip/move/end/restart, `habitSetKind`; ticks are no-ops on routines), `HabitNode/RoutineShelf.tsx` (new), `HabitNode/index.tsx`, `HabitContextMenu.tsx`, `HabitPopover.tsx`, `ui/RepeatEditor.tsx`, `ui/HabitSwapModal.tsx`, `ui/TaskInfoPopup.tsx`, `CalendarNode/WeekView.tsx` (+ types/commands), `MonthView.tsx`, `ClockNode/dayModel.ts` + `index.tsx`, `launch/catchup.ts`, `launch/milestones.ts`, `analytics/sources/habitSource.ts`, `Canvas/commandDispatch.ts`, `store/scheduleActions.ts`, `Tour/tours.ts`, `sys/commands/habit.ts`, `sys/commands/cal.ts`, `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; docs: Decision 39, `docs/06-requirements/routines.md`; tests: `tests/unit/sys/routines.test.ts` (new), tours, layers, add field.
+**Summary:** A class every Monday modelled as a habit got a tick, a streak and "missed"; "No sugar" had to pretend to happen at an hour. Now one record and one editor: the Repeat editor's switch *Routine · it just happens / Habit · I tick it*. Routines always have days, a time and a length; they are never ticked, counted or flagged (streaks, repair, Welcome back, milestones, habit analytics, lanes all skip them — one guard, `isRoutine`). Habits may be **Any time**: ticked in the grid, not on the Calendar or the Clock dial. Node design "B · Two shelves" (picked on the design canvas): HABITS grid above a ROUTINES timetable (name, day letters, now / today / next / skipped). Calendar: a soft band behind plans every week, dashed when skipped; click it to skip, move this one, or end the routine; a **Routines** layer switch; plans overlapping a routine say so in their tooltip. Clock: routines as outlined arcs; their popup offers Skip this one, never a tick. End keeps history; ended routines are listed in the node's settings with Restart. CLI: `routine add|list|skip|unskip|move|end|restart`, `habit kind`, `habit schedule` without `--at`, `cal layers routines on|off`. Tutorial: "Habits & Routines" tour (6 steps, waits on adding, skipping and ending a routine), run in the app — which found and fixed the Repeat popover sitting under the tour card. Existing boards load unchanged (all new fields optional).
+
+## [2026-11-08] — Routine menu and Repeat popup stay inside the window
+
+**Type:** Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `src/renderer/components/nodes/HabitNode/HabitContextMenu.tsx`, `src/renderer/components/nodes/HabitNode/index.tsx`
+**Summary:** Found while capturing the routines walkthrough. Right-clicking a routine low in the node opened its menu off the bottom of the window (only Rename, Color, Icon and Add note showed; Edit repeat, Skip next, End routine and Turn into habit were cut off), and the Repeat popup for a routine (with its time and length rows) was cut off the same way. Both placed themselves from a fixed height guess; both now measure their real height once drawn, move up to fit, and scroll if the window is shorter than they are. Checked in the preview at 640 and 720 px tall.
+
+## [2026-11-08] — Overlapping routines sit side by side; a routine shows across the week it was added
+
+**Type:** Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/routineLanes.ts` (new), `CalendarNode/WeekView.tsx`, `HabitNode/types.ts` (`routineOccurrence`), tests `CalendarNode/__tests__/routineLanes.test.ts` (new), `tests/unit/sys/routines.test.ts`
+**Summary:** User report: two routines at 11:00 drew their bands and names on top of each other ("fgreg" over "hhrthtr6"). Overlapping routines on a day now get a lane each, side by side with a hairline between, and a click picks the routine in the lane clicked. In narrow lanes the name stays (with an ellipsis) down to 44 px; only the repeat icon goes. Also: a routine was hidden on days before the one it was added — a weekday routine added on a Sunday showed nothing that week. It now shows from the Monday of the week it was added. Checked in the preview at Station width.
+
+## [2026-11-08] — Adding asks first; archive and restore habits; clearer calendar words
+
+**Type:** Feature + Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/HabitAddAsk.tsx` (new), `HabitNode/index.tsx`, `HabitNode/HabitContextMenu.tsx`, `HabitNode/HabitPopover.tsx`, `HabitNode/RoutineShelf.tsx`, `HabitNode/commands.ts` (`habitUnarchive`), `Canvas/commandDispatch.ts`, `ui/RepeatEditor.tsx`, `ui/TimeField.tsx` (placeholder), `CalendarNode/WeekView.tsx`, `Tour/tours.ts`, `sys/commands/habit.ts` (`habit unarchive`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `docs/06-requirements/habit-node.md` (F7); tests `HabitNode.addField.test.tsx` (rewritten), `habit.lifecycle.test.ts`.
+**Summary:** User report: typing a name and pressing Enter added a habit with settings never chosen, and the Repeat button was the only way to say what it was. Design "B · Ask in your words" (design canvas, three drafts): the Repeat button is gone; Enter opens a card that asks "Do you want to tick off *Gym* when you do it?" — **Yes, keep track** (a habit) or **No, it just happens** (a routine), keys Y / N — then only that kind's questions (habit: how often, any time or a set time; routine: which days, start time, length). Nothing is pre-chosen; the button stays off and says what is missing ("Pick how often") until every answer is in, then says what will be added ("Add · Mon Wed 10:00–12:00"). Esc cancels and adds nothing. Both tours updated. Review item 3.4: a habit can be **archived** from its right-click menu (history kept, lane removed); archived ones are listed in the node's settings with **Restore** and a delete-for-good button (undoable); `krnl habit unarchive <id|name>` is new (an archived habit could never come back before). Also: the Calendar's "Line up" tab now reads **Fix overlap** and its tooltip names the plans and what a click does (the user asked what "Line up" meant); the Repeat editor's time is one time field ("09:00") instead of two number boxes ("9 : 0"); a routine with no icon shows a colour dot instead of a gap; `habit-node.md` F7 rewritten for habit lanes.
+
+## [2026-11-08] — Weekly targets: "3 times a week, any days" (review 3.1)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/types.ts` (`perWeek`, `weeklyTarget`), `HabitNode/commands.ts` (`calcWeekStreak`, `bestWeekStreak`, `ticksThisWeek`, `habitSetTarget`; `habitAdd` takes `perWeek`), `HabitNode/index.tsx`, `HabitNode/HabitAddAsk.tsx`, `HabitNode/HabitContextMenu.tsx` (test ids), `Canvas/commandDispatch.ts` (`habit.setTarget`), `launch/catchup.ts`, `launch/milestones.ts`, `sys/commands/habit.ts` (`habit target`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `tests/unit/renderer/habit.weeklyTarget.test.ts` (new, 8).
+**Summary:** "Gym 3× a week, any days" could not be said: fixing days broke the streak on a good week. A habit can now have a weekly target (1–6). It is ticked any day; its row reads "2 weeks · 1 of 3 this week" (✓ once reached); the streak counts weeks that reached the target, and this week stays open until it ends, so a rest day never breaks it. No "did it yesterday?" repair and no day milestones for it, and Welcome back never lists it as a broken day streak. Set it while adding (How often? → **Per week** → 1×–6×), from the right-click menu (**Times a week…**), or `krnl habit target <id|name> <1-6|off>`. Old boards load unchanged (optional field).
+
+## [2026-11-08] — Rest days: sick, away or a planned break never break a streak (review 3.3)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/types.ts` (`rest`), `HabitNode/commands.ts` (`habitSetRest`; `calcStreak`, `bestStreak`, `repairableDay`, `calcWeekStreak` take rest days), `HabitNode/index.tsx`, `styles/tokens.css` (`.habit-cell--rest`), `Canvas/commandDispatch.ts` (`habit.setRest`), `launch/catchup.ts`, `launch/milestones.ts`, `sys/commands/habit.ts` (`habit rest`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `tests/unit/renderer/habit.restDays.test.ts` (new, 6).
+**Summary:** One sick day reset a streak to zero, and the only choice was "did it yesterday?" — yes (a lie) or no (start over). A habit can now have rest days. The "Did it yesterday?" card has a third answer, **Rest day**; the right-click menu has **Rest today (keeps the streak)** / **Undo rest today**; `krnl habit rest <id|name> [--on] [--to] [--off]` marks a range (a trip next week). A rest day is stepped over by the streak (it neither counts nor breaks), never asks to be repaired, and shows as a quiet hatch in the grid (still clickable if you did it after all). For a weekly target, a week that falls short but has rest days is skipped, not broken. Welcome back and milestones use the same rule. Checked in the preview: "Read 20 pages" went from "Start again today" to "11 days" after marking yesterday a rest day.
+
+## [2026-11-08] — Due dates and dropped plans (review 2.1, 6.1)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `src/shared/due.ts` (new: `parseDue`, `dueLabel`), `ui/DuePicker.tsx` (new), `TodoNode/types.ts` (`dueOn`, `droppedAt`), `TodoNode/commands.ts` (`todoSetDue`, `todoDrop`, `todoUndrop`; buckets), `TodoNode/index.tsx`, `Canvas/commandDispatch.ts`, `sys/commands/todo.ts` (`todo due`, `todo drop`, `todo undrop`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; tests `todo.dueDate.test.ts`, `todo.drop.test.ts` (new).
+**Summary:** Two gaps from the use-case review. **Due dates:** "tax form due Friday" had to live in the title. A Todo item can now have a due day, apart from when it is planned: row menu **Due date…** opens an app-styled picker (Today, Tomorrow, Friday, In a week, and the next five weeks); the row shows a chip — *overdue · Fri 6* (rust), *due today* (acid), *due tomorrow*, *due Fri*, *due 20 Nov* — that opens the picker again. `krnl todo due <ref> <YYYY-MM-DD|today|tomorrow|mon..sun|off>`. **Dropped:** "not doing this any more" either lied (done) or vanished (delete). Row menu **Drop (not doing it)** moves it to the Archive marked *dropped* — not done, no completion, never in analytics — and takes it off the Calendar; its checkbox in the Archive brings it back. `krnl todo drop|undrop <ref>`. Full suite: 2,380 passing.
+
+## [2026-11-08] — Reminders before a plan starts (review 4.1)
+
+**Type:** Feature
+**Branch:** `feat/routines`
+**Files changed:** `src/shared/reminders.ts` (new: `dueReminders`, `leadWords`), `src/main/reminders.ts` (new), `src/main/index.ts`, `TaskNode/types.ts` (`remindMin`), `TaskNode/commands.ts` (`taskSetRemind`), `Canvas/commandDispatch.ts` (`task.setRemind`), `store/scheduleActions.ts` (`setTaskReminder`), `ui/RemindPicker.tsx` (new), `TodoNode/index.tsx`, `sys/commands/task.ts` (`task remind`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `tests/unit/renderer/reminders.test.ts` (new, 5).
+**Summary:** Plans passed silently — the review's biggest missing loop for a day planner. A plan can now remind you: Todo row menu **Remind me…** (at the start, 5, 10, 15, 30 min or 1 h before; a small bell marks the row), or `krnl task remind <ref> <minutes|off>`. The main process checks every 30 s and shows a system notification ("Call the dentist — Starts in 10 min · 14:00"; click opens KRNL0), so it works with the window closed to the tray. Start times come from the same schedule as the Calendar (chained plans included); done plans and plans not on the Calendar never remind; each reminder shows once and opening the app never replays old ones. Not yet checked with a real Windows notification on screen — needs a run of the app.
+
+## [2026-11-08] — New-user review: first screen and add-flow logic (experimental)
+
+**Type:** Research + Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `docs/research/new-user-review-2026-11-08.md` (new), `ui/LayoutModeToggle.tsx`, `AnalyticsNode/index.tsx`, `TodoNode/index.tsx`, `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`, `ui/RepeatEditor.tsx`, `sys/commands/habit.ts`, `dev/previewBridge.ts` (`?fixture=fresh`); test `HabitNode.addField.test.tsx`.
+**Summary:** Opened KRNL0 on a brand-new board and walked everyday use cases as a first-time user. Fixed: two top-bar buttons both said "CANVAS" (the layout toggle now reads Station / **Free**); Analytics greeted every new user with "streak 0d" (hidden until there is a streak); the empty Todo now says what to do; a routine or timed habit that would run past midnight was cut at 24:00 on the Calendar while the card promised "→ 01:00" (now refused with the reason in the add card, Edit repeat… and `krnl routine add`); adding a second "Gym" is now said in the card (it made every `krnl habit … Gym` ambiguous). Everything else is written up with a proposed order in the review doc (date-only plans, the empty Analytics wall, the Calendar's first view at 2 am, due-today in the Clock and Welcome back, routine reminders).
+
+## [2026-11-08] — Routine reminders (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/reminders.ts`, `HabitNode/types.ts` (`remindMin`), `HabitNode/commands.ts` (`habitSetRemind`), `HabitNode/index.tsx`, `Canvas/commandDispatch.ts` (`habit.setRemind`), `sys/commands/habit.ts` (`routine remind`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; test `reminders.test.ts` (+2).
+**Summary:** From the new-user review (4.2): "remind me before class". A routine's right-click menu has **Remind me…** (the same picker as plans); the main-process reminder loop now also shows a notification before each time a routine happens — never on a skipped day — and `krnl routine remind <id|name> <minutes|off>` sets it from the terminal. Full suite: 2,389 passing, typecheck 0.
+## [2026-11-08] — One streak on every screen (weekly targets and rest days everywhere)
+
+**Type:** Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `HabitNode/commands.ts` (`habitStreak`), `HabitNode/index.tsx` (Week, Month and Year rows), `HabitLaneNode/index.tsx`, `ui/TaskInfoPopup.tsx`, `CalendarNode/WeekView.tsx` (drop dialog), `sys/commands/habit.ts`; test `habit.restDays.test.ts` (+1).
+**Summary:** Found in review: weekly targets and rest days reached only the Week view's row and the CLI. The Month and Year rows, the habit lane, the plan popup and the Calendar's drop dialog still counted plain day streaks — mark a rest day, switch the node to Month, and the streak dropped back; a 3×-a-week habit showed a day streak on its lane. Every screen now asks one helper, `habitStreak(habit, today)` → current, best and unit (weeks for a target, rest days stepped over); the lane reads "3w streak", the popup "streak 3 weeks", the Month/Year badge "3w".
+
+## [2026-11-08] — Edit repeat… says why Save is off (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/RepeatEditor.tsx` (`endsPastMidnight`), test `HabitNode.addField.test.tsx`.
+**Summary:** The past-midnight guard also gates Edit repeat… and the Calendar drop dialog, where Save just turned grey with no reason (dropping a habit at 23:30 with the 60-minute default failed silently). The editor now says "Ends after midnight: start earlier or make it shorter." under the time. Habits & Routines tour re-run in the preview with the new add flow (Enter → No, it just happens → days, time, length → Add): it waits on the new routine and moves to the Calendar step. Full suite: 2,390 passing.
+
+## [2026-11-08] — Due in the Clock; the Calendar's first view; an empty chart that says so (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/dueOn.ts` (new), `ClockNode/index.tsx`, `CalendarNode/WeekView.tsx`, `analytics/charts/PlanVsActual.tsx`, `docs/research/new-user-review-2026-11-08.md`; tests `dueOnDay.test.ts`, `analytics.dailyEmpty.test.tsx` (new).
+**Summary:** From the new-user review. (4.3) The Clock lists what is **DUE** on the day you view under its schedule, overdue first in rust; it wraps, nothing hides. (1.5) Opened at 4 am the Calendar showed an empty 02:00–03:30 night; before 06:00 with nothing planned within 3 h of now it opens on the week's first plan or 08:00. (1.4) "Planned vs worked" drew bare 30m / 15m axes on an empty range; it now says what to do, like the other cards. The review doc corrects its own first read (only one Analytics view shows at a time, not a wall of 15 charts).
+## [2026-11-08] — "Staying on track" tour; a tour no longer hides the menu its step asks for
+
+**Type:** Feature (tutorial) + Bug Fix
+**Branch:** `feat/routines`
+**Files changed:** `Tour/tours.ts` (`on-track` tour + predicates), `Tour/TourHost.tsx` (`coveringPanel`), `tests/unit/renderer/tours.test.tsx`.
+**Summary:** The workflow rule says a feature is done only once its tour exists and has run. New tour **Staying on track** (Help → Tutorials, `krnl tour start on-track`): weekly targets (Times a week… → 3×), rest days (Rest today), due dates (Due date…), reminders (Remind me…) and dropping a plan — each step waits for the real action. Running it in the app found a bug: the tour fades out any fixed panel covering the window it points at, and that included the right-click menu the step had just asked for, so "right-click a habit and choose Times a week…" could not be done. Menus and popovers (layered at popover level or above) are now never tucked. Run once in the preview, all six steps with real clicks.
+
+## [2026-11-08] — Welcome back lists what is due (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `launch/catchup.ts` (`due`, `isEmptyCatchup`), `Launch/WelcomeBack.tsx`, `docs/research/new-user-review-2026-11-08.md`; tests `dueOnDay.test.ts` (+1), `habit.weeklyTarget.test.ts` (passed a timestamp where a day was meant).
+**Summary:** New-user review 4.3, second half: Welcome back has a **Due** section — open Todo items due today or overdue, overdue first ("overdue · was due Fri 6" in rust). A missed deadline is reason enough to open Welcome back; something merely due today is shown when it opens anyway. Checked in the preview.
+
+## [2026-11-08] — Habit amounts: "8 glasses a day" (review 3.2, experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/types.ts` (`amount`, `counts`, `countOn`), `HabitNode/commands.ts` (`habitSetAmount`, `habitSetCount`; `habitToggleDay` / `habitMarkDone` count on amount habits), `HabitNode/index.tsx`, `Canvas/commandDispatch.ts`, `Tour/tours.ts` (+ amount step), `sys/commands/habit.ts` (`habit amount`, `habit count`), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`; tests `habit.amount.test.ts` (new, 5), `tours.test.tsx`.
+**Summary:** "8 glasses of water", "20 pages" were a yes/no tick. A habit can now have an amount a day (right-click → **Amount a day…**: 2–20 chips and a unit, or **Plain tick**). Each click on a day adds one — the cell fills from the bottom — and the day is done (in the log, so streaks, rest days and weekly targets work unchanged) once the amount is reached; one more click starts the day again from 0. The row reads "2 of 8 glasses today". A day ticked before the amount was set counts as full; a Pomo edge fills the day. `krnl habit amount <ref> <n|off> [unit]`, `krnl habit count <ref> <n> [--on]`. The Staying on track tour gained an amount step; run end to end in the preview (7/7).
+
+## [2026-11-08] — Night shifts: routines that run past midnight (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/types.ts` (`RoutineSpan`, `routineSpansOn`), `CalendarNode/WeekView.tsx`, `ClockNode/dayModel.ts`, `HabitNode/HabitAddAsk.tsx`, `ui/RepeatEditor.tsx`, `sys/commands/habit.ts`, `docs/research/new-user-review-2026-11-08.md`; tests `routines.test.ts` (+1), `HabitNode.addField.test.tsx`.
+**Summary:** New-user review 2.3, done properly: a routine like "Night shift, Fri 22:00 for 8 h" was first cut at 24:00, then (earlier today) refused. It now works: the Calendar draws 22:00–24:00 on Friday and 00:00–06:00 at the top of Saturday ("Night shift · from last night"), each in its own lane when it overlaps; the Clock draws the morning part too; right-click either part and skip / move / end act on Friday's occurrence (the menu reads "22:00–06:00 (next day)"); the add card says "Fri 22:00–06:00 next day". A timed *habit* past midnight is still refused with the reason. Checked in the preview (both bands drawn after adding through the card).
+
+## [2026-11-08] — Quick add: "Gym tomorrow 18:00 1h" (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts` (new: `parseQuickAdd`, `describeQuickAdd`), `TodoNode/index.tsx`, `store/scheduleActions.ts` (`scheduleTaskAt`), `Tour/tours.ts` (Todo tour step), `docs/research/new-user-review-2026-11-08.md`; test `quickAdd.test.ts` (new, 8).
+**Summary:** New-user review 2.5: a new user typed "Call mom tomorrow at 5pm" and got a task literally called that, with no time; the field's placeholder read "task → spawns a node…". The Todo add field now reads the day (today, tomorrow, mon..sun, next monday), the time (5pm, 17:00, at 9) and the length (30 min, 1h, 1h30) from the words and shows what Enter will do under the field ("Call mom → tomorrow 17:00", "(that time has passed today)" when it rolls over). Enter adds the plan with the parsed name, puts it on the Calendar when there is a time, or gives it a due day when there is only a day — and skips the "how long?" step when a length was said. Plain names are left alone ("Read chapter 3", "Buy 2 m cable"). Placeholder: "What do you want to get done? (e.g. Gym tomorrow 18:00 1h)". Checked in the preview on a fresh board (four plans typed; two landed on the Calendar, one got a due day); the Todo tour has a new step and was run.
+
+## [2026-11-08] — `krnl todo add` reads day, time and length too (experimental)
+
+**Type:** Feature (CLI)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `sys/commands/todo.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** Rule 8 (every feature has a `krnl` command): `krnl todo add "Dentist next monday 14:00 30 min"` now adds "Dentist" for 30 min and puts it on the Calendar (through the same path as `task schedule`); `krnl todo add "Pay rent friday"` gives it a due day. Plain names are unchanged.
+
+## [2026-11-08] — The Pomo no longer looks started before Start (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `PomoNode/variants/Blocks.tsx`, `Readout.tsx`, `Vu.tsx`, `Outline.tsx`, `docs/research/new-user-review-2026-11-08.md`; test `pomo.idleFace.test.tsx` (new).
+**Summary:** New-user review 1.8: on a fresh board the Pomo showed its first minute bar lit (blinking) and "MIN 1 / 25" before anything ran. Before Start no bar is "now" and the label reads "25 MIN SESSION"; running and paused keep the minute read-out.
+
+## [2026-11-08] — Top bar says "saved"; the narrow Calendar says "Nov 2" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TopBar/index.tsx`, `CalendarNode/WeekView.tsx`, `styles/reactflow-theme.css`, `docs/06-requirements/app-chrome.md` (F1 + scenario), `docs/research/new-user-review-2026-11-08.md`; test `AppChrome.scenarios.test.ts`.
+**Summary:** New-user review 1.6 / 1.7. The top bar's green badge always read "live" and meant nothing; it now reads **saved** with the tooltip "Your board saves itself as you go — there is nothing to save by hand" (true: every change is written at once), and the path has a tooltip about the canvas switcher. In the Station slot the Calendar's week label was cut to "Nove…"; below 470 px it reads "Nov 2". The app-chrome requirement and its scenario were updated to match.
+
+## [2026-11-08] — Analytics names the page you are on (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `AnalyticsNode/index.tsx`, `docs/research/new-user-review-2026-11-08.md`.
+**Summary:** New-user review 1.9: the Analytics toolbar is ten icon buttons and the header read "· 3 SOURCES", so nothing on screen said which page was open. The header now names it ("PLANNED VS SPENT", "HABITS"…) and follows the toolbar; the source count is in its tooltip. Checked in the preview.
+
+## [2026-11-08] — Repeating plans: tick one off, the next appears (review 5.3, experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/repeatTask.ts` (new: `nextRepeatDay`, `parseRepeat`, `describeTaskRepeat`), `ui/TaskRepeatPicker.tsx` (new), `TodoNode/types.ts` (`repeat`), `TodoNode/commands.ts` (`todoSetRepeat`), `TodoNode/index.tsx`, `Canvas/commandDispatch.ts` (todo.toggle / task.toggle bring the next one), `store/scheduleActions.ts` (`spawnNextRepeat`), `Tour/tours.ts` (+ repeat step), `sys/commands/todo.ts` (`todo repeat`; `todo check` brings the next one), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `docs/research/new-user-review-2026-11-08.md`; tests `repeatTask.test.ts` (new, 6), `tours.test.tsx`.
+**Summary:** A weekly review or "water the plants" had to be re-typed every time (routines cover things that just happen, not plans with their own notes and time). A Todo row can now repeat (**Repeat…**: every day, weekdays, every <its weekday>; a repeat icon on the row). Ticking it off — from the row, the task card, the Calendar or `krnl todo check` — adds the next one with the same name, length and tag: at the same time on its next day when it was on the Calendar, otherwise due that day. Days already past are skipped (a late tick lands on today or the next matching day, never a backlog), and the repeat moves to the new one so unticking the old one never doubles it. Checked in the preview ("Water plants 19:00", every day → ticked → "Tomorrow 19:00"); the Staying on track tour gained a step and ran 8/8.
+## [2026-11-08] — 0.11 notes list the routines work
+
+**Type:** Docs (release notes)
+**Branch:** `feat/routines`
+**Files changed:** `src/shared/whatsnew.ts`.
+**Summary:** Workflow rule: every feature in a release appears in its notes. The 0.11 "more" list now names Habits & Routines, the ask-first add flow, weekly targets / rest days / archive, due dates / reminders / Drop, and the Staying on track tour. The designed headline slides for these still need drafts on the design canvas and the user's approval before the release PR.
+
+## [2026-11-08] — Quick add: "at 3" is 3 pm (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Call Sam at 3" was read as 03:00. A bare hour from 1 to 7 without am/pm now reads as afternoon (15:00); "at 9" stays 09:00, "3am" stays 03:00, and the line under the field still shows the result before Enter.
+
+## [2026-11-08] — Pickers take the keyboard focus (experimental)
+
+**Type:** Accessibility
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/DuePicker.tsx`, `ui/RemindPicker.tsx`, `ui/TaskRepeatPicker.tsx`.
+**Summary:** The due, reminder and repeat pickers opened without focus, so a keyboard user could not reach them (Esc worked, Tab went elsewhere). The current choice — or the first — now takes focus on open; Enter / Space pick, Tab moves through the rest.
+
+## [2026-11-08] — A day, no time: the Calendar's DAY line (draft D, experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/dayOnly.ts` (new, `dayOnlyPlans`), `CalendarNode/WeekView.tsx`, `TodoNode/index.tsx`, `docs/research/new-user-review-2026-11-08.md`; test `CalendarNode/__tests__/dayOnly.test.ts` (new).
+**Summary:** The oldest open item (review 1.2 / new-user 2.4): "Pay rent on Sunday" could not be planned without inventing a time. On this branch a plan with a day and no time is a plan due that day (quick add "Pay rent sunday", or Due date…), and the Calendar shows the week's ones in one slim **DAY** line under the day names (design draft D) — only when the week has one, never hidden behind "+N" (narrow columns cut the name; the tooltip has it), overdue in rust. Drag a chip into the hours to give it a time; it then leaves the line. Built on due days, so the scheduler and the board format are unchanged. Checked in the preview: "Call bank today" in this week's line, dragged onto the grid, line gone; next week shows "Groceries" (Mon) and "Pay rent" (Fri). Draft D had not been picked for `feat/routines`; the user gave this branch free rein.
+
+## [2026-11-08] — Habit menu: plain words for the canvas card (experimental)
+
+**Type:** Copy
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitContextMenu.tsx`, `docs/research/new-user-review-2026-11-08.md`.
+**Summary:** "Pin as lane" / "Lane already pinned" / "Unpin lane (keep the habit)" used an internal word. Now: "Put a card on the canvas" / "Already on the canvas" / "Remove its canvas card (keep the habit)".
+
+## [2026-11-08] — "window", not "mother" or "node", in labels (experimental)
+
+**Type:** Copy
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ChassisLayer/TelemetryChrome.tsx`, `Dock/index.tsx`, `MotherFrame/index.tsx`, `TopBar/PocketSection.tsx`.
+**Summary:** A sweep of visible labels and screen-reader names for internal words: "Jump to the habit window", "Add an image (I)", "Pick the window frame style", "Drag to swap with another window", and the floating timer's Box look is "The Pomo window itself".
+
+## [2026-11-08] — A busy Todo row still fits (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/index.tsx`, `styles/reactflow-theme.css`.
+**Summary:** A row with a due day, a repeat and a reminder pushed its PLAN button off the edge at Station width (351 px). The repeat and reminder marks now sit together in one tight group, and in a narrow row the due chip drops its "due " word ("tomorrow", "Fri" — the chip reads as a date). Nothing is hidden; PLAN fits again.
+
+## [2026-11-08] — Free layout opens readable (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `App.tsx`, `Canvas/CanvasFlow.tsx`, `docs/research/new-user-review-2026-11-08.md`.
+**Summary:** New-user review 1.10: switching to Free fitted all six windows side by side at about 34%, where nothing can be read. Free now fits the first four windows from the left (Pomo, Todo, Habits, Calendar) at a readable size (52% at 1440 × 900); FIT and the minimap still show everything. The first fit of a fresh canvas also never goes below 55%. Checked in the preview.
+## [2026-11-08] — Analytics shows the same habit streak as the Habit node
+
+**Type:** Bug Fix
+**Branch:** `feat/routines` (and `experiment/new-user-review`)
+**Files changed:** `analytics/engine.ts`, `analytics/sources/habitSource.ts`, `analytics/types.ts`, `AnalyticsNode/index.tsx`; test `analytics/__tests__/streaks.sameEverywhere.test.ts` (new).
+**Summary:** Found in the new-user review: Analytics kept its own copy of the streak (`calcHabitStreak`), which knew nothing of rest days or weekly targets — a habit with a rest day read 2 days in Analytics and 4 in the Habit node. Analytics now asks `habitStreak` like every other screen; a weekly-target habit's streak is in weeks ("2w" in the per-habit list) and stays out of the "longest streak" figure, which is in days (as milestones do).
+
+## [2026-11-08] — "Did it yesterday? Yes" fills an amount habit (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`; test `HabitNode.repairAmount.test.tsx` (new).
+**Summary:** Found while checking amounts against the rest of the habit flow: on "8 glasses a day", answering **Yes** to "Did it yesterday?" used the grid's click — one more glass — so yesterday stayed undone and the card stayed. Yes now sets yesterday to the full amount.
+
+## [2026-11-08] — `todo list` and `habit list` show what the rows show (experimental)
+
+**Type:** CLI
+**Branch:** `experiment/new-user-review`
+**Files changed:** `sys/commands/todo.ts`, `sys/commands/habit.ts`; tests `repeatTask.test.ts`, `habit.amount.test.ts`.
+**Summary:** Rule 8 — the assistant works through `krnl`, so it must see what a person sees. `krnl todo list` now adds "· due 2026-11-13 · repeats every Sunday · reminder 10 min before · dropped" to a row where they apply; `krnl habit list` shows the streak in weeks for a weekly target ("▲2w"), "3× a week", "2 of 8 glasses today", "rest day today", and "routine" instead of a streak for routines (JSON gains the same fields).
+
+## [2026-11-08] — The in-app assistant knows the new commands (experimental)
+
+**Type:** Docs (assistant prompt)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `claude/CLAUDE.md`.
+**Summary:** The assistant's instructions predated routines and today's work, so it would reach for the old commands or say something cannot be done. It now has a "Routines and habits — two kinds" section (when to ask "do you want to tick it off?"), the routine commands, weekly targets / amounts / counts / rest days / archive–unarchive, quick add in `todo add`, `todo due|repeat|drop|undrop`, and `task remind`; "Pin as lane" reads "Put a card on the canvas".
+
+## [2026-11-08] — Say an amount while adding a habit (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`; test `HabitNode.addField.test.tsx` (+1).
+**Summary:** Amounts were only in the right-click menu. The add card's habit questions end with an optional "+ An amount a day (8 glasses, 20 pages…)": it opens chips (2–20), a unit field and "none"; nothing is set unless asked for, and the button says it ("Add · every day, any time, 8 glasses"). Checked in the preview: the new habit reads "0 of 8 glasses today".
+
+## [2026-11-08] — One home for local-date helpers (experimental)
+
+**Type:** Refactor
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/ymd.ts` (`todayYMD`, `addDaysYMD`, `isoDowYMD`, `daysBetweenYMD`), `src/shared/due.ts`, `src/shared/repeatTask.ts`, `src/sys/commands/todo.ts`; test `tests/unit/shared.ymd.test.ts` (new).
+**Summary:** Structure: today's new modules each carried their own copy of "pad / date to YYYY-MM-DD / add days / ISO weekday". They now share `shared/ymd.ts` (which already held `isValidYMD` and `localYMD`), with a test across month ends and a DST weekend. No behaviour change.
+
+## [2026-11-08] — Habit popovers in their own file (experimental)
+
+**Type:** Refactor
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitPopovers.tsx` (new: `TargetPopover`, `AmountPopover`), `HabitNode/index.tsx` (−60 lines).
+**Summary:** Structure: the "Times a week…" and "Amount a day…" popovers were inline portals in the 1,350-line Habit node. They are now two small components sharing one shell (Esc closes, focus on the current choice), and the amount editor keeps its own draft state. Same behaviour; the Staying on track tour ran 8/8 after the move.
+
+## [2026-11-08] — Month view shows amounts and rest days (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`.
+**Summary:** The Week view filled an amount habit's day from the bottom and hatched rest days; the Month view showed neither (a half-done "8 glasses" day looked untouched, a rest day looked missed). Month cells now read the same, with the same tooltips. Checked in the preview.
+
+## [2026-11-08] — Quick add understands "every …" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`, `TodoNode/index.tsx`, `sys/commands/todo.ts`, `Tour/tours.ts`; test `quickAdd.test.ts` (+1, CLI +1).
+**Summary:** "Weekly review every sunday 18:00", "Water plants every day", "Standup every weekday 9:30" now add a repeating plan in one line: the repeat is read from the words, the first one lands on its first matching day (today counts unless its time has passed), and the line under the field says so ("today 18:00 · repeats every Sunday"). Same in `krnl todo add`. The Todo tour's quick-add step names it.
+
+## [2026-11-08] — Calendar habit pills show an amount's count (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/WeekView.tsx`.
+**Summary:** A timed habit with an amount ("Meditate · 8 a day") showed only done / not done on the Calendar while a click there added one. The pill now shows the day's count ("3/8") until it is done. Checked in the preview.
+
+## [2026-11-08] — A repeat keeps its reminder and kind (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/scheduleActions.ts`, `sys/commands/todo.ts`; test `repeatTask.test.ts` (+1).
+**Summary:** Found by crossing two new features: "Team sync, every Monday, remind me 10 min before" lost its reminder on the second week, and an event came back as a focus block. The next one now keeps the reminder and the kind (in the app and through `krnl todo check`).
+
+## [2026-11-08] — A night shift reads "now" after midnight (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/RoutineShelf.tsx` (`routineStatus`); test `routines.test.ts` (+1).
+**Summary:** Crossing night shifts with the Routines shelf: at 01:00 on Saturday, Friday's 22:00–06:00 shift was still on, but the shelf said "next Fri". It now reads "now" until the shift ends.
+
+## [2026-11-08] — First-day tour fits the new add flows (experimental)
+
+**Type:** Bug Fix (tutorial)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts`.
+**Summary:** The first tour a new user runs had two gaps after today's changes. Its habit step said only "press Enter" (Enter now asks habit or routine) — it now says to answer Yes and how often. Its "plan it" step waited for a task to land on the Calendar; a task added with quick add ("Stretch 23:00 30 min") is already there, so the step waited forever — it now also passes when the newest task is already planned. Run in the preview on a fresh board: step 5 passed on its own after a quick add.
+## [2026-11-08] — Every tutorial is in Help
+
+**Type:** UX (tutorials)
+**Branch:** `feat/routines` (and `experiment/new-user-review`)
+**Files changed:** `Launch/HelpMenu.tsx`.
+**Summary:** Help offered only "Take the tour"; the other tutorials (Habits & Routines, Staying on track, Calendar, …) could be started only from the Orb, yet the 0.11 notes say "Help › Staying on track". Help now has **Tutorials** (N more), which opens the full list in place; each starts its tour, with its summary as the tooltip. Checked in the preview.
+
+## [2026-11-08] — Month view shows plans with a day but no time (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/MonthView.tsx`.
+**Summary:** The Week view's DAY line listed plans due a day with no time yet; the Month view did not, so "Pay rent friday" was invisible there. Month cells now list them after the timed plans, dashed (rust when overdue), draggable like the others, from the same `dayOnlyPlans`. In the short Station slot a cell shows only the chip's edge, like timed chips there; the name is in the tooltip.
+
+## [2026-11-08] — Proof that the new fields survive a load (experimental)
+
+**Type:** Test
+**Branch:** `experiment/new-user-review`
+**Files changed:** `tests/unit/main/board.newFields.roundtrip.test.ts` (new).
+**Summary:** Release rule: an update must open every older board and never drop data. Today's fields are all optional (no migration needed); node state is `z.unknown()` and the two load-time patches spread every field. The new test writes a board with every new field — due day, repeat, dropped, reminder, event kind, weekly target, amount and counts, rest days, a night-shift routine with a reminder and a skip — and loads it through the real loader: all kept.
+
+## [2026-11-08] — Quick add reads ranges: "Meeting 14:00-15:30" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Meeting 14:00-15:30" left "-15:30" in the name. A range now gives the start and the length: "14:00-15:30" (90 min), "6pm-7pm", "9-10am" (the am/pm of the end applies to the start). Numbers without clock words stay in the name ("Pages 10-20").
+
+## [2026-11-08] — Quick add reads "in 2 hours" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Call back in 2 hours" took "2 hours" as the length. "in N min / N hours" is now a start time from now, rounded up to the next 5 minutes (crossing midnight moves it to tomorrow); a length can still follow ("Stretch in 15 min for 10 min").
+
+## [2026-11-08] — Welcome back counts weekly-target habits in weeks (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `launch/catchup.ts`, `Launch/WelcomeBack.tsx`; test `habit.weeklyTarget.test.ts` (+1).
+**Summary:** Welcome back left weekly-target habits out entirely ("Gym 3× a week" never showed, even after a missed week). It now asks the same `habitStreak` as every other screen: "2 weeks, still going" or "Start again this week · best 4w".
+
+## [2026-11-08] — Drop offers UNDO (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/undoNotice.ts` (`revertible`), `ui/UndoNoticeBar.tsx`, `TodoNode/index.tsx`; test `undoNotice.test.ts` (+1).
+**Summary:** A dropped plan leaves the list (dropped plans live in the hidden archive), so a mis-click on "Drop (not doing it)" had no way back except `todo undrop` in the terminal. Drop now shows "Dropped "…" · UNDO"; UNDO brings the plan back and puts its Calendar time back. The notice runs its own reverse step because Drop also unschedules the plan a moment later, which the history-based undo could not cover.
+
+## [2026-11-08] — Quick add reads dates (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+2).
+**Summary:** Quick add knew "tomorrow" and weekdays but not a date, so "Dentist 15.11" kept "15.11" in the name. It now reads "15.11", "15/11", "Nov 20th", "3 March" and "the 15th" (day before month, as written in Germany). A date already past this year is next year's, and "the 2nd" means next month's once this month's has passed. Lengths ("1.5h"), version numbers ("2.5.1") and impossible dates ("31.02") are left alone. `todo add` in the terminal gets the same.
+
+## [2026-11-08] — Habit Archive offers UNDO; routine deletes say "routine" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`.
+**Summary:** Archiving a habit made the row vanish with no word about where it went. It now shows "Archived "…" · UNDO" like a delete. Deleting a routine said "Deleted habit"; it now says "Deleted routine".
+
+## [2026-11-08] — Dropping a repeating plan skips it instead of ending the series (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/index.tsx`, `Tour/tours.ts` (Staying on track, Drop step).
+**Summary:** The next copy of a repeating plan was only made on tick, so dropping one Monday's "Gym every Monday" silently ended the whole series. On a repeating plan the item now reads "Skip this time": it makes the next one (same time, same repeat), then drops this one; UNDO takes back both. Ending a series stays "Repeat… → Off". The tour's Drop step also said dropped plans could be brought back from an Archive the Todo never shows; it now names UNDO and Skip this time.
+
+## [2026-11-08] — A missed day no longer ends a repeating plan (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/repeatTask.ts` (`repeatsBehind`), `TodoNode/index.tsx`; test `repeatTask.test.ts` (+1).
+**Summary:** The next copy of a repeating plan was only made on tick, so "Water plants every day" stopped for good the first time a day passed unticked. On open and at midnight, every open repeating plan whose day has passed now makes its next copy from today (same time, same repeat). The old one stays where it was, as missed, so nothing is hidden. A guard keeps a double-run effect from making two copies (checked in the preview: one copy).
+
+## [2026-11-08] — `todo drop` skips a repeating plan too (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/sys/commands/todo.ts`, `shared/cli/commandRegistry.ts`, `claude/CLAUDE.md`; test `repeatTask.test.ts` (+1).
+**Summary:** Same fix as the app, from the terminal: `todo drop` on a repeating plan makes its next one first (same time, same repeat), then drops this one: "Skipped "Gym" this time. Next one: … 18:00." The help and the in-app assistant's notes say so.
+
+## [2026-11-08] — Quick add won't half-read "every monday and thursday" (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`, `TodoNode/index.tsx`, `src/sys/commands/todo.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Gym every monday and thursday" took "every monday" as the repeat and "thursday" as the first day, so the plan started on a Thursday that did not match its own repeat. A plan repeats on one weekday, so on several days quick add now reads none of it and says why under the field: "Added as typed: a plan repeats on one weekday; for several days, add a routine in Habits". `todo add` says the same.
+
+## [2026-11-08] — "Rest today" is not offered on a day already done (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`.
+**Summary:** A habit already ticked today still offered "Rest today", which changed nothing on screen (the tick wins) and left a stray rest day in the data. The menu now offers it only on a day not yet done; "Undo rest today" stays when a rest day is set.
+
+## [2026-11-08] — Welcome back leaves out missed copies of repeating plans (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `launch/catchup.ts`, `TodoNode/index.tsx` (hint wording), `Tour/tours.ts` (Rest step); test `dueOnDay.test.ts` (+1).
+**Summary:** Since a missed repeating plan now brings its next copy by itself, Welcome back listing the missed one with a "Today" button would have put a second copy on today. Missed copies whose series is still repeating (before or after the next copy is made) are no longer loose ends; plain missed plans still are. Also: the multi-day quick-add hint says "Will be added as typed", and the tour's Rest step asks for a habit not done today (a done day has no "Rest today").
+
+## [2026-11-08] — A plan with no day gets its first day when it starts repeating (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/index.tsx`, `src/sys/commands/todo.ts`; test `repeatTask.test.ts` (+1).
+**Summary:** Repeat… on a plan with no due day and no Calendar time made a plan that repeated on no day: nothing showed on the Calendar's DAY line or in the Clock, and the series only moved if it was ticked. It now gets its first matching day as a due day (on a Sunday, "every weekday" is due Monday). `todo repeat` does the same and says "first due …".
+
+## [2026-11-08] — Adding a habit you archived offers it back (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`; test `HabitNode.addField.test.tsx` (+1).
+**Summary:** Typing the name of an archived habit made a fresh one with no history, and said nothing. The add card now says "Gym is in your archive, with its history" with "Restore it instead", which brings the old habit back and closes the card. A new one can still be made with Yes/No.
+
+## [2026-11-08] — A weekly target lets any day be ticked (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx` (`tickableOn`); test `HabitNode.addField.test.tsx` (+1).
+**Summary:** "Times a week…" says any days count, but on a habit that also had fixed days (say Mondays) the other days stayed "not scheduled" and could not be ticked, so 3 times a week could never be reached. With a weekly target every day can now be ticked, in the week row, the month view and by clicking the row, and the year view no longer dims those days (it also redraws when the target changes); without one, fixed days still apply.
+
+## [2026-11-08] — Quick add reads "noon" (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/quickAdd.ts`; test `quickAdd.test.ts` (+1).
+**Summary:** "Lunch with Sam at noon friday" kept "at noon" in the name. "noon" and "midday" now read as 12:00.
+
+## [2026-11-08] — A repeating plan keeps its day (experimental)
+
+**Type:** Bug Fix (logic)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/DuePicker.tsx` (`canClear`), `TodoNode/index.tsx`.
+**Summary:** "No due date" on a repeating plan with no Calendar time made it repeat on no day again. The due picker no longer offers it there; the plan can move to another day, and Repeat… → Off ends the series.
+
+## [2026-11-08] — Repeating plans removed: something that repeats is a habit with a time or a routine (experimental)
+
+**Type:** Bug Fix (logic) · Removal
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/index.tsx`, `TodoNode/commands.ts`, `TodoNode/types.ts`, `Canvas/commandDispatch.ts`, `store/scheduleActions.ts`, `launch/catchup.ts`, `src/shared/quickAdd.ts`, `src/sys/commands/todo.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `Tour/tours.ts`, `claude/CLAUDE.md`; removed `src/shared/repeatTask.ts`, `ui/TaskRepeatPicker.tsx`, `repeatTask.test.ts`; tests `quickAdd.test.ts`, `dueOnDay.test.ts`, `tours.test.tsx`.
+**Summary:** Used for real, repeating plans broke: ticking one made the next copy at once, so the same daily plan could be ticked again and again on one day (22 times on the user's board); the Calendar showed only that one copy; dragging moved one copy with no series behind it; and it was a third kind of "repeating thing" next to habits and routines, which confused. Removed: Repeat… on a Todo row, "every …" in quick add (it now says "a plan happens once — add a habit with a time or a routine in Habits & Routines" and reads nothing else), `todo repeat`, Skip this time (Drop is plain Drop again, still with UNDO), making the next copy on open or at midnight, and the Welcome back exceptions. Old boards still load: a leftover `repeat` on an item is ignored, and ticking it makes no copy. Gym at 18:00 every day is a habit with a time; a class is a routine.
+
+## [2026-11-08] — Delete from the Calendar means gone everywhere; ended routines stay on their shelf (experimental)
+
+**Type:** Bug Fix (UX)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/TaskPopup.tsx`, `CalendarNode/WeekView.tsx`, `store/scheduleActions.ts` (`deletePlanOfTask`, `deleteRoutine`), `HabitNode/index.tsx`, `HabitNode/RoutineShelf.tsx`.
+**Summary:** Things the windows hid stayed on the Calendar with no way to remove them there: a routine's band only offered "End routine after this day", which kept it, and an ended routine vanished from Habits & Routines into the gear menu while its past days stayed on the Calendar. A plan's Calendar popup now has **Delete** (Todo, Calendar and canvas, with UNDO), a routine's band has **Delete routine** (with UNDO), "End" says it keeps the days before, and an ended routine stays on the Routines shelf marked "ended 2 Nov" with Restart and Delete in its menu.
+
+## [2026-11-08] — A plan's deadline shows in the DAY line even when it has a time (experimental)
+
+**Type:** Bug Fix (UX)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `CalendarNode/dayOnly.ts`, `CalendarNode/DueFlag.tsx` (new), `CalendarNode/WeekView.tsx`, `CalendarNode/MonthView.tsx`; test `dayOnly.test.ts` (+1).
+**Summary:** A due date on a plan that already had a Calendar time was drawn nowhere. The DAY line (Week and Day) and the Month cell now show it on its due day with a small flag, dashed and not draggable (the block on the grid moves the plan); a plan planned on its own due day shows only its block. DAY-line chips wrap the whole name instead of cutting it to "du…".
+
+## [2026-11-08] — One When, an optional Deadline; an ANY TIME strip; repeating events on the Calendar; one habit card; menus with icons (experimental)
+
+**Type:** Feature · UX redesign (Decision 40)
+**Branch:** `experiment/new-user-review`
+**Design:** canvas "KRNL0 launch designs", row "End design" (End-Plans, End-Calendar, End-Habits), from a senior UX review of the user's questions.
+**Requirements:** docs/06-requirements/plans-when-deadline.md · **ADR:** Decision 40 · **Issues:** #222
+**Files changed:** `main/persistence/board.ts` (migration `migrateWhenModel`), `TodoNode/{index,commands,types}.tsx`, `ui/WhenPopover.tsx` (new), `ui/menuIcons.tsx` (new), `ContextMenu/index.tsx` (icons, groups, hints), `CalendarNode/{WeekView,MonthView,TaskPopup,dayOnly}.tsx`, `CalendarNode/EventCard.tsx` (new), `HabitNode/{HabitAddAsk,HabitContextMenu,index}.tsx`, `ClockNode/index.tsx`, `store/scheduleActions.ts` (`putPlanOnDay`, `addPlanAt`), `shared/{quickAdd,dueOn}.ts`, `sys/{parser,SysFacade}.ts`, `sys/commands/todo.ts`, `shared/cli/commandRegistry.ts`, `Tour/tours.ts`, `claude/CLAUDE.md`, `styles/reactflow-theme.css`; tests `todoWhen.cli.test.ts` (new), `dayOnly`, `quickAdd`, `HabitNode.addField`, `habit.weeklyTarget`, `TodoNode.*scenarios`, `MonthView`, `WeekView`, `board.newFields.roundtrip`.
+**Summary:** The user, using the app for real, could not tell a scheduled time from a "due" day, could not put a plan on a day with no time, saw deadlines and plans drawn alike, and found habit / habit-with-a-time / routine confusing, the add flows wordy and the menus all text. Now:
+- **Plans** have one **When** — a day + time (a block) or a day at **any time** (`TodoItem.onDay`) — and an optional **Deadline** (`dueOn`, nothing else). One **When popover** (day grid, any time or a time, length, reminder; a Deadline tab) replaces Edit time, Due date… and Reminder…. Old boards migrate once: a "due" with no Calendar time becomes the plan's any-time day.
+- **Quick add**: one Enter, no "how long?" step; chips above the field show what it read. "fri" = Friday at any time; "by / due / before / deadline sat" = the Deadline.
+- **Todo row**: When · Deadline (flag) · length · bell · tag in one group that wraps under the name; "open" and the PLAN pill are gone; nothing is cut or hidden at narrow widths.
+- **Menus** have line icons, groups and the current value at the right. The Todo row menu: When…, Deadline…, then the timer item that follows the timer (**Focus on it** in Pomo, **Track it now** in Observe, **Switch timer to it** while running), Tag…, Rename, Won't do, Delete.
+- **Calendar**: an always-visible **ANY TIME** strip under the day names — drop a Todo row or a block there (UNDO), drag a chip into the hours for a time; deadlines are dashed flags, plans solid chips; repeating events are hatched bands whose names turn sideways instead of becoming initials; the empty-week overlay is gone. The plan popup says Focus on it / Show in Todo / Any time that day / Delete.
+- **Repeating events** (stored as routines) are made on the Calendar: right-click empty hours → **New here…** → Once (a plan) or Repeats (an event); the band menu has icons, Edit event…, Remind me…, End after this day, Delete event; a header button lists every event, ended ones included, with Edit, End, Restart, Delete.
+- **Habits** window lists only habits ("HABITS — WEEK …"). The add card opens as you type with every day, any time, a plain tick — Enter adds; On days / Times a week, a time, an amount; the button says what it adds. The habit menu: Days & time… (the same card), Rest today, then rename / colour / icon / note, canvas card, Archive, Delete — with icons.
+- **Clock** lists the day's any-time plans and deadlines under ANY TIME.
+- **CLI**: `todo when`, `todo deadline` (`todo due` alias), `event …` (`routine` alias) incl. `event delete`.
+- Tours rewritten for the new words and places (Habits, Repeating events, Staying on track, Todo "SAY WHEN").
+Checked by walking it in the preview as a user (add, tick, drag to the strip, block to the strip, UNDO, New here… Once and Repeats, events list, habit card and Days & time…); 2,441 tests and typecheck green.
+**Not done:** the 0.11 release notes (`shared/whatsnew.ts`) still say "Habits & Routines" — they need the designed, approved notes pass; the habit "Edit…" panel that would fold rename/colour/icon/note into one item was left as separate items.
+
+## [2026-11-08] — One plan card everywhere; an add card while typing; adding on the Calendar is findable; Pomo keeps its face; a Minimal face (experimental)
+
+**Type:** UX (Decision 40, follow-up)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/WhenPopover.tsx` (title + actions: the plan card), `TodoNode/PlanAddCard.tsx` (new), `TodoNode/index.tsx`, `CalendarNode/WeekView.tsx`, `CalendarNode/EventCard.tsx`, `store/scheduleActions.ts` (`planWhenOf`, `applyPlanWhen`), `PomoNode/FaceFit.tsx`, `PomoNode/variants/{Minimal,Outline}.tsx`, `PomoNode/{index,types}.ts`, `pocket/PocketApp.tsx`, `Tour/tours.ts`; tests `planAddCard.test.tsx` (new), `themePhase2.test.tsx`.
+**Summary:** From the user's next round:
+- **One plan card.** Clicking a plan's block on the Calendar opened a different popup than the Todo row's When…. Both now open the same card: the plan's name, When / Deadline, day or any time, time, length, reminder, and its actions (Focus on it / Track it now, Mark done, Show its card, Delete).
+- **Add card while typing a plan.** A small card above the field shows the day (or no day), any time or a time, a length and a deadline, filled from the words; set any of them before adding, or just press Enter. The field keeps the focus.
+- **Adding on the Calendar without knowing the right-click.** A click on empty hours opens the add card (Once = a plan, Repeats = an event), and a **+** sits in the Calendar header. The event card's button now fits ("every day", "weekdays" instead of seven letters).
+- **Pomo keeps the face you picked.** In a short window the face used to swap to a different look; now it scales down and only leaves out its small labels when there's no room. The Outline face's "0 … 25 MIN" labels were positioned over the read-out and overlapped "25:00" when scaled; they're in the flow now.
+- **Minimal Pomo face**: just the time, a thin progress line while it runs, and one word (Ready / Focus / Paused). In the face picker, the pocket timer and `krnl pomo config --face minimal`.
+- **Tours** updated for the new ways: first day (add card, its card, PLAN gone), welcome (plans, click to add, events), Todo (the add card, its card), Calendar (ANY TIME strip, click/+ to add, a plan's card), repeating events (click empty hours), modes ("Focus on it").
+Checked in the preview as a user (plain Enter, card day/length/deadline, words filling the card, click and + on the Calendar, block and row opening the same card; faces at five window sizes). 2,447 tests and typecheck green.
+
+## [2026-11-08] — The add-plan card in the habit card's style (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TodoNode/PlanAddCard.tsx`.
+**Summary:** The first add-plan card was a wall of identical chips (seven days, seven lengths, four deadlines, wrapping rows). The user asked for the habit card's style instead: the plan's name; a No day / On a day switch; this week as day circles (today ringed); a time row (Any time or a time); a length row (No length, − value +); a deadline row (No deadline / by …, with its own day circles); and one button that says what Enter adds ("Add · Tue 16:00 · 1h 30 · by Tue"). Still filled from the words, and Enter still adds a plain plan straight away. Three other directions are on the canvas ("Adding a plan · three drafts").
+
+## [2026-11-08] — One plan card for adding, editing and the Calendar (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/WhenPopover.tsx` (controlled mode, `anchorAbove`, `primaryLabel`), `TodoNode/index.tsx`, `TodoNode/PlanAddCard.tsx` (helpers only now).
+**Summary:** Adding a plan had its own card (a week of day circles with no dates) while a row's When… and a Calendar block showed the month calendar card — two looks for one thing, and the add card could not say which Tuesday. Typing a plan now opens the same plan card: its name, When / Deadline tabs, the month calendar, Any time or a time, length, reminder, and an **Add** button. It follows the words as you type ("Essay tue 16:00 1h" selects Tue 10, 16:00, 1h), anything picked on the card wins, the text field keeps the focus, Enter adds, Esc cancels. A plain name and Enter still adds a plain plan.
+
+## [2026-11-08] — Show on canvas / Show on Calendar, no open-close lines (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/scheduleActions.ts` (`showTaskOnCanvas`, any-time plans in `showTaskOnCalendar`), `TodoNode/index.tsx`, `TaskNode/index.tsx`, `CalendarNode/WeekView.tsx`, `ui/menuIcons.tsx`.
+**Summary:** A plan's right-click menu has two eye items: **Show on canvas** centres its card and makes it blink; **Show on Calendar** opens the Calendar on its day and blinks the block (or its chip in the ANY TIME strip). Show on Calendar is greyed out with "no day yet" when the plan has no day. The plan card has the same two actions, and on the Calendar "Show its card" became "Show on canvas". The Calendar no longer draws the dashed lines for when KRNL0 was first opened and last closed each day; the times are still recorded. 2,447 tests and typecheck green.
+
+## [2026-11-08] — One Show, a highlight that keeps the card's shape, state colours, `krnl show` (experimental, #223)
+
+**Type:** UX + CLI
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/highlight.ts` (new), `store/showCli.ts` (new), `store/scheduleActions.ts` (`showTask`), `store/useCliDispatch.ts`, `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `TodoNode/index.tsx`, `TaskNode/index.tsx`, `TaskNode/CardParts.tsx`, `CalendarNode/WeekView.tsx`, `styles/tokens.css` (`--planned`), `claude/CLAUDE.md`, `tests/unit/sys/show.cli.test.ts`.
+**Summary:**
+- **One Show (eye).** The two items (Show on canvas / Show on Calendar) became one **Show**: the plan's card and its place on the Calendar come on screen together and are highlighted. A plan with no day shows its card only. Same in the plan card and the task card's menu.
+- **The highlight keeps the shape.** It used to put a square glow on the card's wrapper. It is now a ring drawn above the screen, with the same rounded corners as the thing it points at, following it while the canvas moves. The card itself is not restyled. The Calendar block and the ANY TIME chip use the same ring.
+- **Card icons show state.** The drag-to-Calendar icon and the date icon are green when the plan is on the Calendar, grey when not, rust when missed. The length icon is green when a length is set. A plan on a day at any time now reads "Fri 13, any time" on its card (it said "Not on the calendar").
+- **`krnl show` (alias `highlight`)** lets the in-app agent point at things while it explains: a plan by name (card + Calendar), a window (`calendar`, `todo`, `pomo`, `habits`, `clock`, `analytics`, `terminal`), a day (`today`, `2026-11-13`), any button (`show ui "Station"`), a node (`show node <id>`), with `--note "…"` under the ring and `show clear`. The assistant instructions tell it to show what it talks about.
+2,457 tests and typecheck green; checked in the preview.
+
+## [2026-11-08] — Habit card keeps its size with six days picked (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Summary:** Picking six days made the Add button read every day and grow, resizing the whole habit card. Six days now read "all but Tue", and a long button label is cut instead of growing the card. (`HabitNode/HabitAddAsk.tsx`)
+Follow-up: the Add button now has one fixed size (184 px) and the footer never wraps, so the button no longer drops to its own line when the label gets longer; "Not ticked? Calendar →" sits on two lines beside it.
+
+## [2026-11-08] — Habit card: three designs to try in the app (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitAddAsk.tsx`.
+**Summary:** The habit card is rebuilt in the three directions from the canvas ("Adding a habit · three drafts"), with an **A · B · C** switch in its header so they can be tried on real habits: **A** labelled rows (days, then Time and Goal), **B** a sentence whose words open one editor box, **C** three tiles (Days · Time · Goal) with the editor below. All three keep one fixed height, the goal is one control ("− 8 + glasses", unit typed or picked), and Add is a full-width button. The choice is remembered on the computer; the switch goes once one is picked. Habit tests green.
+
+## [2026-11-08] — Tours: practice is not counted, drag steps ring both ends and land today, the card stays off the target (experimental)
+
+**Type:** UX + Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/tourPractice.ts` (new), `store/timeLogPause.ts`, `components/Tour/TourHost.tsx`, `components/Tour/tours.ts`, `CalendarNode/WeekView.tsx`, `HabitNode/HabitAddAsk.tsx`, `tests/unit/renderer/tourPlaceCard.test.ts`.
+**Summary:**
+- **Practice from a tour.** A tour that asks you to do things (add a plan, record time, tick a habit) now says on its first step that what you make is practice. While it runs, nothing is written to the time log. At the end a card lists what it made ("1 plan: \"Essay\"", "12 min of recorded time", "1 habit tick") with **Remove them** (the Todo, Habits, timer and done ledger go back to how they were before the tour; undo is cleared so it can't come back) or **Keep them** (they stay and are logged then, as one change). Nothing practised reaches Analytics unless kept.
+- **Drag steps ring both ends.** "Plan it" rings the **Todo** ("FROM HERE", dashed) and the Calendar ("TO TODAY"); the card stays clear of both.
+- **The first-day plan lands today.** The Calendar opens on today's Day view at now for that step (your own view comes back after it). Dropped on another day, the step says so ("That landed on Monday. The Clock only shows today…") and waits; on today it moves on to the Clock.
+- **The card never sits on what it shows.** The day-recap step points at the recap card, so the guide goes beside it; and the card keeps 36 px from its target so the guide orb on its corner no longer covers it.
+- **Habit card:** one line under the goal says what the number means ("Each click adds 1 glass · done at 8" / "One click a day marks it done").
+Checked by walking the first-day tour in the preview (rings, wrong-day nudge, today drop, recap placement, Remove). Tests: 2,453 green; one time-log test timed out in the full run and passes on its own.
+
+## [2026-11-08] — Habits window: an amount part-way through the day reads as progress (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Summary:** A habit with an amount ("Water, 8 glasses") at 1 of 8 drew a thin coloured line inside today's square that looked like a rendering glitch. The square now fills softly with the count and shows the number ("1"), so progress is readable. (`HabitNode/index.tsx`)
+
+## [2026-11-08] — Habit card settled on A; habit days read clearly (experimental)
+
+**Type:** UX + Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`, `styles/tokens.css`.
+**Summary:**
+- **Habit card:** the A · B · C switch is gone (it confused more than it helped); the card is draft A — days, then Time and Goal rows. The Every day / Weekdays / Weekends row is removed to keep it small: tap the days. One or two days read "Mon" / "Mon Thu" on the button.
+- **The green bar on top of a part-done square** was the progress fill repeating into the square's 1 px border; it is painted from the border box and never repeats now.
+- **Days a habit isn't on** show a quiet **×** and can't be clicked (they were near-invisible squares).
+- **On a day the habit isn't on,** the row says "Next: tomorrow · 2 glasses a day" instead of "Tick today to start · 0 of 2 today".
+
+## [2026-11-08] — Habits window: view switch in the header, Month and Year that fit, a tidy archive (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitNode/index.tsx`, `HabitNode/HabitPopover.tsx`, `styles/tokens.css`.
+**Summary:**
+- **Week · Month · Year** sits in the window's header now (it was inside Settings); titles are shorter ("HABITS — WEEK 45").
+- **Month** fits the window (square size from the space there is), groups days into weeks with a small gap, numbers each week's start (never two side by side), shows a quiet dot on days a habit isn't on, and fills part-done amounts without the stray top line.
+- **Year** fills the window's width (5–12 px squares), has month names above, keeps days before the habit existed and days it isn't on as small dots, and shows the days it is on as clear empty squares.
+- **Settings → Archived (N)** is folded by default with **Show / Hide**; a long archive scrolls inside a short list, and the panel never runs past the window's bottom (checked with 12 archived habits).
+
+## [2026-11-08] — First run starts the tour and ends on Advanced; Easy/Advanced review proposed (experimental)
+
+**Type:** UX + Docs
+**Branch:** `experiment/new-user-review`
+**Files changed:** `components/Orb/index.tsx`, `components/Tour/tours.ts`, `components/Tour/TourHost.tsx`, `HabitNode/HabitAddAsk.tsx`, `docs/06-requirements/easy-mode.md`, `tests/unit/renderer/HabitNode.addField.test.tsx`.
+**Summary:**
+- **First run:** a brand-new board starts "Your first day" by itself, once, after the window settles and never over What's new or Welcome back (it used to wait for a click on the orb). End tour says no; the orb keeps offering it.
+- **The tour ends on Advanced:** in Easy, a step before the last opens Settings → Mode and says what Advanced adds (tags and time by tag, focus sessions, naming recorded time, planned vs spent, deadlines and weekly goals, the terminal and AI), suggesting it after a few days. **See Advanced** hands over to the live "Easy and Advanced" tour. Tour buttons stay on one line.
+- **Easy/Advanced review** (`easy-mode.md`): what a beginner keeps, and proposed rows D19–D26 for Easy (Deadline, habit amounts and weekly goals, creating task chains, the Calendar's line-up/zoom tools, the Terminal, canvas wires/frames/canvases, fewer Settings pages, Station first), with open questions Q6–Q9. Not built: waiting for the user's OK.
+- **Habit card:** "X is in your archive" is one small pill now: **Restore "X" from the archive**.
+Checked in the preview (auto start, the Advanced step, hand-over, once only). 2,457 tests and typecheck green.
+
+## [2026-11-08] — Easy hides what a first week doesn't need (easy-mode D19–D26) (experimental)
+
+**Type:** Feature (UX)
+**Branch:** `experiment/new-user-review`
+**Files changed:** `store/uiMode.ts`, `Station/stationVisibility.ts`, `Station/StationToolbar.tsx`, `ui/WhenPopover.tsx`, `TodoNode/index.tsx`, `HabitNode/HabitAddAsk.tsx`, `HabitNode/index.tsx`, `TaskNode/index.tsx`, `CalendarNode/WeekView.tsx`, `Dock/index.tsx`, `Canvas/canvasWheel.tsx`, `TopBar/index.tsx`, `TopBar/SettingsModal.tsx`, `styles/reactflow-theme.css`, `Tour/tours.ts`, `Launch/HelpMenu.tsx`, `Orb/index.tsx`, `docs/06-requirements/easy-mode.md`, `tests/unit/renderer/easyMode.review.test.tsx`.
+**Summary:** Built the approved review rows. In **Easy**: no **Deadline** (menu, plan-card tab, "by fri"; an existing one still shows and can be cleared) — D19; the habit card is **days and a time** (times a week and the goal stay on habits that already have them) — D20; no **Add next / Add parallel task** (existing chains work) — D21; the Calendar header drops the **layer switches and zoom** — D22; the **Terminal** window and its toggle are gone — D23; no **canvas switcher, Frame tool or connection dots** — D24; Settings drops **Finished cards** — D25; new boards were already Station — D26. Tours follow the mode: the Terminal tour is Advanced-only and Easy steps never mention deadlines, weekly targets or amounts. Data is never changed; switching back shows everything. New tests cover each row in both modes; checked in the preview in both modes. 2,469 tests and typecheck green.
+
+## [2026-11-08] — The guide speaks (Eleven v4), Calendar adds on double-click, a Repeating button, the event card restyled, bigger click areas (experimental)
+
+**Type:** Feature + UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tourVoice.ts` (new), `Tour/voice/*.mp3` + `manifest.json` (new), `scripts/gen-tour-voice.ts` (new), `Tour/tours.ts`, `Tour/TourHost.tsx`, `CalendarNode/WeekView.tsx`, `CalendarNode/EventCard.tsx`, `ui/menuIcons.tsx`, `styles/tokens.css`, `styles/reactflow-theme.css`, `tests/unit/renderer/tourVoice.test.ts`.
+**Summary:**
+- **Voice for "Your first day"** (the test before the other tours). Each step has a spoken script (`say`) written for **Eleven v4** (`eleven_v4`, Sep 2026): audio tags before the words they colour ([warmly], [curious], [playfully], [soft chuckle], [excited], [Brief pause]…, 1–3 a step as ElevenLabs recommends), pauses from [Brief pause] and "…", button names as words in quotes ("Escape", "Start", never "Esc"/"START"/digits/arrows). Clips are named by a hash of the words, so a reworded step gets a new clip and the rest stay. `scripts/gen-tour-voice.ts` records missing clips (key and voice id only from the environment, never in a file). The tour card plays the clip when the step's words show, stops it on Next/Back/End, has a speaker button to mute (remembered), and silences the orb's own lines so two voices never overlap. 18 clips (both modes), ~1.9 MB.
+- **Calendar:** a single click on empty hours no longer opens the add card (it got in the way of moving); **double-click** adds, as do **+**, right-click and the new **Repeating** button (icon + word; the word drops when the header is tight). The events list button has a list icon. Tours say "double-click empty hours".
+- **Event card** in the habit card's style: the name as the title, Once / Repeats, the days as circles (or "On Wed 11, once"), labelled Time ("to 23:00") and Length rows, a full-width button; one fixed height.
+- **Click areas** (audit of every visible control under 24×24 px, both modes): rows of segment and header buttons now have a 24 px minimum height; small stand-alone controls (✓ boxes, the row's calendar icon, gears, earlier/later-hours arrows, the window grips, connection dots, the Todo row's When/deadline/tag) get an invisible click margin of 6–8 px, so they look the same and a near miss still hits. Dense grids (habit squares) are unchanged. The Calendar's zoom now really hides in a narrow window (its inline display beat the rule).
+2,476 tests and typecheck green.
+
+## [2026-11-08] — Pop-ups close on a click elsewhere; the pre-release list (experimental)
+
+**Type:** UX + Docs
+**Branch:** `experiment/new-user-review`
+**Files changed:** `ui/useDismissOutside.ts` (new), `TodoNode/index.tsx`, `HabitNode/index.tsx`, `HabitNode/HabitPopover.tsx`, `docs/releases/pre-release-todo.md` (new).
+**Summary:** The add cards (a plan, a habit) and Habits settings stayed open when you clicked elsewhere — the canvas swallowed the click before their listener saw it. One hook, `useDismissOutside`, listens in the capture phase so every outside click closes them. The add cards hide but keep what you typed; a click in the field (or more typing) brings the card back. Clicks inside a card (a day, the time list) keep it open. Checked in the preview with every pop-up (plan, habit, repeating event, +, events list, settings, row menu, row plan card). The pre-release list (`docs/releases/pre-release-todo.md`) tracks #224 (orb answers through the Claude CLI), #225 (one voice for the orb), #226 (cursor stutter on cards), #227 (voice the other tours), #228 (Easy: task card tag), plus the release steps. 2,476 tests and typecheck green.
+
+## [2026-11-08] — One cursor per area: no more pointer/grab stutter (#226) (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `TaskNode/index.tsx`, `TodoNode/index.tsx`, `HabitNode/index.tsx`, `Canvas/CanvasFlow.tsx`, `styles/tokens.css`, `styles/reactflow-theme.css`, `tests/unit/renderer/TaskNode.new.scenarios.test.ts`, `docs/releases/pre-release-todo.md`.
+**Summary:** A cursor map (the cursor under every 4 px of a card, a Todo row and a habit row, plus their edges) showed why it stuttered: task cards showed the **pointing finger** almost everywhere (they set it on themselves) though they move; the connection dots' click margin reached 14 px into the card, so its sides flipped to a **crosshair**; Todo names showed a **text** cursor between grab areas; habit rows flipped pointer/grab at **every gap** between squares; the **empty canvas** showed the finger, so leaving a card flipped grab → finger. Now one rule: **grab** on what moves (cards, rows — the name and estimate included; double-click still edits, with a tooltip), the **finger** only on what clicks (✓, buttons, squares — their gaps too), the **plain arrow** on the empty canvas and on days a habit isn't on, the crosshair only on the dots themselves (their margin points outward). Hovering a window no longer re-renders the whole canvas (only the wires that highlight); no long tasks were measurable in the preview either way. 2,476 tests and typecheck green.
+
+## [2026-11-08] — The orb answers through the Claude CLI (Decision 41, #224) (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/shared/assistant/claudeStream.ts` (new), `src/main/assistant/askClaude.ts` (new), `src/main/ipc/handlers.ts`, `src/main/preload.ts`, `src/renderer/env.d.ts`, `src/renderer/store/askClaude.ts` (new), `components/Orb/index.tsx`, `Tour/tours.ts`, `docs/03-architecture/decisions.md` (Decision 41), `docs/06-requirements/orb-ask.md` (new), `tests/unit/main/askClaude.test.ts` (new).
+**Summary:** "Ask anything" used to answer with canned text. A question now runs `claude -p` in the main process — in the app's `claude/` folder (the in-app assistant instructions) with `krnl` on PATH and the app's RPC credentials, like the terminal's Claude — and the answer streams into the orb as it is written. Only `Bash(krnl:*)` is allowed (it can read and change the board, nothing else); each krnl command shows as a quiet line under the answer. Follow-ups continue the conversation (`--resume`), **New chat** starts over, **Stop** cancels, 3-minute limit; errors say what to do (not installed, not signed in, timed out). The question goes in on stdin (no quoting or injection); on Windows the fixed arguments are quoted for the shell. A short-answer instruction is added for the small panel. Built-in flows ("focus session") still start locally. Tested with a fake process (stream, tools, split lines, not installed, signed out, timeout, stop) and for real on Windows (answer streamed in ~6 s). Hold Space to talk is not built yet (no speech-to-text in the app): the hint is off the input until it is. 2,484 tests and typecheck green.
+
+## [2026-11-08] — Orb: says when Claude isn't ready, menu only before chatting; the orb stays home in tours; drag the window from the whole top bar (experimental)
+
+**Type:** UX
+**Branch:** `experiment/new-user-review`
+**Files changed:** `main/assistant/askClaude.ts` (`claudeStatus`), `main/ipc/handlers.ts`, `main/preload.ts`, `renderer/env.d.ts`, `renderer/store/askClaude.ts`, `Orb/index.tsx`, `Tour/tourAnchor.ts`, `Tour/TourHost.tsx`, `TopBar/index.tsx`, `styles/tokens.css`.
+**Summary:**
+- **Claude readiness up front.** Opening the orb checks `claude auth status --json` (free, nothing asked; only the status reaches the window, never the account). Not installed → "Claude Code isn't installed… claude.com/claude-code"; not signed in → a **Sign in** button that starts `claude` in the Terminal; both have **Check again**.
+- **The menu shows before the chat starts.** Tours and quick actions sat above every conversation; now they show on an empty chat, hide once you ask, and **Tours** in the header brings them back.
+- **Tours:** the orb no longer jumps onto the tour card's corner at 60 % size; it keeps its place and size, stays above the dimming, and shows its speaking rings while the guide's voice plays.
+- **Moving the window:** every group in the top bar was "no drag", so only small gaps moved the window. Now the whole bar drags and only its controls (buttons, links, fields, menus) don't.
+Checked in the preview with a stand-in bridge (status line, Sign in, menu hide/show, answer and its krnl line, orb place and size during a tour). 2,484 tests and typecheck green.
+
+## [2026-11-08] — Hold Space to talk removed; Easy hides the tag on task cards (#228) (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Orb/index.tsx`, `Assistant/flows/intro.ts`, `TaskNode/index.tsx`, `TaskNode/DoneCard.tsx`, `tests/unit/renderer/TaskNode.new.scenarios.test.ts`, `docs/releases/pre-release-todo.md`.
+**Summary:** The user chose text-only for the orb (no Whisper): holding Space showed a "listening" animation that heard nothing, so push-to-talk is gone (Escape still closes the chat; the orb's label and the intro line no longer mention Space). In Easy, tags were hidden in the Todo list but still showed on the board's task cards — open and done cards now hide them too (test added). Also filed #229: board cards for habits and repeating events in the new task-card style (asked earlier, missed in the to-do list). 2,485 tests and typecheck green.
+
+## [2026-11-08] — Board cards for habits and repeating events, in the task-card style (Decision 42, #229) (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx` (rewritten), `Canvas/commandDispatch.ts` (`spawnHabitCard`, card on `habit.add`), `Canvas/CanvasFlow.tsx`, `Tour/tours.ts`, `docs/03-architecture/decisions.md` (Decision 42), `docs/06-requirements/board-cards.md` (new), `tests/unit/renderer/boardCards.test.tsx` (new), `docs/releases/pre-release-todo.md`.
+**Summary:** Draft A ("Same card") from the canvas. The board card of a habit (`habit.lane`) is redrawn in the task card's frame (CardParts: 220 × 120, same rows and ports): **habit** — tick box (an amount: a count box that adds one), "habit · every day / M W F · 07:30", the week as seven bars (today ringed), "5 days in a row · today open/done today", an amount fills a meter "3 of 8 glasses today". The same node draws a **repeating event** card when it points at an event: never ticked — a repeat mark and the Calendar's hatch, "event · Mon Wed · 10:00–12:00", its days in the week, "Today 10:00 · in 2 h" / "Wed 10:00 · in 3 days"; while it happens, the running border and "Until 12:00 · 40 min left". **Cards appear on their own** when a habit or an event is added (Habits window, Calendar, board `+ Habit` — which now places that card where you clicked instead of adding a second); deleting or archiving removes it, as before; `krnl habit pin|unpin` still add and remove by hand. Tour steps in Habits and Repeating events. No new node kind, no migration. Checked in the preview (three cards next to a task card, ticking and counting from the card). 2,490 tests and typecheck green.
+
+## [2026-11-08] — Board cards: fixes after the user's first look (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx`, `Canvas/rfAdapters.tsx`, `styles/reactflow-theme.css`, `tests/unit/renderer/boardCards.test.tsx`.
+**Summary:**
+- **The second dot:** the card's box was still the old lane's 280 × 170 while the card is 220 × 120, so its right-hand dot floated 60 px past the card (onto the next one). The box is the task card's size now; the dots sit on the card's sides.
+- **A day the habit isn't on** ("drink milk", Mondays, on a Sunday) no longer says "0 of 2 today · click to add one" next to a box you can't use: it says "Next: tomorrow · 2 a day" (a plain habit: "next: Mon"), the box dims.
+- **The event card was busy:** no hatch over the whole card; its days are quiet solid bars (stripes on every day read as a barcode); row 2 shows the start only ("every day · 23:00") so it isn't cut off.
+- **Same motion as other cards:** habit cards no longer tilt, turn rust and show a "drop on a calendar day" hint while dragged, and selected they get the task cards' cyan ring.
+2,490 tests and typecheck green; checked in the preview.
+
+## [2026-11-08] — Board cards: task, habit and event look different at a glance (experimental)
+
+**Type:** Enhancement
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx`, `tests/unit/renderer/boardCards.test.tsx`, `docs/06-requirements/board-cards.md`.
+**Summary:** The user found the three cards too alike. Same size, rows and ports still, but each kind now has its own shape: a **task** stays plain with a square box; a **habit** is tinted in its own colour, its tick (or counter) is round, and a stack of two sheets behind the card says "it repeats every day"; a **repeating event** has no box but a time tile on its left — repeat mark, start time large, length ("17:30 · 1.5 h") — like its block on the Calendar, so row 2 shows only its days and the bottom only the day ("Tomorrow · in 18 h"). Checked in the preview with all four next to each other.
+
+## [2026-11-08] — Habit card: the stack of sheets under it removed (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx`, `docs/06-requirements/board-cards.md`.
+**Summary:** The two sheets peeking out under a habit card (meant as "a stack of days") read as a rendering glitch. Removed; a habit is told apart by its colour tint and round tick.
+
+## [2026-11-09] — Habit and event cards, round two: today's square, a date page, Skip and Show, no wire dots (Decision 42) (experimental)
+
+**Type:** Enhancement
+**Branch:** `experiment/new-user-review`
+**Files changed:** `HabitLaneNode/index.tsx`, `Canvas/commandDispatch.ts` (`habit.lane.skip|unskip`), `Canvas/rfAdapters.tsx`, `Canvas/CanvasFlow.tsx`, `CalendarNode/WeekView.tsx` (`data-date` on event blocks), `store/showCli.ts` (`showEventOnCalendar`, `krnl show <event>`), `Tour/tours.ts`, `docs/03-architecture/decisions.md`, `docs/06-requirements/board-cards.md`, `docs/06-requirements/habit-node.md`, `tests/unit/renderer/boardCards.test.tsx`.
+**Summary:** The user picked draft A of "Habit and event cards, round two" on the canvas. **Habit card:** name and streak ("4 in a row", or "next: Wed" on a day it isn't on), "habit · every day / 2 a day", and the week as seven lettered squares — **today's square is the button** (faint check in a bright outline, filled with the check once ticked; an amount shows "+1" and "1/2", filling from the bottom; disabled on a day it isn't on). The bare "0 in a circle" is gone. **Event card:** a calendar page with the **next date** it happens (WED 11 Nov / TODAY / NOW), the time span ("17:00 – 18:20"; past midnight it reads 01:16, not 00:00), "every Wed · in 3 days", and two buttons: **Skip this one** (that date only; then **Undo skip**) and **Show** (opens that week on the Calendar and rings the block). **No wire dots** on either card; old wires to habit cards are not drawn but kept (they still fire). `krnl show <event name>` rings an event's next block. Tour lines updated. Checked in the preview: tick, +1, disabled day, skip/undo, Show ringing Class on the Calendar, no handles.
+
+## [2026-11-09] — UI rule: a control's words stay inside it (orb "New chat" fix) (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Orb/index.tsx`, `styles/tokens.css`, `dev/overflowGuard.ts` (new), `index.tsx`, `docs/04-visual-system/design-tokens.md`, `tests/unit/renderer/overflowGuard.test.ts` (new).
+**Summary:** The orb's "New chat" wrapped onto two lines and out of its pill: the header's title took the room and the buttons were squeezed. The title now gives way (ellipsis) and the buttons keep their size. To stop it happening anywhere: **an app-wide rule** in `tokens.css` keeps every plain-label control (button, tab, menu item, option, chip) on one line, so a crowded row can't squeeze one narrower than its words; controls with a title and a description still wrap; `data-wrap` opts out. **A dev-only guard** warns in the console once per control when a label wraps, spills or is cut off without an ellipsis (`[ui-rule] text spills out of "New chat"`). The rule is written in the visual system doc. An audit of every button across fixtures, Easy/Advanced, station/free and pop-ups at two window sizes found one more case ("BIG CLOCK" wrapping at 1100 px), fixed by the rule; nothing else spills.
+
+## [2026-11-09] — Align to grid: an invisible grid for the canvas (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Canvas/alignGrid.ts` (new), `Canvas/CanvasFlow.tsx`, `store/boardStore.ts` (`setAlignGrid`, `moveNodes`), `shared/types/board.ts` + `board.schema.ts` (`alignGrid?: 'cards' | 'all'`, optional — no migration), `TopBar/SettingsModal.tsx` (General → Canvas), `sys/parser.ts`, `sys/SysFacade.ts`, `sys/commands/info.ts` (`krnl settings grid [on|off]`), `shared/cli/commandRegistry.ts`, `styles/reactflow-theme.css`, `docs/06-requirements/align-grid.md` (new), `tests/unit/renderer/alignGrid.test.ts` (new), `tests/unit/sys/settings.layout.test.ts`.
+**Summary:** The user wanted no visible grid, "like Windows": with **Align to grid** on, whatever you drop on the canvas settles on an invisible **80 px** grid (made strict on the user's request: few spots, so lining up is easy; a task card takes 3 × 2 cells, so neighbours keep even 20/40 px gaps), and if that spot is taken it goes to the **nearest free** one — never on top of another card. Turning it on tidies the canvas once in reading order (windows, frames and their contents stay; one undo). A frame snaps and carries its children. Fixed while testing: when the free spot was where a note started, the store didn't change and the canvas kept showing it on top of the other card — the canvas now always moves it to the settled spot. **Off by default**; when on, the user picks **Cards only** (plan, habit and event cards — the default) or **Everything** (also notes, sticky notes, shapes, images, frames); what doesn't align still counts as in the way. Settings → General → Canvas, or `krnl settings grid off|cards|all`. Checked in the preview: Cards only lines up the cards and leaves notes alone; Everything tidies the rest (23 items on the grid, no overlaps); dropping a note onto another one.
+
+## [2026-11-09] — Ghost wires to hidden cards; Align to grid defaults to cards (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Canvas/CanvasFlow.tsx`, `Canvas/alignGrid.ts` (`gridScopeOf`), `TopBar/SettingsModal.tsx`, `sys/commands/info.ts`, `tests/unit/renderer/alignGrid.test.ts`.
+**Summary:** **Connecting to a note snapped onto an invisible card**, and a wire was drawn between two invisible cards at the top left. Cause: hidden cards (finished ones, or a layer switched off) were handed to React Flow with `hidden: true`; React Flow keeps a hidden node's old wire dots (a new wire snaps to them) and still draws wires between hidden nodes. Hidden cards are now left out of the canvas entirely, wires are drawn only when both ends are shown, and a hidden card inside a frame still moves with the frame. Checked in the preview: tasks layer off → no card, no wire, no wire dot; on → all back. **Align to grid** reads a board saved by the first build (`true`) as **cards only**, the default — never everything.
+
+## [2026-11-09] — Tours brought up to date, in Easy and Advanced (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts`, `Tour/TourHost.tsx`, `TodoNode/index.tsx` (`data-item-id`), `tests/unit/renderer/easyMode.review.test.tsx`, `tests/unit/renderer/tourVoice.test.ts`.
+**Summary:** Every tour was walked step by step in both modes with a script (screenshot, ring found or not, the real action done where it could). Fixed:
+- **The ring jumped to another task when the camera moved** — a step picked the most visible match each time. It now keeps the element it found, and prefers what was made during the tour (your new task, habit or plan row).
+- **"…or just press Enter"** read as "skip": it now says **press Enter to add it** (first day, Todo, habits).
+- **Pomo mode** (Advanced's default timer) has other buttons: steps now follow how the timer works — the stopwatch's BREAK / BACK TO WORK / STOP, or Pomo's break cup / END BREAK / ■. The Pomo tour's task picker and "forgot to start" step point at what exists (the TASK picker; the Calendar's Log time here…).
+- **Repeating events**: the **Repeating** button; Easy (no Events switch) gets its own line. **Habits**: Advanced mentions times a week and goals; **Goal**, not "Amount", in Staying on track; **Reminder** wording.
+- The **day recap closes** after its step; the **Welcome** tour shows the Terminal in Advanced; **Easy and Advanced** now shows all Advanced adds (deadlines and chains, Calendar layers, canvases/frames/Terminal).
+The first-day voice clips no longer match the corrected words: the clip check is paused until the voice is re-recorded (#227).
+
+## [2026-11-09] — Station: soft snap for dividers (experimental)
+
+**Type:** Enhancement
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Station/softSnap.ts` (new), `Station/StationLayout.tsx`, `tests/unit/renderer/stationSoftSnap.test.ts` (new).
+**Summary:** Let go of a Station divider within 14 px of a line and it clicks onto it: a divider in the other row (the Clock's edge under the Calendar's) or the divider's default spot. Further away it stays exactly where you put it — it helps, never forces. Checked in the preview: 8 px off → onto the Clock edge; 80 px away → stays; the bottom row snaps to the top row too.
+
+## [2026-11-09] — Every tour voiced, the orb in the same voice, the board tour (#225, #227) (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts` (board tour; a tagged `say` script on every step), `Tour/voice/*` (120 clips), `scripts/gen-tour-voice.ts` (both timer modes, dry run), `Assistant/orbLines.ts` (new), `scripts/gen-orb-voice.ts` (new), `Assistant/audio/voice/*` (35 clips), `Assistant/clipMap.ts`, `Assistant/flows/index.ts`, `Orb/index.tsx`, `store/tourPractice.ts`, `dev/overflowGuard.ts`, tests.
+**Summary:**
+- **The board tour** (new, both modes): cards, the toolbar, a sticky note (practice — removable at the end), Show, the habit/event cards, Align to grid; Advanced adds canvases and wires.
+- **Every step of every tour has a voice script written for the ear** with Eleven v4 audio tags ([warmly], [Brief pause], [playfully]…): numbers as words, button names as words, no symbols. 120 clips recorded with ElevenLabs `eleven_v4` (every tour, Easy and Advanced, both ways the timer works); stale clips pruned. A test checks that every step a user can meet has its clip and that no script has digits, capitals or markup the voice would garble.
+- **The orb speaks in the same voice (#225)**: greetings, click replies, the focus session, the Commander and short replies — 35 lines (`orbLines.ts`), recorded the same way; the old recordings are removed. The outdated intro and Pomo/Todo walkthrough flows (they said "hold Space to talk" and taught auto-chaining) are retired with their ~60 clips: the tours replaced them.
+- Overflow guard: no false alarms for SVG numerals or ellipsized text. The slow Station-cell test gets 20 s. Real boards on this machine (6) load with nothing lost or moved; a test pins the release fields.
+
+## [2026-11-09] — Release 0.11.0 prepared (not released)
+
+**Type:** Release
+**Branch:** `experiment/new-user-review`
+**Files changed:** `package.json` (0.11.0), `CHANGELOG.md`, `docs/releases/v0.11.0.md`, `src/shared/whatsnew.ts`, `Launch/WhatsNewDialog.tsx` (Show me starts the first-day tour; two new plates `plate-guide`, `plate-board`), `docs/releases/pre-release-todo.md`.
+**Summary:** Everything on this branch since 0.10.1 ships as **0.11.0** (a feature release). What's new: three headlines picked for everyone who plans a day — Easy mode and a voiced guide, plans/habits/events on one board, the floating timer — plus the full "more" list; laid out on the design canvas ("What's new in 0.11 · for approval"). Release notes and changelog cover every feature. GitHub housekeeping: 13 finished issues closed (#200–#206, #217, #219–#221, #102, #176), #222–#229 marked built and waiting for the owner's check, #170 #172–#175 #180 kept for after the release. **Not tagged, not published:** the owner approves What's new and checks the app, then merges the PR and runs RELEASING.md §3–4.
+
+## [2026-11-09] — Release checks: every clip transcribed back, the real app driven, Claude CLI states (experimental)
+
+**Type:** Chore
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts` (two voice lines reworded), `Tour/voice/*` (2 clips re-recorded, 2 removed), `docs/releases/pre-release-todo.md`.
+**Summary:** All 155 recordings were transcribed back with ElevenLabs speech-to-text and compared with their scripts (mean word match 0.98; no audio tag read aloud). Two slips — "Tick it" heard as "Ticket", "Tick the box" as "Take the box" — were reworded ("Then tick it off… right there in the list", "Then tick the little box on its row") and re-recorded; both now transcribe exactly. The real Electron build was driven over CDP with its own profile and board (the owner's running app untouched): windows open, the board tour opens, the orb answers through Claude Code. Claude CLI states checked on Windows: not installed, not signed in, ready, and a question with quotes and `&`. Issues #222–#229 closed with this evidence.
+
+## [2026-11-09] — What's new plates redrawn sharp (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/renderer/assets/launch/plate-guide.webp`, `src/renderer/assets/launch/plate-board.webp`.
+**Summary:** The two new 0.11 plates were made with a CSS tilt of a small HTML card, which smeared their tiny text. They are now rendered with the same 3D plate renderer as every older plate (flat texture on a real slab, ink outline): big type, few words — "Plan it." with progress, voice and Next for the guide; a Read habit row and a Wed 11 · Class · 17:00 event for the board. Checked at the dialog's real size; the approval board's three screenshots were retaken.

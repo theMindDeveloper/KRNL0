@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 // Eagerly resolve all .mp3 files under ./sounds at bundle time.
-const _sounds = import.meta.glob('./sounds/**/*.mp3', { as: 'url', eager: true }) as Record<string, string>;
+const _sounds = import.meta.glob('./sounds/**/*.mp3', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 
 const _stemToUrl: Record<string, string> = {};
 for (const [path, url] of Object.entries(_sounds)) {

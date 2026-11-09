@@ -40,10 +40,12 @@ export function isHabitView(value: unknown): value is HabitView {
 // ISO day-of-week, 1 = Monday … 7 = Sunday. Matches ISO-8601.
 export type IsoDow = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+// Decision 39 — `timeOfDay` is optional for a habit ("Any time"); a routine
+// always has one (enforced by the editor, the commands and the CLI).
 export type HabitSchedule =
-  | { kind: 'daily'; timeOfDay: string; durationMin?: number }
-  | { kind: 'weekly'; timeOfDay: string; days: IsoDow[]; durationMin?: number }
-  | { kind: 'weekdays'; timeOfDay: string; durationMin?: number };
+  | { kind: 'daily'; timeOfDay?: string; durationMin?: number }
+  | { kind: 'weekly'; timeOfDay?: string; days: IsoDow[]; durationMin?: number }
+  | { kind: 'weekdays'; timeOfDay?: string; durationMin?: number };
 
 export const TIME_OF_DAY_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
@@ -82,6 +84,113 @@ export interface Habit {
   icon?: string;        // v2.1 — optional glyph/emoji; falls back to round-robin glyph
   schedule?: HabitSchedule; // ADR 0002 — absence = unscheduled
   note?: string;        // free-form text shown under the habit row
+  /** Decision 39 — 'routine': repeats at a time and just happens; never
+   *  ticked, counted or flagged. Absent = a habit. */
+  kind?: 'routine';
+  /** Routine only: last day it happens (YYYY-MM-DD). Absent = no end. */
+  endsOn?: string;
+  /** Routine only: one occurrence skipped or moved to another time. */
+  exceptions?: RoutineException[];
+  /** Habit only: a weekly target ("3 times a week, any days"), 1–6. Ticked
+   *  any day; its streak counts weeks that reach the target, so a rest day
+   *  never breaks it. Absent = every scheduled day counts. */
+  perWeek?: number;
+  /** Rest days (YYYY-MM-DD): sick, travelling, a planned break. A rest day
+   *  never breaks a streak and never asks "did it yesterday?". */
+  rest?: string[];
+  /** Routine only: remind this many minutes before each time it happens
+   *  (0 = at the start). Absent = no reminder. */
+  remindMin?: number;
+  /** Habit only (review 3.2): "8 glasses a day". A day is done (in `log`)
+   *  once its count reaches the target. Absent = a plain yes/no tick. */
+  amount?: { target: number; unit: string };
+  /** Per-day counts toward `amount` (YYYY-MM-DD → count). */
+  counts?: Record<string, number>;
+}
+
+/** Today's count toward the amount (a ticked day without a count counts as full). */
+export function countOn(h: Pick<Habit, 'amount' | 'counts' | 'log'>, date: string): number {
+  if (!h.amount) return h.log.includes(date) ? 1 : 0;
+  const c = h.counts?.[date];
+  if (typeof c === 'number') return c;
+  return h.log.includes(date) ? h.amount.target : 0;
+}
+
+/** The habit's weekly target, or null (routines never have one). */
+export function weeklyTarget(h: Pick<Habit, 'perWeek' | 'kind'>): number | null {
+  if (h.kind === 'routine') return null;
+  const n = h.perWeek;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 6 ? n : null;
+}
+
+export interface RoutineException {
+  date: string;   // YYYY-MM-DD of the occurrence
+  skip?: true;
+  at?: string;    // HH:MM — this date only
+}
+
+/** Decision 39 — the one guard every tick / count / flag consumer checks. */
+export function isRoutine(h: { kind?: string } | null | undefined): boolean {
+  return h?.kind === 'routine';
+}
+
+/** A habit (or routine) that repeats at a set time of day. */
+export function hasTimeOfDay(h: { schedule?: HabitSchedule }): h is { schedule: HabitSchedule & { timeOfDay: string } } {
+  return typeof h.schedule?.timeOfDay === 'string' && isValidTimeOfDay(h.schedule.timeOfDay);
+}
+
+export interface RoutineOccurrence {
+  date: string;        // YYYY-MM-DD
+  startMin: number;    // minutes from midnight (after a move)
+  endMin: number;
+  skipped: boolean;
+  moved: boolean;
+}
+
+/** What a routine draws on one day: its own time, and the part of last
+ *  night's that runs past midnight (a 22:00–06:00 shift). `date` is always the
+ *  day the occurrence started, so skip / move / end act on the right one. */
+export interface RoutineSpan extends RoutineOccurrence {
+  /** True for the after-midnight part of the previous day's occurrence. */
+  spill: boolean;
+  /** The whole occurrence, in minutes from its own day's midnight (end may pass 1440). */
+  fullStart: number;
+  fullEnd: number;
+}
+
+export function routineSpansOn(h: Habit, date: string): RoutineSpan[] {
+  const out: RoutineSpan[] = [];
+  const len = (o: RoutineOccurrence) => Math.max(5, h.schedule?.durationMin ?? (o.endMin - o.startMin));
+  const own = routineOccurrence(h, date);
+  if (own) out.push({ ...own, spill: false, fullStart: own.startMin, fullEnd: own.startMin + len(own) });
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  const prev = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const p = routineOccurrence(h, prev);
+  if (p) {
+    const over = p.startMin + len(p) - 24 * 60;
+    if (over > 0) out.push({ ...p, startMin: 0, endMin: Math.min(24 * 60, over), spill: true, fullStart: p.startMin, fullEnd: p.startMin + len(p) });
+  }
+  return out;
+}
+
+/**
+ * Where a routine happens on `date`, or null when it does not (not one of its
+ * days, before it was created, after it ended, or it has no time).
+ */
+export function routineOccurrence(h: Habit, date: string): RoutineOccurrence | null {
+  if (!isRoutine(h) || h.archived || !hasTimeOfDay(h)) return null;
+  if (!isDayScheduled(h.schedule, date)) return null;
+  // From the start of the week it was added: a routine added on a Sunday still
+  // shows across that week, not only from next Monday.
+  if (date < toYMD(getMondayOf(new Date(h.createdAt)))) return null;
+  if (h.endsOn && date > h.endsOn) return null;
+  const ex = h.exceptions?.find((e) => e.date === date);
+  const at = ex?.at && isValidTimeOfDay(ex.at) ? ex.at : h.schedule.timeOfDay;
+  const [hh, mm] = at.split(':').map(Number) as [number, number];
+  const startMin = hh * 60 + mm;
+  const len = Math.max(5, h.schedule.durationMin ?? 60);
+  return { date, startMin, endMin: Math.min(24 * 60, startMin + len), skipped: ex?.skip === true, moved: !!ex?.at };
 }
 
 // Built-in icon ids (drawn as theme-aware SVGs by HabitNode/HabitIcon.tsx —

@@ -48,7 +48,7 @@ describe('Done dropdown (F16)', () => {
   it('a done item leaves the open list and waits in a collapsed "Done (1)"', () => {
     renderNode(seed());
     expect(texts()).toEqual(['open task']);
-    expect(screen.getByTestId('todo-done-toggle').textContent).toContain('Done (1)');
+    expect(screen.getByTestId('todo-done-toggle').textContent).toContain('Done today (1)');
     expect(screen.getByTestId('todo-header').textContent).toContain('Todos (1)');
   });
 
@@ -59,28 +59,12 @@ describe('Done dropdown (F16)', () => {
   });
 });
 
-describe('Archive dropdown (F17, F19, F20)', () => {
-  it('earlier days sit in a collapsed Archive with a day label', () => {
+describe('Only today in the Todo list (engagement.md F7)', () => {
+  it('done items from earlier days are not shown (they stay in the data)', () => {
     renderNode(seed());
-    const toggle = screen.getByTestId('todo-archive-toggle');
-    expect(toggle.textContent).toContain('Archive (1)');
-    fireEvent.click(toggle);
-    expect(texts()).toContain('done last week');
-  });
-
-  it('CLEAR appears when open and dispatches todo.clearArchived', () => {
-    const onCommand = renderNode(seed());
-    expect(screen.queryByTestId('todo-clear-archive-btn')).toBeNull();
-    fireEvent.click(screen.getByTestId('todo-archive-toggle'));
-    fireEvent.click(screen.getByTestId('todo-clear-archive-btn'));
-    expect(onCommand).toHaveBeenCalledWith('todo.clearArchived');
-  });
-
-  it('the checkbox on an archived row restores it', () => {
-    const onCommand = renderNode(seed());
-    fireEvent.click(screen.getByTestId('todo-archive-toggle'));
-    fireEvent.click(screen.getByLabelText('Restore to list'));
-    expect(onCommand).toHaveBeenCalledWith('todo.toggle', { id: 'c' });
+    expect(screen.queryByTestId('todo-archive-toggle')).toBeNull();
+    fireEvent.click(screen.getByTestId('todo-done-toggle'));
+    expect(texts()).not.toContain('done last week');
   });
 });
 

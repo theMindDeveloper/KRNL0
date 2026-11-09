@@ -175,10 +175,10 @@ These override visual rules that depend on color cues, replacing them with geome
 
 | Element | Size | Weight | Font | Case |
 |---|---|---|---|---|
-| Node header | 10.5px | 500 | mono | UPPER |
+| Node header | 11px | 500 | mono | UPPER |
 | Topbar brand | 12.5px | 600 | mono | UPPER |
 | Buttons | 11px | 400 | mono | lower |
-| Status bar | 10.5px | 400 | mono | — |
+| Status bar | 11px | 400 | mono | — |
 | Body text (todos, habits) | 13–14px | 400 | sans | — |
 | Pomodoro clock (default) | 64px | 300 | mono | — |
 | Terminal body | 11.5px | 400 | mono | — |
@@ -188,6 +188,10 @@ These override visual rules that depend on color cues, replacing them with geome
 - Node headers are **always monospace, always uppercase, always `--ink-3`**. No exceptions.
 - No system fonts — all three families are loaded from Google Fonts (or bundled subset).
 - `JetBrains Mono` carries `font-variant-numeric: tabular-nums` on timers.
+- **Readable floor (2026-11-07):** functional text — labels, meta rows, chips, buttons, times — is **at least 11px**. The Calendar's gutter is 40px so its half-hour marks meet the floor too; only chart axis text drawn inside SVG is smaller. When a bigger label doesn't fit, the layout gives way (ellipsis, an icon-only button, a toolbar that wraps under its title) — never the text size.
+- No blurred zero-offset glows (use a crisp 1–2px ring) and no overshooting "bounce" easing — motion eases out (`cubic-bezier(0.22, 1, 0.36, 1)`).
+- Inside a window, sections are separated by space and a hairline, not by cards inside the window's card.
+- Text contrast is at least 4.5:1 against what is actually behind it, in both themes (3:1 for 14px bold / 18px+). Disabled controls are the only dim text.
 
 ---
 
@@ -382,4 +386,20 @@ No text in the app may touch or cross the edge of the shape it sits in: a chart 
 
   Each label keeps `TEXT_INSET` (3 px) of clearance on every side, which also covers the dark text halo. If a label doesn't fit, shrink it down to `MIN_LABEL_FONT` (8 px). If it still doesn't fit, don't draw it. The legend or tooltip already carries the value. Never place a label at a fixed spot or behind a fixed `pct >= N` check.
 - **HTML.** Any text box that can get long needs `overflow: hidden; text-overflow: ellipsis; white-space: nowrap` plus a max width (see the Todo tag pill), or it must wrap. Padding is never zero on a bordered container.
+- **Controls (buttons, tabs, menu items, options, chips).** A control's label stays on one line and inside its box. `tokens.css` sets `white-space: nowrap` on every control that holds a plain label, so a crowded row (a header with a title and two buttons) can never squeeze a button narrower than its words; the title gives way instead (`min-width: 0` + ellipsis). A control that holds a title *and* a description (a `div`, a `p`, a `*hint*`/`*desc*` part) wraps as before; `data-wrap` opts out on purpose. In a flex row, the text that may shrink is the title, never a button: give the title `min-width: 0; overflow: hidden; text-overflow: ellipsis`.
+- **Guarded in dev** by `src/renderer/dev/overflowGuard.ts`: every few seconds it warns in the console, once per control, about any label that wraps, spills or is cut off without an ellipsis (`[ui-rule] text spills out of "New chat"`). Fix the layout, don't silence the warning.
 - **Enforced by** `tests/unit/renderer/analytics.textContainment.test.tsx`. It checks 3,000 random slice layouts plus rendered donuts, and fails if any label's box leaves its slice. New chart types add a case there.
+
+
+## Rule — board cards tell their kind at a glance (0.11, Decision 42)
+
+Plan, habit and event cards share the task card's size (220 × 120) but never look alike:
+
+- **Plan**: the plain card, square check box, wire dots on its sides.
+- **Habit**: tinted in its own colour (border 38 %, fill 6 %; 60 % / 11 % when done today), its week as seven lettered squares; **today's square is the button** (a faint check in an acid outline; "+1" and "n/goal" filling from the bottom for an amount). No wire dots.
+- **Event**: a calendar page on the left (weekday or TODAY / NOW, the day, the month) with the next date it happens; the time span and the rule beside it; **Skip this one** and **Show** as small outlined buttons. No wire dots.
+
+## Rule — Align to grid and Station soft snap
+
+- **Align to grid** is invisible: an 80 px grid (a task card = 3 × 2 cells). A drop settles on the nearest free spot with a 260 ms glide (none with reduced motion).
+- **Station soft snap**: a divider let go within 14 px of a line (the other row's divider, or its default spot) clicks onto it; further away it stays.

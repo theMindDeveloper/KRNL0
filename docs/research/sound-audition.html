@@ -1,0 +1,706 @@
+<title>KRNL0 Sound Audition</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<style>
+/* Layout: workbench. Anatomy of a tactile sound → live scope → map of 12 themes → theme cards → what happens after you pick. */
+:root{
+  --paper:#ebe1c2; --paper-2:#ddd0a7; --paper-3:#cbba85;
+  --ink:#1a1612; --ink-2:#38302a; --ink-3:#554b38;
+  --acid:#c9f158; --acid-ink:#3f5c0a; --line:rgba(26,22,18,.16);
+  --card:#f3ecd6; --zone:rgba(63,92,10,.12); --cut:rgba(168,62,42,.10);
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --serif:'Instrument Serif',Georgia,'Times New Roman',serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#131210; --paper-2:#1f1d18; --paper-3:#2f2b24;
+  --ink:#f4efe2; --ink-2:#ddd6c6; --ink-3:#b3aa94;
+  --acid:#c9f158; --acid-ink:#c9f158; --line:rgba(244,239,226,.14);
+  --card:#1a1915; --zone:rgba(201,241,88,.12); --cut:rgba(238,132,102,.12); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#131210; --paper-2:#1f1d18; --paper-3:#2f2b24;
+  --ink:#f4efe2; --ink-2:#ddd6c6; --ink-3:#b3aa94;
+  --acid:#c9f158; --acid-ink:#c9f158; --line:rgba(244,239,226,.14);
+  --card:#1a1915; --zone:rgba(201,241,88,.12); --cut:rgba(238,132,102,.12); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.55}
+.wrap{max-width:1040px;margin:0 auto;padding-block:32px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:44px}
+h1{font-family:var(--serif);font-weight:400;font-size:clamp(36px,6vw,58px);line-height:1;margin:0;text-wrap:balance}
+h1 em{color:var(--acid-ink)}
+h2{font-family:var(--serif);font-weight:400;font-size:30px;margin:0;text-wrap:balance}
+h3{font-family:var(--serif);font-weight:400;font-size:23px;margin:0}
+p{margin:0;max-width:70ch;color:var(--ink-2)}
+code{font-size:12px}
+section{display:grid;gap:14px;min-width:0}
+.eyebrow{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.lab{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.btn{all:unset;cursor:pointer;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border-radius:8px;border:1px solid var(--ink);color:var(--ink);white-space:nowrap}
+.btn:hover{background:var(--paper-2)}
+.btn.primary{background:var(--acid);color:#1a1612;border-color:#1a1612}
+.btn.primary:hover{background:#d8ff6e}
+.btn:focus-visible,.dot:focus-visible,input:focus-visible{outline:2px solid var(--acid-ink);outline-offset:2px}
+.controls{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center}
+.controls label{display:flex;gap:10px;align-items:center}
+input[type=range]{accent-color:var(--acid-ink);width:140px}
+.caption{min-height:1.5em;font-size:12px;color:var(--ink-3)}
+.notice{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:12px;color:var(--ink-2)}
+
+/* anatomy */
+.anat{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px;overflow-x:auto}
+.anat svg{display:block;width:100%;min-width:640px;height:auto}
+.anat text{font-family:var(--mono);fill:var(--ink-2);font-size:11px}
+.anat .t-dim{fill:var(--ink-3);font-size:10px}
+.anat .ax{stroke:var(--line)}
+.anat .w{fill:none;stroke:var(--ink);stroke-width:1.2}
+.anat .w.acc{stroke:var(--acid-ink)}
+.bands{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:10.5px;min-width:640px}
+.bands div{padding:8px 6px;border-right:1px solid var(--line);display:grid;gap:2px;min-width:0}
+.bands div:last-child{border-right:0}
+.bands .cut{background:var(--cut)}
+.bands .keep{background:var(--zone)}
+.bands b{font-weight:500;font-size:11px}
+.bands span{color:var(--ink-3)}
+.scroll-x{overflow-x:auto}
+
+/* scope */
+.scope{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+@media (max-width:760px){.scope{grid-template-columns:minmax(0,1fr)}}
+.panel{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:12px;display:grid;gap:8px;min-width:0}
+.panel canvas{width:100%;height:170px;display:block}
+
+/* map */
+.map{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:10px;overflow-x:auto}
+.map svg{display:block;width:100%;min-width:560px;height:auto}
+.map text{font-family:var(--mono);fill:var(--ink-2);font-size:11px}
+.map .t-dim{fill:var(--ink-3);font-size:10px}
+.map .ax{stroke:var(--line)}
+.map .zone{fill:var(--zone);stroke:var(--acid-ink);stroke-dasharray:4 4}
+.dot{cursor:pointer}
+.dot circle{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+.dot:hover circle,.dot.on circle{fill:var(--acid);stroke:#1a1612}
+
+/* cards */
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px;display:grid;gap:10px;align-content:start;min-width:0}
+.card.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink) inset}
+.card .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card .no{font-size:10.5px;color:var(--ink-3)}
+.card p{font-size:12.5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:10.5px;padding:3px 7px;border-radius:99px;border:1px solid var(--line);color:var(--ink-2)}
+.meter{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;font-size:10.5px;color:var(--ink-3)}
+.meter .bar{height:4px;border-radius:2px;background:var(--paper-3);position:relative}
+.meter .bar i{position:absolute;top:-3px;width:10px;height:10px;border-radius:50%;background:var(--ink);transform:translateX(-50%)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.star[aria-pressed="true"]{background:var(--acid);color:#1a1612;border-color:#1a1612}
+.short{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* moments table */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:680px;font-size:12.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-weight:500;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);background:var(--paper-2)}
+tr:last-child td{border-bottom:0}
+td a{color:var(--ink);text-underline-offset:3px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2)}
+.mcell{display:flex;gap:10px;align-items:flex-start;min-width:0}
+.mplay{all:unset;cursor:pointer;flex:none;width:30px;height:30px;border-radius:50%;border:1px solid var(--ink);display:grid;place-items:center}
+.mplay:hover{background:var(--acid);color:#1a1612;border-color:#1a1612}
+.mplay:focus-visible{outline:2px solid var(--acid-ink);outline-offset:2px}
+.mplay svg{width:11px;height:11px;fill:currentColor;margin-left:2px}
+.mrow.on td{background:var(--paper-2)}
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <div class="eyebrow">KRNL0 · sound research · Nov 2026 · round 4: themes</div>
+    <h1>Twelve ways a click can <em>feel</em></h1>
+    <p>Pick a <b>theme</b> first: a whole sound world, from a felt-padded notebook to a film camera shutter. Every theme is built from the same layers, mixed very differently, and every hit varies slightly like a real object. Once you pick one, we design each moment inside it. Built with <a href="https://tonejs.github.io/" target="_blank" rel="noopener" style="color:var(--ink)">Tone.js</a>. Use headphones; laptop speakers drop the thock.</p>
+    <div class="controls">
+      <button class="btn primary" id="tour" type="button">▶ Hear all 12</button>
+      <button class="btn" id="stop" type="button">■ Stop</button>
+      <label for="vol"><span class="lab">Volume</span><input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+    </div>
+    <div class="caption" id="caption" aria-live="polite">Browsers only play sound after a click.</div>
+    <div class="notice" id="noTone" hidden>The sound library didn't load (offline or blocked). Reload the page with a connection.</div>
+  </header>
+
+  <section aria-labelledby="an-h">
+    <h2 id="an-h">What makes a sound tactile and warm</h2>
+    <p>The earlier rounds were one smooth knock that only changed pitch, so everything sounded the same and flat. A real press, like a good key or a knuckle on wood, is <b>several things happening within 200 ms</b>. Each theme below is a different mix of these five layers:</p>
+    <div class="anat"><svg id="anatomy" viewBox="0 0 900 360" role="img" aria-label="Five layers of a tactile sound over the first 200 milliseconds"></svg></div>
+    <p><b>Where it sits in frequency.</b> Your brief is "not too high, not flat, in between", so the themes live in the green zones and roll off the red ones:</p>
+    <div class="scroll-x"><div class="bands" id="bands"></div></div>
+    <p><b>Warm</b> comes from three things: cutting the top end (above ~6 kHz), a touch of soft saturation that adds the 2nd harmonic (like tape or a valve), and a short, damped room instead of a long echo. <b>Texture</b> comes from the click being noise, not a tone, from material resonances, and from tiny random changes on every hit (±2–3% pitch, level, stereo position), so it never sounds copy-pasted.</p>
+  </section>
+
+  <section aria-labelledby="sc-h">
+    <h2 id="sc-h">Live scope</h2>
+    <p>Every sound you play is drawn here: the waveform shows the click spike and the thock body; the spectrum shows where the energy sits against the target zones.</p>
+    <div class="scope">
+      <div class="panel"><div class="lab" id="waveLab">Waveform · around the last hit</div><canvas id="wave" aria-label="Waveform of the last sound"></canvas></div>
+      <div class="panel"><div class="lab" id="specLab">Spectrum · 40 Hz – 12 kHz</div><canvas id="spec" aria-label="Spectrum of the last sound"></canvas></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="map-h">
+    <h2 id="map-h">The map</h2>
+    <p>Left to right: from pure thock to pure click. Bottom to top: from warm and muffled to bright and hard. The dashed zone is your brief. Click a dot to hear it.</p>
+    <div class="map"><svg id="map" viewBox="0 0 900 430" role="group" aria-label="Map of the 12 themes"></svg></div>
+  </section>
+
+  <section aria-labelledby="th-h">
+    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:end">
+      <h2 id="th-h">The 12 themes</h2>
+      <div class="short"><span class="lab">Shortlist</span><span id="shortlist" style="font-size:12px">none yet, star the ones you like</span><button class="btn" id="copy" type="button">Copy</button></div>
+    </div>
+    <p><b>Phrase</b> plays the same rhythm in every theme (tap, tap, double, big) so you compare like for like. <b>Typing</b> plays a burst of quick hits, which is where texture and variation show.</p>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section aria-labelledby="nx-h">
+    <h2 id="nx-h">Moments inside a theme</h2>
+    <p>The theme list above is only a <b>material test</b>: every theme plays the same rhythm so you can compare materials fairly. That's not how the app sounds. In the app, each moment is its own <b>gesture</b> built from the theme's materials: a leather strap sliding, a press-stud snapping, a drawer shutting, a pencil rolling. Here are two themes worked out in full.</p>
+    <div class="legend">
+      <span><b>Goes up</b> = good, forward</span><span><b>Goes down</b> = undo, missed</span><span><b>Rings</b> = reward</span><span><b>Slides</b> = something moves</span><span><b>Air</b> = letting go</span><span><b>Rolls</b> = streak</span><span><b>No click</b> = soft or blocked</span>
+    </div>
+    <div class="controls">
+      <button class="btn primary" id="day-felt" type="button">▶ A day in Felt &amp; Leather</button>
+      <button class="btn primary" id="day-walnut" type="button">▶ A day in Walnut Desk</button>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Moment</th><th>What it should say</th><th>Felt &amp; Leather</th><th>Walnut Desk</th></tr></thead>
+      <tbody id="moments"></tbody>
+    </table></div>
+    <p><b>In the app:</b> each moment of the chosen theme is rendered once into 3–4 slightly different short audio files (about 10–30 KB each). The app picks one at random each time, so it never sounds copy-pasted, uses no CPU, and works offline through the existing sound engine. The CLI gets <code>krnl sound test &lt;moment&gt;</code>.</p>
+  </section>
+
+<section aria-labelledby="rc-h">
+    <h2 id="rc-h">If we want recordings instead</h2>
+    <p>Once a theme wins, it can also be recorded for real and used as files, or used as the brief to pick a pack: a thocky keyboard, a hardwood desk, a cassette deck. Options: record our own (most unique), <a href="https://jdsherbert.itch.io/wooden-ui-sfx-pack" target="_blank" rel="noopener" style="color:var(--ink)">JDSherbert Wooden UI</a> or <a href="https://stormwave-audio.itch.io/wooden-interface-sound-effects-pack" target="_blank" rel="noopener" style="color:var(--ink)">Stormwave Wooden Interface</a> packs (a few dollars), or <a href="https://mechvibes.com/" target="_blank" rel="noopener" style="color:var(--ink)">Mechvibes</a> keyboard packs (licence differs per pack). Either way it ships inside the app and plays offline.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const cap = $('caption');
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  // ── Themes: same five layers, very different mixes ──────────────────────────
+  // x = click amount (0 thock … 1 click), y = brightness (0 warm/muffled … 1 bright/hard)
+  const THEMES = [
+    { id:'felt', name:'Felt & Leather', line:'A padded leather notebook shut on a felt desk mat. Marshmallow.', x:.1, y:.1,
+      chips:['deep 105 Hz body','leather slap','almost no click'],
+      master:{lowpass:2600, drive:.22, reverb:[.3,.05], gain:0.53},
+      body:{freq:105, octaves:1.4, pitchDecay:.02, decay:.12, gain:1},
+      click:{noise:'pink', freq:1100, q:.7, decay:.012, gain:.22},
+      modes:{base:240, ratios:[1,1.5], q:6, gains:[1,.5], excite:.008, gain:.25} },
+    { id:'vinyl', name:'Vinyl Lounge', line:'A warm thock with record-player crackle around it.', x:.24, y:.16,
+      chips:['thock 150 Hz','vinyl crackle texture','tape warmth'],
+      master:{lowpass:4200, drive:.32, reverb:[.8,.12], gain:0.56},
+      body:{freq:150, octaves:1.8, pitchDecay:.014, decay:.09, gain:1},
+      click:{noise:'pink', freq:2000, q:1, decay:.008, gain:.35},
+      grains:{count:8, spread:.24, freq:3200, q:.8, gain:.8} },
+    { id:'walnut', name:'Walnut Desk', line:'A knuckle on a thick hardwood desk.', x:.3, y:.28,
+      chips:['wood ring 310 Hz','soft knuckle','dry study'],
+      master:{lowpass:5200, drive:.12, reverb:[.45,.1], gain:0.65},
+      body:{freq:120, octaves:1.2, pitchDecay:.015, decay:.07, gain:.7},
+      click:{noise:'pink', freq:1600, q:.8, decay:.004, gain:.3},
+      modes:{base:310, ratios:[1,2.76,5.4,8.93], q:22, gains:[1,.45,.2,.08], excite:.006, gain:1} },
+    { id:'dome', name:'Rubber Dome', line:'A chunky button on an old console or TV remote.', x:.32, y:.24,
+      chips:['hollow plastic 760 Hz','squishy press','muted'],
+      master:{lowpass:4500, drive:.2, reverb:[.15,.04], gain:0.85},
+      body:{freq:230, octaves:2, pitchDecay:.01, decay:.045, type:'triangle', gain:.7},
+      click:{noise:'pink', freq:1500, q:1.5, decay:.02, gain:.45},
+      modes:{base:760, ratios:[1,1.6,2.3], q:8, gains:[1,.6,.3], excite:.006, gain:.65} },
+    { id:'cream', name:'Cream Keys', line:'A lubed linear key bottoming out in a walnut case.', x:.4, y:.33,
+      chips:['thock 190 Hz','soft plastic click','case ring 520 Hz'],
+      master:{lowpass:6000, drive:.18, reverb:[.25,.07], gain:0.94},
+      body:{freq:190, octaves:1.6, pitchDecay:.012, decay:.075, type:'triangle', gain:.9},
+      click:{noise:'pink', freq:2400, q:1.3, decay:.006, gain:.6},
+      modes:{base:520, ratios:[1,1.71,2.9], q:14, gains:[1,.5,.25], excite:.004, gain:.5} },
+    { id:'bamboo', name:'Bamboo', line:'A hollow bamboo tube tapped with a fingertip.', x:.48, y:.42,
+      chips:['hollow tube 420 Hz','odd harmonics','airy'],
+      master:{lowpass:6000, drive:.1, reverb:[.5,.12], gain:1.24},
+      body:{freq:200, octaves:1, pitchDecay:.01, decay:.03, gain:.35},
+      click:{noise:'pink', freq:2600, q:1.5, decay:.003, gain:.4},
+      modes:{base:420, ratios:[1,3,5,7], q:35, gains:[1,.5,.25,.1], excite:.004, gain:1} },
+    { id:'tape', name:'Tape Deck', line:'The PLAY key of a cassette deck latching down.', x:.62, y:.34,
+      chips:['double latch','spring','tape saturation'],
+      master:{lowpass:5000, drive:.38, reverb:[.2,.05], gain:1},
+      body:{freq:160, octaves:1.5, pitchDecay:.012, decay:.06, gain:.7},
+      click:{noise:'white', freq:2200, q:3, decay:.008, gain:.8, double:.014},
+      modes:{base:680, ratios:[1,1.37,2.2], q:10, gains:[1,.6,.3], excite:.004, gain:.4},
+      metal:{freq:180, harmonicity:3.2, modulationIndex:8, resonance:1800, decay:.09, gain:.15} },
+    { id:'abacus', name:'Abacus', line:'Wooden beads sliding and clacking together.', x:.7, y:.5,
+      chips:['bead clack 1.25 kHz','rattle','tiny body'],
+      master:{lowpass:7000, drive:.1, reverb:[.35,.1], gain:1.86},
+      body:{freq:260, octaves:.8, pitchDecay:.008, decay:.025, gain:.25},
+      click:{noise:'pink', freq:2800, q:2, decay:.003, gain:.6},
+      modes:{base:1250, ratios:[1,2.76,5.4], q:30, gains:[1,.35,.12], excite:.002, gain:.9},
+      rattle:{count:3, gap:.016, decay:.5} },
+    { id:'ceramic', name:'Ceramic Café', line:'A spoon tapping a stoneware mug.', x:.6, y:.8,
+      chips:['ceramic ring 820 Hz','shimmer','café room'],
+      master:{lowpass:7500, drive:.05, reverb:[1,.16], gain:1.64},
+      body:{freq:180, octaves:1, pitchDecay:.01, decay:.04, gain:.3},
+      click:{noise:'white', freq:3500, q:1.5, decay:.003, gain:.45},
+      modes:{base:820, ratios:[1,2.32,4.25,6.63], q:90, gains:[1,.4,.18,.07], excite:.002, gain:1} },
+    { id:'stones', name:'River Stones', line:'Two smooth pebbles knocked together.', x:.76, y:.72,
+      chips:['mineral 1.6 kHz','double knock','hard and dry'],
+      master:{lowpass:8000, drive:.05, reverb:[.5,.12], gain:1.4},
+      body:{freq:150, octaves:1, pitchDecay:.008, decay:.035, gain:.45},
+      click:{noise:'white', freq:4200, q:1, decay:.002, gain:.8},
+      modes:{base:1600, ratios:[1,1.83,2.95,4.1], q:45, gains:[1,.5,.3,.15], excite:.0015, gain:.7},
+      rattle:{count:1, gap:.022, decay:.35} },
+    { id:'typewriter', name:'Typewriter Study', line:'A 1960s typewriter key, the typebar hitting the platen.', x:.84, y:.6,
+      chips:['strike + platen','metal typebar','study room'],
+      master:{lowpass:7000, drive:.25, reverb:[.6,.14], gain:1.48},
+      body:{freq:140, octaves:2, pitchDecay:.01, decay:.05, gain:.45},
+      click:{noise:'white', freq:3200, q:2.5, decay:.012, gain:1, double:.009},
+      modes:{base:1100, ratios:[1,2.1], q:25, gains:[1,.4], excite:.003, gain:.35},
+      metal:{freq:320, harmonicity:5.1, modulationIndex:16, resonance:3200, decay:.06, gain:.2} },
+    { id:'rangefinder', name:'Rangefinder', line:'A film camera shutter: k-chk.', x:.9, y:.46,
+      chips:['two-stage shutter','metal snap','compact body'],
+      master:{lowpass:7000, drive:.15, reverb:[.2,.05], gain:1.27},
+      body:{freq:170, octaves:1.5, pitchDecay:.01, decay:.05, gain:.4},
+      click:{noise:'white', freq:3000, q:2, decay:.006, gain:1, double:.028},
+      modes:{base:950, ratios:[1,1.9], q:20, gains:[1,.4], excite:.003, gain:.3},
+      metal:{freq:400, harmonicity:4.1, modulationIndex:12, resonance:4000, decay:.04, gain:.15} }
+  ];
+
+  // ── Engine ──────────────────────────────────────────────────────────────────
+  // Layer loudness was measured once offline (4 renders each, averaged) so a theme's
+  // gains mean "peak relative to the others". Nothing is rendered at startup.
+  const NORM = {"felt":{"body":0.738,"click":6.18,"modes":17.7},"vinyl":{"body":0.717,"click":6.74,"grain":1.63},"walnut":{"body":0.755,"click":4.88,"modes":47.4},"dome":{"body":0.764,"click":7.93,"modes":17},"cream":{"body":0.728,"click":10.2,"modes":44.3},"bamboo":{"body":0.74,"click":8.47,"modes":83.1},"tape":{"body":0.717,"click":3.1,"modes":23.7,"metal":0.168},"abacus":{"body":0.734,"click":10.3,"modes":78},"ceramic":{"body":0.748,"click":2.29,"modes":188},"stones":{"body":0.781,"click":1.91,"modes":75.7},"typewriter":{"body":0.718,"click":2.39,"modes":69,"metal":0.153},"rangefinder":{"body":0.714,"click":2.33,"modes":71.9,"metal":0.161}};
+  let ready = false, VOL, MASTER, REV, analyser, fft, LIVE;
+  let active = null;            // only one theme's graph exists at a time
+  const rnd = (a) => (Math.random()*2-1) * a;
+  const safe = (fn) => { try { fn(); } catch (e) { /* a voice still busy: skip this layer */ } };
+  function pool(arr){ let k = 0; return () => arr[(k++) % arr.length]; }
+
+  async function boot(){
+    if (ready) return true;
+    if (typeof Tone === 'undefined'){ $('noTone').hidden = false; return false; }
+    // A larger audio buffer: a little more latency, no crackle when the page or the app is busy.
+    Tone.setContext(new Tone.Context({ latencyHint:'playback', lookAhead:0.05 }));
+    await Tone.start();
+    LIVE = Tone.getContext();
+    VOL = new Tone.Gain(+$('vol').value).toDestination();
+    const comp = new Tone.Compressor({threshold:-12, ratio:3, attack:0.003, release:0.1});
+    const limit = new Tone.Limiter(-1);
+    MASTER = new Tone.Gain(0.8); MASTER.chain(comp, limit, VOL);
+    REV = new Tone.Reverb({decay:0.7, preDelay:0.004, wet:1}); REV.connect(MASTER);
+    analyser = new Tone.Analyser({type:'waveform', size:16384, smoothing:0});
+    fft = new Tone.FFT({size:4096, smoothing:0});
+    VOL.connect(analyser); VOL.connect(fft);
+    ready = true; return true;
+  }
+
+  const mk = {
+    body: (b) => new Tone.MembraneSynth({pitchDecay:b.pitchDecay, octaves:b.octaves, oscillator:{type:b.type || 'sine'}, envelope:{attack:0.001, decay:b.decay, sustain:0, release:0.02}}),
+    click: (c) => new Tone.NoiseSynth({noise:{type:c.noise}, envelope:{attack:0.0008, decay:c.decay, sustain:0, release:0.004}}),
+    ex: (md) => new Tone.NoiseSynth({noise:{type:'pink'}, envelope:{attack:0.0008, decay:md.excite, sustain:0, release:0.004}}),
+    metal: (mt) => new Tone.MetalSynth({envelope:{attack:0.001, decay:mt.decay, release:0.02}, harmonicity:mt.harmonicity, modulationIndex:mt.modulationIndex, resonance:mt.resonance, octaves:1}),
+    grain: () => new Tone.NoiseSynth({noise:{type:'white'}, envelope:{attack:0.0004, decay:0.002, sustain:0, release:0.002}}),
+    bank: (md, i, o, nodes) => md.ratios.forEach((r, k) => { const f = new Tone.Filter({type:'bandpass', frequency:md.base*r, Q:md.q});
+      const g = new Tone.Gain(md.gains[k] ?? .2); i.connect(f); f.connect(g); g.connect(o); nodes.push(f, g); })
+  };
+
+  function build(s){
+    if (active && active.s.id === s.id) return active;
+    if (active){ const old = active; setTimeout(() => old.nodes.forEach((n) => safe(() => n.dispose())), 1500); }
+    const m = s.master, n = NORM[s.id], T = { s, nodes: [] };
+    const keep = (x) => { T.nodes.push(x); return x; };
+    const bus = keep(new Tone.Gain(1));
+    const hp = keep(new Tone.Filter({type:'highpass', frequency:m.highpass || 80, rolloff:-12}));
+    const cheb = keep(new Tone.Chebyshev({order:2, wet:m.drive, oversample:'4x'}));
+    const lp = keep(new Tone.Filter({type:'lowpass', frequency:m.lowpass, rolloff:-24, Q:0.4}));
+    const out = keep(new Tone.Gain(m.gain || 1));
+    bus.chain(hp, cheb, lp, out, MASTER);
+    const send = keep(new Tone.Gain(m.reverb[1] * 1.6)); out.connect(send); send.connect(REV);
+    // Each voice keeps its own fixed stereo spot: variety without moving a sounding voice.
+    const voices = (count, make, dest) => pool(Array.from({length:count}, (_, i) => {
+      const p = keep(new Tone.Panner(count > 1 ? (i / (count - 1) - 0.5) * 0.3 : 0)); const v = keep(make()); v.connect(p); p.connect(dest); return v; }));
+
+    if (s.body){ const g = keep(new Tone.Gain(s.body.gain * n.body)); g.connect(bus); T.body = voices(4, () => mk.body(s.body), g); }
+    if (s.click){ const g = keep(new Tone.Gain(s.click.gain * n.click)); g.connect(bus);
+      const f = keep(new Tone.Filter({type:'bandpass', frequency:s.click.freq, Q:s.click.q})); f.connect(g);
+      T.click = voices(4, () => mk.click(s.click), f); }
+    if (s.modes){ const inG = keep(new Tone.Gain(1)), outG = keep(new Tone.Gain(s.modes.gain * n.modes)); outG.connect(bus);
+      mk.bank(s.modes, inG, outG, T.nodes);
+      T.ex = voices(4, () => mk.ex(s.modes), inG); }
+    if (s.metal){ const g = keep(new Tone.Gain(s.metal.gain * n.metal)); g.connect(bus); T.metal = voices(2, () => mk.metal(s.metal), g); }
+    if (s.grains){ const g = keep(new Tone.Gain(s.grains.gain * n.grain)); g.connect(bus);
+      const f = keep(new Tone.Filter({type:'bandpass', frequency:s.grains.freq, Q:s.grains.q})); f.connect(g);
+      T.grain = voices(6, () => mk.grain(), f); }
+    active = T; return T;
+  }
+
+  // One physical hit. v = force (0..1), p = size (pitch multiplier).
+  function hit(T, t, v, p){
+    const s = T.s;
+    const pm = p * (1 + rnd(0.02));
+    const vm = Math.max(0.05, v * (1 - Math.random() * 0.15));
+    if (T.body){ const b = T.body(); safe(() => b.triggerAttackRelease(s.body.freq * pm, s.body.decay, t, vm)); }
+    const strike = (tt, vv) => {
+      if (T.click){ const c = T.click(); safe(() => c.triggerAttackRelease(s.click.decay, tt, vv)); }
+      if (T.ex){ const e = T.ex(); safe(() => e.triggerAttackRelease(s.modes.excite, tt, vv)); }
+    };
+    strike(t, vm);
+    if (s.click && s.click.double){ const c = T.click(); safe(() => c.triggerAttackRelease(s.click.decay, t + s.click.double * (1 + rnd(0.15)), vm * 0.6)); }
+    if (s.rattle){ for (let i = 1; i <= s.rattle.count; i++) strike(t + s.rattle.gap * i * (1 + rnd(0.25)), vm * Math.pow(s.rattle.decay, i)); }
+    if (T.metal){ const mtl = T.metal(); safe(() => mtl.triggerAttackRelease(s.metal.freq * pm, s.metal.decay, t + 0.002, vm)); }
+    if (T.grain){
+      const times = Array.from({length:s.grains.count}, () => t + 0.008 + Math.random() * s.grains.spread).sort((a, b) => a - b);
+      times.forEach((tt) => { const gr = T.grain(); safe(() => gr.triggerAttackRelease(0.002, tt, 0.3 + Math.random() * 0.7)); });
+    }
+  }
+
+// Same rhythm in every theme: tap, tap, tap-tap, BIG.
+  const PHRASE = [[0,.55,1],[.24,.55,1.02],[.5,.6,1],[.575,.45,1.12],[.95,1,.8]];
+  function phrase(T, t0){ PHRASE.forEach(([dt, v, p]) => hit(T, t0 + dt, v, p)); return 0.95; }
+  function typing(T, t0){
+    let t = t0, last = 0;
+    for (let i = 0; i < 14; i++){
+      const space = i === 7;
+      hit(T, t, space ? 0.85 : 0.42 + Math.random() * 0.25, space ? 0.82 : 1 + rnd(0.04));
+      last = t - t0; t += 0.075 + Math.random() * 0.07 + (space ? 0.06 : 0);
+    }
+    return last;
+  }
+
+  let timers = [], specTimer = 0, waveTimer = 0;
+  function clearAll(){ timers.forEach(clearTimeout); timers = []; }
+  async function play(id, kind){
+    if (!(await boot())) return;
+    const s = THEMES.find((x) => x.id === id), T = build(s);
+    const t0 = LIVE.now() + 0.03;
+    const last = kind === 'typing' ? typing(T, t0) : phrase(T, t0);
+    highlight(id);
+    cap.textContent = s.name + ' · ' + (kind === 'typing' ? 'typing' : 'phrase');
+    clearTimeout(specTimer); clearTimeout(waveTimer);
+    const ms = (last + 0.03) * 1000;
+    specTimer = setTimeout(drawSpec, ms + 40);
+    waveTimer = setTimeout(drawWave, ms + 630);
+    $('waveLab').textContent = 'Waveform · ' + s.name + ' · last hit';
+    $('specLab').textContent = 'Spectrum · ' + s.name + ' · last hit';
+  }
+  function highlight(id){
+    document.querySelectorAll('.card').forEach((c) => c.classList.toggle('on', c.dataset.id === id));
+    document.querySelectorAll('.dot').forEach((d) => d.classList.toggle('on', d.dataset.id === id));
+  }
+
+  // ── Scope drawing ───────────────────────────────────────────────────────────
+  let lastWave = null, lastSpec = null;
+  function sizeCanvas(c){ const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    c.width = Math.max(10, Math.round(r.width * d)); c.height = Math.round(r.height * d); const g = c.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); return [g, r.width, r.height]; }
+  function drawWave(){ if (analyser) lastWave = analyser.getValue().slice(); paintWave(); }
+  function paintWave(){
+    const c = $('wave'); const [g, W, H] = sizeCanvas(c);
+    g.clearRect(0, 0, W, H); g.strokeStyle = css('--line'); g.beginPath(); g.moveTo(0, H/2); g.lineTo(W, H/2); g.stroke();
+    if (!lastWave) { g.fillStyle = css('--ink-3'); g.font = '11px JetBrains Mono, monospace'; g.fillText('play something', 8, 16); return; }
+    const v = lastWave, n = v.length, step = n / W;
+    let peak = 0.0001; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(v[i]));
+    const scale = (H / 2 - 6) / peak;
+    g.fillStyle = css('--ink');
+    for (let x = 0; x < W; x++){
+      let mn = 1, mx = -1; const a = Math.floor(x * step), b = Math.floor((x + 1) * step);
+      for (let i = a; i < b; i++){ if (v[i] < mn) mn = v[i]; if (v[i] > mx) mx = v[i]; }
+      if (mx < mn) continue;
+      g.fillRect(x, H/2 - mx * scale, 1, Math.max(1, (mx - mn) * scale));
+    }
+  }
+  const FMIN = 40, FMAX = 12000;
+  const fx = (f, W) => (Math.log10(f / FMIN) / Math.log10(FMAX / FMIN)) * W;
+  function drawSpec(){ if (fft){ const v = fft.getValue(); lastSpec = { v:v.slice(), f:Array.from(v, (_, i) => fft.getFrequencyOfIndex(i)) }; } paintSpec(); }
+  function paintSpec(){
+    const c = $('spec'); const [g, W, H] = sizeCanvas(c);
+    g.clearRect(0, 0, W, H);
+    const zones = [[120,400,'thock'],[400,1500,'material'],[1500,4000,'click']];
+    g.fillStyle = css('--zone'); zones.forEach(([a, b]) => g.fillRect(fx(a, W), 0, fx(b, W) - fx(a, W), H));
+    g.fillStyle = css('--cut'); g.fillRect(fx(6000, W), 0, W - fx(6000, W), H); g.fillRect(0, 0, fx(80, W), H);
+    g.fillStyle = css('--ink-3'); g.font = '10px JetBrains Mono, monospace';
+    zones.forEach(([a, b, l]) => g.fillText(l, fx(a, W) + 3, 12));
+    g.fillText('harsh', fx(6000, W) + 3, 12);
+    [100, 300, 1000, 3000, 10000].forEach((f) => { const x = fx(f, W); g.fillText(f >= 1000 ? (f/1000) + 'k' : String(f), x + 2, H - 4); });
+    if (!lastSpec) return;
+    const lo = -110, hi = -20;
+    g.strokeStyle = css('--ink'); g.lineWidth = 1.5; g.beginPath(); let started = false;
+    for (let i = 1; i < lastSpec.v.length; i++){
+      const f = lastSpec.f[i]; if (f < FMIN || f > FMAX) continue;
+      const y = H - ((Math.min(hi, Math.max(lo, lastSpec.v[i])) - lo) / (hi - lo)) * (H - 18) - 14;
+      const x = fx(f, W); if (!started){ g.moveTo(x, y); started = true; } else g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+  window.addEventListener('resize', () => { paintWave(); paintSpec(); });
+
+  // ── Anatomy diagram (drawn from the same envelope maths) ────────────────────
+  (function anatomy(){
+    const svg = $('anatomy'), X0 = 230, X1 = 880, MS = 200, px = (ms) => X0 + (ms / MS) * (X1 - X0);
+    const rows = [
+      ['Click', '0–6 ms · 1.5–4 kHz noise', 'the tactile edge you feel', (t) => t < 6 ? Math.exp(-t / 1.2) * Math.sin(t * 9.1 + 1) : 0, true],
+      ['Thock body', '2–90 ms · 120–400 Hz', 'pitch falls ~1 octave in 15 ms', (t) => t < 2 ? 0 : Math.exp(-(t - 2) / 26) * Math.sin(2 * Math.PI * (0.19 * (t - 2) + 0.4 * (1 - Math.exp(-(t - 2) / 8)) * 8 / 6.3)), false],
+      ['Material ring', '3–60 ms · 400–1500 Hz', 'wood, plastic, ceramic modes', (t) => t < 3 ? 0 : Math.exp(-(t - 3) / 14) * (Math.sin((t - 3) * 3.3) * 0.7 + Math.sin((t - 3) * 9.1) * 0.3), true],
+      ['Texture', 'micro-clicks, rattle, crackle', 'different on every hit', (t) => { const s = Math.sin(t * 12.9898) * 43758.5453; const r = s - Math.floor(s); return r > 0.965 ? (r - 0.965) * 22 * Math.exp(-t / 90) * (Math.sin(t * 7) > 0 ? 1 : -1) : 0; }, false],
+      ['Room', '10–250 ms · short, damped', 'warmth without echo', (t) => t < 10 ? 0 : Math.exp(-(t - 10) / 60) * 0.35 * Math.sin(t * 2.3) * Math.sin(t * 0.37), false]
+    ];
+    let html = '<line class="ax" x1="' + X0 + '" y1="330" x2="' + X1 + '" y2="330"/>';
+    [0, 25, 50, 100, 150, 200].forEach((ms) => { html += '<line class="ax" x1="' + px(ms) + '" y1="20" x2="' + px(ms) + '" y2="330"/><text class="t-dim" x="' + (px(ms) - 8) + '" y="348">' + ms + ' ms</text>'; });
+    rows.forEach(([name, spec, why, fn, acc], i) => {
+      const y = 40 + i * 62, amp = 20;
+      html += '<text x="0" y="' + (y - 4) + '" style="font-weight:500">' + name + '</text><text class="t-dim" x="0" y="' + (y + 10) + '">' + spec + '</text><text class="t-dim" x="0" y="' + (y + 23) + '">' + why + '</text>';
+      let d = ''; for (let k = 0; k <= 900; k++){ const t = (k / 900) * MS; d += (k ? 'L' : 'M') + px(t).toFixed(1) + ' ' + (y + 2 - fn(t) * amp).toFixed(1); }
+      html += '<path class="w' + (acc ? ' acc' : '') + '" d="' + d + '"/>';
+    });
+    svg.innerHTML = html;
+  })();
+
+  (function bands(){
+    const B = [[20,80,'Rumble','cut',true],[80,120,'Low weight','felt, not heard',false],[120,400,'Thock','the body',false,true],[400,1500,'Material','wood, plastic',false,true],[1500,4000,'Click','tactile edge',false,true],[4000,6000,'Air','a little',false],[6000,20000,'Harsh','rolled off',true]];
+    const total = Math.log10(20000 / 20);
+    $('bands').innerHTML = B.map(([a, b, n, d, cut, keep]) => '<div class="' + (cut ? 'cut' : keep ? 'keep' : '') + '" style="flex:' + (Math.log10(b / a) / total).toFixed(3) + '"><b>' + n + '</b><span>' + (a >= 1000 ? a/1000 + 'k' : a) + '–' + (b >= 1000 ? b/1000 + 'k' : b) + ' Hz</span><span>' + d + '</span></div>').join('');
+  })();
+
+  // ── Map ─────────────────────────────────────────────────────────────────────
+  (function map(){
+    const svg = $('map'), L = 70, R = 870, Tp = 20, B = 380;
+    const mx = (x) => L + x * (R - L), my = (y) => B - y * (B - Tp);
+    let h = '<rect class="ax" x="' + L + '" y="' + Tp + '" width="' + (R - L) + '" height="' + (B - Tp) + '" fill="none"/>';
+    h += '<ellipse class="zone" cx="' + mx(.5) + '" cy="' + my(.33) + '" rx="' + ((R - L) * .24) + '" ry="' + ((B - Tp) * .2) + '"/>';
+    h += '<text class="t-dim" x="' + (mx(.5) - 54) + '" y="' + (my(.33) + 4) + '">your brief</text>';
+    h += '<text class="t-dim" x="' + L + '" y="' + (B + 22) + '">← pure thock</text><text class="t-dim" x="' + (R - 92) + '" y="' + (B + 22) + '">pure click →</text>';
+    h += '<text class="t-dim" x="4" y="' + (Tp + 10) + '">bright</text><text class="t-dim" x="4" y="' + B + '">warm</text>';
+    THEMES.forEach((s) => {
+      const x = mx(s.x), y = my(s.y), right = s.x < .82;
+      h += '<g class="dot" data-id="' + s.id + '" tabindex="0" role="button" aria-label="Play ' + s.name + '"><circle cx="' + x + '" cy="' + y + '" r="8"/><text x="' + (right ? x + 13 : x - 13) + '" y="' + (y + 4) + '"' + (right ? '' : ' text-anchor="end"') + '>' + s.name + '</text></g>';
+    });
+    svg.innerHTML = h;
+    svg.querySelectorAll('.dot').forEach((d) => {
+      d.addEventListener('click', () => play(d.dataset.id, 'phrase'));
+      d.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(d.dataset.id, 'phrase'); } });
+    });
+  })();
+
+  // ── Cards + shortlist ───────────────────────────────────────────────────────
+  let shortlist = [];
+  try { shortlist = JSON.parse(localStorage.getItem('krnl-sound-shortlist') || '[]'); } catch (e) {}
+  function renderShort(){
+    const names = THEMES.filter((s) => shortlist.includes(s.id)).map((s) => s.name);
+    $('shortlist').textContent = names.length ? names.join(', ') : 'none yet, star the ones you like';
+    try { localStorage.setItem('krnl-sound-shortlist', JSON.stringify(shortlist)); } catch (e) {}
+  }
+  const grid = $('grid');
+  THEMES.forEach((s, i) => {
+    const el = document.createElement('article'); el.className = 'card'; el.dataset.id = s.id;
+    el.innerHTML = '<div class="top"><h3>' + s.name + '</h3><span class="no">' + String(i + 1).padStart(2, '0') + '</span></div>' +
+      '<p>' + s.line + '</p><div class="chips">' + s.chips.map((c) => '<span class="chip">' + c + '</span>').join('') + '</div>' +
+      '<div class="meter"><span>thock</span><span class="bar"><i style="left:' + (s.x * 100) + '%"></i></span><span>click</span></div>' +
+      '<div class="meter"><span>warm</span><span class="bar"><i style="left:' + (s.y * 100) + '%"></i></span><span>bright</span></div>' +
+      '<div class="row"><button class="btn primary" type="button" id="ph-' + s.id + '">▶ Phrase</button><button class="btn" type="button" id="ty-' + s.id + '">⌨ Typing</button>' +
+      '<button class="btn star" type="button" id="st-' + s.id + '" aria-pressed="' + shortlist.includes(s.id) + '">★ Shortlist</button></div>';
+    grid.appendChild(el);
+    el.querySelector('#ph-' + s.id).addEventListener('click', () => play(s.id, 'phrase'));
+    el.querySelector('#ty-' + s.id).addEventListener('click', () => play(s.id, 'typing'));
+    const st = el.querySelector('#st-' + s.id);
+    st.addEventListener('click', () => {
+      shortlist = shortlist.includes(s.id) ? shortlist.filter((x) => x !== s.id) : shortlist.concat(s.id);
+      st.setAttribute('aria-pressed', String(shortlist.includes(s.id))); renderShort();
+    });
+  });
+  renderShort();
+  $('copy').addEventListener('click', () => {
+    const text = 'Sound shortlist: ' + $('shortlist').textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => { cap.textContent = 'Copied: ' + text; }, () => { cap.textContent = text; });
+    else cap.textContent = text;
+  });
+
+  // ── Moments: gestures built from a theme's materials ────────────────────────
+  // Every gesture creates its own short-lived nodes (no shared filters retuned
+  // mid-ring, no voice reuse), then disposes them once it has finished sounding.
+  const KIT_GAIN = { felt: 1, walnut: 1 };
+  const kits = {};
+  function kit(id){
+    if (kits[id]) return kits[id];
+    const s = THEMES.find((x) => x.id === id), m = s.master;
+    const bus = new Tone.Gain(1);
+    const hp = new Tone.Filter({type:'highpass', frequency:70, rolloff:-12});
+    const cheb = new Tone.Chebyshev({order:2, wet:m.drive, oversample:'4x'});
+    const lp = new Tone.Filter({type:'lowpass', frequency:m.lowpass, rolloff:-24, Q:0.4});
+    const out = new Tone.Gain(KIT_GAIN[id]);
+    bus.chain(hp, cheb, lp, out, MASTER);
+    const send = new Tone.Gain(m.reverb[1] * 1.8); out.connect(send); send.connect(REV);
+    kits[id] = { id, s, bus, day: 1 };
+    return kits[id];
+  }
+  function trash(nodes, end){ setTimeout(() => nodes.forEach((n) => safe(() => n.dispose())), Math.max(0, (end - LIVE.now()) * 1000) + 600); }
+  // Rough loudness normalisers, fitted to the offline measurements above.
+  const pinkN = (q) => 7 * Math.sqrt(q), whiteN = (f, q) => 95 / Math.sqrt(f / q), ringN = (f, q) => 50 * q / Math.sqrt(f);
+
+  const P = {
+    body(K, t, f, v, o = {}){
+      const d = o.decay ?? 0.1;
+      const s = new Tone.MembraneSynth({pitchDecay:o.pd ?? 0.015, octaves:o.oct ?? 1.3, oscillator:{type:'sine'}, envelope:{attack:0.001, decay:d, sustain:0, release:0.02}});
+      const g = new Tone.Gain(v * 0.74); s.connect(g); g.connect(K.bus);
+      s.triggerAttackRelease(f, d, t, 0.7); trash([s, g], t + d + 0.1);
+    },
+    click(K, t, v, o = {}){
+      const f = o.f ?? 1600, q = o.q ?? 0.8, d = o.decay ?? 0.005, type = o.noise || 'pink';
+      const ns = new Tone.NoiseSynth({noise:{type}, envelope:{attack:0.0008, decay:d, sustain:0, release:0.004}});
+      const fl = new Tone.Filter({type:'bandpass', frequency:f, Q:q});
+      const g = new Tone.Gain(v * (type === 'pink' ? pinkN(q) : whiteN(f, q)));
+      ns.chain(fl, g, K.bus); ns.triggerAttackRelease(d, t, 0.7); trash([ns, fl, g], t + d + 0.05);
+    },
+    ring(K, t, f, v, o = {}){
+      const q = o.q ?? 22, ratios = o.ratios ?? [1, 2.76, 5.4], gains = o.gains ?? [1, .4, .15], ex = o.excite ?? 0.005;
+      const ns = new Tone.NoiseSynth({noise:{type:'pink'}, envelope:{attack:0.0008, decay:ex, sustain:0, release:0.004}});
+      const inG = new Tone.Gain(1), out = new Tone.Gain(v * ringN(f, q)); const nodes = [ns, inG, out];
+      ratios.forEach((r, i) => { const fl = new Tone.Filter({type:'bandpass', frequency:f * r, Q:q}); const g = new Tone.Gain(gains[i] ?? .1); inG.connect(fl); fl.connect(g); g.connect(out); nodes.push(fl, g); });
+      ns.connect(inG); out.connect(K.bus); ns.triggerAttackRelease(ex, t, 0.7); trash(nodes, t + 1.2);
+    },
+    // Slides, creaks and air: filtered noise over time. `stick` adds stick-slip judder (leather creak, wooden drawer).
+    friction(K, t, dur, v, o = {}){
+      const q = o.q ?? 1.2, f0 = o.f0 ?? 800, f1 = o.f1 ?? f0;
+      const n = new Tone.Noise(o.noise || 'pink'); const fl = new Tone.Filter({type:o.type || 'bandpass', frequency:f0, Q:q});
+      const env = new Tone.Gain(0), am = new Tone.Gain(1), out = new Tone.Gain(v * (o.norm ?? 1.5 * Math.sqrt(q)));
+      n.chain(fl, env, am, out, K.bus); const nodes = [n, fl, env, am, out];
+      fl.frequency.setValueAtTime(f0, t); fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(1, t + dur * (o.attack ?? 0.3)); env.gain.linearRampToValueAtTime(0, t + dur);
+      if (o.stick){
+        const lfo = new Tone.LFO({frequency:o.stick[0], type:'sawtooth', min:o.stickMin ?? 0.05, max:1});
+        lfo.connect(am.gain); lfo.frequency.setValueAtTime(o.stick[0], t); lfo.frequency.linearRampToValueAtTime(o.stick[1], t + dur);
+        lfo.start(t).stop(t + dur + 0.02); nodes.push(lfo);
+      }
+      n.start(t).stop(t + dur + 0.02); trash(nodes, t + dur + 0.1);
+    },
+    metal(K, t, v, o = {}){
+      const s = new Tone.MetalSynth({envelope:{attack:0.001, decay:o.decay ?? 0.03, release:0.02}, harmonicity:o.h ?? 3, modulationIndex:o.mi ?? 6, resonance:o.res ?? 2200, octaves:1});
+      const g = new Tone.Gain(v * 0.16); s.connect(g); g.connect(K.bus); s.triggerAttackRelease(o.f ?? 600, o.decay ?? 0.03, t, 0.7); trash([s, g], t + 0.3);
+    }
+  };
+
+  // Felt & Leather materials
+  const FELT = {
+    slap:  (K, t, v) => P.click(K, t, v, {f:1100, q:.7, decay:.012}),
+    snap:  (K, t, v) => { P.click(K, t, v, {noise:'white', f:2600, q:2.5, decay:.004}); P.metal(K, t + .001, v * .5, {f:620, h:3, mi:6, res:2400, decay:.03}); },
+    thump: (K, t, f, v, d) => P.body(K, t, f, v, {decay:d ?? .1, oct:1.4, pd:.02}),
+    tone:  (K, t, f, v) => P.ring(K, t, f, v, {q:6, ratios:[1, 1.5], gains:[1, .5], excite:.008}),
+    creak: (K, t, dur, v, a, b, f0, f1) => P.friction(K, t, dur, v, {f0:f0 ?? 650, f1:f1 ?? 480, q:5, stick:[a ?? 30, b ?? 14], attack:.25}),
+    strap: (K, t, dur, v) => P.friction(K, t, dur, v, {f0:900, f1:1300, q:1.2, attack:.4}),
+    puff:  (K, t, dur, v) => P.friction(K, t, dur, v, {noise:'brown', type:'lowpass', f0:700, f1:250, q:.5, attack:.7, norm:.8})
+  };
+  // Walnut Desk materials
+  const WAL = {
+    knock:  (K, t, p, v, o = {}) => { P.body(K, t, 120 * p, v * .7, {decay:o.decay ?? .07, oct:1.2}); P.click(K, t, v * .35, {f:1600, q:.8, decay:.004});
+              if (!o.noRing) P.ring(K, t, 310 * p, v * (o.ringV ?? .9), {q:o.q ?? 22, ratios:[1, 2.76, 5.4, 8.93], gains:[1, .45, .2, .08], excite:.006}); },
+    tap:    (K, t, p, v) => { P.click(K, t, v * 1.1, {f:2400, q:1.2, decay:.003}); P.ring(K, t, 520 * p, v * 1.0, {q:18, ratios:[1, 2.76], gains:[1, .3], excite:.003}); },
+    slide:  (K, t, dur, v, f0, f1, att) => P.friction(K, t, dur, v, {f0:f0 ?? 500, f1:f1 ?? 850, q:2, stick:[55, 70], stickMin:.45, attack:att ?? .3}),
+    latch:  (K, t, v) => { P.click(K, t, v * .6, {noise:'white', f:2400, q:3, decay:.003}); P.click(K, t + .012, v * .45, {noise:'white', f:2000, q:3, decay:.003});
+              P.ring(K, t + .012, 700, v * .3, {q:30, ratios:[1, 2.4], gains:[1, .3], excite:.002}); },
+    bright: (K, t, f, v) => P.ring(K, t, f, v, {q:40, ratios:[1, 2.76, 5.4], gains:[1, .35, .12], excite:.004})
+  };
+
+  const RECIPES = {
+    felt: {
+      add:    (K, t) => { FELT.slap(K, t, .5); FELT.thump(K, t, 125, .45, .07); return .2; },
+      plan:   (K, t) => { FELT.strap(K, t, .16, .5); FELT.thump(K, t + .15, 110, .7, .1); FELT.slap(K, t + .15, .35); return .4; },
+      start:  (K, t) => { FELT.snap(K, t, .7); FELT.thump(K, t + .03, 105, .55, .08); FELT.thump(K, t + .14, 140, .75, .1); FELT.tone(K, t + .14, 280, .4); return .4; },
+      break:  (K, t) => { FELT.puff(K, t, .32, .6); FELT.thump(K, t + .28, 95, .7, .16); FELT.creak(K, t + .3, .2, .35, 22, 12, 600, 450); return .6; },
+      back:   (K, t) => { FELT.snap(K, t, .55); FELT.thump(K, t + .02, 130, .5, .07); return .2; },
+      stop:   (K, t) => { FELT.puff(K, t, .12, .5); FELT.thump(K, t + .1, 82, 1, .24); FELT.slap(K, t + .1, .6); return .45; },
+      done:   (K, t) => { FELT.thump(K, t, 115, .6, .08); FELT.snap(K, t + .08, .75); FELT.thump(K, t + .08, 155, .75, .1); FELT.tone(K, t + .08, 330, .55); return .4; },
+      reopen: (K, t) => { FELT.thump(K, t, 110, .45, .08); P.click(K, t + .04, .18, {f:800, q:.6, decay:.01}); return .2; },
+      missed: (K, t) => { FELT.creak(K, t, .38, .45, 30, 10, 650, 420); FELT.thump(K, t + .3, 100, .55, .12); FELT.thump(K, t + .52, 78, .45, .16); return .75; },
+      habit:  (K, t) => { const d = K.day; FELT.slap(K, t, .45); FELT.thump(K, t, 122 - d * 2, .4 + d * .04, .07 + d * .01);
+                if (d >= 3) FELT.snap(K, t + .05, .45); if (d >= 5) FELT.tone(K, t + .05, 300, .35 + d * .03); if (d >= 7) RECIPES.felt.streak(K, t + .35); return d >= 7 ? .9 : .3; },
+      streak: (K, t) => { let tt = t; for (let i = 0; i < 6; i++){ FELT.slap(K, tt, .3 + i * .06); FELT.thump(K, tt, 140 - i * 4, .25 + i * .05, .05); tt += .075 - i * .008; }
+                FELT.snap(K, tt + .04, .8); FELT.thump(K, tt + .05, 90, .95, .2); FELT.tone(K, tt + .05, 260, .5); return tt - t + .4; },
+      dayDone:(K, t) => { FELT.creak(K, t, .2, .35, 25, 15); FELT.puff(K, t + .15, .3, .6); FELT.thump(K, t + .42, 85, 1, .25); FELT.slap(K, t + .42, .6);
+                FELT.snap(K, t + .85, .7); FELT.thump(K, t + .86, 120, .4, .08); FELT.tone(K, t + .86, 240, .45); return 1.2; },
+      nudge:  (K, t) => { [0, .16].forEach((d, i) => { FELT.thump(K, t + d, 140, .35 - i * .05, .05); FELT.slap(K, t + d, .25 - i * .05); }); return .3; },
+      error:  (K, t) => { FELT.thump(K, t, 90, .55, .1); FELT.thump(K, t + .12, 85, .5, .12); return .3; }
+    },
+    walnut: {
+      add:    (K, t) => { WAL.tap(K, t, 1, .55); return .2; },
+      plan:   (K, t) => { WAL.slide(K, t, .14, .45, 500, 800); WAL.knock(K, t + .14, 1, .7); return .35; },
+      start:  (K, t) => { WAL.latch(K, t, .6); WAL.knock(K, t + .06, 1, .55); WAL.knock(K, t + .18, 1.335, .75); return .45; },
+      break:  (K, t) => { WAL.slide(K, t, .38, .5, 800, 450, .5); WAL.knock(K, t + .36, .85, .5, {decay:.1}); return .6; },
+      back:   (K, t) => { WAL.latch(K, t, .5); WAL.knock(K, t + .05, 1.12, .55); return .25; },
+      stop:   (K, t) => { WAL.slide(K, t, .1, .55, 600, 900, .2); WAL.knock(K, t + .1, .74, 1, {decay:.14}); return .4; },
+      done:   (K, t) => { WAL.knock(K, t, 1, .65); P.click(K, t + .08, .4, {f:2600, q:1.4, decay:.003}); WAL.bright(K, t + .08, 465, .85); return .5; },
+      reopen: (K, t) => { WAL.knock(K, t, .9, .65, {noRing:true}); return .15; },
+      missed: (K, t) => { WAL.knock(K, t, 1.335, .75, {q:9}); WAL.knock(K, t + .22, .89, .65, {q:9, decay:.1}); return .45; },
+      habit:  (K, t) => { const d = K.day; WAL.tap(K, t, 1 + d * .02, .45 + d * .03); if (d >= 3) WAL.knock(K, t + .04, 1, .4 + d * .04);
+                if (d >= 5) WAL.bright(K, t + .04, 465, .35 + d * .04); if (d >= 7) RECIPES.walnut.streak(K, t + .35); return d >= 7 ? .9 : .3; },
+      streak: (K, t) => { let tt = t, gap = .07; for (let i = 0; i < 8; i++){ P.click(K, tt, .25 + i * .03, {f:3000, q:2, decay:.002});
+                P.ring(K, tt, 1400 * (1 + rnd(.03)), .18 + i * .02, {q:30, ratios:[1], gains:[1], excite:.002}); tt += gap; gap *= .85; }
+                WAL.knock(K, tt + .05, 1, .8); WAL.bright(K, tt + .05, 465, .6); return tt - t + .5; },
+      dayDone:(K, t) => { WAL.knock(K, t, 1, .6); WAL.knock(K, t + .22, 1.12, .65); WAL.slide(K, t + .42, .12, .4, 600, 900, .2);
+                WAL.knock(K, t + .55, .74, 1, {decay:.16}); WAL.bright(K, t + .56, 465, .55); return 1.1; },
+      nudge:  (K, t) => { WAL.knock(K, t, 1.2, .35); WAL.knock(K, t + .15, 1.2, .3); return .3; },
+      error:  (K, t) => { P.body(K, t, 95, .55, {decay:.08}); P.body(K, t + .11, 90, .45, {decay:.09}); return .3; }
+    }
+  };
+
+  const MOMENTS = [
+    ['add',    'Add a to-do',         'small, light',                 'a leather tap',                                   'a fingertip tap'],
+    ['plan',   'Plan on the Calendar','moves, then lands',            'a strap slides, then seats',                      'a short drawer slide, then a knock'],
+    ['start',  'Start the timer',     'forward, going up',            'press-stud snap, two thumps going up',            'wooden latch, two knocks going up'],
+    ['break',  'Take a break',        'letting go, slowing down',     'the notebook closes slowly, leather settles',     'a drawer slides open slowly, a soft knock'],
+    ['back',   'Back to work',        'a quick restart',              'a snap and a thump',                              'latch and a knock'],
+    ['stop',   'Stop & save',         'heavy, final',                 'the notebook shut firmly',                        'a drawer pushed shut: thunk'],
+    ['done',   'Task done',           'the reward: rises and rings',  'thump, then a snap and a higher thump',           'knock, then a bright wood ring'],
+    ['reopen', 'Reopen a task',       'undo: soft, no click',         'a soft, muffled thump',                           'a dull knock, no ring'],
+    ['missed', 'Planned block missed','a gentle "oh well": falls',    'leather creaks, two thumps falling',              'two damped knocks falling'],
+    ['habit',  'Tick a habit',        'grows with the streak',        'tap → + snap (day 3) → + tone (day 5) → roll (day 7)', 'tap → + knock (day 3) → + ring (day 5) → roll (day 7)'],
+    ['streak', '7-day streak',        'a roll, then a landing',       'fingers drum on leather, a buckle snaps',         'a pencil rolls across the desk, a knock'],
+    ['dayDone','Day complete',        'the longest; closes the day',  'the journal closes, the strap buckles',           'knock, knock, drawer shut, a ring'],
+    ['nudge',  'Gentle nudge',        'a knock on the door',          'two soft knocks',                                 'knock-knock'],
+    ['error',  "Can't do that",       'blocked: dull, nothing gives', 'two muffled thuds',                               'two dull thuds']
+  ];
+  const KIT_NAME = { felt:'Felt & Leather', walnut:'Walnut Desk' };
+
+  async function playMoment(kid, mid){
+    if (!(await boot())) return 0;
+    const K = kit(kid), t = LIVE.now() + 0.05;
+    const len = RECIPES[kid][mid](K, t) || 0.3;
+    const row = MOMENTS.find((m) => m[0] === mid);
+    cap.textContent = KIT_NAME[kid] + ' · ' + row[1] + (mid === 'habit' ? ' (day ' + K.day + ')' : '');
+    if (mid === 'habit'){ K.day = K.day >= 7 ? 1 : K.day + 1; const lab = $('hd-' + kid); if (lab) lab.textContent = 'next: day ' + K.day; }
+    document.querySelectorAll('.mrow').forEach((r) => r.classList.toggle('on', r.dataset.m === mid));
+    clearTimeout(specTimer); clearTimeout(waveTimer);
+    specTimer = setTimeout(drawSpec, 110);
+    waveTimer = setTimeout(drawWave, 650);
+    $('waveLab').textContent = 'Waveform · ' + KIT_NAME[kid] + ' · ' + row[1];
+    $('specLab').textContent = 'Spectrum · ' + KIT_NAME[kid] + ' · ' + row[1];
+    return len;
+  }
+
+  (function momentsTable(){
+    const icon = '<svg viewBox="0 0 10 12" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg>';
+    const cell = (kid, m, desc) => '<div class="mcell"><button class="mplay" type="button" id="mp-' + kid + '-' + m + '" aria-label="Play ' + KIT_NAME[kid] + ': ' + m + '">' + icon + '</button><span>' + desc +
+      (m === 'habit' ? ' <span class="lab" id="hd-' + kid + '">next: day 1</span>' : '') + '</span></div>';
+    $('moments').innerHTML = MOMENTS.map(([m, name, say, felt, wal]) => '<tr class="mrow" data-m="' + m + '"><td><b>' + name + '</b></td><td>' + say + '</td><td>' + cell('felt', m, felt) + '</td><td>' + cell('walnut', m, wal) + '</td></tr>').join('');
+    MOMENTS.forEach(([m]) => ['felt', 'walnut'].forEach((kid) => $('mp-' + kid + '-' + m).addEventListener('click', () => playMoment(kid, m))));
+    const DAY = [['add','08:58 · add "Write report"'],['plan','08:59 · plan it at 09:00'],['start','09:00 · START'],['break','09:50 · BREAK'],['back','10:00 · BACK TO WORK'],
+      ['stop','10:40 · STOP, saved'],['done','10:40 · tick "Write report"'],['missed','14:00 · the Gym block passed'],['habit','18:30 · tick "Read"'],['nudge','19:00 · "Planned now: Review"'],['dayDone','21:00 · day complete']];
+    ['felt', 'walnut'].forEach((kid) => $('day-' + kid).addEventListener('click', async () => {
+      if (!(await boot())) return; clearAll(); kit(kid).day = 1;
+      DAY.forEach(([m, text], i) => timers.push(setTimeout(() => { playMoment(kid, m); cap.textContent = KIT_NAME[kid] + ' · ' + text; }, i * 1500)));
+    }));
+  })();
+
+// ── Controls ────────────────────────────────────────────────────────────────
+  $('vol').addEventListener('input', () => { if (VOL) VOL.gain.value = +$('vol').value; });
+  $('tour').addEventListener('click', async () => {
+    if (!(await boot())) return; clearAll();
+    THEMES.forEach((s, i) => timers.push(setTimeout(() => { play(s.id, 'phrase'); cap.textContent = (i + 1) + ' / 12 · ' + s.name + ' · ' + s.line; }, i * 2100)));
+  });
+  $('stop').addEventListener('click', () => { clearAll(); cap.textContent = 'Stopped.'; });
+  paintWave(); paintSpec();
+})();
+</script>

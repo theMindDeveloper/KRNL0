@@ -73,5 +73,7 @@ describe('Analytics window — station cell', () => {
     render(React.createElement(StationCell, { slot: 'bottom-right-pre' }));
     expect(document.querySelector('.mother-frame [data-testid="analytics-mother"] [data-testid="analytics-node-root"]')).not.toBeNull();
     expect(document.querySelector('.station-drag-handle')).not.toBeNull();
-  });
+    // The first import of StationCell pulls in every window: slow under the
+    // full parallel run, so it gets more than the default 5 s.
+  }, 20_000);
 });

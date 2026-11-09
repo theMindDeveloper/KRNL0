@@ -335,7 +335,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
               flex: 1,
               textAlign: 'center',
               fontFamily: 'var(--font-mono)',
-              fontSize: 10,
+              fontSize: 11,
               color: 'var(--term-dim)',
               letterSpacing: '0.04em',
             }}
@@ -352,7 +352,7 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
               alignItems: 'center',
               gap: 4,
               fontFamily: 'var(--font-mono)',
-              fontSize: 9,
+              fontSize: 11,
               // The terminal is dark in every theme: use the accent that stays
               // light on dark (Macintosh light's --acid is near-black).
               color: ended ? 'var(--ink-3)' : 'var(--term-bg)',

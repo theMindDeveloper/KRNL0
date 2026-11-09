@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { selectPomoReality } from '../../store/pomoReality';
 import { ymdOf } from '../nodes/PomoNode/spanEdit';
+import { LineGlyph } from './LineGlyph';
 
 const SNAP_MIN = 15;
 const DAY = 1440;
@@ -49,7 +50,7 @@ export function addDaysYMD(ymd: string, n: number): string {
 }
 
 const chip = (on = false): React.CSSProperties => ({
-  fontFamily: 'var(--font-mono)', fontSize: 10, padding: '4px 9px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap',
+  fontFamily: 'var(--font-mono)', fontSize: 11, padding: '4px 9px', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap',
   border: `1px solid ${on ? 'var(--ink)' : 'var(--paper-3)'}`, background: on ? 'var(--ink)' : 'transparent', color: on ? 'var(--paper)' : 'var(--ink-2)',
 });
 
@@ -75,11 +76,11 @@ export function LogTimeDayPicker({ dayYMD, onChange }: { dayYMD: string; onChang
       <button type="button" data-testid="log-time-today" style={chip(dayYMD === today)} onClick={() => onChange(today)}>Today</button>
       <button type="button" data-testid="log-time-yesterday" style={chip(dayYMD === yesterday)} onClick={() => onChange(yesterday)}>Yesterday</button>
       <span style={{ flex: 1 }} />
-      <button type="button" aria-label="Day before" style={arrow} onClick={() => onChange(addDaysYMD(dayYMD, -1))}>‹</button>
+      <button type="button" aria-label="Day before" style={arrow} onClick={() => onChange(addDaysYMD(dayYMD, -1))}><LineGlyph name="chevronLeft" /></button>
       <span data-testid="log-time-date" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)', minWidth: 86, textAlign: 'center' }}>
         {`${DOW[date.getDay()]}, ${MON[date.getMonth()]} ${date.getDate()}`}
       </span>
-      <button type="button" aria-label="Day after" style={{ ...arrow, opacity: dayYMD >= today ? 0.35 : 1 }} disabled={dayYMD >= today} onClick={() => onChange(addDaysYMD(dayYMD, 1))}>›</button>
+      <button type="button" aria-label="Day after" style={{ ...arrow, opacity: dayYMD >= today ? 0.35 : 1 }} disabled={dayYMD >= today} onClick={() => onChange(addDaysYMD(dayYMD, 1))}><LineGlyph name="chevron" /></button>
     </div>
   );
 }
@@ -111,7 +112,7 @@ export function LogTimeBar({ dayYMD, startHM, endHM }: {
         })}
         {nowMin !== null && <span style={{ position: 'absolute', top: 0, bottom: 0, left: pct(nowMin), width: 1.5, background: 'var(--rust)' }} />}
       </div>
-      <div style={{ position: 'relative', height: 9, fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--ink-4)' }}>
+      <div style={{ position: 'relative', height: 9, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>
         {[0, 6, 12, 18, 24].map((h) => (
           <span key={h} style={{ position: 'absolute', left: pct(h * 60), transform: h === 0 ? 'none' : h === 24 ? 'translateX(-100%)' : 'translateX(-50%)' }}>{String(h).padStart(2, '0')}</span>
         ))}
@@ -178,9 +179,9 @@ export function LogTimeDayStepper({ dayYMD, onChange }: { dayYMD: string; onChan
   });
   return (
     <div data-testid="log-time-day" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <button type="button" aria-label="Day before" style={arrow(false)} onClick={() => onChange(addDaysYMD(dayYMD, -1))}>‹</button>
+      <button type="button" aria-label="Day before" style={arrow(false)} onClick={() => onChange(addDaysYMD(dayYMD, -1))}><LineGlyph name="chevronLeft" /></button>
       <span data-testid="log-time-date" style={{ flex: 1, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{label}</span>
-      <button type="button" aria-label="Day after" style={arrow(dayYMD >= today)} disabled={dayYMD >= today} onClick={() => onChange(addDaysYMD(dayYMD, 1))}>›</button>
+      <button type="button" aria-label="Day after" style={arrow(dayYMD >= today)} disabled={dayYMD >= today} onClick={() => onChange(addDaysYMD(dayYMD, 1))}><LineGlyph name="chevron" /></button>
     </div>
   );
 }
@@ -192,7 +193,7 @@ export function LogTimeGaps({ dayYMD, onChange }: { dayYMD: string; onChange: (s
   if (gaps.length === 0) return null;
   return (
     <div data-testid="log-time-quick" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>Fill a gap:</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>Fill a gap:</span>
       {gaps.map((g) => (
         <button key={g.startMin} type="button" data-testid="log-time-gap" style={chip()} onClick={() => onChange(toHM(g.startMin), toHM(g.endMin))}>
           {toHM(g.startMin)}–{toHM(g.endMin)}

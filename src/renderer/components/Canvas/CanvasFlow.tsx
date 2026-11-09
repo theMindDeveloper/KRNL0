@@ -53,6 +53,7 @@ import type { TextLook } from '../nodes/TextNode/types';
 import { ChassisLayer } from '../ChassisLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
+import { finishedClockKey, finishedTaskIds, useFinishedCards } from '../../store/finishedCards';
 import { ContextMenu } from '../ContextMenu';
 import { ingestImageFile, imageRejectReason, initialDisplaySize } from './dropImage';
 import { classifyFile, classifyUrl } from './dropMedia';
@@ -84,8 +85,21 @@ import { undoable } from '../../store/undoNotice';
 const MOTHER_ROW_START_X = -1400;
 const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
-import { FOCUS_NODE_EVENT } from '../../store/scheduleActions';
+import { FIT_NODES_EVENT, FOCUS_NODE_EVENT } from '../../store/scheduleActions';
 import { activeCanvasOf, edgesOnCanvas, isOnCanvas, isSharedNode, isStrokeOnCanvas, visibleNodeIds } from '../../../shared/canvas';
+import { alignAll, gridScopeOf, landing, onGrid, snap as snapGrid, type Box } from './alignGrid';
+
+/** Align to grid: let moved nodes glide the last few pixels instead of jumping. */
+function settleNodes(ids: readonly string[]): void {
+  requestAnimationFrame(() => {
+    for (const id of ids) {
+      const el = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+      if (!el) continue;
+      el.setAttribute('data-settling', '1');
+      window.setTimeout(() => el.removeAttribute('data-settling'), 320);
+    }
+  });
+}
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
 // Hex literals used instead of CSS var() to skip variable resolution per rect.
@@ -480,7 +494,6 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const updateNode = useBoardStore((s) => s.updateNode);
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
-  const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
   const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport, setCenter } = useReactFlow();
 
   // Dock-frame variant (classic | synthesizer | telemetry | phosphor).
@@ -492,6 +505,17 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const layerTasks = useLayerVisibility((s) => s.tasks);
   const layerTexts = useLayerVisibility((s) => s.texts);
   const layerImages = useLayerVisibility((s) => s.images);
+  // Finished task cards leave the canvas (engagement.md F4): the policy, the
+  // "show finished" switch, and a coarse clock (day / 5 min) to re-check on.
+  const finishedPolicy = useFinishedCards((s) => s.policy);
+  const showFinished = useFinishedCards((s) => s.showFinished);
+  const [finishedClock, setFinishedClock] = useState(() => finishedClockKey(finishedPolicy, Date.now()));
+  useEffect(() => {
+    const check = () => setFinishedClock(finishedClockKey(finishedPolicy, Date.now()));
+    check();
+    const t = setInterval(check, 60_000);
+    return () => clearInterval(t);
+  }, [finishedPolicy]);
 
   // Start the debounced viewport persister (Decision #7).
   useViewportPersistence();
@@ -652,7 +676,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       .filter((n) => (n as { isMother?: boolean }).isMother === true)
       .map((n) => ({ id: (n as { id: string }).id }));
     if (motherIds.length === 0) return;
-    fitView({ padding: 0.15, includeHiddenNodes: false, nodes: motherIds, duration: 0 });
+    // Never below a readable size: six windows side by side fit at ~34%, where
+    // no text can be read (new-user review). FIT and the minimap show them all.
+    fitView({ padding: 0.15, includeHiddenNodes: false, nodes: motherIds, duration: 0, minZoom: 0.55 });
     didFitRef.current = true;
   }, [rfNodes.length, initialViewport, fitView]);
 
@@ -974,8 +1000,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       else setCenter(at.x + 110, at.y + 80, { duration: 400, zoom: 0.9 });
     };
     window.addEventListener(FOCUS_NODE_EVENT, onFocus);
-    return () => window.removeEventListener(FOCUS_NODE_EVENT, onFocus);
-  }, [setCenter, getNodes]);
+    // The plan guide fits the Todo and the Calendar on screen together, so a
+    // row can be dragged onto the grid (engagement.md F14).
+    const onFit = (e: Event) => {
+      const ids = (e as CustomEvent<{ nodeIds?: string[] }>).detail?.nodeIds ?? [];
+      if (ids.length) fitView({ nodes: ids.map((id) => ({ id })), padding: 0.08, duration: 400, maxZoom: 1 });
+    };
+    window.addEventListener(FIT_NODES_EVENT, onFit);
+    return () => {
+      window.removeEventListener(FOCUS_NODE_EVENT, onFocus);
+      window.removeEventListener(FIT_NODES_EVENT, onFit);
+    };
+  }, [setCenter, getNodes, fitView]);
 
   const handleAddNode = useCallback((args: { kind: NodeKind; at?: { x: number; y: number }; look?: TextLook }) => {
     // Auto-enable the layer filter for the spawned kind so the new node is
@@ -1165,9 +1201,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       const newHabit = habits.at(-1);
       if (!newHabit) return;
 
-      // Spawn habit.lane at the click flow pos (commandDispatch:1122 mirrors
-      // this shape but slots by laneCount — we want explicit pos here).
-      const lane: KrnlNode = {
+      // Decision 42 — habit.add already put the habit's card on the board;
+      // here it goes where you clicked (never a second card).
+      const existingCard = fresh.nodes.find((n) => n.kind === 'habit.lane' && (n.state as { habitId?: string }).habitId === newHabit.id);
+      const lane: KrnlNode = existingCard ?? {
         id: `habit-lane-${crypto.randomUUID()}`,
         kind: 'habit.lane',
         position: { x: flowX, y: flowY },
@@ -1175,7 +1212,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         state: { habitId: newHabit.id } as unknown as Record<string, unknown>,
         config: { days: 28 },
       };
-      addNode(lane);
+      if (existingCard) useBoardStore.getState().updateNode(existingCard.id, { position: { x: flowX, y: flowY } });
+      else addNode(lane);
       const saved = useBoardStore.getState().board;
       if (saved) void saveBoard(saved);
       emit('node.added', `habit.lane spawned for habit ${newHabit.id.slice(0, 8)}`, {
@@ -1462,9 +1500,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // whose kind has a registered layer (tasks / texts / images) are affected;
     // mothers + frames + habits stay visible regardless. Spread-clone only the
     // ones that need `hidden:true` so identity is preserved for unaffected nodes.
+    const leftBoard = showFinished ? new Set<string>() : finishedTaskIds(board, finishedPolicy, Date.now());
     const filteredBase = baseNodes.map((rf, idx) => {
       const node = sourceNodes[idx];
       if (!node) return rf;
+      if (leftBoard.has(node.id)) return { ...rf, hidden: true };
       const layer = kindToLayer(node.kind);
       if (!layer) return rf;
       const visible = layer === 'tasks' ? layerTasks
@@ -1475,8 +1515,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     });
 
     const strokeNodes = (board.drawings ?? []).filter((d) => isStrokeOnCanvas(d, canvasId)).map(strokeRfNode);
-    return [...filteredBase, ...swapNodes, ...strokeNodes];
-  }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation]);
+    // Hidden cards (finished, or a layer switched off) are left out of the
+    // canvas, not handed to React Flow as `hidden`: RF keeps a hidden node's
+    // old wire dots, so a new wire snapped onto an invisible card, and wires
+    // between two hidden cards were still drawn.
+    return [...filteredBase.filter((n) => !n.hidden), ...swapNodes, ...strokeNodes];
+  }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation, finishedPolicy, showFinished, finishedClock]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
   // RF emits 'dimensions' / 'position' (during drag) / 'select' changes that
@@ -1517,16 +1561,22 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const motherIds = isStation
       ? new Set(board.nodes.filter((n) => n.isMother).map((n) => n.id))
       : null;
-    const onCanvas = edgesOnCanvas(board.edges, visibleNodeIds(board.nodes, activeCanvasOf(board)));
-    const visibleEdges = motherIds
+    // Only wires whose two ends are on the canvas right now (not hidden).
+    const shownIds = new Set(derivedNodes.map((n) => n.id));
+    const onCanvas = edgesOnCanvas(board.edges, visibleNodeIds(board.nodes, activeCanvasOf(board)))
+      .filter((e) => shownIds.has(e.from.nodeId) && shownIds.has(e.to.nodeId));
+    const withoutMothers = motherIds
       ? onCanvas.filter((e) => !motherIds.has(e.from.nodeId) && !motherIds.has(e.to.nodeId))
       : onCanvas;
+    // Habit and event cards have no wire dots, so an old wire to one has
+    // nothing to attach to: it is not drawn (it still exists in the board).
+    const visibleEdges = withoutMothers.filter((e) => kindMap.get(e.from.nodeId) !== 'habit.lane' && kindMap.get(e.to.nodeId) !== 'habit.lane');
     return visibleEdges.map((edge) => {
       const srcKind = kindMap.get(edge.from.nodeId) ?? '';
       const tgtKind = kindMap.get(edge.to.nodeId) ?? '';
       return getMemoizedRfEdge(edge, srcKind, tgtKind);
     });
-  }, [board, isStation]);
+  }, [board, isStation, derivedNodes]);
 
   // ── Bold-set — which source node IDs should bold their outgoing edges ─────
   // Keyed on [board.nodes, hoveredNodeId]. When a mother is hovered we walk its
@@ -1538,44 +1588,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   //   others (pomo, terminal, calendar, clock) → empty (no child nodes with edges)
   // When hovering a non-mother: set = {hoveredNodeId} (direct source match).
   // When nothing hovered: empty set (frozen, stable reference).
-  const boldSet = useMemo<ReadonlySet<string>>(() => {
-    if (!hoveredNodeId || !board) return EMPTY_BOLD_SET;
-    const hoveredNode = board.nodes.find((n: KrnlNode) => n.id === hoveredNodeId);
-    if (!hoveredNode) return EMPTY_BOLD_SET;
-
-    if (hoveredNode.kind === 'todo' && hoveredNode.isMother) {
-      // All task nodes belonging to this todo mother.
-      const ids = new Set<string>();
-      for (const n of board.nodes) {
-        if (n.kind === 'todo.task') {
-          const ts = n.state as TaskState;
-          if (ts.parentTodoId === hoveredNodeId) ids.add(n.id);
-        }
-      }
-      return ids;
-    }
-
-    if (hoveredNode.kind === 'habit' && hoveredNode.isMother) {
-      // All habit.lane nodes whose habitId is one of this mother's habits.
-      const motherHabitIds = new Set<string>(
-        ((hoveredNode.state as { habits?: Array<{ id: string }> }).habits ?? []).map(
-          (h) => h.id
-        )
-      );
-      const ids = new Set<string>();
-      for (const n of board.nodes) {
-        if (n.kind === 'habit.lane') {
-          const ls = n.state as HabitLaneState;
-          if (motherHabitIds.has(ls.habitId)) ids.add(n.id);
-        }
-      }
-      return ids;
-    }
-
-    // Non-mother or other mother kinds (pomo, terminal, calendar, clock):
-    // bold edges whose source is the hovered node itself.
-    return new Set<string>([hoveredNodeId]);
-  }, [board, hoveredNodeId]);
+  // (The bold set lives in BoldSetProvider: hovering a window re-renders only the wires.)
 
   // ── onNodesChange — apply every change locally; commit only on drag end ──
   // Local-first: applyNodeChanges absorbs position/dimensions/select changes
@@ -1729,23 +1742,57 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const dragged = all.find((n) => n.id === draggedId);
     if (!dragged) return;
     const draggedKind = dragged.data?.node?.kind;
+    // Where the store had it before this drag (for hidden frame children).
+    const before = useBoardStore.getState().board?.nodes.find((n) => n.id === draggedId)?.position;
 
-    updateNode(draggedId, { position: dragged.position });
+    // Align to grid: the drop settles on the nearest free grid spot (a frame
+    // only snaps; its children move with it). Others moving in the same
+    // gesture don't count as in the way.
+    const alignOn = onGrid(gridScopeOf(useBoardStore.getState().board?.alignGrid), draggedKind, dragged.data?.node?.isMother === true);
+    const pos = { ...dragged.position };
+    if (alignOn) {
+      const boxOf = (n: KrnlRFNode): Box => ({ x: n.position.x, y: n.position.y, w: (n.measured?.width ?? n.width ?? 0) as number, h: (n.measured?.height ?? n.height ?? 0) as number });
+      if (draggedKind === 'frame') {
+        pos.x = snapGrid(pos.x); pos.y = snapGrid(pos.y);
+      } else {
+        const obstacles = all
+          .filter((n) => n.id !== draggedId && !n.selected && !n.dragging && n.data?.node?.kind !== 'frame' && !isStrokeId(n.id) && !n.hidden)
+          .map(boxOf);
+        Object.assign(pos, landing(boxOf(dragged), obstacles));
+      }
+      if (pos.x !== dragged.position.x || pos.y !== dragged.position.y) settleNodes([draggedId]);
+    }
+    const shift = { dx: pos.x - dragged.position.x, dy: pos.y - dragged.position.y };
+    updateNode(draggedId, { position: pos });
+    // The canvas keeps its own copy while dragging; move it there too (the
+    // store may not change at all when the free spot is where it started).
+    if (shift.dx || shift.dy) {
+      const kids = new Set(draggedKind === 'frame' ? ((dragged.data.node.state as FrameState).childIds ?? []) : []);
+      setNodes((nds) => nds.map((n) => (n.id === draggedId ? { ...n, position: pos }
+        : kids.has(n.id) ? { ...n, position: { x: n.position.x + shift.dx, y: n.position.y + shift.dy } } : n)));
+    }
 
     if (draggedKind === 'frame') {
       const fs = dragged.data.node.state as FrameState;
+      // A child that is hidden (finished, layer off) is not on the canvas, so
+      // the drag didn't move it: move it by the frame's whole drag.
       for (const cid of fs.childIds ?? []) {
         const child = all.find((n) => n.id === cid);
-        if (child) updateNode(cid, { position: child.position });
+        if (child) updateNode(cid, { position: { x: child.position.x + shift.dx, y: child.position.y + shift.dy } });
+        else if (before) {
+          const stored = useBoardStore.getState().board?.nodes.find((n) => n.id === cid);
+          if (stored) updateNode(cid, { position: { x: stored.position.x + pos.x - before.x, y: stored.position.y + pos.y - before.y } });
+        }
       }
+      if (shift.dx || shift.dy) settleNodes(fs.childIds ?? []);
     } else if (draggedKind && draggedKind !== 'frame') {
       // Skip mothers — they are not eligible to be soft-grouped.
       const isMother = dragged.data?.node?.isMother === true;
       if (!isMother) {
         const w = (dragged.measured?.width ?? dragged.width ?? 0) as number;
         const h = (dragged.measured?.height ?? dragged.height ?? 0) as number;
-        const cx = dragged.position.x + w / 2;
-        const cy = dragged.position.y + h / 2;
+        const cx = pos.x + w / 2;
+        const cy = pos.y + h / 2;
         let newParent: string | null = null;
         for (const n of all) {
           if (n.data?.node?.kind !== 'frame') continue;
@@ -1784,7 +1831,32 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
-  }, [getNodes, updateNode]);
+  }, [getNodes, updateNode, setNodes]);
+
+  // ── Align to grid: turning it on tidies the canvas once ──────────────────
+  // Fixed things (windows, frames and what is in them) stay; every other card,
+  // note and image settles on its nearest free grid spot, in reading order.
+  // One undo step. Runs on the switch going on (Settings or `krnl settings
+  // grid on`), not on every load.
+  const gridScope = useBoardStore((s) => gridScopeOf(s.board?.alignGrid));
+  const gridWas = useRef<'cards' | 'all' | null | undefined>(undefined);
+  useEffect(() => {
+    const was = gridWas.current;
+    gridWas.current = gridScope;
+    // Only when it is switched on, or widened from cards to everything.
+    if (was === undefined || !gridScope || was === gridScope || was === 'all') return;
+    const all = getNodes() as KrnlRFNode[];
+    const inFrame = new Set(all.flatMap((n) => (n.data?.node?.kind === 'frame' ? ((n.data.node.state as FrameState).childIds ?? []) : [])));
+    const items = all.filter((n) => !isStrokeId(n.id) && !n.hidden).map((n) => ({
+      id: n.id,
+      box: { x: n.position.x, y: n.position.y, w: (n.measured?.width ?? n.width ?? 0) as number, h: (n.measured?.height ?? n.height ?? 0) as number },
+      movable: onGrid(gridScope, n.data?.node?.kind, n.data?.node?.isMother === true) && n.data?.node?.kind !== 'frame' && !inFrame.has(n.id) && n.draggable !== false,
+    }));
+    const moves = alignAll(items);
+    if (moves.size === 0) return;
+    useBoardStore.getState().moveNodes([...moves].map(([id, p]) => ({ id, ...p })));
+    settleNodes([...moves.keys()]);
+  }, [gridScope, getNodes]);
 
   // ── onEdgesChange — ignored for v1 (no edge create/delete UX) ────────────
   const onEdgesChange = useCallback((_changes: EdgeChange[]) => {
@@ -1825,7 +1897,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
   return (
     <div ref={canvasContainerRef} style={{ width: '100%', height: '100%' }}>
-    <BoldSetContext.Provider value={boldSet}>
+    <BoldSetProvider>
     <ReactFlow
       nodes={nodes}
       edges={rfEdges}
@@ -2070,7 +2142,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         />
       )}
     </ReactFlow>
-    </BoldSetContext.Provider>
+    </BoldSetProvider>
     </div>
   );
 }
@@ -2083,6 +2155,56 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 // NOTE: ReactFlowProvider is no longer here — it lives in App.tsx so that
 // TopBar (useReactFlow for fitView) and StatusBar (useReactFlow for zoom) share
 // the same RF instance context as CanvasFlowInner.
+
+/**
+ * Which source nodes bold their outgoing wires while a window is hovered.
+ * Its own component (#226): hovering a window used to re-render the whole
+ * canvas on every enter/leave; now only the wires that read this re-render
+ * (the canvas passed as children keeps its element identity).
+ */
+function BoldSetProvider({ children }: { children: React.ReactNode }) {
+  const board = useBoardStore((s) => s.board);
+  const hoveredNodeId = useBoardStore((s) => s.hoveredNodeId);
+  const boldSet = useMemo<ReadonlySet<string>>(() => {
+    if (!hoveredNodeId || !board) return EMPTY_BOLD_SET;
+    const hoveredNode = board.nodes.find((n: KrnlNode) => n.id === hoveredNodeId);
+    if (!hoveredNode) return EMPTY_BOLD_SET;
+
+    if (hoveredNode.kind === 'todo' && hoveredNode.isMother) {
+      // All task nodes belonging to this todo mother.
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'todo.task') {
+          const ts = n.state as TaskState;
+          if (ts.parentTodoId === hoveredNodeId) ids.add(n.id);
+        }
+      }
+      return ids;
+    }
+
+    if (hoveredNode.kind === 'habit' && hoveredNode.isMother) {
+      // All habit.lane nodes whose habitId is one of this mother's habits.
+      const motherHabitIds = new Set<string>(
+        ((hoveredNode.state as { habits?: Array<{ id: string }> }).habits ?? []).map(
+          (h) => h.id
+        )
+      );
+      const ids = new Set<string>();
+      for (const n of board.nodes) {
+        if (n.kind === 'habit.lane') {
+          const ls = n.state as HabitLaneState;
+          if (motherHabitIds.has(ls.habitId)) ids.add(n.id);
+        }
+      }
+      return ids;
+    }
+
+    // Non-mother or other mother kinds (pomo, terminal, calendar, clock):
+    // bold edges whose source is the hovered node itself.
+    return new Set<string>([hoveredNodeId]);
+  }, [board, hoveredNodeId]);
+  return <BoldSetContext.Provider value={boldSet}>{children}</BoldSetContext.Provider>;
+}
 
 export function CanvasFlow() {
   const viewport = useBoardStore((s) => s.viewport);

@@ -202,3 +202,35 @@ More generally: **when you adopt a library's controlled mode, you take on its fu
 And: **measure before optimising**. The advisor told us this on iteration three and we didn't actually do it — we kept guessing. A React DevTools profile of a 1-second drag would have shown exactly which components were re-rendering and how long they took, and we would have spotted the mother-node cascade and the dropped-dimensions warning simultaneously. The cost of one profiling session is much smaller than five rounds of speculative fixes.
 
 ---
+
+---
+
+## 2026-11-08 — The cursor stuttered between finger, grab and crosshair on cards
+
+### The symptom (what the user saw)
+
+Moving the mouse over a task card showed a pointing finger where you'd expect a grab hand. Near a card's edge the cursor "suddenly" changed, and moving along a Todo row or a habit row made it flick between shapes, like a stutter.
+
+### What we thought was wrong (and why we were wrong)
+
+The first guess was a re-render on hover: each window records "I'm hovered", and the whole canvas component re-rendered on every enter/leave. That was real wasted work, so it was moved into a tiny component. But timing a sweep across the windows showed no long tasks before or after, so it wasn't what the user felt.
+
+### What was actually wrong
+
+Nothing was broken in a single place; the cursor was simply decided by many small pieces that disagreed. A script recorded the cursor under every 4 px of a card, a row and their surroundings, and printed it as a letter map (G grab, P finger, T text, + crosshair). The map showed five sources:
+
+- The task card set `cursor: pointer` on itself, so the whole card said "click" while it really means "move".
+- The connection dots had an invisible click margin (added the same day to make small targets easier to hit) that reached 14 px **into** the card, so its sides turned into a crosshair.
+- Todo names had a text cursor (they rename on double-click), sitting between grab areas.
+- Habit squares were "finger" but the gaps between them belonged to the row ("grab"), so sliding along the squares flipped at every gap.
+- The empty canvas (React Flow's selection mode) showed the finger, so leaving a card flipped grab → finger.
+
+The analogy used: it's like a street where every shop paints its own part of the pavement a different colour — each one is fine on its own, but walking down the street you see a flicker of colours. The fix is one rule for the whole street.
+
+### The fix
+
+One rule: **grab** on what moves (cards and rows, their text included), the **finger** only on what clicks (buttons, ✓, habit squares and the gaps between them), the **plain arrow** on empty canvas and on days a habit isn't on, the crosshair only on the dots themselves. The dots' click margin now points away from the card (`.react-flow__handle-left::after { right: 50% }` …). Changes in `TaskNode/index.tsx` (card and estimate), `TodoNode/index.tsx` (name), `HabitNode/index.tsx` (square strips), `tokens.css`, `reactflow-theme.css` (pane, handles), and the hover state moved into `BoldSetProvider` in `CanvasFlow.tsx`.
+
+### The lesson
+
+Cursor bugs are layout bugs: measure the cursor over a grid of points instead of reading CSS — the map shows the flicker zones at a glance. And decide the cursor by one rule (moves / clicks / types), not per component; a "helpful" invisible hit margin must never reach into a neighbour that has a different cursor.

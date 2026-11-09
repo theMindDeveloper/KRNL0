@@ -14,9 +14,11 @@ interface UpdateStore {
   dismissed: string | null;
   /** A manual check is running (Settings button). */
   checking: boolean;
+  /** The last manual check failed: shown once as a notice with Retry (automatic checks fail quietly). */
+  manualError: string | null;
 }
 
-export const useUpdateStore = create<UpdateStore>(() => ({ state: null, dismissed: null, checking: false }));
+export const useUpdateStore = create<UpdateStore>(() => ({ state: null, dismissed: null, checking: false, manualError: null }));
 
 const STATUSES: ReadonlySet<UpdateStatus> = new Set<UpdateStatus>([
   'disabled', 'idle', 'checking', 'up-to-date', 'available', 'downloading', 'ready', 'error',
@@ -49,6 +51,10 @@ export function useUpdateBridge(): void {
   }, []);
 }
 
+export function clearManualUpdateError(): void {
+  useUpdateStore.setState({ manualError: null });
+}
+
 /** "Later": hide the notice for this version until the next launch. */
 export function dismissUpdateNotice(): void {
   const v = useUpdateStore.getState().state?.latestVersion ?? null;
@@ -58,9 +64,14 @@ export function dismissUpdateNotice(): void {
 export async function checkForUpdates(): Promise<void> {
   const bridge = window.krnl;
   if (!bridge?.updateCheck) return;
-  useUpdateStore.setState({ checking: true });
+  useUpdateStore.setState({ checking: true, manualError: null });
   try {
-    apply(await bridge.updateCheck());
+    const raw = await bridge.updateCheck();
+    apply(raw);
+    const st = parseUpdateState(raw);
+    if (st?.status === 'error') useUpdateStore.setState({ manualError: st.error ?? 'unknown error' });
+  } catch (err) {
+    useUpdateStore.setState({ manualError: err instanceof Error ? err.message : String(err) });
   } finally {
     useUpdateStore.setState({ checking: false });
   }

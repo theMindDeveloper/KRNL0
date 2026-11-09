@@ -47,6 +47,7 @@ import { useFrameTheme } from '../../themes/useFrameTheme';
 import { SLOT_DEFAULTS } from './SlotResolver';
 import type { MotherNodeConfig, StationSlot } from '../../../shared/types';
 import type { Node } from '../../../shared/types/node';
+import { dividers, snapPercent, snapRow, type RowLayout } from './softSnap';
 import { restoredSizes, restoredSizesAround } from './restoredSizes';
 import { bottomUnchanged, columnsUnchanged, rowUnchanged, useSnapshot } from './layoutGeometry';
 
@@ -139,6 +140,26 @@ export function StationLayout() {
   const topGroupRef = useRef<GroupImperativeHandle | null>(null);
   const bottomGroupRef = useRef<GroupImperativeHandle | null>(null);
 
+  // ── Soft snap: a divider let go near a line clicks onto it ──────────────
+  // Lines: the other row's dividers (the Clock's edge under the Calendar's)
+  // and this row's default spots. Filled in below, read when a drag ends.
+  const rowsRef = useRef<{ top: string[]; bottom: string[]; topDefault: number[]; bottomDefault: number[]; mins: Record<string, number> }>(
+    { top: [], bottom: [], topDefault: [], bottomDefault: [], mins: {} });
+  const softSnap = (row: 'top' | 'bottom', layout: Layout): Layout => {
+    const r = rowsRef.current;
+    const other = row === 'top' ? bottomGroupRef.current : topGroupRef.current;
+    const otherOrder = row === 'top' ? r.bottom : r.top;
+    const lines = [
+      ...(other ? dividers(other.getLayout(), otherOrder) : []),
+      ...(row === 'top' ? r.topDefault : r.bottomDefault),
+    ];
+    const width = document.querySelector<HTMLElement>('[data-testid="station-layout"]')?.clientWidth ?? window.innerWidth;
+    const snapped = snapRow(layout as RowLayout, row === 'top' ? r.top : r.bottom, lines, snapPercent(width), r.mins);
+    if (!snapped) return layout;
+    const group = row === 'top' ? topGroupRef.current : bottomGroupRef.current;
+    return (group?.setLayout(snapped) ?? snapped) as Layout;
+  };
+
   // ── Persistence callbacks ────────────────────────────────────────────────
   const onOuterLayoutChanged = useCallback((layout: Layout) => {
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
@@ -159,7 +180,8 @@ export function StationLayout() {
     });
   }, [setLayoutGeometry]);
 
-  const onTopLayoutChanged = useCallback((layout: Layout) => {
+  const onTopLayoutChanged = useCallback((dropped: Layout) => {
+    const layout = softSnap('top', dropped);
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
     // A hidden column keeps the width it had (it isn't in `layout`).
     const columnFractions = TOP_ROW_DEFS.map((d, i) =>
@@ -176,7 +198,8 @@ export function StationLayout() {
     });
   }, [setLayoutGeometry]);
 
-  const onBottomLayoutChanged = useCallback((layout: Layout) => {
+  const onBottomLayoutChanged = useCallback((dropped: Layout) => {
+    const layout = softSnap('bottom', dropped);
     const rightColumnSplit = (layout[PANEL_IDS.bottomCanvas] ?? SLOT_DEFAULTS.bottom.canvas) / 100;
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
     if (bottomUnchanged(current, layout, rightColumnSplit)) return;
@@ -273,6 +296,16 @@ export function StationLayout() {
     flexTotal,
   ));
   flexItems.forEach((it, i) => { it.size = flexSizes[i]!; });
+  // What the soft snap needs when a drag ends: each row's panels in order,
+  // where its dividers sit by default, and each panel's minimum.
+  const defaultLines = (sizes: number[]) => { const total = sizes.reduce((a, b) => a + b, 0) || 1; let x = 0; return sizes.slice(0, -1).map((v) => (x += (v / total) * 100)); };
+  rowsRef.current = {
+    top: visibleTopDefs.map((d) => d.panelId),
+    bottom: bottomItems.map((it) => it.id),
+    topDefault: defaultLines(visibleTopDefs.map((d) => d.defaultSize)),
+    bottomDefault: defaultLines(bottomItems.map((it) => (it.id === PANEL_IDS.bottomCanvas ? canvasSize : it.id === PANEL_IDS.bottomTerminal ? terminalSize : it.id === PANEL_IDS.bottomAnalytics ? analyticsSize : clockSize))),
+    mins: Object.fromEntries([...visibleTopDefs.map((d) => [d.panelId, SLOT_DEFAULTS.minColumn] as const), ...bottomItems.map((it) => [it.id, it.min] as const)]),
+  };
   bottomItems.forEach((it, i) => {
     if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} className="station-splitter" style={verticalHandleStyle} />);
     bottomRowChildren.push(

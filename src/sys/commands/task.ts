@@ -39,6 +39,7 @@ import {
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
 import { TASK_STEP_X, TASK_STEP_Y, MOTHER_OFFSET_Y } from '../layout';
 import { wouldCreateChainCycle, parallelizeChainEdges } from '../../renderer/store/chainWalker';
+import { detachIfPushed, unscheduleOne } from '../../renderer/store/chainSchedule';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
 
@@ -702,6 +703,9 @@ export async function taskSchedule(
   if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
+  // A time its chain would push it away from (before the task before it
+  // ends): it leaves the chain and lands where it was put (chainSchedule.ts).
+  (board as { edges: unknown[] }).edges = detachIfPushed(board as unknown as Board, taskId, at);
   const ts = taskNode.state as TaskState;
   const nextState = fsmTaskSetSchedule(ts, {
     scheduledFor: at,
@@ -734,6 +738,22 @@ export async function taskSchedule(
  * Clears scheduledFor from a TaskNode (removes the field entirely, matching
  * the FSM behaviour) and mirrors the clear to the linked TodoItem.
  */
+/** `krnl task remind <ref> <minutes-before|off>` (review 4.1). 0 = at the start. */
+export async function taskRemind(ctx: TaskCtx, ref: string | undefined, value: string | undefined): Promise<SysResult> {
+  if (!ref || value === undefined) return { ok: false, message: 'task remind requires <ref> <minutes-before|off>' };
+  const off = value === 'off' || value === 'none';
+  const n = Number(value);
+  if (!off && !(Number.isInteger(n) && n >= 0 && n <= 240)) return { ok: false, message: `task remind: "${value}" is not 0-240 minutes or off` };
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, ref);
+  if (!taskNode) return { ok: false, message: noTaskMessage(ref) };
+  const st = taskNode.state as Record<string, unknown>;
+  if (off) delete st['remindMin']; else st['remindMin'] = n;
+  saveBoard(ctx, board);
+  const text = typeof st['text'] === 'string' ? st['text'] : ref;
+  return { ok: true, message: off ? `"${text}": no reminder` : `"${text}": reminder ${n === 0 ? 'at the start' : `${n} min before`} (while it is on the Calendar)`, data: { id: taskNode.id, remindMin: off ? null : n } };
+}
+
 export async function taskUnschedule(
   ctx: TaskCtx,
   taskId: string | undefined,
@@ -744,40 +764,35 @@ export async function taskUnschedule(
   if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
-  let ts = taskNode.state as TaskState;
-  let chainNote = '';
-  if (!ts.scheduledFor) {
-    // A chain successor stores no time: it is placed by its chain's anchor.
-    // Unscheduling it takes the chain off, like the Calendar's 'Unschedule chain'.
-    const anchorId = selectSchedule(board as unknown as Board).placements.get(taskId)?.anchorTaskId;
-    const anchor = anchorId && anchorId !== taskId ? findNode(board, anchorId) : null;
-    if (!anchor) return { ok: true, message: `Task "${taskId.slice(0, 8)}" was not scheduled.` };
-    taskNode = anchor;
-    taskId = anchor.id;
-    ts = anchor.state as TaskState;
-    chainNote = ' (its chain, via the anchor)';
-  }
-  const nextState = fsmTaskSetSchedule(ts, { scheduledFor: null });
-  updateNode(board, taskId, { ...taskNode, state: nextState });
+  // Only this task leaves the calendar; tasks timed by its chain keep the
+  // times they have now, and it stops following its predecessor
+  // (renderer/store/chainSchedule.ts — the Calendar does the same).
+  const plan = unscheduleOne(board as unknown as Board, taskId);
+  if (!plan) return { ok: true, message: `Task "${taskId.slice(0, 8)}" was not scheduled.` };
+  (board as { edges: unknown[] }).edges = plan.edges;
+  for (const w of plan.writes) writeSchedule(board, w.taskId, w.scheduledFor);
 
-  // Mirror to linked TodoItem.
+  saveBoard(ctx, board);
+  const pinned = plan.writes.length - 1;
+  return {
+    ok: true,
+    message: `Task "${taskId.slice(0, 8)}" unscheduled${pinned > 0 ? ` (${pinned} task${pinned === 1 ? '' : 's'} after it keep their times)` : ''}.`,
+    data: { id: taskId },
+  };
+}
+
+/** Set (or clear) one task's time and mirror it to its Todo row. */
+function writeSchedule(board: ReturnType<typeof loadBoard>, taskId: string, scheduledFor: string | null): void {
+  const node = findNode(board, taskId);
+  if (!node || node.kind !== 'todo.task') return;
+  const ts = node.state as TaskState;
+  updateNode(board, taskId, { ...node, state: fsmTaskSetSchedule(ts, { scheduledFor }) });
   if (ts.todoItemId !== null) {
     const todoNode = findNode(board, ts.parentTodoId);
     if (todoNode && todoNode.kind === 'todo') {
-      const newTodoState = fsmTodoSetItemSchedule(todoNode.state as TodoState, {
-        itemId: ts.todoItemId,
-        scheduledFor: null,
-      });
-      updateNode(board, todoNode.id, { ...todoNode, state: newTodoState });
+      updateNode(board, todoNode.id, { ...todoNode, state: fsmTodoSetItemSchedule(todoNode.state as TodoState, { itemId: ts.todoItemId, scheduledFor }) });
     }
   }
-
-  saveBoard(ctx, board);
-  return {
-    ok: true,
-    message: `Task "${taskId.slice(0, 8)}" unscheduled${chainNote}.`,
-    data: { id: taskId },
-  };
 }
 
 // ── ADR 0004 — taskAddNext ────────────────────────────────────────────────────
@@ -1073,7 +1088,9 @@ export async function taskList(
     const ts = n.state as TaskState;
     const status = ts.done ? '[x]' : '[ ]';
     const indent = '  '.repeat(ts.layer);
-    return `${status} ${short.get(n.id)}  ${indent}#${ts.sequenceNumber} L${ts.layer} — ${ts.text}`;
+    // When it is planned, so `task schedule` / `cal lineup` can be checked here.
+    const when = typeof ts.scheduledFor === 'string' && ts.scheduledFor ? `  @ ${ts.scheduledFor.replace('T', ' ')}` : '';
+    return `${status} ${short.get(n.id)}  ${indent}#${ts.sequenceNumber} L${ts.layer} — ${ts.text}${when}`;
   });
 
   return {

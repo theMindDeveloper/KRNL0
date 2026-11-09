@@ -63,7 +63,7 @@ export function HourLine({
           key={h}
           x={pad.left + h * xStep}
           y={height - 5}
-          fontSize={8}
+          fontSize={11}
           textAnchor="middle"
           fill={COLOR_LABEL}
           fontFamily="var(--font-mono)"
@@ -74,7 +74,7 @@ export function HourLine({
       <text
         x={pad.left - 3}
         y={pad.top + 8}
-        fontSize={8}
+        fontSize={11}
         textAnchor="end"
         fill={COLOR_LABEL}
         fontFamily="var(--font-mono)"

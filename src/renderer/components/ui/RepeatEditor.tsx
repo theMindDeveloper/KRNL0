@@ -4,6 +4,7 @@
 
 import type { HabitSchedule, IsoDow } from '../nodes/HabitNode/types';
 import { NumberStepper } from './NumberStepper';
+import { TimeField } from './TimeField';
 import { IconRepeat, IconClock, IconTimer, IconCalendarAll, IconBriefcase, IconDots } from './repeatIcons';
 
 export type RepeatKind = 'daily' | 'weekdays' | 'weekly';
@@ -13,7 +14,14 @@ export interface RepeatValue {
   days: IsoDow[];        // used when kind = 'weekly'
   timeOfDay: string;     // "HH:MM"
   durationMin: number;
+  /** Decision 39 — a routine (repeats at a time, never ticked) or a habit (ticked). Default: habit. */
+  itemKind?: 'habit' | 'routine';
+  /** Habit only: no set time ("Any time"). A routine always has a time. */
+  anyTime?: boolean;
 }
+
+/** A habit with no time; a routine never is. */
+export const isAnyTime = (v: RepeatValue): boolean => v.itemKind !== 'routine' && v.anyTime === true;
 
 const DAYS: ReadonlyArray<{ dow: IsoDow; letter: string; name: string }> = [
   { dow: 1, letter: 'M', name: 'Monday' }, { dow: 2, letter: 'T', name: 'Tuesday' },
@@ -22,17 +30,40 @@ const DAYS: ReadonlyArray<{ dow: IsoDow; letter: string; name: string }> = [
   { dow: 7, letter: 'S', name: 'Sunday' },
 ];
 const QUICK_LEN = [10, 15, 25, 30, 45, 60];
+/** Routines run longer: a call, a class, a shift. */
+const ROUTINE_LEN = [30, 60, 90, 120, 180, 240];
+
+/** A repeat is drawn inside one day: start + length past 24:00 would be cut. */
+export function endsPastMidnight(v: RepeatValue): boolean {
+  const m = /^(\d{2}):(\d{2})$/.exec(v.timeOfDay);
+  return !!m && Number(m[1]) * 60 + Number(m[2]) + v.durationMin > 24 * 60;
+}
 
 export function isRepeatValid(v: RepeatValue): boolean {
-  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(v.timeOfDay)
-    && Number.isFinite(v.durationMin) && v.durationMin >= 5 && v.durationMin <= 480
-    && (v.kind !== 'weekly' || v.days.length > 0);
+  const daysOk = v.kind !== 'weekly' || v.days.length > 0;
+  if (isAnyTime(v)) return daysOk;
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(v.timeOfDay)) return false;
+  const [h, m] = v.timeOfDay.split(':').map(Number) as [number, number];
+  return Number.isFinite(v.durationMin) && v.durationMin >= 5 && v.durationMin <= 720
+    // A timed habit is drawn inside one day; a routine may run past midnight
+    // (a night shift: the rest shows at the start of the next day).
+    && (v.itemKind === 'routine' || h * 60 + m + v.durationMin <= 24 * 60)
+    && daysOk;
 }
 
 export function toSchedule(v: RepeatValue): HabitSchedule {
-  if (v.kind === 'daily') return { kind: 'daily', timeOfDay: v.timeOfDay, durationMin: v.durationMin };
-  if (v.kind === 'weekdays') return { kind: 'weekdays', timeOfDay: v.timeOfDay, durationMin: v.durationMin };
-  return { kind: 'weekly', timeOfDay: v.timeOfDay, days: [...v.days].sort((a, b) => a - b), durationMin: v.durationMin };
+  const t = isAnyTime(v) ? {} : { timeOfDay: v.timeOfDay, durationMin: v.durationMin };
+  if (v.kind === 'daily') return { kind: 'daily', ...t };
+  if (v.kind === 'weekdays') return { kind: 'weekdays', ...t };
+  return { kind: 'weekly', ...t, days: [...v.days].sort((a, b) => a - b) };
+}
+
+/** The editor's value for an existing habit or routine (Decision 39). */
+export function fromSchedule(schedule: HabitSchedule | undefined, kind: 'habit' | 'routine'): RepeatValue {
+  const base = { timeOfDay: schedule?.timeOfDay ?? '09:00', durationMin: schedule?.durationMin ?? 60, itemKind: kind, anyTime: kind === 'habit' && !schedule?.timeOfDay };
+  if (!schedule || schedule.kind === 'daily') return { kind: 'daily', days: [], ...base };
+  if (schedule.kind === 'weekdays') return { kind: 'weekdays', days: [], ...base };
+  return { kind: 'weekly', days: [...schedule.days], ...base };
 }
 
 /** Plain-language summary, e.g. "Every Mon, Wed · 07:00 · 30 min". */
@@ -42,7 +73,8 @@ export function describeRepeat(v: RepeatValue): string {
     : v.days.length === 7 ? 'Every day'
     : v.days.length === 1 ? `Every ${DAYS.find((d) => d.dow === v.days[0])?.name ?? ''}`
     : `Every ${[...v.days].sort((a, b) => a - b).map((d) => DAYS.find((x) => x.dow === d)?.name.slice(0, 3)).join(', ')}`;
-  return `${when} · ${v.timeOfDay} · ${v.durationMin} min`;
+  const what = v.itemKind === 'routine' ? 'Routine · ' : '';
+  return isAnyTime(v) ? `${when} · any time` : `${what}${when} · ${v.timeOfDay} · ${v.durationMin} min`;
 }
 
 function litDays(v: RepeatValue): Set<IsoDow> {
@@ -69,16 +101,25 @@ export function RepeatEditor({ value, onChange, testIdPrefix = 'repeat' }: Props
     else set({ kind: 'weekly', days });
   };
 
-  const [hh, mm] = (() => {
-    const m = /^(\d{1,2}):(\d{1,2})$/.exec(value.timeOfDay);
-    return [m ? Number(m[1]) : 0, m ? Number(m[2]) : 0] as const;
-  })();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const setHH = (h: number) => set({ timeOfDay: `${pad(Math.max(0, Math.min(23, h)))}:${pad(mm)}` });
-  const setMM = (m: number) => set({ timeOfDay: `${pad(hh)}:${pad(Math.max(0, Math.min(59, m)))}` });
-
+  const routine = value.itemKind === 'routine';
+  const anyTime = isAnyTime(value);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Decision 39 — the one new idea: does it just happen, or do I tick it? */}
+      <div role="radiogroup" aria-label="Kind" style={{ ...segWrap, gridTemplateColumns: '1fr 1fr' }}>
+        {([['routine', 'Routine', 'it just happens'], ['habit', 'Habit', 'I tick it']] as const).map(([k, name, sub]) => {
+          const on = (k === 'routine') === routine;
+          return (
+            <button key={k} type="button" role="radio" aria-checked={on} data-testid={`${testIdPrefix}-item-${k}`}
+              onClick={() => set({ itemKind: k, ...(k === 'routine' ? { anyTime: false } : {}) })}
+              style={{ ...seg(on), flexDirection: 'column', gap: 2, padding: '7px 4px', whiteSpace: 'normal' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{k === 'routine' ? <IconClock /> : <IconRepeat />}{name}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500, color: on ? 'var(--ink-2)' : 'var(--ink-4)' }}>{sub}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Repeat mode */}
       <div style={col}>
         <span style={label}><IconRepeat />Repeat</span>
@@ -123,29 +164,45 @@ export function RepeatEditor({ value, onChange, testIdPrefix = 'repeat' }: Props
         </div>
       </div>
 
+      {/* A habit may have no time ("Any time"); a routine always has one. */}
+      {!routine && (
+        <div style={col}>
+          <span style={label}><IconClock />When</span>
+          <div style={{ ...segWrap, gridTemplateColumns: '1fr 1fr' }}>
+            <button type="button" data-testid={`${testIdPrefix}-anytime`} onClick={() => set({ anyTime: true })} style={seg(anyTime)}>Any time</button>
+            <button type="button" data-testid={`${testIdPrefix}-attime`} onClick={() => set({ anyTime: false })} style={seg(!anyTime)}>At a time</button>
+          </div>
+        </div>
+      )}
+
+      {/* Say why Save is off instead of a silent grey button. */}
+      {!anyTime && value.itemKind !== 'routine' && endsPastMidnight(value) && (
+        <div data-testid={`${testIdPrefix}-past-midnight`} style={{ fontSize: 12, color: 'var(--rust)', fontFamily: 'var(--font-sans)' }}>
+          Ends after midnight: start earlier or make it shorter.
+        </div>
+      )}
+
       {/* Time + length */}
+      {!anyTime && (
       <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 18, alignItems: 'start' }}>
         <div style={col}>
           <span style={label}><IconClock />Time</span>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <NumberStepper value={hh} onChange={setHH} min={0} max={23} step={1} testId={`${testIdPrefix}-time-hh`} />
-            <span aria-hidden style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontWeight: 700 }}>:</span>
-            <NumberStepper value={mm} onChange={setMM} min={0} max={59} step={5} testId={`${testIdPrefix}-time-mm`} />
-          </div>
+          <TimeField value={value.timeOfDay} onChange={(t) => set({ timeOfDay: t })} testId={`${testIdPrefix}-time`} style={{ width: 104 }} />
         </div>
         <div style={col}>
           <span style={label}><IconTimer />Length</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <NumberStepper value={value.durationMin} onChange={(n) => set({ durationMin: n })} min={5} max={480} step={5} testId={`${testIdPrefix}-duration-input`} />
+            <NumberStepper value={value.durationMin} onChange={(n) => set({ durationMin: n })} min={5} max={720} step={5} testId={`${testIdPrefix}-duration-input`} />
             <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>min</span>
           </div>
           <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
-            {QUICK_LEN.map((m) => (
+            {(routine ? ROUTINE_LEN : QUICK_LEN).map((m) => (
               <button key={m} type="button" onClick={() => set({ durationMin: m })} style={chip(value.durationMin === m)}>{m}</button>
             ))}
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

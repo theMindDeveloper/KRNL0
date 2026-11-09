@@ -54,6 +54,8 @@
   --lilac: #9c8ec4;
   --sand:  #b8a17a;
   --moss:  #7a8f5a;
+  /* State colour: "this is set" (on the Calendar, has a length). */
+  --planned: #4a7d22;
 
   /* Terminal — always dark */
   --term-bg:    #0c0a08;
@@ -143,6 +145,7 @@
   --spine-hot: #a8d244;
   --rust:      #ee8466;
   --rust-deep: #d05f47;
+  --planned:   #8fd05c;
 
   --term-bg:   #05040a;
   --term-bg-2: #0a0812;
@@ -495,7 +498,7 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   box-shadow: 0 0 0 2px var(--rust);
 }
 .clock-day-today {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -531,7 +534,7 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   color: var(--ink);
   border: 1px solid transparent;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.04em;
   white-space: nowrap;
   cursor: default;
@@ -581,6 +584,48 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   text-shadow: 0 0 4px rgba(201,241,88,0.5);
 }
 
+/* engagement.md F1 — the done moment: one-shot pop + ring (no loop, so the
+   frame budget #197 is untouched). Off under reduced motion. */
+.task-check--pop { animation: krnl-check-pop 420ms cubic-bezier(0.32, 0.72, 0, 1) 1; }
+@keyframes krnl-check-pop {
+  0%   { transform: scale(0.6); box-shadow: 0 0 0 0 rgba(201,241,88,0.55); }
+  55%  { transform: scale(1.18); box-shadow: 0 0 0 7px rgba(201,241,88,0.18); }
+  100% { transform: scale(1); box-shadow: 0 0 0 10px rgba(201,241,88,0); }
+}
+@media (prefers-reduced-motion: reduce) { .task-check--pop { animation: none; } }
+/* The done card's reward (engagement.md F2): 8 dots burst from the check once,
+   and the border glows once. */
+.task-done-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.task-done-burst i {
+  position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 1px; background: var(--acid);
+  animation: krnl-done-burst 560ms cubic-bezier(0.22, 1, 0.36, 1) 1 both;
+}
+@keyframes krnl-done-burst {
+  0%   { transform: rotate(var(--a)) translateX(4px) scale(1); opacity: 1; }
+  100% { transform: rotate(var(--a)) translateX(20px) scale(0.4); opacity: 0; }
+}
+.task-done-card--celebrate { animation: krnl-done-glow 900ms ease-out 1; }
+@keyframes krnl-done-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(201,241,88,0.0), var(--shadow-1); }
+  25%  { box-shadow: 0 0 0 3px rgba(201,241,88,0.35), 0 0 22px rgba(201,241,88,0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(201,241,88,0), var(--shadow-1); }
+}
+@media (prefers-reduced-motion: reduce) { .task-done-burst { display: none; } .task-done-card--celebrate { animation: none; } }
+[data-motion="reduced"] .task-done-burst { display: none; }
+[data-motion="reduced"] .task-done-card--celebrate { animation: none; }
+[data-motion="reduced"] .task-check--pop { animation: none; }
+
+/* engagement.md F19 — REPLAN: the missed block lifts and hops once ("I can move"). */
+.krnl-hop { animation: krnl-hop 640ms cubic-bezier(0.32, 0.72, 0, 1) 1; }
+@keyframes krnl-hop {
+  0%   { transform: translateY(0); box-shadow: none; }
+  30%  { transform: translateY(-4px) scale(1.02); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+  60%  { transform: translateY(10px) scale(1.02); }
+  100% { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .krnl-hop { animation: none; } }
+[data-motion="reduced"] .krnl-hop { animation: none; }
+
 /* ── HabitNode cell classes (perf — avoid per-cell inline styles) ───── */
 .habit-cell {
   /* `position: relative` is needed for the done-state inner ::after block
@@ -595,52 +640,48 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
   cursor: default;
 }
 .habit-cell--year   { border-radius: 1px; }
-.habit-cell--past   { opacity: 0.4; }
-.habit-cell--future { /* no extra */ }
-/* Non-scheduled days (per habit.schedule) — de-emphasised + non-interactive. */
+.habit-cell--past   { opacity: 0.55; }
+/* Future days: an empty outline — they can't be ticked yet, and must never
+   look heavier than the past. */
+.habit-cell--future { background: transparent; box-shadow: inset 0 0 0 1px var(--paper-3); }
+/* Days the habit isn't on (per habit.schedule): a quiet ×, not clickable —
+   a near-invisible square read as "missing", not "not this day". */
 .habit-cell--unscheduled {
-  opacity: 0.15;
-  cursor: not-allowed;
-  pointer-events: none;
+  opacity: 1;
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+  display: grid;
+  place-items: center;
+  /* Not clickable, and says so: the plain arrow (not the row's grab) (#226). */
+  cursor: default;
 }
+.habit-cell--unscheduled::before {
+  content: '×';
+  font: 600 12px/1 var(--font-mono);
+  color: var(--ink-4);
+}
+/* Month view: 10 px cells — a small dot, not a row of crosses. */
+.habit-cell--month.habit-cell--unscheduled::before {
+  content: '';
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+/* Year view: cells are 5 px — no room for a mark. */
+.habit-cell--year.habit-cell--unscheduled { opacity: 0.15; background: var(--paper-3); }
+.habit-cell--year.habit-cell--unscheduled::before { content: none; }
 
-/* PR6 — done state uses LifeOS's two-color trick: outer is ink (dark),
-   inner ::after is the habit color (acid by default). Gives a small
-   "framed" look instead of a flat block. Year-density variant skips the
-   inner block since 5px cells leave no usable inner area. */
+/* Done: a solid block in the habit's colour, in both themes (the old framed
+   two-colour cell read as an empty box with an outline). */
 .habit-cell--done {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--habit-color, var(--acid));
+  border-color: var(--habit-color, var(--acid));
+  box-shadow: none;
   opacity: 1;
 }
-.habit-cell--done::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  background: var(--habit-color, var(--acid));
-  border-radius: 1px;
-  pointer-events: none;
-}
-.habit-cell--year.habit-cell--done {
-  background: var(--habit-color, var(--acid));
-  border-color: var(--habit-color, var(--acid));
-}
-.habit-cell--year.habit-cell--done::after {
-  display: none;
-}
-/* Dark-mode inversion: outer becomes the habit color, inner becomes paper
-   so the cell still reads against the dark background. */
-[data-theme="dark"] .habit-cell--done {
-  background: var(--habit-color, var(--acid));
-  border-color: var(--habit-color, var(--acid));
-}
-[data-theme="dark"] .habit-cell--done::after {
-  background: var(--paper);
-}
-[data-theme="dark"] .habit-cell--year.habit-cell--done {
-  background: var(--habit-color, var(--acid));
-  border-color: var(--habit-color, var(--acid));
-}
+.habit-cell--done::after { content: none; }
 
 .habit-cell--today {
   background: transparent;
@@ -654,6 +695,9 @@ strong, b, h1, h2, h3, h4, h5, h6 { font-weight: 700; }
 /* Today + done: keep the two-color body but add the today outline so the
    "today" cue survives the done fill. */
 .habit-cell--done.habit-cell--today {
+  /* Ticked today must look ticked: the today rule above clears the fill. */
+  background: var(--habit-color, var(--acid));
+  border-color: var(--habit-color, var(--acid));
   outline: 1.5px solid var(--habit-color, var(--acid));
   outline-offset: 1px;
 }
@@ -834,4 +878,76 @@ select option { background: var(--paper); color: var(--ink); }
   --task-16: oklch(0.75 0.13 312);
   --task-17: oklch(0.75 0.13 92);
   --task-18: oklch(0.75 0.13 232);
+}
+
+/* Placeholders follow the theme (the browser's grey was 3.9:1 on dark windows). */
+::placeholder { color: var(--ink-3); opacity: 1; }
+
+/* Rest day (sick, away, a planned break): a quiet hatch, still clickable to tick. */
+.habit-cell--rest {
+  background: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in srgb, var(--habit-color, var(--acid)) 35%, transparent) 3px 4px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--habit-color, var(--acid)) 30%, transparent);
+  opacity: 0.9;
+}
+
+/* ── Click areas (hit-area audit, 8 Nov 2026) ─────────────────────────────────
+   Many controls were 12–22 px: a cursor a few pixels off missed them. Two fixes,
+   neither changes how anything looks:
+   1. Rows of segment buttons and header buttons get a real 24 px minimum height
+      (min-height wins over their inline height). An invisible margin there would
+      spill onto the neighbour and cause misclicks.
+   2. Small controls that stand alone get an invisible margin you can click
+      (an ::after layer). `:where()` keeps `position: relative` at zero weight,
+      so a control positioned by its own class or style keeps its position.
+   Dense grids (habit squares) keep their size: a margin would land on the
+   next square. */
+:where(
+  [data-testid^="habit-view-"], [data-testid^="analytics-range-"], [data-testid="week-today"],
+  [data-testid="calendar-new"], [data-testid="calendar-events-list"], [data-testid="calendar-new-repeating"],
+  [data-testid^="calendar-layer-"], [data-testid="clock-week-toggle"], [data-testid="clock-dial-only"],
+  [data-testid^="clock-window-"], [data-testid^="clock-day-"], [data-testid^="layout-toggle-"],
+  [data-testid="topbar-canvas-switcher"], [data-testid^="pomo-mode-"], [data-testid="week-prev"],
+  [data-testid="week-next"], [data-testid^="ambient-radio-preset-"], [data-testid="topbar-settings"],
+  [data-testid="pomo-tag-select"], [data-testid="habit-add-input"]
+) { min-height: 24px; box-sizing: border-box; }
+
+:where(
+  .task-check, [data-testid^="todo-plan-"], [data-testid="pomo-gear"], [data-habit-gear],
+  [data-testid="pomo-log-toggle"], [aria-label^="Earlier hours"], [aria-label^="Later hours"],
+  [data-testid="clock-window-swap"], [data-testid^="todo-when-"], [data-testid^="todo-due-"],
+  [data-testid="task-calendar-grip"], [data-testid^="todo-tag-"]
+) { position: relative; }
+:is(
+  .task-check, [data-testid^="todo-plan-"], [data-testid="pomo-gear"], [data-habit-gear],
+  [data-testid="pomo-log-toggle"], [aria-label^="Earlier hours"], [aria-label^="Later hours"],
+  [data-testid="clock-window-swap"], [data-testid="task-calendar-grip"]
+)::after { content: ''; position: absolute; inset: -7px; }
+/* Text buttons in a row (Tue 16:00 · by Fri · tag): taller, barely wider. */
+:is([data-testid^="todo-when-"], [data-testid^="todo-due-"], [data-testid^="todo-tag-"])::after { content: ''; position: absolute; inset: -6px -2px; }
+/* The windows' drag grip and the cards' connection dots. */
+.station-drag-handle::after { content: ''; position: absolute; inset: -6px -8px; }
+/* A connection dot's extra margin points away from its card, so the card's
+   own edge keeps the grab cursor (#226). */
+.react-flow__handle::after { content: ''; position: absolute; inset: -6px; }
+.react-flow__handle-left::after { right: 50%; }
+.react-flow__handle-right::after { left: 50%; }
+.react-flow__handle-top::after { bottom: 50%; }
+.react-flow__handle-bottom::after { top: 50%; }
+
+/* The whole top bar moves the window (frameless window); only its controls
+   don't, so you can grab the bar anywhere between them. Groups used to opt
+   out entirely, leaving a few small gaps to drag from. */
+[data-testid="topbar"] :is(button, a, input, select, textarea, [role="button"], [role="menu"], [role="menuitem"], [role="radiogroup"], [role="tablist"], [role="dialog"], [data-no-drag]) {
+  -webkit-app-region: no-drag;
+}
+
+/* ── UI rule: a control's words stay inside it ────────────────────────────
+   Buttons, tabs, menu items, options and chips keep their label on one line,
+   so a crowded row can't squeeze one narrower than its words ("New chat"
+   wrapping out of its pill). Controls that hold a title plus a description
+   (a div, a p, a hint/desc part) wrap as before; data-wrap opts out.
+   Zero specificity: any explicit white-space still wins. Guarded in dev by
+   src/renderer/dev/overflowGuard.ts. docs/04-visual-system/design-tokens.md. */
+:where(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], .task-tag):where(:not(:has(div, p, [class*="hint"], [class*="desc"])):not([data-wrap])) {
+  white-space: nowrap;
 }

@@ -18,6 +18,8 @@ import { activeCanvasOf, isOnCanvas } from '../../shared/canvas';
 import type { BoardShape } from '../../shared/dispatch/types';
 import { TERM_CLEAR_EVENT, TERM_FONT_MIN, TERM_FONT_MAX } from '../components/nodes/TerminalNode/constants';
 import { sfxEngine } from '../sfx/sfxEngine';
+import { runSoundCommand } from '../sfx/soundCli';
+import { runEngagementCommand } from './engagementCli';
 import { useEventLog } from './eventLog/store';
 import type { Board } from '../../shared/types';
 import type { Node } from '../../shared/types';
@@ -28,7 +30,11 @@ import { isFrameStyleId } from '../../shared/frameStyles';
 import { radioControl } from '../components/AmbientRadio/radioControl';
 import { launchClaudeInTerminal } from './claudeLaunch';
 import { startTour } from '../components/Tour/TourHost';
+import { runShow, type ShowArgs } from './showCli';
 import { flushBeforeRestart } from './updateStore';
+import { openFeedback, openShare, openWelcomeBack, openWhatsNew, todayYMD } from '../launch/launchStore';
+import { shareCardFor } from '../launch/milestones';
+import { isFeedbackKind } from '../../shared/feedback';
 
 export function useCliDispatch(): void {
   const store = useBoardStore;
@@ -38,6 +44,11 @@ export function useCliDispatch(): void {
     if (!bridge?.onCliDispatch || !bridge?.cliDispatchReply) return;
 
     const unsubscribe = bridge.onCliDispatch((id, command, args) => {
+      if (command === 'ui.show') {
+        const r = runShow(args as unknown as ShowArgs);
+        bridge.cliDispatchReply!(id, r.ok, r.message);
+        return;
+      }
       if (command === 'tour.start') {
         const ok = startTour(String(args['id'] ?? ''));
         bridge.cliDispatchReply!(id, ok, ok ? `Tour "${String(args['id'])}" started` : `No tour "${String(args['id'])}"`);
@@ -55,6 +66,32 @@ export function useCliDispatch(): void {
         void launchClaudeInTerminal(args['bypass'] === true)
           .then((r) => bridge.cliDispatchReply!(id, r.ok, r.message))
           .catch((e: unknown) => bridge.cliDispatchReply!(id, false, e instanceof Error ? e.message : String(e)));
+        return;
+      }
+      // Decision 38 — launch experience surfaces (krnl whatsnew show, feedback, catchup show, share).
+      if (command === 'whatsnew.show') {
+        const shown = openWhatsNew();
+        bridge.cliDispatchReply!(id, shown, shown ? "What's new is open in the window" : 'No release notes in this build');
+        return;
+      }
+      if (command === 'feedback.open') {
+        openFeedback(isFeedbackKind(args['kind']) ? args['kind'] : 'bug', String(args['title'] ?? ''));
+        bridge.cliDispatchReply!(id, true, 'Send feedback is open in the window. Nothing is sent until the user posts it on GitHub.');
+        return;
+      }
+      if (command === 'catchup.show') {
+        const shown = openWelcomeBack(true, null);
+        bridge.cliDispatchReply!(id, shown, shown ? 'Welcome back is open in the window' : 'The board is not loaded yet');
+        return;
+      }
+      if (command === 'share.show') {
+        const board = store.getState().board;
+        const habit = String(args['habit'] ?? '');
+        const card = board
+          ? shareCardFor(board.nodes, todayYMD(), args['kind'] === 'sessions' ? { kind: 'sessions' } : { kind: 'streak', habit })
+          : null;
+        if (card) openShare(card);
+        bridge.cliDispatchReply!(id, card !== null, card ? `Card open in the window: ${card.value} ${card.kind === 'streak' ? `days · ${card.habit}` : 'focus sessions'}` : habit ? `No habit called "${habit}"` : 'No habits yet');
         return;
       }
       let ok = false;
@@ -286,6 +323,29 @@ export function useCliDispatch(): void {
             sfxEngine.stop();
             ok = true;
             message = 'SFX stopped';
+            break;
+          }
+
+          case 'finished.status':
+          case 'finished.show':
+          case 'finished.hide':
+          case 'finished.policy':
+          case 'recap.today':
+          case 'recap.yesterday':
+          case 'recap.week':
+          case 'recap.show': {
+            ({ ok, message } = runEngagementCommand(command, args as Record<string, unknown>, store.getState().board));
+            break;
+          }
+
+          case 'sound.status':
+          case 'sound.list':
+          case 'sound.on':
+          case 'sound.off':
+          case 'sound.pack':
+          case 'sound.volume':
+          case 'sound.play': {
+            ({ ok, message } = runSoundCommand(command, args as Record<string, unknown>));
             break;
           }
 

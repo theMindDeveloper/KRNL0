@@ -14,6 +14,9 @@ export interface UndoNotice {
   label: string;
   before: Board;
   after: Board;
+  /** Set when the change can't be stepped back through history (it ran
+   *  async work): UNDO calls this instead. */
+  revert?: () => void;
 }
 
 export const useUndoNotice = create<{ notice: UndoNotice | null }>(() => ({ notice: null }));
@@ -29,6 +32,14 @@ export function undoable(label: string, run: () => void): void {
   useUndoNotice.setState({ notice: { id: ++seq, label, before, after } });
 }
 
+/** A notice whose UNDO runs its own reverse step (for changes with async
+ *  parts, like Drop, which also takes the plan off the Calendar). */
+export function revertible(label: string, revert: () => void): void {
+  const board = useBoardStore.getState().board;
+  if (!board) return;
+  useUndoNotice.setState({ notice: { id: ++seq, label, before: board, after: board, revert } });
+}
+
 export function dismissUndoNotice(): void {
   useUndoNotice.setState({ notice: null });
 }
@@ -37,6 +48,7 @@ export function dismissUndoNotice(): void {
 export function undoNoticed(): boolean {
   const n = useUndoNotice.getState().notice;
   dismissUndoNotice();
+  if (n?.revert) { n.revert(); return true; }
   const s = useBoardStore.getState();
   if (!n || s.board !== n.after) return false;
   const at = s.history.lastIndexOf(n.before);

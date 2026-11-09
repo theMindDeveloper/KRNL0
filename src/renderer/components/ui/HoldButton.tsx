@@ -85,7 +85,7 @@ export function HoldButton({
         position: 'relative',
         overflow: 'hidden',
         fontFamily: 'var(--font-mono)',
-        fontSize: 10,
+        fontSize: 11,
         letterSpacing: '0.06em',
         textTransform: 'uppercase',
         padding: '7px 12px',

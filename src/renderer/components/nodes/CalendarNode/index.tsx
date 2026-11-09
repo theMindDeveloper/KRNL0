@@ -94,7 +94,7 @@ export function CalendarNode({
           display: 'flex',
           borderTop: '1px solid var(--paper-3)',
           fontFamily: 'var(--font-mono)',
-          fontSize: 10,
+          fontSize: 11,
         }}
       >
         {(['day', 'week', 'month', 'year'] as const).map((view) => (
