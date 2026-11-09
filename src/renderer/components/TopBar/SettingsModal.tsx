@@ -15,6 +15,7 @@ import { BackupsSection, CelebrationsSection } from './LaunchSettings';
 import { SoundSection } from './SoundSection';
 import { FinishedSection } from './FinishedSection';
 import { Switch } from '../ui/Switch';
+import { gridScopeOf } from '../Canvas/alignGrid';
 import { SettingsIcon, type SettingsIconName } from '../ui/SettingsIcons';
 
 export type Theme = 'light' | 'dark';
@@ -133,7 +134,7 @@ function Card({ title, icon, children }: { title?: string; icon?: SettingsIconNa
 
 function General({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
   const setUiMode = useBoardStore((s) => s.setUiMode);
-  const alignGrid = useBoardStore((s) => s.board?.alignGrid ?? null);
+  const alignGrid = useBoardStore((s) => gridScopeOf(s.board?.alignGrid));
   const setAlignGrid = useBoardStore((s) => s.setAlignGrid);
   const easy = useEasyMode();
   return (

@@ -555,6 +555,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     return (
     <div
       key={item.id}
+      data-item-id={item.id}
       className={`todo-item${item.done ? ' done' : ''}`}
       draggable={true}
       onDragStart={(e: DragEvent<HTMLDivElement>) => {

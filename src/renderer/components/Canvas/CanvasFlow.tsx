@@ -87,7 +87,7 @@ const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
 import { FIT_NODES_EVENT, FOCUS_NODE_EVENT } from '../../store/scheduleActions';
 import { activeCanvasOf, edgesOnCanvas, isOnCanvas, isSharedNode, isStrokeOnCanvas, visibleNodeIds } from '../../../shared/canvas';
-import { alignAll, landing, onGrid, snap as snapGrid, type Box } from './alignGrid';
+import { alignAll, gridScopeOf, landing, onGrid, snap as snapGrid, type Box } from './alignGrid';
 
 /** Align to grid: let moved nodes glide the last few pixels instead of jumping. */
 function settleNodes(ids: readonly string[]): void {
@@ -1515,7 +1515,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     });
 
     const strokeNodes = (board.drawings ?? []).filter((d) => isStrokeOnCanvas(d, canvasId)).map(strokeRfNode);
-    return [...filteredBase, ...swapNodes, ...strokeNodes];
+    // Hidden cards (finished, or a layer switched off) are left out of the
+    // canvas, not handed to React Flow as `hidden`: RF keeps a hidden node's
+    // old wire dots, so a new wire snapped onto an invisible card, and wires
+    // between two hidden cards were still drawn.
+    return [...filteredBase.filter((n) => !n.hidden), ...swapNodes, ...strokeNodes];
   }, [board, selectNode, layerTasks, layerTexts, layerImages, isStation, finishedPolicy, showFinished, finishedClock]);
 
   // ── Local RF nodes state — fixes RF warning #015 + drag stutter ──────────
@@ -1557,7 +1561,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const motherIds = isStation
       ? new Set(board.nodes.filter((n) => n.isMother).map((n) => n.id))
       : null;
-    const onCanvas = edgesOnCanvas(board.edges, visibleNodeIds(board.nodes, activeCanvasOf(board)));
+    // Only wires whose two ends are on the canvas right now (not hidden).
+    const shownIds = new Set(derivedNodes.map((n) => n.id));
+    const onCanvas = edgesOnCanvas(board.edges, visibleNodeIds(board.nodes, activeCanvasOf(board)))
+      .filter((e) => shownIds.has(e.from.nodeId) && shownIds.has(e.to.nodeId));
     const withoutMothers = motherIds
       ? onCanvas.filter((e) => !motherIds.has(e.from.nodeId) && !motherIds.has(e.to.nodeId))
       : onCanvas;
@@ -1569,7 +1576,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       const tgtKind = kindMap.get(edge.to.nodeId) ?? '';
       return getMemoizedRfEdge(edge, srcKind, tgtKind);
     });
-  }, [board, isStation]);
+  }, [board, isStation, derivedNodes]);
 
   // ── Bold-set — which source node IDs should bold their outgoing edges ─────
   // Keyed on [board.nodes, hoveredNodeId]. When a mother is hovered we walk its
@@ -1735,11 +1742,13 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const dragged = all.find((n) => n.id === draggedId);
     if (!dragged) return;
     const draggedKind = dragged.data?.node?.kind;
+    // Where the store had it before this drag (for hidden frame children).
+    const before = useBoardStore.getState().board?.nodes.find((n) => n.id === draggedId)?.position;
 
     // Align to grid: the drop settles on the nearest free grid spot (a frame
     // only snaps; its children move with it). Others moving in the same
     // gesture don't count as in the way.
-    const alignOn = onGrid(useBoardStore.getState().board?.alignGrid, draggedKind, dragged.data?.node?.isMother === true);
+    const alignOn = onGrid(gridScopeOf(useBoardStore.getState().board?.alignGrid), draggedKind, dragged.data?.node?.isMother === true);
     const pos = { ...dragged.position };
     if (alignOn) {
       const boxOf = (n: KrnlRFNode): Box => ({ x: n.position.x, y: n.position.y, w: (n.measured?.width ?? n.width ?? 0) as number, h: (n.measured?.height ?? n.height ?? 0) as number });
@@ -1765,9 +1774,15 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
 
     if (draggedKind === 'frame') {
       const fs = dragged.data.node.state as FrameState;
+      // A child that is hidden (finished, layer off) is not on the canvas, so
+      // the drag didn't move it: move it by the frame's whole drag.
       for (const cid of fs.childIds ?? []) {
         const child = all.find((n) => n.id === cid);
         if (child) updateNode(cid, { position: { x: child.position.x + shift.dx, y: child.position.y + shift.dy } });
+        else if (before) {
+          const stored = useBoardStore.getState().board?.nodes.find((n) => n.id === cid);
+          if (stored) updateNode(cid, { position: { x: stored.position.x + pos.x - before.x, y: stored.position.y + pos.y - before.y } });
+        }
       }
       if (shift.dx || shift.dy) settleNodes(fs.childIds ?? []);
     } else if (draggedKind && draggedKind !== 'frame') {
@@ -1823,7 +1838,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // note and image settles on its nearest free grid spot, in reading order.
   // One undo step. Runs on the switch going on (Settings or `krnl settings
   // grid on`), not on every load.
-  const gridScope = useBoardStore((s) => s.board?.alignGrid ?? null);
+  const gridScope = useBoardStore((s) => gridScopeOf(s.board?.alignGrid));
   const gridWas = useRef<'cards' | 'all' | null | undefined>(undefined);
   useEffect(() => {
     const was = gridWas.current;

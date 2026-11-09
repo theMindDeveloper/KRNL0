@@ -160,7 +160,12 @@ export function coveringPanel(el: Element, box: Rect): HTMLElement | null {
  * visible one wins, preferring those inside the window the step is about.
  * `box` is null when it exists but can't be seen right now.
  */
-export function findTarget(selector: string, scope: Element | null, text?: string): { el: Element; box: Rect | null } | null {
+export function findTarget(
+  selector: string,
+  scope: Element | null,
+  text?: string,
+  opts?: { keep?: Element | null; made?: readonly string[] },
+): { el: Element; box: Rect | null } | null {
   let list: Element[];
   try { list = Array.from(document.querySelectorAll(selector)); } catch { return null; }
   if (text) {
@@ -178,7 +183,22 @@ export function findTarget(selector: string, scope: Element | null, text?: strin
   }
   if (list.length === 0) return null;
   const inScope = scope ? list.filter((e) => scope.contains(e)) : [];
-  const pool = inScope.length > 0 ? inScope : list;
+  let pool = inScope.length > 0 ? inScope : list;
+  // The one this step already points at stays, even when the camera moves and
+  // another match becomes bigger on screen (the ring never jumps cards).
+  if (opts?.keep && opts.keep.isConnected && pool.includes(opts.keep)) return { el: opts.keep, box: visibleBox(opts.keep) };
+  // What was made during this tour (the user's new task, habit or plan — its
+  // card, its row) wins over older ones, the newest first.
+  if (opts?.made?.length) {
+    const nodeId = (e: Element) => {
+      const own = e.closest('[data-habit-row], [data-item-id], .react-flow__node');
+      return own?.getAttribute('data-habit-row') ?? own?.getAttribute('data-item-id') ?? own?.getAttribute('data-id') ?? null;
+    };
+    for (let k = opts.made.length - 1; k >= 0; k--) {
+      const mine = pool.filter((e) => nodeId(e) === opts.made![k]);
+      if (mine.length > 0) { pool = mine; break; }
+    }
+  }
   let best: { el: Element; box: Rect | null } | null = null;
   let bestArea = -1;
   for (const el of pool) {
@@ -187,6 +207,19 @@ export function findTarget(selector: string, scope: Element | null, text?: strin
     if (area > bestArea) { best = { el, box }; bestArea = area; }
   }
   return best;
+}
+
+/** Every id a step could point at: board nodes, habits and Todo items (in board order, newest last). */
+export function idsOnBoard(board: Board | null | undefined): string[] {
+  if (!board) return [];
+  const out: string[] = [];
+  for (const n of board.nodes) {
+    out.push(n.id);
+    const s = n.state as { habits?: Array<{ id: string }>; items?: Array<{ id: string }> } | null;
+    if (n.isMother && n.kind === 'habit') for (const h of s?.habits ?? []) out.push(h.id);
+    if (n.isMother && n.kind === 'todo') for (const it of s?.items ?? []) out.push(it.id);
+  }
+  return out;
 }
 
 /**
@@ -284,6 +317,8 @@ export function TourHost(): JSX.Element | null {
   const rectRef = useRef<Rect | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const startBoard = useRef<Board | null>(null);
+  /** Node ids on the board when the tour began: anything else was made in it. */
+  const tourStartIds = useRef<Set<string>>(new Set());
   const uiMode = useBoardStore((s) => (s.board?.uiMode === 'easy' ? 'easy' : 'advanced'));
   // The user's own mode, put back when a tour that switched modes ends
   // without the user choosing one.
@@ -340,8 +375,14 @@ export function TourHost(): JSX.Element | null {
       const t = tourById((e as CustomEvent<{ id: string }>).detail.id);
       if (!t) return;
       // Only the steps that exist in the user's mode (no ring on a hidden control).
-      const mode = useBoardStore.getState().board?.uiMode === 'easy' ? 'easy' : 'advanced';
-      setTour({ ...t, steps: stepsFor(t, mode) });
+      const b = useBoardStore.getState().board;
+      const mode = b?.uiMode === 'easy' ? 'easy' : 'advanced';
+      // The timer's buttons differ: Easy and OBSERVE are a stopwatch (Back to
+      // work, Stop); POMO has End break and the ■ button.
+      const pomoCfg = b?.nodes.find((n) => n.kind === 'pomo' && n.isMother)?.config as { mode?: string } | undefined;
+      const timer = mode === 'easy' || pomoCfg?.mode === 'observe' ? 'stopwatch' : 'pomo';
+      setTour({ ...t, steps: stepsFor(t, mode, timer) });
+      tourStartIds.current = new Set(idsOnBoard(useBoardStore.getState().board));
       setI(0);
       setPracticeEnd(null);
       // A tour where the user makes things: what they make is practice.
@@ -395,6 +436,8 @@ export function TourHost(): JSX.Element | null {
     // may still be gliding to it) and is on screen.
     let prev: Rect | null = null;
     let scrolled = false;
+    // What this step points at, once found: it stays its target.
+    let kept: Element | null = null;
     const tucked = new Set<HTMLElement>();
     const measure = (): void => {
       // The target, or (when it isn't on screen, e.g. no tasks to show a tag
@@ -403,7 +446,9 @@ export function TourHost(): JSX.Element | null {
       // A step about nothing in particular while a dialog is open (the day
       // recap) is about that dialog: the card goes beside it, never on it.
       const target = sel(step.target) ?? (!step.node ? '[role="dialog"][aria-modal="true"]:not([data-testid="tour-card"])' : undefined);
-      const found = target ? findTarget(target, scope, step.targetText) : null;
+      const made = idsOnBoard(useBoardStore.getState().board).filter((id) => !tourStartIds.current.has(id));
+      const found = target ? findTarget(target, scope, step.targetText, { keep: kept, made }) : null;
+      if (found?.box) kept = found.el;
       const from = step.from ? findTarget(step.from, null) : null;
       const fromBox = from?.box ?? null;
       setRect2((cur) => (fromBox ? (same(cur, fromBox) ? cur : fromBox) : null));

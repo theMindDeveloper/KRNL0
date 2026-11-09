@@ -138,7 +138,7 @@ export function settingsGrid(
 ): SysResult {
   const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { alignGrid?: unknown }) | null;
   if (!raw) return { ok: false, message: 'No board found' };
-  const current = raw.alignGrid === 'cards' || raw.alignGrid === 'all' ? raw.alignGrid : 'off';
+  const current = raw.alignGrid === 'all' ? 'all' : raw.alignGrid === 'cards' || raw.alignGrid === true ? 'cards' : 'off';
   if (value === undefined) return { ok: true, message: `grid: ${current}`, data: { grid: current } };
   const asked = value.toLowerCase();
   const v = asked === 'on' ? 'cards' : asked;

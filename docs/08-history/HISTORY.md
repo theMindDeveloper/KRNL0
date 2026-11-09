@@ -2551,3 +2551,30 @@ Checked in the preview with a stand-in bridge (status line, Sign in, menu hide/s
 **Branch:** `experiment/new-user-review`
 **Files changed:** `Canvas/alignGrid.ts` (new), `Canvas/CanvasFlow.tsx`, `store/boardStore.ts` (`setAlignGrid`, `moveNodes`), `shared/types/board.ts` + `board.schema.ts` (`alignGrid?: 'cards' | 'all'`, optional — no migration), `TopBar/SettingsModal.tsx` (General → Canvas), `sys/parser.ts`, `sys/SysFacade.ts`, `sys/commands/info.ts` (`krnl settings grid [on|off]`), `shared/cli/commandRegistry.ts`, `styles/reactflow-theme.css`, `docs/06-requirements/align-grid.md` (new), `tests/unit/renderer/alignGrid.test.ts` (new), `tests/unit/sys/settings.layout.test.ts`.
 **Summary:** The user wanted no visible grid, "like Windows": with **Align to grid** on, whatever you drop on the canvas settles on an invisible **80 px** grid (made strict on the user's request: few spots, so lining up is easy; a task card takes 3 × 2 cells, so neighbours keep even 20/40 px gaps), and if that spot is taken it goes to the **nearest free** one — never on top of another card. Turning it on tidies the canvas once in reading order (windows, frames and their contents stay; one undo). A frame snaps and carries its children. Fixed while testing: when the free spot was where a note started, the store didn't change and the canvas kept showing it on top of the other card — the canvas now always moves it to the settled spot. **Off by default**; when on, the user picks **Cards only** (plan, habit and event cards — the default) or **Everything** (also notes, sticky notes, shapes, images, frames); what doesn't align still counts as in the way. Settings → General → Canvas, or `krnl settings grid off|cards|all`. Checked in the preview: Cards only lines up the cards and leaves notes alone; Everything tidies the rest (23 items on the grid, no overlaps); dropping a note onto another one.
+
+## [2026-11-09] — Ghost wires to hidden cards; Align to grid defaults to cards (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Canvas/CanvasFlow.tsx`, `Canvas/alignGrid.ts` (`gridScopeOf`), `TopBar/SettingsModal.tsx`, `sys/commands/info.ts`, `tests/unit/renderer/alignGrid.test.ts`.
+**Summary:** **Connecting to a note snapped onto an invisible card**, and a wire was drawn between two invisible cards at the top left. Cause: hidden cards (finished ones, or a layer switched off) were handed to React Flow with `hidden: true`; React Flow keeps a hidden node's old wire dots (a new wire snaps to them) and still draws wires between hidden nodes. Hidden cards are now left out of the canvas entirely, wires are drawn only when both ends are shown, and a hidden card inside a frame still moves with the frame. Checked in the preview: tasks layer off → no card, no wire, no wire dot; on → all back. **Align to grid** reads a board saved by the first build (`true`) as **cards only**, the default — never everything.
+
+## [2026-11-09] — Tours brought up to date, in Easy and Advanced (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts`, `Tour/TourHost.tsx`, `TodoNode/index.tsx` (`data-item-id`), `tests/unit/renderer/easyMode.review.test.tsx`, `tests/unit/renderer/tourVoice.test.ts`.
+**Summary:** Every tour was walked step by step in both modes with a script (screenshot, ring found or not, the real action done where it could). Fixed:
+- **The ring jumped to another task when the camera moved** — a step picked the most visible match each time. It now keeps the element it found, and prefers what was made during the tour (your new task, habit or plan row).
+- **"…or just press Enter"** read as "skip": it now says **press Enter to add it** (first day, Todo, habits).
+- **Pomo mode** (Advanced's default timer) has other buttons: steps now follow how the timer works — the stopwatch's BREAK / BACK TO WORK / STOP, or Pomo's break cup / END BREAK / ■. The Pomo tour's task picker and "forgot to start" step point at what exists (the TASK picker; the Calendar's Log time here…).
+- **Repeating events**: the **Repeating** button; Easy (no Events switch) gets its own line. **Habits**: Advanced mentions times a week and goals; **Goal**, not "Amount", in Staying on track; **Reminder** wording.
+- The **day recap closes** after its step; the **Welcome** tour shows the Terminal in Advanced; **Easy and Advanced** now shows all Advanced adds (deadlines and chains, Calendar layers, canvases/frames/Terminal).
+The first-day voice clips no longer match the corrected words: the clip check is paused until the voice is re-recorded (#227).
+
+## [2026-11-09] — Station: soft snap for dividers (experimental)
+
+**Type:** Enhancement
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Station/softSnap.ts` (new), `Station/StationLayout.tsx`, `tests/unit/renderer/stationSoftSnap.test.ts` (new).
+**Summary:** Let go of a Station divider within 14 px of a line and it clicks onto it: a divider in the other row (the Clock's edge under the Calendar's) or the divider's default spot. Further away it stays exactly where you put it — it helps, never forces. Checked in the preview: 8 px off → onto the Clock edge; 80 px away → stays; the bottom row snaps to the top row too.

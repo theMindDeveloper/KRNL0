@@ -91,8 +91,9 @@ describe('Tours follow the mode', () => {
   });
   it('no Easy step talks about deadlines, weekly targets or amounts', () => {
     for (const t of toursIn('easy')) {
-      // (The step that pitches Advanced names what Advanced adds, on purpose.)
-      for (const s of stepsFor(t, 'easy').filter((x) => !x.then)) {
+      // (The step that pitches Advanced names what Advanced adds, on purpose,
+      // and so do the live-demo steps that switch the app to Advanced.)
+      for (const s of stepsFor(t, 'easy').filter((x) => !x.then && x.mode !== 'advanced')) {
         expect(s.text.toLowerCase(), `${t.id}: ${s.text}`).not.toMatch(/deadline|times a week|weekly target|amount/);
       }
     }

@@ -1,6 +1,6 @@
 /** Align to grid (docs/06-requirements/align-grid.md). */
 import { describe, it, expect } from 'vitest';
-import { GAP, GRID, alignAll, landing, onGrid, snap, type Box } from '../../../src/renderer/components/Canvas/alignGrid';
+import { GAP, GRID, alignAll, gridScopeOf, landing, onGrid, snap, type Box } from '../../../src/renderer/components/Canvas/alignGrid';
 
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.w + GAP && a.x + a.w + GAP > b.x && a.y < b.y + b.h + GAP && a.y + a.h + GAP > b.y;
 
@@ -65,5 +65,14 @@ describe('what aligns (F6)', () => {
     expect(onGrid('all', 'image')).toBe(true);
     expect(onGrid('all', 'frame')).toBe(true);
     expect(onGrid('all', 'todo', true)).toBe(false);
+  });
+});
+
+describe('default scope', () => {
+  it('cards only by default; a board from the first build (true) reads as cards only', () => {
+    expect(gridScopeOf(undefined)).toBeNull();
+    expect(gridScopeOf(true)).toBe('cards');
+    expect(gridScopeOf('cards')).toBe('cards');
+    expect(gridScopeOf('all')).toBe('all');
   });
 });

@@ -23,8 +23,18 @@ export interface Box { x: number; y: number; w: number; h: number }
 export type GridScope = 'cards' | 'all';
 /** The board's cards (a plan, a habit, an event); 'cards' snaps only these. */
 const CARD_KINDS: ReadonlySet<string> = new Set(['todo.task', 'habit.lane']);
+/**
+ * The board's setting as a scope. Cards only is the default: a board saved by
+ * the first build (`alignGrid: true`) reads as cards only, never everything.
+ */
+export function gridScopeOf(value: unknown): GridScope | null {
+  if (value === 'all') return 'all';
+  if (value === 'cards' || value === true) return 'cards';
+  return null;
+}
+
 /** Does the grid apply to this kind? Windows (mothers) never move. */
-export function onGrid(scope: GridScope | undefined, kind: string | undefined, isMother = false): boolean {
+export function onGrid(scope: GridScope | null | undefined, kind: string | undefined, isMother = false): boolean {
   if (!scope || isMother || !kind) return false;
   return scope === 'all' || CARD_KINDS.has(kind);
 }
