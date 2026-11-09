@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
 }));
 
 import { chooseBackend } from '../../../src/main/updater';
-import { createGithubNotifyBackend, releasePageUrl } from '../../../src/main/updater/backends';
+import { createGithubNotifyBackend, pickAutoUpdater, releasePageUrl } from '../../../src/main/updater/backends';
 import type { FetchLike } from '../../../src/main/updater/backends';
 import { LATEST_RELEASE_API } from '../../../src/shared/update';
 
@@ -86,5 +86,18 @@ describe('GitHub notify backend (F3)', () => {
   it('a network failure says GitHub could not be reached', async () => {
     const fetch: FetchLike = async () => { throw new Error('ENOTFOUND'); };
     await expect(createGithubNotifyBackend(fetch).latest()).rejects.toThrow("couldn't reach GitHub (ENOTFOUND)");
+  });
+});
+
+describe('electron-updater loads in either shape (the v0.10.1 / v0.11.0 update bug)', () => {
+  const updater = { autoDownload: true } as unknown as Parameters<typeof pickAutoUpdater>[0];
+  it('a real dynamic import: autoUpdater only on default (CommonJS getter)', () => {
+    expect(pickAutoUpdater({ default: { autoUpdater: updater } })).toBe(updater);
+  });
+  it('a bundled require: autoUpdater as a named export', () => {
+    expect(pickAutoUpdater({ autoUpdater: updater })).toBe(updater);
+  });
+  it('neither: a clear error, not "Cannot set properties of undefined"', () => {
+    expect(() => pickAutoUpdater({ default: {} })).toThrow('electron-updater did not load');
   });
 });
