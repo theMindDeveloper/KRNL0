@@ -2667,3 +2667,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `README.md`, this file; the repo's About → Website.
 **Summary:** The README now links the website (https://theminddev.com/krnl0/) and the latest download under the tagline, with a Website badge; the stale "v0.10.0 latest" badge reads v0.11.1 and opens the latest release. The repository's Website field is set to the same address, so it shows in the About box.
 
+## [2026-11-09] — 0.10.1 installer rebuilt with the updater fix
+
+**Type:** Release (re-upload, owner's call)
+**Branch:** `rebuild/v0.10.1-updater-fix` (v0.10.1 + the `autoUpdater` fix only; built by the Release workflow on a branch, CI run 42634698799, release job skipped)
+**Files changed:** the v0.10.1 GitHub release (`KRNL0-Setup-0.10.1.exe`, `.blockmap`, `latest.yml`, page note); this file.
+**Summary:** So the owner can install 0.10.1 and watch it update itself, the owner asked to rebuild 0.10.1 with the fix, knowingly setting aside AGENTS.md rule 11 for this one case. The exact v0.10.1 code plus the one-line updater fix was built on the same CI Windows image; inside the installer, `app.asar` reports version 0.10.1 and contains the fixed import, and `app-update.yml` points at this repo's releases. The three files on the v0.10.1 release were replaced and the page now says it is the rebuilt 0.10.1 that updates itself. 0.11.1 stays Latest. Installs of the original 0.10.1 still can't update themselves (their code is unchanged); they install 0.11.1 by hand once.
+
