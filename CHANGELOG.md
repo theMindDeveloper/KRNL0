@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Easy: no timer action on Calendar plan cards, no "claude code" orb button, tour descriptions without reminders or deadlines, and an error line that doesn't mention the terminal.
 - Terminal commands: `todo when` shows at once; `todo drop` keeps a chain's times; `task duration` works while the timer runs; `--for 2h` / `1h30` work (and a bad length is refused); rescheduling an event keeps its length; `habit done` is honest for events and amount habits; a subtask can't be scheduled; `cal show` lists repeating events; `pomo stop --at 23:50` after midnight is last night; impossible dates and single-digit hours are handled; `krnl help` and the assistant's instructions match the app.
 - Updates: a restart into an update that doesn't happen shows an error and can be retried. Cancelling an orb question stops Claude on Windows.
+- Calendar › Repeating events: "End after today" now shows "ends after today" with a Keep button (the row looked unchanged, as if nothing happened).
+
+### Added
+- New `krnl` commands for what only the window could do: `window list|show|hide|swap`, `pomo label`, `analytics set`, `media title`, `image alt`.
 
 ## [0.11.2] — 2026-11-09
 

@@ -95,6 +95,14 @@ krnl settings layout station|canvas
 krnl settings grid on|off
 ```
 
+### Windows, labels and cards
+```
+krnl window list | window show <name> | window hide <name> | window swap <a> <b>   # todo, timer, habits, calendar, clock, terminal, analytics
+krnl pomo label "<what you are doing>" [--tag <id>]   # name what the timer records
+krnl analytics set --view time --range 30             # the Analytics window's page and range
+krnl media title <id> "<title>" · krnl image alt <id> "<text>"
+```
+
 ### Habits — colors, icons, notes, schedules, lanes
 
 A habit lives inside the mother HabitNode and is referenced by `id|name`. Each habit has: `name`, `color` (12-color palette), optional `icon` (single grapheme — glyph or emoji), optional `note`, optional `schedule`, `log[]` (sparse `YYYY-MM-DD` checkin list), `archived: boolean`.

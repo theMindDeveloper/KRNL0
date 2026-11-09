@@ -2970,6 +2970,10 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             {routinesForCal.length === 0 && <span style={{ color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.5 }}>None yet. A class or a shift: right-click empty hours → New here… → Repeats.</span>}
             {routinesForCal.map((h) => {
               const ended = !!(h.endsOn && h.endsOn < todayYMD());
+              // Ended from today on: it still happens today, so say so (the row
+              // looked unchanged after End, as if the button did nothing).
+              const ending = !ended && !!h.endsOn;
+              const endWord = h.endsOn === todayYMD() ? 'today' : new Date(`${h.endsOn}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
               const days = daysOf(h);
               const t = h.schedule?.timeOfDay ?? '';
               const endMin = t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3)) + (h.schedule?.durationMin ?? 60) : 0;
@@ -2979,13 +2983,15 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: `var(--${h.color})`, flexShrink: 0 }} />
                   <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 96 }}>{h.name}</span>
                   <span style={{ fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
-                    {ended ? `ended ${new Date(`${h.endsOn}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : `${days.length === 7 ? 'every day' : days.map((n) => DAY_LETTER[n - 1]).join(' ')} · ${t}–${end}`}
+                    {ended ? `ended ${new Date(`${h.endsOn}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ending ? `ends after ${endWord}` : `${days.length === 7 ? 'every day' : days.map((n) => DAY_LETTER[n - 1]).join(' ')} · ${t}–${end}`}
                   </span>
                   <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 2 }}>
                     {ended
                       ? <button type="button" title="Restart" aria-label={`Restart ${h.name}`} onClick={() => { void habitMotherCommand('routine.restart', { id: h.id }); }} style={iconBtn}><MenuIcon name="restart" size={13} /></button>
                       : <button type="button" title="Edit" aria-label={`Edit ${h.name}`} onClick={(e) => { setEventsOpen(null); setEventCard({ x: e.clientX - 140, y: e.clientY, day: todayYMD(), allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days, time: t || '09:00', lengthMin: h.schedule?.durationMin ?? 60 } }); }} style={iconBtn}><MenuIcon name="rename" size={13} /></button>}
-                    {!ended && <button type="button" title="End after today (keeps past)" aria-label={`End ${h.name}`} onClick={() => { void habitMotherCommand('routine.end', { id: h.id, date: todayYMD() }); }} style={iconBtn}><MenuIcon name="end" size={13} /></button>}
+                    {ending
+                      ? <button type="button" title="Keep it (don't end it)" aria-label={`Keep ${h.name}`} onClick={() => { void habitMotherCommand('routine.restart', { id: h.id }); }} style={iconBtn}><MenuIcon name="restart" size={13} /></button>
+                      : !ended && <button type="button" title="End after today (keeps past)" aria-label={`End ${h.name}`} onClick={() => { void habitMotherCommand('routine.end', { id: h.id, date: todayYMD() }); }} style={iconBtn}><MenuIcon name="end" size={13} /></button>}
                     <button type="button" title="Delete" aria-label={`Delete ${h.name}`} onClick={() => { void deleteRoutine(h.id); }} style={{ ...iconBtn, color: 'var(--rust)' }}><MenuIcon name="delete" size={13} /></button>
                   </span>
                 </div>
