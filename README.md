@@ -20,7 +20,7 @@ Pomodoro, Todos, Tasks, Habits, Calendar, Clock, and a real Terminal anchored as
 [![License: FSL-1.1](https://img.shields.io/badge/License-FSL--1.1-c9f158?style=flat-square&labelColor=0e0d0b)](LICENSE.md)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-c9f158?style=flat-square&labelColor=0e0d0b)](#quickstart)
 [![Website](https://img.shields.io/badge/Website-theminddev.com%2Fkrnl0-c9f158?style=flat-square&labelColor=0e0d0b)](https://theminddev.com/krnl0/)
-[![Latest](https://img.shields.io/badge/v0.11.1-latest-c9f158?style=flat-square&labelColor=0e0d0b)](https://github.com/theMindDeveloper/KRNL0/releases/latest)
+[![Latest](https://img.shields.io/badge/v0.11.2-latest-c9f158?style=flat-square&labelColor=0e0d0b)](https://github.com/theMindDeveloper/KRNL0/releases/latest)
 [![Local-first](https://img.shields.io/badge/100%25-local%20first-c9f158?style=flat-square&labelColor=0e0d0b)](#architecture)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&labelColor=0e0d0b)](tsconfig.json)
 [![ADRs](https://img.shields.io/badge/Architecture-5%20ADRs%20locked-c9f158?style=flat-square&labelColor=0e0d0b)](docs/03-adr/)

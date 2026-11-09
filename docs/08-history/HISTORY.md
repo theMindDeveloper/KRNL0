@@ -2681,3 +2681,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `ui/useDismissOutside.ts`, `CalendarNode/WeekView.tsx`, `CalendarNode/EventCard.tsx`, `ClockNode/index.tsx`, `Tour/tours.ts` (+ two re-recorded clips), `styles/tokens.css`, `styles/reactflow-theme.css`, `CHANGELOG.md`, tests.
 **Summary:** While adding a plan, picking an hour in the time picker closed the plan card: the picker is portaled to `<body>`, so the add card's click-outside rule saw it as outside. `useDismissOutside` now treats any `.krnl-popover` (a picker opened from the pop-up) as inside, the same rule `Popover` already had. The Calendar header's Repeating button is removed; the + opens the same card with its Once / Repeats switch (the two tour lines that named Repeating now point at the +). The Calendar's time column writes each hour once and shows sub-marks as small `:15` / `:30` / `:45`. The Clock no longer draws the cyan "KRNL0 opened" / grey "closed" rim ticks.
 
+## [2026-11-09] — Release 0.11.2 prepared
+
+**Type:** Release
+**Branch:** `chore/release-v0.11.2`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/releases/v0.11.2.md`, `README.md` (badge), this file.
+**Summary:** Patch release for PR #238: the plan card stays open while picking a time, one Calendar + (Repeating button removed), hours written once in the Calendar's time column, no app opened / closed ticks on the clock. What's new is per feature release (0.11), so no new slides; the notes page is `docs/releases/v0.11.2.md`. Tag `v0.11.2` and Publish wait for the owner's OK.
+
