@@ -157,7 +157,10 @@ export function computeEstimates(board: Board, range: RangeArg, nowMs: number): 
 
   // Planned minutes per day from the calendar placements.
   const plannedByDay = new Map<string, number>();
+  const openEnded = new Set(board.nodes.filter((n) => n.kind === 'todo.task' && (n.state as { timeOpen?: boolean } | null)?.timeOpen === true).map((n) => n.id));
   for (const p of selectSchedule(board).placements.values()) {
+    // A plan with a start and no length ("Call mom fri 17:00") plans no minutes.
+    if (openEnded.has(p.taskId)) continue;
     const s = new Date(p.startISO).getTime();
     const e = new Date(p.endISO).getTime();
     if (!(e > s) || e <= rangeStart || s >= rangeEnd) continue;

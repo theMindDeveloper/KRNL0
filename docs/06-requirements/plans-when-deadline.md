@@ -10,6 +10,7 @@ Decision 40 · Issues #219–#221 · End design on the canvas "KRNL0 launch desi
 - **F4** The Calendar week and day views always show the ANY TIME strip. Dropping a Todo row or a block on a day's strip cell puts the plan on that day at any time; dragging a strip chip into the hours gives it that time.
 - **F5** Five kinds look different: timed plan (filled block), any-time plan (solid chip), deadline (dashed flag), timed habit (stadium with a ring), repeating event (hatched band).
 - **F6** The When popover sets day, time or any time, length and reminder (reminder only with a time); a Deadline tab sets or clears the deadline. It replaces Edit time, Due date… and Reminder….
+  - Reminder timing (audit 2026-11-09): a reminder shows once when its time has come and the plan has not started yet. A plan made or moved inside its lead time still gets it; a plan that already started (the laptop slept through it) is never announced late. A damaged board.json delays reminders until it is readable; none are skipped.
 - **F7** Menus show icons, group items, and show the current value at the right. The timer item follows the timer: "Focus on it" (Pomo), "Track it now" (Observe).
 - **F8** The habit add card asks nothing in prose: on days / times a week, optional time, optional amount; Enter adds with the defaults.
 - **F9** The Habits window lists only habits. Repeating events are made on the Calendar (drag on empty hours → Repeats) and listed under the Calendar's Events menu, ended ones included.

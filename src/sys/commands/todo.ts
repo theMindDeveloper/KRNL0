@@ -282,7 +282,8 @@ export async function todoWhen(ctx: TodoCtx, ref?: string, day?: string, time?: 
   if (!item) return { ok: false, message: `todo when: no item ${ref}` };
   if (onDay && time && item.taskNodeId) {
     const hh = time.length === 4 ? `0${time}` : time;
-    const res = await taskSchedule({ boardPath: ctx.boardPath }, item.taskNodeId, `${onDay}T${hh}`);
+    // With the window's notify, so the open Calendar and Todo show it at once.
+    const res = await taskSchedule(ctx, item.taskNodeId, `${onDay}T${hh}`);
     if (!res.ok) return res;
     return { ok: true, message: `Todo "${item.text}" on the Calendar ${onDay} ${hh}.`, data: { id: r.id.itemId, day: onDay, time: hh } };
   }
@@ -303,17 +304,26 @@ export async function todoDropCmd(ctx: TodoCtx, ref: string | undefined, undo: b
   const board = loadBoard(ctx);
   const r = resolveTodoItemRef(board, ref);
   if (!r.ok) return { ok: false, message: resolutionError('todo item', ref, r) };
-  const m = mutateTodo(ctx, (st) => (undo ? todoUndrop(st, { id: r.id.itemId }) : todoDrop(st, { id: r.id.itemId })));
+  // A dropped plan comes off the Calendar (it is not "missed"), the way the
+  // window does it: the plans after it in a chain keep their times.
+  const before = (board.nodes.find((n) => n.id === r.id.todoNodeId)?.state as TodoState | undefined)?.items.find((i) => i.id === r.id.itemId);
+  if (!undo && before?.taskNodeId && !before.done && before.droppedAt === undefined) {
+    const un = await taskUnschedule({ boardPath: ctx.boardPath }, before.taskNodeId);
+    if (!un.ok) return un;
+  }
+  const m = mutateTodo(ctx, (st) => {
+    const next = undo ? todoUndrop(st, { id: r.id.itemId }) : todoDrop(st, { id: r.id.itemId });
+    if (undo || next === st) return next;
+    // Its row's copy of the time goes too.
+    return { ...next, items: next.items.map((i) => {
+      if (i.id !== r.id.itemId || i.scheduledFor === undefined) return i;
+      const { scheduledFor: _s, ...rest } = i;
+      void _s;
+      return rest;
+    }) };
+  });
   if (!m.ok) return m;
   const item = m.after.items.find((i) => i.id === r.id.itemId);
-  // A dropped plan comes off the Calendar (it is not "missed").
-  if (!undo && item?.taskNodeId) {
-    const t = m.board.nodes.find((n) => n.id === item.taskNodeId);
-    if (t && t.state && typeof t.state === 'object') {
-      const { scheduledFor: _s, ...rest } = t.state as Record<string, unknown>;
-      t.state = rest;
-    }
-  }
   saveBoard(ctx, m.board);
   if (m.after === m.before) return { ok: true, message: `Todo "${item?.text ?? ref}" was ${undo ? 'not dropped' : 'already dropped or done'}.`, data: { id: r.id.itemId } };
   return { ok: true, message: undo ? `Todo "${item?.text}" is back on the list.` : `Todo "${item?.text}" dropped (in the Archive; todo undrop brings it back).`, data: { id: r.id.itemId, dropped: !undo } };

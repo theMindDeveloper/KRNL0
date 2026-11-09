@@ -28,6 +28,7 @@
 // reference identity. Config edits create a new node array (immutable updates)
 // so reference identity is sufficient and cheap.
 
+import { droppedTaskIds } from '../../shared/droppedPlans';
 import type { Board, Node } from '../../shared/types';
 import type { TaskState } from '../components/nodes/TaskNode/types';
 import type { TaskKind } from '../components/nodes/TaskNode/types';
@@ -261,12 +262,15 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
   // Group anchored tasks by todo for the per-todo loop below.
   const todoIdToAnchors = new Map<string, string[]>();
 
+  // "Won't do" plans are off the Calendar, whatever their stored time says.
+  const dropped = droppedTaskIds(board.nodes);
   for (const n of board.nodes) {
     if (n.kind !== 'todo.task') continue;
     const ts = n.state as TaskState;
     // Subtasks (parentTaskId !== null) are never placed — walkChain already
     // omits them and we never anchor a chain to a subtask either.
     if (ts.parentTaskId !== null) continue;
+    if (dropped.has(n.id)) continue;
     taskInfoById.set(n.id, { taskState: ts, todoId: ts.parentTodoId });
     if (!todoIdToTaskIds.has(ts.parentTodoId)) {
       todoIdToTaskIds.set(ts.parentTodoId, new Set());

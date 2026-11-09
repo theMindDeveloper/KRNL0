@@ -89,6 +89,9 @@ export interface Habit {
   kind?: 'routine';
   /** Routine only: last day it happens (YYYY-MM-DD). Absent = no end. */
   endsOn?: string;
+  /** Routine only: stretches it was ended and later restarted (inclusive
+   *  YYYY-MM-DD). Nothing happened then, so nothing is drawn there. */
+  pauses?: Array<{ from: string; to: string }>;
   /** Routine only: one occurrence skipped or moved to another time. */
   exceptions?: RoutineException[];
   /** Habit only: a weekly target ("3 times a week, any days"), 1–6. Ticked
@@ -160,7 +163,8 @@ export interface RoutineSpan extends RoutineOccurrence {
 
 export function routineSpansOn(h: Habit, date: string): RoutineSpan[] {
   const out: RoutineSpan[] = [];
-  const len = (o: RoutineOccurrence) => Math.max(5, h.schedule?.durationMin ?? (o.endMin - o.startMin));
+  // Its full length (the occurrence's end is cut at midnight): 60 min when unset.
+  const len = (_o: RoutineOccurrence) => Math.max(5, h.schedule?.durationMin ?? 60);
   const own = routineOccurrence(h, date);
   if (own) out.push({ ...own, spill: false, fullStart: own.startMin, fullEnd: own.startMin + len(own) });
   const d = new Date(`${date}T00:00:00`);
@@ -185,6 +189,7 @@ export function routineOccurrence(h: Habit, date: string): RoutineOccurrence | n
   // shows across that week, not only from next Monday.
   if (date < toYMD(getMondayOf(new Date(h.createdAt)))) return null;
   if (h.endsOn && date > h.endsOn) return null;
+  if (h.pauses?.some((p) => date >= p.from && date <= p.to)) return null;
   const ex = h.exceptions?.find((e) => e.date === date);
   const at = ex?.at && isValidTimeOfDay(ex.at) ? ex.at : h.schedule.timeOfDay;
   const [hh, mm] = at.split(':').map(Number) as [number, number];

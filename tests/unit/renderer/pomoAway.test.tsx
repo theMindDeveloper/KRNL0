@@ -56,9 +56,11 @@ describe('pomoStopAt', () => {
 });
 
 describe('CLI pomo stop --at', () => {
-  it('reads HH:MM as today and rejects nonsense', () => {
+  it('reads HH:MM as today (or last night when that is still to come) and rejects nonsense', () => {
     const now = new Date(2026, 10, 3, 9, 30).getTime();
-    expect(parseStopAt('18:02', now)).toBe(new Date(2026, 10, 3, 18, 2).getTime());
+    expect(parseStopAt('08:02', now)).toBe(new Date(2026, 10, 3, 8, 2).getTime());
+    // 18:02 hasn't come yet today: it is yesterday's.
+    expect(parseStopAt('18:02', now)).toBe(new Date(2026, 10, 2, 18, 2).getTime());
     expect(parseStopAt('2026-11-02T18:02', now)).toBe(new Date(2026, 10, 2, 18, 2).getTime());
     expect(parseStopAt('25:00', now)).toBeUndefined();
     expect(parseStopAt('2026-02-31T10:00', now)).toBeUndefined();

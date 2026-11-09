@@ -75,7 +75,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
       'Tours for every window, voiced, in Easy and Advanced (the orb’s menu). The first one starts on its own the first time you open KRNL0.',
       'Ask the orb anything: it answers with Claude Code (when it is installed) and can change your board for you.',
       'Show: one click lights up a plan on the board and on the Calendar.',
-      'The Calendar: double-click empty hours to add a plan, a Repeating button for classes and shifts, an ANY TIME strip for plans with a day but no time, deadlines as flags.',
+      'The Calendar: double-click empty hours or press + to add a plan or a repeating class or shift, an ANY TIME strip for plans with a day but no time, deadlines as flags.',
       'Habits: times a week, a daily goal (8 glasses), rest days that keep a streak, Week / Month / Year views, and archive.',
       'Plans: Won’t do for things you drop, and in Advanced a reminder before a plan starts (even with the window closed).',
       'Quick add: type “Gym tomorrow 18:00 1h”, “Pay rent fri” or “Meeting 14:00-15:30” and it lands on the right day and time.',

@@ -524,17 +524,14 @@ describe('sys task duration', () => {
     expect(res.ok).toBe(false);
   });
 
-  it('refuses to change duration when pomo is running', async () => {
+  it('changes the length while the timer runs (the timer is separate, #180; as in the window)', async () => {
     const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'focus task', 25);
     const taskId = (addRes.data as { id: string }).id;
-    // Start the pomo
     await taskStartPomo(ctx, taskId);
     const res = await taskDuration(ctx, taskId, 50);
-    expect(res.ok).toBe(false);
-    expect(res.message).toMatch(/pomo session is running/i);
-    // Duration should be unchanged
+    expect(res.ok).toBe(true);
     const task = findTasks().find((t) => t.id === taskId)!;
-    expect((task.state as TaskState).durationMin).toBe(25);
+    expect((task.state as TaskState).durationMin).toBe(50);
   });
 });
 

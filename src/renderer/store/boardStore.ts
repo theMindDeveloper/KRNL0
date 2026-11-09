@@ -149,13 +149,30 @@ const HISTORY_CAP = 50;
 // time pushHistory is called within a task, then suppress further pushes until
 // the microtask queue drains.
 let _coalescing = false;
+// One user action that writes in several steps across awaits (Won't do =
+// drop + unschedule; quick add = add + schedule + remind) is one Ctrl+Z.
+let _group: { pushed: boolean } | null = null;
+
+/** Run `fn` as one undo step, however many awaits it spans. */
+export async function historyGroup<T>(fn: () => Promise<T> | T): Promise<T> {
+  if (_group) return fn();
+  _group = { pushed: false };
+  try {
+    return await fn();
+  } finally {
+    _group = null;
+  }
+}
 
 /** Exported so bulk paths that call setState directly (cascade delete) take
  *  part in the same per-task coalescing — otherwise a delete followed by an
  *  updateNode in the same tick cost two Ctrl+Z presses. */
 export function pushHistory(s: BoardStore): { history: Board[]; future: Board[] } {
   if (!s.board) return { history: s.history, future: s.future };
-  if (_coalescing) return { history: s.history, future: s.future };
+  if (_group) {
+    if (_group.pushed) return { history: s.history, future: s.future };
+    _group.pushed = true;
+  } else if (_coalescing) return { history: s.history, future: s.future };
   _coalescing = true;
   queueMicrotask(() => { _coalescing = false; });
   const nextHistory = [...s.history, s.board];
@@ -435,6 +452,8 @@ export const useBoardStore = create<BoardStore>((set) => ({
       void _drop;
       const cleared: Board = {
         ...(rest as Board),
+        completions: [],
+        completionsClearedAt: new Date().toISOString(),
         nodes: s.board.nodes.map((n) =>
           n.kind === 'pomo'
             ? { ...n, state: { ...(n.state as Record<string, unknown>), history: [] } }

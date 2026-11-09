@@ -116,6 +116,13 @@ function rpcCall(sockPath, _token, reqId, _argv) {
     process.stderr.write(`krnl: cannot connect to KRNL0 app (${err.message})\n`);
     process.exit(1);
   });
+
+  // The app closed the connection before answering (it quit mid-command): a
+  // failure, never a silent success.
+  socket.on('close', () => {
+    process.stderr.write('krnl: KRNL0 closed the connection before the command finished\n');
+    process.exit(1);
+  });
 }
 
 async function probe(sockPath, tok) {

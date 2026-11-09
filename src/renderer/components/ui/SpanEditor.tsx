@@ -102,6 +102,9 @@ export function SpanTimeEditor({ seg, onSaved, testIdPrefix = 'span', autoEdit, 
     const endHM = editing === 'end' ? hmv : hmOf(seg.endMs);
     const times = timesFromFields(day, startHM, endHM);
     if (!times) { setError('Type a time like 18:30'); return; }
+    // A session that ended on its own day doesn't become a next-morning one
+    // because of a typo (09:00 → 08:30 was saved as 23.5 hours).
+    if (!seg.live && ymdOf(seg.endMs - 1) === day && ymdOf(times.endMs - 1) !== day) { setError('The end must be after the start'); return; }
     // Unchanged → just close.
     if (!seg.live && times.startMs === seg.startMs && Math.abs(times.endMs - seg.endMs) < 60_000) { cancel(); return; }
     let err: string | null;
@@ -110,7 +113,7 @@ export function SpanTimeEditor({ seg, onSaved, testIdPrefix = 'span', autoEdit, 
       // ran past midnight puts an earlier time on the next day.
       const [yy, mo, dd] = ymdOf(seg.startMs).split('-').map(Number) as [number, number, number];
       let endMs = new Date(yy, mo - 1, dd, Math.floor(toMinutes(hmv) / 60), toMinutes(hmv) % 60).getTime();
-      if (endMs <= seg.startMs && ymdOf(Date.now()) !== ymdOf(seg.startMs)) endMs += 86_400_000;
+      if (endMs <= seg.startMs && ymdOf(Date.now()) !== ymdOf(seg.startMs)) endMs = new Date(yy, mo - 1, dd + 1, Math.floor(toMinutes(hmv) / 60), toMinutes(hmv) % 60).getTime();
       err = endMs <= seg.startMs ? 'That is before the session started'
         : endMs > Date.now() ? 'That time is in the future'
         : stopSessionAt(endMs);

@@ -54,7 +54,9 @@ beforeEach(() => {
 describe('boardStore.clearFocusHistory', () => {
   it('drops the completion ledger', () => {
     useBoardStore.getState().clearFocusHistory();
-    expect(useBoardStore.getState().board!.completions).toBeUndefined();
+    expect(useBoardStore.getState().board!.completions).toEqual([]);
+    // Stamped, so the load-time backfill does not bring it back.
+    expect(useBoardStore.getState().board!.completionsClearedAt).toEqual(expect.any(String));
   });
 
   it('empties every pomo node history but keeps the node', () => {

@@ -19,16 +19,17 @@ export interface DaySpans {
   live: boolean;
 }
 
-const DAY = 86_400_000;
 
 export function todaySpans(state: PomoState, library: readonly TagDef[], nowMs: number, plain = false): DaySpans {
   const dayStart = new Date(nowMs);
   dayStart.setHours(0, 0, 0, 0);
   const d0 = dayStart.getTime();
+  // Midnight to midnight: 23 or 25 hours on a daylight-saving day.
+  const dayEnd = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1).getTime();
   const spans: DaySpan[] = [];
   for (const r of state.history) {
     const start = Math.max(d0, Date.parse(r.startedAt));
-    const end = Math.min(d0 + DAY, Date.parse(r.endedAt));
+    const end = Math.min(dayEnd, Date.parse(r.endedAt));
     if (!(end > start)) continue;
     spans.push({ id: r.id, start, end, break: r.kind === 'break', color: spanTone(library, r, plain) });
   }

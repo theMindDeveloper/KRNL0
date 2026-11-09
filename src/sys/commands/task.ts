@@ -458,17 +458,8 @@ export async function taskDuration(
   if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
-  // Guard: if the pomo mother is actively running, refuse to change duration.
-  const pomoMother = findPomoMother(board);
-  if (pomoMother) {
-    const ps = pomoMother.state as import('../../renderer/components/nodes/PomoNode/types').PomoState;
-    if (ps.status === 'running' && ps.startedAt !== null) {
-      return {
-        ok: false,
-        message: 'Cannot change duration while a pomo session is running. Stop the pomo first.',
-      };
-    }
-  }
+  // The timer is its own thing (#180): a plan's length can change while it
+  // runs, as in the window.
 
   // Same FSM as the UI: also updates plannedMin/scheduledDurationMin so the
   // calendar block actually resizes.
@@ -702,6 +693,11 @@ export async function taskSchedule(
   const taskNode = findTaskNode(board, taskId);
   if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
+  // A step inside a task is never drawn on the Calendar: saying "scheduled"
+  // for it was a lie.
+  if ((taskNode.state as TaskState).parentTaskId) {
+    return { ok: false, message: `"${(taskNode.state as TaskState).text}" is a step inside another task; schedule the task it belongs to` };
+  }
 
   // A time its chain would push it away from (before the task before it
   // ends): it leaves the chain and lands where it was put (chainSchedule.ts).

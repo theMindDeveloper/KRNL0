@@ -6,6 +6,7 @@
 // Layout (canvas "Adding a habit", draft A): the days at the top, then one
 // labelled row each for Time and Goal. One fixed height, nothing jumps.
 
+import { pickerOpen } from '../../ui/Popover';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { HabitSchedule, IsoDow } from './types';
@@ -103,7 +104,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const { add: doAdd, onCancel: cancel } = latest.current;
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); return; }
+      if (e.key === 'Escape') { if (pickerOpen()) return; e.preventDefault(); e.stopPropagation(); cancel(); return; }
       const inField = e.target instanceof HTMLInputElement;
       // Enter adds from anywhere: the name field, the time, the amount (a focused button clicks itself).
       if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); e.stopPropagation(); doAdd(); return; }
@@ -226,6 +227,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
       role="dialog"
       aria-label={initial ? `Edit ${name}` : `Add ${name}`}
       data-testid="habit-ask"
+      data-owns-keys="true"
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -292,7 +294,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
   );
   return createPortal(
     <>
-      <div onMouseDown={(e) => { e.stopPropagation(); onCancel(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1, pointerEvents: initial ? 'auto' : 'none' }} />
+      <div onMouseDown={(e) => { e.stopPropagation(); onCancel(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop, pointerEvents: initial ? 'auto' : 'none' }} />
       {card}
     </>,
     document.body,

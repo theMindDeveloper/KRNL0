@@ -19,9 +19,14 @@ export function isControlTarget(t: EventTarget | null): boolean {
     && !!t.closest('button, a[href], [role="button"], [role="radio"], [role="checkbox"], [role="switch"], [role="menuitem"], [role="option"], [role="tab"]');
 }
 
-/** A modal dialog is open (Settings, Commander, …): it owns the keyboard. */
+/**
+ * A modal dialog is open (Settings, Commander, …), or a card that owns the
+ * keys (a plan card, the Calendar's add card, a picker list): it owns the
+ * keyboard. Ctrl+Z or Delete under an open plan card used to change the board
+ * behind it.
+ */
 export function isModalOpen(): boolean {
-  return typeof document !== 'undefined' && document.querySelector('[aria-modal="true"]') !== null;
+  return typeof document !== 'undefined' && document.querySelector('[aria-modal="true"], [data-owns-keys="true"], .krnl-popover') !== null;
 }
 
 /** Global single-key / canvas shortcuts: off while typing or behind a modal. */

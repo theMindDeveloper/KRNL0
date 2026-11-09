@@ -85,7 +85,9 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
   const ROW_H = 26;
   const rows = (fold?.tasks ?? []).filter((t) => t.totalMin > 0 || t.plan || t.completions.length > 0);
   const maxRows = Math.max(1, Math.floor((height - 150) / (ROW_H + 4)));
-  const shown = rows.slice(0, maxRows);
+  // Every row stays readable: past the window's height the list scrolls
+  // (never "+N more").
+  const shown = rows;
   const maxCell = Math.max(30, ...shown.flatMap((t) => Object.values(t.byDay)));
   const today = ymd(new Date());
   const tagInfo = (id: string) => library.find((t) => t.id === id);
@@ -138,6 +140,7 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
             })}
             <span style={{ width: TOTAL_W, textAlign: 'right', flexShrink: 0 }}>worked / plan</span>
           </div>
+          <div className="nowheel" style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: maxRows * (ROW_H + 4), overflowY: rows.length > maxRows ? 'auto' : 'visible', scrollbarWidth: 'thin' }}>
           {shown.map((t) => {
             const color = rowColor(t);
             const tag = rowTag(t);
@@ -182,9 +185,7 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
               </div>
             );
           })}
-          {rows.length > shown.length && (
-            <div style={{ color: ink3, fontSize: 11 }}>+{rows.length - shown.length} more — make the window taller to see them</div>
-          )}
+          </div>
           <div role="row" style={{ display: 'flex', alignItems: 'center', height: 18, color: 'var(--k-an-ink-2, var(--ink-2))', fontSize: 11, borderTop: '1px solid var(--k-an-line, var(--paper-3))', paddingTop: 4 }}>
             <span style={{ width: NAME_W, flexShrink: 0 }}>per day</span>
             {days.map((d) => (
@@ -205,7 +206,7 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
             ))}
           </div>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 11 }}>
-            {tagEntries.slice(0, 8).map(([id, v]) => {
+            {tagEntries.map(([id, v]) => {
               const ti = tagInfo(id);
               return (
                 <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>

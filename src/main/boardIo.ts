@@ -11,7 +11,7 @@ import { getMainWindow } from './mainWindow';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { backupCorruptBoard, BoardUnreadableError, readBoardText, seedBoard, writeFileAtomic } from './persistence/board';
+import { backupCorruptBoard, BoardCorruptError, BoardUnreadableError, readBoardText, seedBoard, writeFileAtomic } from './persistence/board';
 
 export const BOARD_DIR =
   process.env.KRNL0_BOARD_DIR ?? join(homedir(), 'Documents', app.getName());
@@ -28,9 +28,10 @@ export interface RawBoard {
 }
 
 /**
- * Read board.json. Null when it doesn't exist, or when it was unparseable and
- * has been backed up. A locked file, or a corrupt one whose backup failed,
- * throws BoardUnreadableError — callers must not seed over it.
+ * Read board.json. Null when it doesn't exist. A locked file throws
+ * BoardUnreadableError; a damaged one is backed up and throws
+ * BoardCorruptError — callers must not seed over it (the open window holds
+ * the good copy and rewrites the file on its next save).
  */
 export function readBoardFile(): RawBoard | null {
   const raw = existsSync(BOARD_PATH) ? readBoardText(BOARD_PATH) : null;
@@ -44,7 +45,7 @@ export function readBoardFile(): RawBoard | null {
     if (!backupCorruptBoard(BOARD_PATH, err)) {
       throw new BoardUnreadableError('board.json is unreadable and could not be backed up; it was left untouched', err);
     }
-    return null;
+    throw new BoardCorruptError('board.json is damaged (a copy was kept as board.json.corrupt-…); nothing was changed', err);
   }
 }
 
@@ -74,9 +75,10 @@ export function notifyBoardChanged(): void {
 export function mutateBoard(
   mutator: (board: RawBoard) => RawBoard | void,
 ): RawBoard {
-  // A missing (or unreadable — already backed up by readBoardFile) board
-  // starts from the canonical seed, never an empty board: writing an empty
-  // board would permanently drop the mother nodes.
+  // A missing board starts from the canonical seed, never an empty board:
+  // writing an empty board would permanently drop the mother nodes. A damaged
+  // one throws (readBoardFile): seeding over it would wipe the open window's
+  // board on its next reload.
   const current = readBoardFile() ?? (seedBoard() as RawBoard);
   const next = mutator(current) ?? current;
   writeBoardFile(next);

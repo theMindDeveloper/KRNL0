@@ -1,7 +1,7 @@
 import { dirname } from 'path';
 import { SysParser } from './parser';
 import type { SysCommand } from './parser';
-import { loadBoardFrom } from '../main/persistence/board';
+import { boardFileIsCorrupt, loadBoardFrom } from '../main/persistence/board';
 import { logBoardChange, appendTimeLog } from '../main/persistence/timelog';
 import { TOURS } from '../renderer/components/Tour/tours';
 
@@ -197,6 +197,15 @@ export class SysFacade {
    * synchronously, so a renderer save cannot slip in between.
    */
   async run(argv: string[]): Promise<SysResult> {
+    // A damaged board.json is never written over by a command (it would start
+    // from an empty board); the open window rewrites it from its own copy.
+    if (argv.length > 0 && argv[0] !== 'help' && boardFileIsCorrupt(this.deps.boardPath)) {
+      loadBoardFrom(this.deps.boardPath); // keeps a copy aside (once per version)
+      return {
+        ok: false,
+        message: 'board.json is damaged, so nothing was changed (a copy was kept as board.json.corrupt-…). Make any change in the KRNL0 window to write the board back from the open window, then run the command again.',
+      };
+    }
     const parsed = argv.length > 0 ? SysParser.parse(argv) : null;
     if (!parsed || !changesTime(parsed)) return this.runCommand(argv);
     const before = this.boardSnapshot();
@@ -242,7 +251,8 @@ export class SysFacade {
           : { ok: false, message: `Unknown subcommand: ${command.group} ${command.sub}` };
       }
       if (command.group) {
-        const text = generateGroupHelp(command.group);
+        // `event` is what people call repeating events; its commands are `routine`'s.
+        const text = generateGroupHelp(command.group === 'event' ? 'routine' : command.group);
         return text
           ? { ok: true, message: text }
           : { ok: false, message: `Unknown command group: ${command.group}` };
@@ -792,6 +802,7 @@ export class SysFacade {
         case 'end':     return habit.cliRoutineEnd(ctx, command.ref, command.on);
         case 'move':    return habit.cliRoutineMove(ctx, command.ref, command.on, command.at);
         case 'restart': return habit.cliRoutineRestart(ctx, command.ref);
+        case 'delete': return habit.cliRemove(ctx, command.ref, { onlyRoutine: true });
         case 'remind':  return habit.cliRoutineRemind(ctx, command.ref, command.value);
       }
     }

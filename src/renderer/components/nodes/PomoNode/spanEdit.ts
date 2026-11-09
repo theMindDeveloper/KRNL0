@@ -13,10 +13,18 @@ const hm = (ms: number): string => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-/** The live span (running or on a break) as [start, now], or null when idle/paused. */
+/**
+ * The live span as [start, now] (running or on a break), or [start, paused at]
+ * while paused: that time is recorded on resume or stop, so it is taken
+ * already. Null when idle.
+ */
 function liveSpan(state: PomoState, nowMs: number): SpanTimes | null {
   if ((state.status === 'running' || state.status === 'break') && state.startedAt) {
     return { startMs: Date.parse(state.startedAt), endMs: nowMs };
+  }
+  if (state.status === 'paused' && state.startedAt) {
+    const paused = state.pausedAt ? Date.parse(state.pausedAt) : nowMs;
+    return { startMs: Date.parse(state.startedAt), endMs: Number.isFinite(paused) ? paused : nowMs };
   }
   return null;
 }
@@ -48,7 +56,9 @@ export function spanProblem(
   }
   const live = liveSpan(state, nowMs);
   if (live && startMs < live.endMs && endMs > live.startMs) {
-    return `Overlaps the session running since ${hm(live.startMs)}`;
+    return state.status === 'paused'
+      ? `Overlaps the paused session ${hm(live.startMs)}–${hm(live.endMs)}`
+      : `Overlaps the session running since ${hm(live.startMs)}`;
   }
   return null;
 }
@@ -110,7 +120,9 @@ export function timesFromFields(dayYMD: string, startHM: string, endHM: string):
   const y = Number(m[1]); const mo = Number(m[2]) - 1; const d = Number(m[3]);
   const startMs = new Date(y, mo, d, Number(s[1]), Number(s[2])).getTime();
   let endMs = new Date(y, mo, d, Number(e[1]), Number(e[2])).getTime();
-  if (endMs <= startMs) endMs = new Date(y, mo, d + 1, Number(e[1]), Number(e[2])).getTime();
+  // The same time is not a 24-hour session: left as is, it reads as "the end
+  // must be after the start".
+  if (endMs < startMs) endMs = new Date(y, mo, d + 1, Number(e[1]), Number(e[2])).getTime();
   return { startMs, endMs };
 }
 

@@ -794,8 +794,9 @@ export function Orb() {
                   >
                     <><LineGlyph name="chevron" size={10} /> commander · plan a session</>
                   </button>
-                  {/* Claude Code in the board terminal, permission prompts off (#206). */}
-                  <button
+                  {/* Claude Code in the board terminal, permission prompts off (#206).
+                      Not in Easy: Easy has no terminal (D23). */}
+                  {!easyMode && <button
                     type="button"
                     data-testid="orb-claude-bypass"
                     title="Opens the terminal and starts Claude Code with permission prompts off (claude --dangerously-skip-permissions)"
@@ -821,7 +822,7 @@ export function Orb() {
                     }}
                   >
                     <><LineGlyph name="chevron" size={10} /> claude code</>
-                  </button>
+                  </button>}
                   {/* Voice flows are hidden until proper voice tutorials exist — the
                       text Tutorials below replace them (maintainer, 2026-11-05). */}
                   {FLOWS.filter((f) => !HIDDEN_FLOW_IDS.has(f.id)).map((flow) => (

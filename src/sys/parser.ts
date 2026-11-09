@@ -172,7 +172,7 @@ export type SysCommand =
   | { kind: 'routine'; sub: 'list'; json: boolean }
   | { kind: 'routine'; sub: 'skip' | 'unskip' | 'end'; ref: string | undefined; on: string | undefined }
   | { kind: 'routine'; sub: 'move'; ref: string | undefined; on: string | undefined; at: string | undefined }
-  | { kind: 'routine'; sub: 'restart'; ref: string | undefined }
+  | { kind: 'routine'; sub: 'restart' | 'delete'; ref: string | undefined }
   | { kind: 'routine'; sub: 'remind'; ref: string | undefined; value: string | undefined }
   | { kind: 'pomo'; sub: 'config'; session: number | undefined; short: number | undefined; long: number | undefined; every: number | undefined; face: string | undefined; countStopped: boolean | undefined; mode?: string | undefined }
   | {
@@ -249,6 +249,9 @@ function positiveNum(raw: string | undefined, what: string): number | undefined 
 const BOOLEAN_FLAGS = new Set([
   'json', 'child', 'clear', 'daily', 'force', 'mother', 'weekdays', 'weekly', 'delete',
   'all', 'archived', 'done',
+  // These swallowed the next word (`habit rest --off Run` read "--off" as the habit).
+  // (--note takes a value in `show`; `text look --note` reads its id below.)
+  'sticky', 'off', 'yes', 'link', 'bypass',
 ]);
 
 /**
@@ -554,7 +557,8 @@ export class SysParser {
           kind: 'task',
           sub: 'schedule',
           id: rest[0],
-          at: flag(rest, 'at'),
+          // "2026-11-10 9:05" / "2026-11-10T9:05" → "2026-11-10T09:05".
+          at: (() => { const a = flag(rest, 'at'); const m = a ? /^(\d{4}-\d{2}-\d{2})[T ](\d):(\d{2})$/.exec(a) : null; return m ? `${m[1]}T0${m[2]}:${m[3]}` : a; })(),
           durationMin: positiveNum(durRaw, '--duration'),
         };
       }
@@ -657,7 +661,7 @@ export class SysParser {
         const ref = rest[0];
         const durRaw = flag(rest, 'duration');
         const durationMin = positiveNum(durRaw, '--duration');
-        const atVal = flag(rest, 'at');
+        const atVal = padHM(flag(rest, 'at'));
         if (hasFlag(rest, 'daily')) {
           return { kind: 'habit', sub: 'schedule', ref, scheduleKind: 'daily', days: undefined, invalidDays: undefined, at: atVal, durationMin };
         }
@@ -728,14 +732,17 @@ export class SysParser {
     // Decision 39 / 40 — repeating events (stored as routines): never ticked.
     // `event` is the name people see; `routine` keeps working.
     if (cmd === 'routine' || cmd === 'event') {
-      if (sub === 'delete') return { kind: 'habit', sub: 'remove', name: rest[0] };
+      // Only a repeating event: a habit with the same name is not touched.
+      if (sub === 'delete') return { kind: 'routine', sub: 'delete', ref: rest[0] };
       if (sub === 'add') {
         const forRaw = flag(rest, 'for');
-        return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: flag(rest, 'at'), forMin: forRaw !== undefined && /^\d+$/.test(forRaw) ? Number(forRaw) : undefined };
+        // "90", "90m", "2h", "1.5h", "1h30"; anything else is NaN, which the
+        // command refuses (it used to become 60 minutes without a word).
+        return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: padHM(flag(rest, 'at')), forMin: forRaw === undefined ? undefined : parseLengthMin(forRaw) };
       }
       if (sub === 'list' || sub === undefined) return { kind: 'routine', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'skip' || sub === 'unskip' || sub === 'end') return { kind: 'routine', sub, ref: rest[0], on: flag(rest, 'on') };
-      if (sub === 'move') return { kind: 'routine', sub: 'move', ref: rest[0], on: flag(rest, 'on'), at: flag(rest, 'at') };
+      if (sub === 'move') return { kind: 'routine', sub: 'move', ref: rest[0], on: flag(rest, 'on'), at: padHM(flag(rest, 'at')) };
       if (sub === 'restart') return { kind: 'routine', sub: 'restart', ref: rest[0] };
       if (sub === 'remind') return { kind: 'routine', sub: 'remind', ref: rest[0], value: rest[1] };
     }
@@ -793,7 +800,8 @@ export class SysParser {
         const atStr = flag(rest, 'at');
         return {
           kind: 'text', sub: 'add',
-          text: flag(rest, 'text'),
+          // `text add "hello"` works like `--text "hello"` (it made an empty note).
+          text: flag(rest, 'text') ?? (rest[0] !== undefined && !rest[0].startsWith('--') ? rest[0] : undefined),
           at: atStr ? parseAt(atStr) : undefined,
           near: flag(rest, 'near'),
           // Brainstorming looks: --sticky [color] | --shape rect|ellipse|diamond [--color c]
@@ -812,7 +820,9 @@ export class SysParser {
         const color = flag(rest, 'color');
         const withColor = color ? { color } : {};
         return {
-          kind: 'text', sub: 'look', id: rest[0],
+          // The id is the word that isn't a flag or --color/--shape's value
+          // (`text look --note abcd`: --note takes no value here).
+          kind: 'text', sub: 'look', id: rawRest.find((a, i) => !a.startsWith('--') && !['--color', '--shape'].includes(rawRest[i - 1] ?? '')),
           look: hasFlag(rest, 'note')
             ? { kind: 'note', ...withColor }
             : hasFlag(rest, 'sticky')
@@ -1074,4 +1084,21 @@ function parseAt(s: string): { x: number; y: number } | undefined {
   const y = Number(parts[1]);
   if (isNaN(x) || isNaN(y)) return undefined;
   return { x, y };
+}
+
+/** A length in minutes: "90", "90m", "90 min", "2h", "1.5h", "1h30". NaN when it isn't one. */
+export function parseLengthMin(raw: string): number {
+  const t = raw.trim().toLowerCase();
+  let m = /^(\d+)\s*(?:m|min|mins|minutes)?$/.exec(t);
+  if (m) return Number(m[1]);
+  m = /^(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)$/.exec(t);
+  if (m) return Math.round(Number(m[1]) * 60);
+  m = /^(\d+)h\s*(\d{1,2})(?:m|min)?$/.exec(t);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  return NaN;
+}
+
+/** "9:05" → "09:05", the way `todo when` and `pomo stop --at` already read it. */
+function padHM(v: string | undefined): string | undefined {
+  return v !== undefined && /^\d:\d{2}$/.test(v) ? `0${v}` : v;
 }

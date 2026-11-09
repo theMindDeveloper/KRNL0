@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
 import { getUpdater } from '../updater';
-import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard } from '../persistence/board';
+import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard, BoardCorruptError } from '../persistence/board';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
 import { mergeBoards } from '../../shared/boardMerge';
 import { renderMotd } from '../rpc/motd';
@@ -177,7 +177,20 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       // (defaults added, keys reordered), the renderer's copies do not, and
       // the merge must not read that reshaping as somebody's edit.
       const mine = asBoard(normalized(data));
-      const theirs = asBoard(loadBoard());
+      let theirs: ReturnType<typeof asBoard>;
+      try {
+        theirs = asBoard(loadBoardFrom(BOARD_PATH, { seedIfCorrupt: false }));
+      } catch (err) {
+        if (!(err instanceof BoardCorruptError)) throw err;
+        // board.json was damaged (and kept aside): the window holds the good
+        // board. Write it back as it is — merging against an empty seed would
+        // read as "the user deleted everything".
+        saveBoard(data);
+        rendererRev.sync();
+        rendererBase = mine;
+        awaitingReload = false;
+        return;
+      }
       const base = rendererBase ? asBoard(normalized(rendererBase)) : null;
       if (base && mine && theirs) {
         saveBoard(mergeBoards(base, mine, theirs));
@@ -210,7 +223,8 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     // (locked by antivirus / sync), skip this viewport write.
     let board: unknown;
     try {
-      board = loadBoard();
+      // Damaged: skip, never write seed + viewport over it.
+      board = loadBoardFrom(BOARD_PATH, { seedIfCorrupt: false });
     } catch (err) {
       console.warn('[board] viewport not saved:', err instanceof Error ? err.message : err);
       return;
@@ -376,8 +390,12 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       onEvent: send,
     });
     asking.set(id, cancel);
+    // The window reloads or closes: its questions stop too.
+    event.sender.once('destroyed', () => { asking.get(id)?.(); asking.delete(id); });
     return { ok: true };
   });
+  // Quitting stops every question still running.
+  if (typeof app.once === 'function') app.once('before-quit', () => { for (const c of asking.values()) c(); asking.clear(); });
   // Is Claude Code installed and signed in? (the orb says so before you ask)
   ipcMain.handle('assistant:status', () => claudeStatus({ cwd: claudeHomeDir(), env: toolsEnv() }));
   ipcMain.handle('assistant:cancel', (_event, id: unknown) => {

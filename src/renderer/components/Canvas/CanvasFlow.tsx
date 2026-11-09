@@ -626,6 +626,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         e.deltaMode !== 0 ||
         (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50);
       if (!isMouseWheel) return;
+      // Inside a window that scrolls (habit list, week grid, a note, the
+      // terminal: marked .nowheel) the wheel scrolls it, as on a trackpad.
+      if (e.target instanceof Element && e.target.closest('.nowheel, .krnl-popover')) return;
       e.preventDefault();
       e.stopPropagation();
       const vp = getViewport();

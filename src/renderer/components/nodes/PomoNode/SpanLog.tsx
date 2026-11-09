@@ -33,7 +33,8 @@ function fmtDur(ms: number): string {
 export function SpanLog({ history, library, taskName, onDelete, onName }: SpanLogProps) {
   const plain = !onName;
   const [dayOffset, setDayOffset] = useState(0);
-  const day = ymd(Date.now() - dayOffset * 86_400_000);
+  // Calendar days back from today (a daylight-saving day is 23 or 25 hours).
+  const day = (() => { const t = new Date(); return ymd(new Date(t.getFullYear(), t.getMonth(), t.getDate() - dayOffset, 12).getTime()); })();
   const rows = history
     .filter((r) => ymd(Date.parse(r.startedAt)) === day)
     .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));

@@ -297,7 +297,8 @@ export function analyticsClearHistory(ctx: AnalyticsWindowCtx, yes: boolean): Sy
   const nodes = (board.nodes ?? []).map((n) =>
     n['kind'] === 'pomo' ? { ...n, state: { ...((n['state'] ?? {}) as Record<string, unknown>), history: [] } } : n,
   );
-  saveBoardTo(ctx.boardPath, { ...rest, nodes, savedAt: new Date().toISOString() });
+  const now = new Date().toISOString();
+  saveBoardTo(ctx.boardPath, { ...rest, completions: [], completionsClearedAt: now, nodes, savedAt: now });
   ctx.onBoardChanged?.();
   return { ok: true, message: 'focus history cleared (pomo spans and the completion ledger)' };
 }

@@ -100,6 +100,9 @@ export interface Board {
   // #169 — durable completion ledger (see CompletionRecord). Optional so legacy
   // boards load unchanged; migration backfills from existing done tasks.
   completions?: CompletionRecord[];
+  /** When "Clear focus history" last ran: tasks finished before it are not
+   *  put back in the ledger by the load-time backfill. */
+  completionsClearedAt?: string;
   // Pen tool strokes (canvas annotations). Optional — absent until drawn.
   drawings?: DrawStroke[];
   // Decision 33 — free-content canvases. Optional so legacy fixtures type-check;

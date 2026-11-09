@@ -7,6 +7,7 @@
 // switch, the days as circles, labelled Time and Length rows, one full-width
 // button. One fixed height: nothing jumps while you set it.
 
+import { pickerOpen } from '../../ui/Popover';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Z } from '../../ui/layers';
@@ -44,7 +45,7 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
   const [d, setD] = useState<EventDraft>(initial);
   const [timeText, setTimeText] = useState(initial.time);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pickerOpen()) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
@@ -69,9 +70,10 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
 
   return createPortal(
     <>
-      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />
       <div
         data-testid="event-card"
+        data-owns-keys="true"
         role="dialog"
         aria-label={allowOnce ? 'New here' : 'Edit event'}
         onMouseDown={(e) => e.stopPropagation()}

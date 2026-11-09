@@ -49,13 +49,13 @@ Every read command supports `--json` (bare JSON to stdout, no banner). Falling b
 ```
 krnl <group> <subcommand> [args]
 ```
-- Runs from any shell session inside or outside the app.
+- Runs inside a KRNL0 terminal (the app sets `KRNL0_RPC_SOCKET` and `KRNL0_RPC_TOKEN`). Outside one, `krnl` exits 1 with "not set".
 - Talks to the running Electron process over a per-launch RPC pipe (auth-token gated).
 - Every mutation broadcasts to the open canvas — your changes appear instantly without reload.
 - Exit code: `0` success · `1` user/command error · `2` "requires an open renderer" (some commands need a window open).
 - **`sys ...` is a deprecated alias** that prints "sys is deprecated" to stderr and forwards to `krnl`. Use `krnl`.
 
-**Two dispatch paths.** Mutating commands prefer the renderer path (live canvas update + EventLog entry) when the app is open, and fall back to a headless file-layer write when no renderer is attached. A few commands are renderer-only and exit 2 when detached: `habit pin`, `habit unpin`, `log tail`, `log stats`, `viewport pan/zoom`, `undo`, `redo`, `theme set`. Read commands work in both modes (analytics, frame list, theme show, habit show).
+**One path: the running app.** Every command goes through the open KRNL0 over RPC; there is no headless fallback. A few commands also need the window itself open and exit 2 when it isn't: `habit pin`, `habit unpin`, `log tail`, `log stats`, `viewport pan/zoom`, `undo`, `redo`, `theme set`. Read commands work in both modes (analytics, frame list, theme show, habit show).
 
 **Edges are visual-only today.** The CLI lets you add, list, enable, disable, and remove edges. They render as lines. They do **not** automatically fire `to.command` when `from.event` is emitted. If a user asks you to "wire X to Y so Y reacts when X does", be honest: you can draw the wire, but you'll need to run the target command yourself. See `skills/wire-edge.md`.
 
@@ -71,27 +71,29 @@ If you forget syntax, ask the CLI — don't guess.
 
 ## Core models you must understand
 
-### Task kind — `focus` (pomodoro) vs `event` (single block)
+### Plans and the timer are separate
 
-Every task on the canvas is one of two kinds. Decision 28 added this discriminator and it is fundamental.
+Every plan is one block of time on the Calendar (its When, its length). There is no "focus task" any more: `krnl task kind <ref> focus` is refused. The timer is its own window and works one of two ways, for the whole board:
 
-- **`kind: 'focus'`** — a pomodoro-capable task. Splits into work + short-break + long-break cycles based on the **mother PomoNode's `PomoConfig`** (`sessionMin`, `shortBreakMin`, `longBreakMin`, `longBreakEvery`). Double-clicking the task loads it into the PomoNode and starts the cycle. The PomoNode draws the visualization (Vapor / LCD / Blocks / Ascii face).
-- **`kind: 'event'`** — a single block of time on the calendar. No breaks, no pomo split. Used for meetings, appointments, hard-edged time blocks.
+- **Observe** — a stopwatch: start it, stop it, it records the span. Easy mode always works this way (it calls the timer "Record").
+- **Pomodoro** — sessions and breaks from the timer's settings.
 
-Default for newly created tasks is `focus`. Toggle with:
 ```
-krnl task kind <ref> focus       # set as pomodoro task
-krnl task kind <ref> event       # set as single-block event
+krnl pomo config --mode observe|pomodoro
+krnl pomo config [--session 25] [--short 5] [--long 15] [--every 4] [--face auto|minimal|ascii|lcd|blocks|vapor|vu|outline|mac]
+krnl pomo start|pause|resume|break|extend|stop [--at HH:MM]|discard|status
+krnl pomo tag <task-ref>                       # what the running span is for
+krnl pomo add --start HH:MM --end HH:MM [--task <ref>]   # record time that wasn't recorded
+krnl pomo segments [--date YYYY-MM-DD] / pomo segment <id> --start/--end / pomo retag / pomo delete-segment
 ```
-A `focus → event` toggle on the **active** pomo task is risky. The renderer-path command cancels the active pomo first; the headless-path command refuses with exit 1 (`"cannot toggle kind on active pomo task — open the app or stop pomo first"`). When in doubt, run `krnl pomo status` and stop it first.
+A plan's length is `krnl task duration <ref> <minutes>` (fine while the timer runs).
 
-**Pomo durations are board-scoped, not per-task.** All `focus` tasks share the same work/short-break/long-break/longBreakEvery configuration:
+### Modes and layout
 ```
-krnl pomo config [--session 25] [--short 5] [--long 15] [--every 4] [--face vapor|lcd|blocks|ascii]
+krnl settings mode easy|advanced        # Easy hides deadlines, reminders, the terminal, Pomodoro naming
+krnl settings layout station|canvas
+krnl settings grid on|off
 ```
-Per-task you can only override the **budget** (total time planned for the task) with `krnl task duration <ref> <minutes>`.
-
-See `skills/task-kind-and-pomo.md` for the full mental model.
 
 ### Habits — colors, icons, notes, schedules, lanes
 
@@ -215,7 +217,6 @@ krnl task subtask <parentId> "<text>"
 krnl task edit <id> "<new text>"
 krnl task toggle <id>                  # mark done / undone (mirrors to TodoItem)
 krnl task duration <id> <minutes>      # set plannedMin override
-krnl task kind <id> focus|event        # toggle pomo vs single-block kind
 krnl task note <id> "<text>"           # set note  (use --clear to remove)
 krnl task sibling <id>                 # fork a parallel branch
 krnl task parallel <id>                # canonical alias for sibling
@@ -304,12 +305,14 @@ krnl clock day <YYYY-MM-DD|today|+1|-1>     # set selected date
 krnl clock show
 krnl info
 krnl settings show
-krnl term setTitle|setFontSize|clear
+krnl term setTitle|setFontSize|clear|setShell <shell>|claude [--bypass]
 krnl viewport pan|zoom|show                  # mutations need renderer
 krnl undo / krnl redo                        # need renderer
 krnl theme set <light|dark>                  # mutation; needs renderer
-krnl theme show                              # read; headless-capable
-krnl say "<text>" / krnl hear
+krnl theme show                              # read
+krnl theme frames / krnl theme frame <style>  # window frame styles
+krnl tour list / krnl tour start <id>         # guided tours
+krnl sound … / krnl sfx play|stop|list        # sound packs, volume, UI sounds
 ```
 
 ### App updates
@@ -340,7 +343,7 @@ krnl show clear                              # remove highlights
 Most operations need an ID. The flow is always:
 1. **List or read first** — `krnl task list --json`, `krnl habit list --json`, `krnl frame list --json`, etc.
 2. **Refs accept any of:** full UUID, ≥4-char id prefix (git-style), or unique text/name match.
-3. **Habit refs accept name fallback;** task refs accept text-prefix fallback. This asymmetry is by design — match the resolver.
+3. **Names must match exactly** (case does not matter): a habit or task by its whole name. A part of a name does not resolve; list and use the id prefix.
 4. **Never invent IDs.** If you don't see one in the most recent listing, list again.
 5. **For multi-step workflows:** read once with `--json`, then chain mutations using prefix refs.
 
@@ -372,14 +375,14 @@ User: "Set up my morning routine: meditate at 7, then 30 min of writing, then 15
 
 ```
 # 1. Make sure the habit exists and is pinned to the canvas as a lane.
-krnl habit add "meditation"           # idempotent failure if exists — check `habit list` first
+krnl habit add "meditation"           # adds a second one if it exists (then names are ambiguous) — check `habit list` first
 krnl habit color meditation cyan
-krnl habit icon meditation 🧘
+krnl habit icon meditation meditate
 krnl habit schedule meditation --daily --at 07:00 --duration 15
 krnl habit pin meditation             # creates the lane node (needs renderer)
 
-# 2. Create the two writing/triage tasks as focus blocks, chained in sequence.
-krnl task add "writing block" --duration 30        # kind defaults to focus
+# 2. Create the two writing/triage plans, chained in sequence.
+krnl task add "writing block" --duration 30
 krnl task list --json                              # capture the new id prefix
 krnl task addNext <writing-prefix> "email triage" --duration 15
 
@@ -400,7 +403,7 @@ Reply: "Morning routine set up — meditation pinned at 7, writing at 7:15, emai
 
 ### Pipeline 2 — Deep-work block (4 pomodoros + breaks)
 
-See `skills/plan-session.md`. The new wrinkle: every pomodoro task is `kind: focus` by default. Set `pomo config --session 25 --short 5 --long 15 --every 4` to match the user's preference once for the whole board.
+See `skills/plan-session.md`. Put the block on the Calendar as one plan (`task schedule`), switch the timer to Pomodoro (`pomo config --mode pomodoro --session 25 --short 5 --long 15 --every 4`), and start it with `pomo start` / `pomo tag <ref>`.
 
 ### Pipeline 3 — Single-event meeting
 
@@ -409,11 +412,10 @@ User: "Block 1pm to 2pm tomorrow for the design review."
 ```
 krnl task add "design review" --duration 60
 krnl task list --json                       # find id
-krnl task kind <prefix> event               # switch from focus to event
 krnl task schedule <prefix> --at 2026-05-18T13:00
 ```
 
-Why `kind event`? It's not a pomodoro — it's one continuous block. Calendar treats `event` tasks as solid; `focus` tasks may render with pomodoro segmentation.
+Every plan is one continuous block; the timer is separate.
 
 ### Pipeline 4 — Three parallel tasks under one mother
 
@@ -454,18 +456,18 @@ krnl frame add --near <first-task-prefix> --label "Project Alpha" --tint plum --
 krnl frame contents <frame-prefix> --json      # verify which children landed
 ```
 
-### Pipeline 7 — Convert a focus task to a meeting
+### Pipeline 7 — Repeating events (a class, a shift)
 
-User: "Actually that focus block at 2pm — change it to a meeting block."
+User: "I have class Monday and Wednesday at 10 for 90 minutes."
 
 ```
-krnl pomo status                               # check no active pomo on this task
-krnl task list --json
-krnl task kind <prefix> event
-# duration / schedule are preserved
+krnl event add "Class" --days mon,wed --at 10:00 --for 90     # also 1h30, 2h
+krnl event skip Class --on 2026-11-18                        # no class that day
+krnl event move Class --on 2026-11-25 --at 13:00
+krnl event end Class --on 2026-12-20 / krnl event restart Class
+krnl event delete Class                                       # only deletes events, never a habit
 ```
-
-If `pomo status` shows the task is active, run `krnl pomo stop` first or refuse honestly: "Can't toggle kind while pomo is running — want me to stop it?"
+`krnl cal show` lists events next to plans (`[E]`).
 
 ### Pipeline 8 — Quick "what just happened" check
 
@@ -498,8 +500,8 @@ krnl analytics totals --range 1 --json         # today's counts
 4. **One action at a time** unless the user explicitly asks for a multi-step plan. For plans, read `skills/plan-session.md` and the `Pipelines` section above.
 5. **Be specific without being chatty.** For ambiguous requests, ask one focused question. For clear commands, just execute and confirm.
 6. **The CLI is the source of truth for what's possible.** If `krnl help` doesn't mention a feature, it doesn't exist yet — don't promise it.
-7. **Respect the renderer-attached vs detached split.** Commands that exit 2 in headless mode mean the user must open the app. Tell them, don't loop retrying.
-8. **Do not toggle `task kind` on the active pomo task without checking `pomo status` first.** The headless path refuses; the renderer path cancels the pomo. Either way, ask the user before making it happen.
+7. **Exit 2 means the window must be open.** Tell the user, don't loop retrying.
+8. **A damaged board.json blocks every change** (the command says so). Ask the user to make any change in the KRNL0 window, which writes the board back, then try again.
 
 ---
 
@@ -509,7 +511,7 @@ Skills are detailed playbooks for specific scenarios. Read the relevant one befo
 
 - [`skills/plan-session.md`](skills/plan-session.md) — build a focus session (deep-work block)
 - [`skills/wire-edge.md`](skills/wire-edge.md) — edges + the honest "they don't fire" caveat
-- [`skills/task-kind-and-pomo.md`](skills/task-kind-and-pomo.md) — focus vs event, double-click semantics, pomo-config
+- [`skills/task-kind-and-pomo.md`](skills/task-kind-and-pomo.md) — older notes on the timer (plans are always single blocks now; see "Plans and the timer are separate" above)
 - [`skills/habit-lifecycle.md`](skills/habit-lifecycle.md) — color/icon/note/rename/schedule/pin/archive in one place
 - [`skills/frame-grouping.md`](skills/frame-grouping.md) — create + size frames, tint, how childIds works
 - [`skills/pipelines.md`](skills/pipelines.md) — multi-step authoring patterns (parallel, addNext, chain, schedule, frames, habits) in the right order

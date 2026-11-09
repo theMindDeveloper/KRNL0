@@ -85,7 +85,7 @@ export function habitStreaks(nodes: readonly NodeLike[], today: string): HabitSt
     const log = Array.isArray(h['log']) ? h['log'].filter((d): d is string => typeof d === 'string') : [];
     const schedule = h['schedule'] as HabitSchedule | undefined;
     const rest = Array.isArray(h['rest']) ? h['rest'].filter((d): d is string => typeof d === 'string') : [];
-    out.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current: calcStreak(log, today, schedule, rest), best: bestStreak(log, schedule, rest), log });
+    out.push({ id: h['id'], name: String(h['name'] ?? 'Habit'), current: calcStreak(log, today, schedule, rest), best: Math.max(calcStreak(log, today, schedule, rest), bestStreak(log, schedule, rest)), log });
   }
   return out;
 }

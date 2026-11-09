@@ -12,7 +12,7 @@ import { putPlanOnDay } from '../../../store/scheduleActions';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
-import { selectScheduledTasksForRange } from '../../../store/scheduleSelector';
+import { selectSchedule, selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
 import { getMonthDays, getMondayOf, toYMD, isRoutine } from '../HabitNode/types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
@@ -276,7 +276,10 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
     try { payload = JSON.parse(e.dataTransfer.getData('application/krnl-task')) as typeof payload; } catch { return; }
     const board = useBoardStore.getState().board;
     const task = payload.taskId ? board?.nodes.find((n) => n.id === payload.taskId) : undefined;
-    const current = (task?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor;
+    // Its time as drawn: a chained plan has none of its own (it follows the
+    // one before), so read its placement.
+    const own = (task?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor;
+    const current = own ?? (payload.taskId ? selectSchedule(board ?? null).placements.get(payload.taskId)?.startISO : undefined);
     // Decision 40 — a plan with a time keeps it on the new day; one without
     // goes on that day at any time (it is not given a made-up 09:00).
     if (!(typeof current === 'string' && /T\d{2}:\d{2}/.test(current))) {

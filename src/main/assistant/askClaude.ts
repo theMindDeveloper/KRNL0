@@ -66,9 +66,18 @@ export function askClaude(o: AskClaudeOptions): () => void {
     return () => {};
   }
 
+  // On Windows the child is cmd.exe running claude.cmd: killing it leaves
+  // Claude running (still able to change the board). Kill the whole tree.
+  const stop = (): void => {
+    try {
+      if (isWin && !o.spawnFn && child.pid !== undefined) {
+        nodeSpawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on('error', () => { try { child.kill(); } catch { /* gone */ } });
+      } else child.kill();
+    } catch { /* already gone */ }
+  };
   const timer = setTimeout(() => {
     end({ type: 'error', code: 'timeout', message: ASK_MESSAGES.timeout });
-    try { child.kill(); } catch { /* already gone */ }
+    stop();
   }, o.timeoutMs ?? ASK_TIMEOUT_MS);
 
   let buf = '';
@@ -101,7 +110,7 @@ export function askClaude(o: AskClaudeOptions): () => void {
 
   return () => {
     end({ type: 'error', code: 'cancelled', message: ASK_MESSAGES.cancelled });
-    try { child.kill(); } catch { /* already gone */ }
+    stop();
   };
 }
 

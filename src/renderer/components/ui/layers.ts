@@ -31,8 +31,12 @@ export const Z = {
   /** Guided-tour spotlight and card — above modals (a tour step can point
    *  into Settings), below dropdowns the user opens while following it. */
   tourBackdrop: 4050,
-  tour: 4051,
+  /** The tour card sits above the click-catchers of open cards (so Next and
+   *  Skip work while a plan card is open) and below the cards themselves. */
+  tour: 4097,
   /** Dropdowns and pickers — always above whatever opened them, modals included. */
+  /** Click-outside catcher of a card or dropdown: under the tour card. */
+  popoverBackdrop: 4090,
   popover: 4100,
   /** Generic right-click menus (habit, tag picker, list rows). */
   contextMenu: 9999,

@@ -5,6 +5,22 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed (full audit, 2026-11-09)
+- **Your board is safer:** if board.json gets damaged, KRNL0 writes the open window's board back instead of merging it with an empty board (which looked like everything deleted); terminal commands refuse to write over it; it is copied aside once, not every 30 seconds.
+- `krnl event delete` deletes only repeating events, never a habit with the same name. Main windows can't be removed from the terminal. "Clear focus history" stays cleared after a restart.
+- Won't do: one Ctrl+Z undoes it fully; UNDO puts a chained plan back with its time and link; a dropped plan leaves the Calendar, Clock, Welcome back, Analytics and the timer's task list, and stops a timer running on it.
+- Quick add is one Ctrl+Z; "Gym fri 18:00" typed on a Friday evening is next Friday; in Easy, "by fri" becomes the plan's day.
+- Restarting an ended repeating event keeps the weeks it was ended empty; a late event with no length runs its full hour past midnight.
+- Log time can't overlap a paused session (it was counted twice); the same start and end is no longer a 24-hour session.
+- Streaks: "best" is never below the current streak; the Clock draws no timed habit on rest days or before it existed; Welcome back doesn't call a still-running block missed; a plan with no length plans no minutes; hour charts spread a session over the hours it covered; daylight-saving days count 23 or 25 hours.
+- Reminders: a plan made inside its reminder time still gets one; after sleep, past plans are not announced late.
+- Escape in a time or reminder list closes only the list; picking a time keeps the focus in the field (typing no longer fires canvas shortcuts); Ctrl+Z and Delete wait while a card is open; the mouse wheel scrolls inside windows; the tour's Next works while a card is open; the hour list follows its field; the Move card and the habit menu close when you click away; Time per task scrolls instead of "+N more".
+- Easy: no timer action on Calendar plan cards, no "claude code" orb button, tour descriptions without reminders or deadlines, and an error line that doesn't mention the terminal.
+- Terminal commands: `todo when` shows at once; `todo drop` keeps a chain's times; `task duration` works while the timer runs; `--for 2h` / `1h30` work (and a bad length is refused); rescheduling an event keeps its length; `habit done` is honest for events and amount habits; a subtask can't be scheduled; `cal show` lists repeating events; `pomo stop --at 23:50` after midnight is last night; impossible dates and single-digit hours are handled; `krnl help` and the assistant's instructions match the app.
+- Updates: a restart into an update that doesn't happen shows an error and can be retried. Cancelling an orb question stops Claude on Windows.
+
 ## [0.11.2] — 2026-11-09
 
 ### Fixed

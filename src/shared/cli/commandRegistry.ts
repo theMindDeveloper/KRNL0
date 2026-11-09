@@ -63,14 +63,14 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'done', usage: 'habit done <id|name> [--date YYYY-MM-DD]', summary: 'Mark a habit done for a date (idempotent)' },
       { name: 'undo', usage: 'habit undo <id|name> [--date YYYY-MM-DD]', summary: 'Un-mark a habit for a date' },
       { name: 'streak', usage: 'habit streak <id|name>', summary: 'Show current streak' },
-      { name: 'color', usage: 'habit color <id|name> <acid|rust|cyan|plum|spine|ink>', summary: 'Set habit color' },
+      { name: 'color', usage: 'habit color <id|name> <acid|rust|cyan|plum|spine|ink|amber|rose|teal|lilac|sand|moss>', summary: 'Set habit color (12 colours)' },
       { name: 'remove', usage: 'habit remove <id|name>', summary: 'Remove a habit' },
       { name: 'view', usage: 'habit view <week|month|year>', summary: 'Set habit view mode' },
       { name: 'list', usage: 'habit list [--json]', summary: 'List all habits' },
       { name: 'rename', usage: 'habit rename <id|name> "<new>"', summary: 'Rename a habit' },
       { name: 'icon', usage: 'habit icon <id|name> <icon> | --clear', summary: 'Set or clear a habit icon: pen, trend, target, code, meditate, run, book, water, sleep, food, brain, strength, coffee, goal, plant, music, clean, write, sun, moon, heart, walk, study, phone' },
       { name: 'note', usage: 'habit note <id|name> "<text>" | --clear', summary: 'Set or clear a free-form note on a habit' },
-      { name: 'schedule', usage: 'habit schedule <id|name> --daily [--at HH:MM] [--duration N]', summary: 'Set which days (--daily / --weekly --days 1,2,5 / --weekdays); --at HH:MM gives it a time, without --at it is "any time" (a routine always needs --at).' },
+      { name: 'schedule', usage: 'habit schedule <id|name> --daily|--weekdays|--weekly --days 1,3 [--at HH:MM] [--duration N]', summary: 'Set which days (--daily / --weekly --days 1,2,5 / --weekdays); --at HH:MM gives it a time, without --at it is "any time" (a routine always needs --at).' },
       { name: 'kind', usage: 'habit kind <id|name> routine|habit', summary: 'Turn a habit into a routine (repeats at a time, never ticked) or back; the log is kept' },
       { name: 'unschedule', usage: 'habit unschedule <id|name>', summary: 'Clear habit schedule' },
       { name: 'archive', usage: 'habit archive <id|name>', summary: 'Archive a habit (hidden from grid, history kept)' },
@@ -117,7 +117,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'add', usage: 'pomo add --start HH:MM --end HH:MM [--task <ref>] [--text "what"]', summary: 'Record time you did not record (HH:MM = today, or YYYY-MM-DDTHH:MM)' },
       { name: 'delete-segment', usage: 'pomo delete-segment <segmentId>', summary: 'Delete a recorded focus/break span (Calendar/Clock right-click → Delete segment)' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
-      { name: 'config', usage: 'pomo config [--session N] [--short N] [--long N] [--every N] [--face ascii|lcd|blocks|vapor] [--count-stopped on|off]', summary: 'Update board-scoped PomoConfig on the mother PomoNode (count-stopped: does Stop record the session so far)' },
+      { name: 'config', usage: 'pomo config [--mode observe|pomodoro] [--session N] [--short N] [--long N] [--every N] [--face auto|minimal|ascii|lcd|blocks|vapor|vu|outline|mac] [--count-stopped on|off]', summary: 'Timer settings: --mode observe (a stopwatch) or pomodoro (sessions and breaks); count-stopped: does Stop record the session so far' },
     ],
   },
   {
@@ -195,7 +195,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Low-level node management — all refs accept id-prefix or unique text',
     subcommands: [
       { name: 'read', usage: 'node read <ref> [--json]', summary: 'Print full state + config + incident edges for one node' },
-      { name: 'remove', usage: 'node remove <ref> [--force]', summary: 'Remove a node (cascades for tasks; --force needed for mothers)' },
+      { name: 'remove', usage: 'node remove <ref> [--force]', summary: 'Remove a node (cascades for tasks; main windows can never be removed)' },
       { name: 'set-position', usage: 'node set-position <ref> --x N --y N', summary: 'Set node position directly' },
       { name: 'move', usage: 'node move <ref> --to x,y', summary: 'Animate node move (requires renderer)' },
       { name: 'list', usage: 'node list [--kind <k>] [--mother|--child] [--json]', summary: 'List all nodes' },
@@ -208,8 +208,6 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'show', usage: 'board show [--json]', summary: 'Print board: --json emits bare JSON; default is a human summary' },
       { name: 'summary', usage: 'board summary [--json]', summary: 'One-line counts of nodes + edges' },
       { name: 'stats', usage: 'board stats [--json]', summary: 'Per-kind node counts + per-event edge counts' },
-      { name: 'save', usage: 'board save [path]', summary: '(autosave is always on — kept for parity)' },
-      { name: 'load', usage: 'board load <path>', summary: 'Load board from path' },
     ],
   },
   {
@@ -427,13 +425,14 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'setFontSize', usage: 'term setFontSize <N>', summary: 'Set terminal font size' },
       { name: 'clear', usage: 'term clear', summary: 'Clear the terminal screen' },
       { name: 'claude', usage: 'term claude [--bypass]', summary: 'Show the terminal and start Claude Code in it (--bypass skips permission prompts)' },
+      { name: 'setShell', usage: 'term setShell <shell>', summary: 'Choose the shell the terminal starts (e.g. powershell, pwsh, cmd, bash)' },
     ],
   },
   {
     group: 'marquee',
     summary: 'Select by rectangle (requires open renderer)',
     subcommands: [
-      { name: '--rect', usage: 'marquee --rect x1,y1,x2,y2 --delete', summary: 'Delete every node on the current canvas whose top-left corner is inside the rectangle (mother windows excepted). --delete is required; undoable with undo.' },
+      { name: '--rect', usage: 'marquee --rect x1,y1,x2,y2 --delete', summary: 'Delete every node on the current canvas whose top-left corner is inside the rectangle (mother windows excepted). --delete is required; one undo brings them all back.' },
     ],
   },
   {
@@ -459,14 +458,17 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'set', usage: 'theme set <light|dark>', summary: 'Switch renderer theme (requires open renderer)' },
       { name: 'show', usage: 'theme show [--json]', summary: 'Read current theme from settings (headless-capable)' },
+      { name: 'frames', usage: 'theme frames [--json]', summary: 'List the window frame styles' },
+      { name: 'frame', usage: 'theme frame <style>', summary: 'Set the window frame style' },
     ],
   },
   {
-    group: 'voice',
-    summary: 'Voice I/O',
+    group: 'sfx',
+    summary: 'UI sounds',
     subcommands: [
-      { name: 'say', usage: 'say "<text>"', summary: 'Speak text via TTS' },
-      { name: 'hear', usage: 'hear', summary: 'One-shot STT transcription' },
+      { name: 'play', usage: 'sfx play <clipId>', summary: 'Play one UI sound' },
+      { name: 'stop', usage: 'sfx stop', summary: 'Stop sounds that are playing' },
+      { name: 'list', usage: 'sfx list', summary: 'List the sound ids' },
     ],
   },
   {

@@ -12,6 +12,7 @@ import {
   pomoDiscard as fsmDiscard,
   pomoDeleteSegment as fsmDeleteSegment,
   pomoRetagSegment as fsmRetag,
+  pomoDropBlips,
   type PomoEnv,
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
@@ -112,12 +113,22 @@ function plannedTaskNow(board: { nodes: Array<Record<string, unknown>>; edges?: 
   return null;
 }
 
+/**
+ * Observe (and Easy, always a stopwatch): a start/stop misclick leaves no
+ * sliver span, the same rule as the window (commandDispatch observeBlips).
+ */
+function dropBlips(board: { uiMode?: unknown }, node: Record<string, unknown>, prev: PomoState, next: PomoState): PomoState {
+  const mode = (node['config'] as { mode?: unknown } | null | undefined)?.mode;
+  return mode === 'observe' || board.uiMode === 'easy' ? pomoDropBlips(prev, next) : next;
+}
+
 /** Shared shape for the simple state-transition verbs below. */
 function pomoTransition(
   allowed: readonly PomoState['status'][],
   verb: string,
   apply: (prev: PomoState) => PomoState,
   okMsg: string,
+  blips = false,
 ): SysResult {
   let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
   getBoardIo().mutateBoard((board) => {
@@ -128,7 +139,7 @@ function pomoTransition(
       result = { ok: false, message: `pomo is ${prev.status} — can only ${verb} while ${allowed.join(' or ')}` };
       return;
     }
-    node['state'] = apply(prev);
+    node['state'] = blips ? dropBlips(board as { uiMode?: unknown }, node, prev, apply(prev)) : apply(prev);
     result = { ok: true, message: okMsg };
   });
   return result;
@@ -139,7 +150,7 @@ export function pomoPause(): SysResult {
 }
 
 export function pomoResume(): SysResult {
-  return pomoTransition(['paused', 'break'], 'resume', (s) => fsmResume(s, {}, cliEnv()), 'Pomodoro resumed');
+  return pomoTransition(['paused', 'break'], 'resume', (s) => fsmResume(s, {}, cliEnv()), 'Pomodoro resumed', true);
 }
 
 /** Abandon the in-flight span without recording it (the UI's RESET). */
@@ -169,10 +180,10 @@ export function pomoStop(at?: string): SysResult {
     const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
     if (atMs !== undefined) {
       refused = stopAtRefusal(prev, atMs, at ?? '');
-      if (refused === null) node['state'] = fsmStopAt(prev, { atMs }, cliEnv());
+      if (refused === null) node['state'] = dropBlips(board as { uiMode?: unknown }, node, prev, fsmStopAt(prev, { atMs }, cliEnv()));
       return;
     }
-    node['state'] = fsmStop(prev, {}, cliEnv());
+    node['state'] = dropBlips(board as { uiMode?: unknown }, node, prev, fsmStop(prev, {}, cliEnv()));
   });
   if (!found) return { ok: false, message: 'No Pomodoro node found on the board' };
   if (refused) return { ok: false, message: refused };
@@ -188,6 +199,7 @@ export function stopAtRefusal(prev: PomoState, atMs: number, at: string): string
   if ((prev.status !== 'running' && prev.status !== 'break') || prev.startedAt === null) {
     return `--at needs a running span (pomo is ${prev.status}); use plain "pomo stop"`;
   }
+  if (atMs > Date.now() + 60_000) return `--at ${at} is in the future`;
   if (atMs < Date.parse(prev.startedAt)) {
     const d = new Date(prev.startedAt);
     return `--at ${at} is before this span started (${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')})`;
@@ -203,7 +215,9 @@ export function parseStopAt(at: string, nowMs: number): number | undefined {
     const m = Number(hm[2]);
     if (h > 23 || m > 59) return undefined;
     const d = new Date(nowMs);
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+    const today = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+    // After midnight, "23:50" means last night, not tonight.
+    return today > nowMs ? new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, h, m).getTime() : today;
   }
   const full = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(at);
   if (!full) return undefined;
@@ -224,7 +238,7 @@ export function pomoBreak(): SysResult {
       msg = `pomo is ${prev.status} — can only break from running or paused`;
       return;
     }
-    node['state'] = fsmBreak(prev, {}, cliEnv());
+    node['state'] = dropBlips(board as { uiMode?: unknown }, node, prev, fsmBreak(prev, {}, cliEnv()));
     msg = 'Switched to break';
     found = true;
   });
@@ -350,7 +364,7 @@ export function pomoEditSegmentCmd(ctx: PomoTagCtx, segmentId: string | undefine
     const startMs = start === undefined ? Date.parse(rec.startedAt) : parseOnDay(start, day);
     let endMs = end === undefined ? Date.parse(rec.endedAt) : parseOnDay(end, day);
     if (startMs === undefined || endMs === undefined) { result = { ok: false, message: 'times are HH:MM or YYYY-MM-DDTHH:MM' }; return; }
-    if (end !== undefined && HM_RE.test(end) && endMs <= startMs) endMs += 86_400_000;
+    if (end !== undefined && HM_RE.test(end) && endMs <= startMs) endMs = nextDaySameTime(endMs);
     const problem = spanProblem(prev, { startMs, endMs }, Date.now(), { exceptId: seg.id, kind: rec.kind });
     if (problem) { result = { ok: false, message: problem }; return; }
     node['state'] = { ...prev, history: fsmEditSegment(prev, { id: seg.id, startMs, endMs }).history };
@@ -369,7 +383,7 @@ export function pomoAddSegmentCmd(ctx: PomoTagCtx, start: string | undefined, en
   const startMs = parseOnDay(start, day);
   let endMs = parseOnDay(end, day);
   if (startMs === undefined || endMs === undefined) return { ok: false, message: 'times are HH:MM or YYYY-MM-DDTHH:MM' };
-  if (HM_RE.test(end) && endMs <= startMs) endMs += 86_400_000;
+  if (HM_RE.test(end) && endMs <= startMs) endMs = nextDaySameTime(endMs);
   let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
   mutatePomoBoard(ctx, (board) => {
     const node = findPomoNode(board);
@@ -663,4 +677,10 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
 
   saveBoardTo(boardPath, { ...(board as unknown as Record<string, unknown>), savedAt: new Date().toISOString() });
   return { ok: true, message: 'pomo config updated' };
+}
+
+/** The same clock time a day later (23 or 25 hours on a daylight-saving night). */
+function nextDaySameTime(ms: number): number {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, d.getHours(), d.getMinutes(), d.getSeconds()).getTime();
 }

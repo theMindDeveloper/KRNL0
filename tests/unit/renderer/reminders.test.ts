@@ -44,8 +44,18 @@ describe('dueReminders', () => {
     const r = dueReminders(board, at('13:49'), at('13:50'));
     expect(r.map((x) => x.title)).toEqual(['Dentist']);
     expect(r[0]!.body).toBe('Starts in 10 min · 14:00');
-    expect(dueReminders(board, at('13:50'), at('13:51'))).toEqual([]);
+    // Still due until the plan starts (the main process shows each key once).
+    expect(dueReminders(board, at('13:50'), at('13:51')).map((x) => x.key)).toEqual([r[0]!.key]);
+    // Started: never announced late.
+    expect(dueReminders(board, at('14:00'), at('14:01'))).toEqual([]);
     expect(dueReminders(board, at('17:59'), at('18:00')).map((x) => x.body)).toEqual(['Starts now · 18:00']);
+  });
+
+  it('a plan made inside its lead time still gets its reminder; after sleep, a past start is not announced', () => {
+    // Set at 13:55 for 14:00 with 10 min: its time (13:50) has passed, the plan hasn't started.
+    expect(dueReminders(board, at('13:54'), at('13:55')).map((x) => x.title)).toEqual(['Dentist']);
+    // Woke at 16:00: the main loop only looks at the last 30 s.
+    expect(dueReminders(board, at('15:59'), at('16:00')).map((x) => x.title)).not.toContain('Dentist');
   });
 
   it('a key is stable per plan, start and lead (so it shows once)', () => {

@@ -25,6 +25,16 @@ export function leadWords(min: number): string {
   return min % 60 ? `in ${Math.floor(min / 60)} h ${min % 60} min` : `in ${min / 60} h`;
 }
 
+/**
+ * Due when its time has come by `toMs` and the plan had not started yet at the
+ * last check (`fromMs`): a plan made or moved inside its lead time still gets
+ * its reminder (once: the caller keeps the keys it showed), and a plan that
+ * already started is never announced as "starts in 10 min".
+ */
+function isDue(atMs: number, startMs: number, fromMs: number, toMs: number): boolean {
+  return atMs <= toMs && startMs > fromMs;
+}
+
 export function dueReminders(board: Board | null, fromMs: number, toMs: number): Reminder[] {
   if (!board) return [];
   const { placements } = selectSchedule(board);
@@ -39,7 +49,7 @@ export function dueReminders(board: Board | null, fromMs: number, toMs: number):
     if (!p) continue;
     const startMs = new Date(p.startISO).getTime();
     const atMs = startMs - lead * 60_000;
-    if (!(atMs > fromMs && atMs <= toMs)) continue;
+    if (!isDue(atMs, startMs, fromMs, toMs)) continue;
     const text = typeof s.text === 'string' && s.text.trim() ? s.text.trim() : 'A plan';
     out.push({
       key: `${node.id}@${p.startISO}-${lead}`,
@@ -64,7 +74,7 @@ export function dueReminders(board: Board | null, fromMs: number, toMs: number):
         if (!occ || occ.skipped) continue;
         const startMs = new Date(`${ymd}T${pad(Math.floor(occ.startMin / 60))}:${pad(occ.startMin % 60)}:00`).getTime();
         const atMs = startMs - lead * 60_000;
-        if (!(atMs > fromMs && atMs <= toMs)) continue;
+        if (!isDue(atMs, startMs, fromMs, toMs)) continue;
         out.push({
           key: `${h.id}@${ymd}T${occ.startMin}-${lead}`,
           taskId: h.id,

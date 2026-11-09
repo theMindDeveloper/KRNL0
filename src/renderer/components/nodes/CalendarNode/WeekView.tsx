@@ -4,6 +4,7 @@
 // rows and TaskNode blocks. Supports drag-to-schedule from HabitNode rows via
 // HabitSwapModal. NowLine is rendered as an overlay.
 
+import { pickerOpen } from '../../ui/Popover';
 import { CALENDAR_REVEAL_EVENT, showTask, unscheduleTask } from '../../../store/scheduleActions';
 import { highlightElement } from '../../../store/highlight';
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
@@ -808,6 +809,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     return hit ? { h: hit.h, occ: hit.occ } : null;
   };
   const [routineMove, setRoutineMove] = useState<{ id: string; name: string; date: string; value: string; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!routineMove) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pickerOpen()) setRoutineMove(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [routineMove]);
   // Decision 40 — "New here…" / "Edit event…": the card that makes a plan or a repeating event.
   const [eventCard, setEventCard] = useState<{ x: number; y: number; day: string; initial: EventDraft; allowOnce: boolean; editId?: string } | null>(null);
   const [eventRemind, setEventRemind] = useState<{ id: string; x: number; y: number; value: number | null } | null>(null);
@@ -2914,7 +2921,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             value={plan.value}
             title={{ text: plan.text, tone: toneVarForTask(taskPopup.task.id) }}
             actions={[
-              { key: 'timer', label: observe ? 'Track it now' : 'Focus on it', icon: observe ? 'observe' : 'play', onClick: () => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); close(); } },
+              // Easy (D9/D10): no timer action on a plan, as on the Todo card.
+              ...(easy ? [] : [{ key: 'timer', label: observe ? 'Track it now' : 'Focus on it', icon: (observe ? 'observe' : 'play') as 'observe' | 'play', onClick: () => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); close(); } }]),
               { key: 'done', label: taskPopup.task.done ? 'Not done yet' : 'Mark done', icon: taskPopup.task.done ? 'undo' : 'check', onClick: () => { void toggleTaskDone(taskPopup.task.id); close(); } },
               { key: 'show', label: 'Show', icon: 'show', onClick: () => { const t = taskPopup.task.id; close(); void showTask(t); } },
               { key: 'delete', label: 'Delete', icon: 'delete', danger: true, onClick: () => { void deletePlanOfTask(taskPopup.task.id); close(); } },
@@ -2924,7 +2932,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           />
         );
       })()}
-      {taskPopup && !planWhenOf({ taskId: taskPopup.task.id }) && (
+      {/* Only while the task exists: an undo or a delete elsewhere closes it. */}
+      {taskPopup && !planWhenOf({ taskId: taskPopup.task.id }) && useBoardStore.getState().board?.nodes.some((n) => n.id === taskPopup.task.id) && (
         <TaskPopup
           task={taskPopup.task}
           x={taskPopup.x}
@@ -2934,7 +2943,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           onTime={setExactTime}
           onDuration={setExactDur}
           onApply={(t) => { applyExactTime(taskPopup.task, t); setTaskPopup(null); }}
-          onActivate={() => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); setTaskPopup(null); }}
+          {...(easy ? {} : { onActivate: () => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); setTaskPopup(null); } })}
           onJump={() => { jumpToTaskNode(taskPopup.task.id); setTaskPopup(null); }}
           onUnschedule={() => { void putPlanOnDay({ taskId: taskPopup.task.id }, taskPopup.task.startISO.slice(0, 10)); setTaskPopup(null); }}
           timerLabel={(useBoardStore.getState().board?.nodes.find((n) => n.kind === 'pomo')?.config as { mode?: string } | undefined)?.mode === 'observe' ? 'Track it now' : 'Focus on it'}
@@ -2945,7 +2954,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
       {eventsOpen && createPortal(
         <>
-          <div onMouseDown={() => setEventsOpen(null)} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+          <div onMouseDown={() => setEventsOpen(null)} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />
           <div
             data-testid="calendar-events-popover"
             role="dialog"
@@ -3021,8 +3030,12 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         />
       )}
       {routineMove && createPortal(
+        <>
+        {/* A click elsewhere closes it, like the other cards. */}
+        <div onMouseDown={(e) => { e.stopPropagation(); setRoutineMove(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />
         <div
           data-testid="routine-move"
+          data-owns-keys="true"
           onMouseDown={(e) => e.stopPropagation()}
           style={{
             position: 'fixed', left: Math.min(routineMove.x, window.innerWidth - 240), top: Math.min(routineMove.y, window.innerHeight - 140),
@@ -3043,7 +3056,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             <button type="button" data-testid="routine-move-save" onClick={() => { void habitMotherCommand('routine.move', { id: routineMove.id, date: routineMove.date, at: routineMove.value }); setRoutineMove(null); }}
               style={{ height: 28, padding: '0 12px', borderRadius: 7, border: 'none', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', cursor: 'pointer', fontSize: 12, fontWeight: 650 }}>Move</button>
           </div>
-        </div>,
+        </div>
+        </>,
         document.body,
       )}
       {ctxMenu && (

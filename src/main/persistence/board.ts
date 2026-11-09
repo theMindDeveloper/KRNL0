@@ -429,7 +429,14 @@ function migrateAddAnalyticsMother(board: Record<string, unknown>): Record<strin
   board['nodes'] = kept;
   const edges = board['edges'];
   if (Array.isArray(edges) && childIds.size > 0) {
-    board['edges'] = edges.filter((e) => !(isObj(e) && (childIds.has(e['source']) || childIds.has(e['target']))));
+    // Edges point by from.nodeId / to.nodeId (shared/types/edge.ts); the old
+    // source/target check never matched, so links to removed windows stayed.
+    const ends = (e: Record<string, unknown>): unknown[] => [
+      e['source'], e['target'],
+      isObj(e['from']) ? (e['from'] as Record<string, unknown>)['nodeId'] : undefined,
+      isObj(e['to']) ? (e['to'] as Record<string, unknown>)['nodeId'] : undefined,
+    ];
+    board['edges'] = edges.filter((e) => !(isObj(e) && ends(e).some((id) => typeof id === 'string' && childIds.has(id))));
   }
   return board;
 }
@@ -535,6 +542,7 @@ function migrateCompletionLedger(board: Record<string, unknown>): Record<string,
   const existing = Array.isArray(board['completions'])
     ? (board['completions'] as Array<Record<string, unknown>>)
     : [];
+  const clearedAt = board['completionsClearedAt'];
   const byId = new Map<string, Record<string, unknown>>();
   for (const c of existing) {
     if (c && typeof c['taskId'] === 'string') byId.set(c['taskId'] as string, c);
@@ -546,6 +554,8 @@ function migrateCompletionLedger(board: Record<string, unknown>): Record<string,
     const s = (node.state ?? {}) as Record<string, unknown>;
     if (s['done'] !== true || typeof s['completedAt'] !== 'string') continue;
     if (byId.has(node.id)) continue; // don't clobber an existing ledger entry
+    // "Clear focus history" means gone: finished before the clear, not refilled.
+    if (typeof clearedAt === 'string' && s['completedAt'] <= clearedAt) continue;
     byId.set(node.id, {
       taskId: node.id,
       text: typeof s['text'] === 'string' ? s['text'] : '',
@@ -731,6 +741,26 @@ export class BoardUnreadableError extends Error {
   }
 }
 
+/**
+ * board.json exists but is not a board (bad JSON). It has been copied aside
+ * (`.corrupt-<time>`). Writers that hold no good copy of their own must not
+ * write a fresh board over it; the open window, which does, rewrites it.
+ */
+export class BoardCorruptError extends BoardUnreadableError {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause);
+    this.name = 'BoardCorruptError';
+  }
+}
+
+/** True when board.json exists and reads, but is not valid JSON. */
+export function boardFileIsCorrupt(boardPath: string): boolean {
+  let raw: string | null;
+  try { raw = existsSync(boardPath) ? readFileSync(boardPath, 'utf8') : null; } catch { return false; }
+  if (raw === null) return false;
+  try { JSON.parse(raw); return false; } catch { return true; }
+}
+
 const TRANSIENT_READ_CODES = new Set(['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'ENFILE', 'EAGAIN']);
 
 /**
@@ -823,7 +853,7 @@ export function migrateBoard(parsed: unknown): unknown {
   );
 }
 
-export function loadBoardFrom(boardPath: string): unknown {
+export function loadBoardFrom(boardPath: string, opts: { seedIfCorrupt?: boolean } = {}): unknown {
   try {
     const raw = existsSync(boardPath) ? readBoardText(boardPath) : null;
     if (raw !== null) {
@@ -838,6 +868,9 @@ export function loadBoardFrom(boardPath: string): unknown {
     if (!backupCorruptBoard(boardPath, err)) {
       throw new BoardUnreadableError('board.json is unreadable and could not be backed up; it was left untouched', err);
     }
+    // Callers that would merge with or write over this file get an error, not
+    // an empty board: merging against the seed reads as "everything deleted".
+    if (opts.seedIfCorrupt === false) throw new BoardCorruptError('board.json is damaged (a copy was kept as board.json.corrupt-…)', err);
   }
   return seedBoard();
 }
@@ -846,11 +879,19 @@ export function loadBoardFrom(boardPath: string): unknown {
  * Copy an unreadable board.json aside as `board.json.corrupt-<timestamp>`.
  * True when the data is safe to replace (copied, or there was no file).
  */
+const backedUp = new Map<string, string>();
+
 export function backupCorruptBoard(boardPath: string, err: unknown): boolean {
   try {
     if (!existsSync(boardPath)) return true;
+    // One copy per version of the broken file: readers that retry (the
+    // reminder check every 30 s) must not fill the disk with copies.
+    const st = statSync(boardPath);
+    const version = `${st.size}:${st.mtimeMs}`;
+    if (backedUp.get(boardPath) === version) return true;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     copyFileSync(boardPath, `${boardPath}.corrupt-${stamp}`);
+    backedUp.set(boardPath, version);
     console.error(`[board] could not read ${boardPath}; backed up as .corrupt-${stamp}`, err);
     return true;
   } catch (backupErr) {

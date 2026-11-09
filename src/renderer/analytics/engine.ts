@@ -3,6 +3,7 @@
 // this in useMemo so it survives the dock's 1-second tick without
 // re-bucketing.
 
+import { droppedTaskIds } from '../../shared/droppedPlans';
 import type {
   AnalyticsEvent,
   AnalyticsResult,
@@ -131,11 +132,12 @@ export function buildAnalytics(board: BoardLike): AnalyticsResult {
       let tasksTotal = 0;
       let sessionsToday = 0;
       let focusMinToday = 0;
+      const dropped = droppedTaskIds(board.nodes as never);
       for (const n of board.nodes) {
         if (n.kind === 'todo.task') {
           tasksTotal += 1;
           const s = n.state as TaskLike;
-          if (!s.done) tasksOpen += 1;
+          if (!s.done && !dropped.has(n.id)) tasksOpen += 1;
         } else if (n.kind === 'pomo') {
           const s = n.state as PomoStateLike;
           const history = s.history ?? [];

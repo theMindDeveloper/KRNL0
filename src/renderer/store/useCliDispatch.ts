@@ -10,7 +10,7 @@
  */
 
 import { useEffect } from 'react';
-import { useBoardStore } from './boardStore';
+import { useBoardStore, historyGroup } from './boardStore';
 import { emit, saveBoard } from './eventLog';
 import { deleteTaskNodesCascade, makeCommandHandler } from '../components/Canvas/commandDispatch';
 import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
@@ -266,8 +266,11 @@ export function useCliDispatch(): void {
             const taskIds = inside.filter((n) => n.kind === 'todo.task').map((n) => n.id);
             const otherIds = inside.filter((n) => n.kind !== 'todo.task').map((n) => n.id);
 
-            if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
-            for (const id of otherIds) store.getState().removeNode(id);
+            // One `krnl undo` brings the whole selection back.
+            void historyGroup(() => {
+              if (taskIds.length > 0) deleteTaskNodesCascade(taskIds);
+              for (const id of otherIds) store.getState().removeNode(id);
+            });
             if (inside.length > 0) {
               const updated = store.getState().board as Board | null;
               if (updated) void saveBoard(updated);
@@ -398,6 +401,10 @@ export function useCliDispatch(): void {
             if (!currentBoard) { message = 'No board loaded'; break; }
             const habitMother = currentBoard.nodes.find((n) => n.kind === 'habit' && n.isMother === true);
             if (!habitMother) { message = 'No habit mother node found'; break; }
+            // An archived habit has no card (archive removes it; its card would
+            // delete itself at once).
+            const pinned = ((habitMother.state as { habits?: Array<{ id: string; archived?: boolean; name?: string }> } | null)?.habits ?? []).find((h) => h.id === habitId);
+            if (pinned?.archived) { message = `"${pinned.name ?? habitId}" is archived; habit unarchive it first`; break; }
             // Check for duplicate
             const existing = currentBoard.nodes.find(
               (n) => n.kind === 'habit.lane' && (n.state as HabitLaneState | null)?.habitId === habitId,

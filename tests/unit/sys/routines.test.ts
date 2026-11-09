@@ -117,7 +117,7 @@ describe('krnl routine / habit kind / any-time habits', () => {
     expect(habits()[0]!.endsOn).toBe('2026-12-20');
     expect((await f.run(['routine', 'restart', 'Class'])).ok).toBe(true);
     expect(habits()[0]!.endsOn).toBeUndefined();
-    expect((await f.run(['habit', 'done', 'Class'])).ok).toBe(true);
+    expect((await f.run(['habit', 'done', 'Class'])).ok).toBe(false); // a repeating event is never ticked
     expect(habits()[0]!.log).toEqual([]); // never ticked
   });
 
