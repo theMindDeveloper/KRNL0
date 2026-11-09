@@ -2674,3 +2674,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** the v0.10.1 GitHub release (`KRNL0-Setup-0.10.1.exe`, `.blockmap`, `latest.yml`, page note); this file.
 **Summary:** So the owner can install 0.10.1 and watch it update itself, the owner asked to rebuild 0.10.1 with the fix, knowingly setting aside AGENTS.md rule 11 for this one case. The exact v0.10.1 code plus the one-line updater fix was built on the same CI Windows image; inside the installer, `app.asar` reports version 0.10.1 and contains the fixed import, and `app-update.yml` points at this repo's releases. The three files on the v0.10.1 release were replaced and the page now says it is the rebuilt 0.10.1 that updates itself. 0.11.1 stays Latest. Installs of the original 0.10.1 still can't update themselves (their code is unchanged); they install 0.11.1 by hand once.
 
+## [2026-11-09] — Plan card time picker, one Calendar +, quieter time column and clock
+
+**Type:** Bug Fix / UI
+**Branch:** `fix/when-time-and-calendar-plus`
+**Files changed:** `ui/useDismissOutside.ts`, `CalendarNode/WeekView.tsx`, `CalendarNode/EventCard.tsx`, `ClockNode/index.tsx`, `Tour/tours.ts` (+ two re-recorded clips), `styles/tokens.css`, `styles/reactflow-theme.css`, `CHANGELOG.md`, tests.
+**Summary:** While adding a plan, picking an hour in the time picker closed the plan card: the picker is portaled to `<body>`, so the add card's click-outside rule saw it as outside. `useDismissOutside` now treats any `.krnl-popover` (a picker opened from the pop-up) as inside, the same rule `Popover` already had. The Calendar header's Repeating button is removed; the + opens the same card with its Once / Repeats switch (the two tour lines that named Repeating now point at the +). The Calendar's time column writes each hour once and shows sub-marks as small `:15` / `:30` / `:45`. The Clock no longer draws the cyan "KRNL0 opened" / grey "closed" rim ticks.
+

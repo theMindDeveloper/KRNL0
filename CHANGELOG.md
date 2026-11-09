@@ -5,6 +5,16 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Adding a plan: picking an hour or minute in the time picker no longer closes the plan card (the picker list sits outside the card, and counted as a click elsewhere).
+
+### Changed
+- Calendar header: one **+** adds a plan or a repeating event (its card's Once / Repeats switch); the separate Repeating button is gone.
+- Calendar time column: each hour is written once; the marks under it show only the minutes, small (`:30`, not `09:30`).
+- Clock: no more "KRNL0 opened / closed" ticks on the rim (the cyan mark).
+
 ## [0.11.1] — 2026-11-09
 
 ### Fixed

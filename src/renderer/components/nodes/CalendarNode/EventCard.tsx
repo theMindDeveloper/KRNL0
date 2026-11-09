@@ -1,5 +1,5 @@
 // Decision 40 — make something on the Calendar (double-click empty hours, the
-// + button, the Repeating button, or right-click → "New here…"). Once adds a
+// + button, or right-click → "New here…"). Once adds a
 // plan at that time; Repeats adds a repeating event (a class, a shift — never
 // ticked). The same card edits an event.
 //

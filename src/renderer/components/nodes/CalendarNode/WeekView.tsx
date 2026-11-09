@@ -226,7 +226,7 @@ interface WeekViewProps {
 
 /** Window event: scroll the hour window to this week's first routine (routines tour). */
 export const SHOW_ROUTINES_EVENT = 'krnl:calendar-show-routines';
-const GUTTER_WIDTH = 40; // px — time gutter width (fits "00:30" at the 11px text floor)
+const GUTTER_WIDTH = 40; // px — time gutter width (hours, with ":30" sub-marks under them)
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
 const MIN_BLOCK_PX = 14; // px — a planned block is never thinner than one text line
 /** Space between two blocks that touch in time. */
@@ -818,14 +818,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
     const at = `${String(Math.floor(snapMin / 60)).padStart(2, '0')}:${String(snapMin % 60).padStart(2, '0')}`;
     const isoDow = ((new Date(`${dayYMD}T00:00:00`).getDay() + 6) % 7) + 1;
     setEventCard({ x, y, day: dayYMD, allowOnce: true, initial: { name: '', mode: 'once', days: [isoDow], time: at, lengthMin: 60 } });
-  };
-  /** The Repeating button: the same card, already on Repeats (today's weekday, the next hour). */
-  const openNewRepeating = (x: number, y: number) => {
-    const now = new Date();
-    const day = todayYMD();
-    const isoDow = ((now.getDay() + 6) % 7) + 1;
-    const at = `${String(Math.min(23, now.getHours() + 1)).padStart(2, '0')}:00`;
-    setEventCard({ x, y, day, allowOnce: true, initial: { name: '', mode: 'repeat', days: [isoDow], time: at, lengthMin: 60 } });
   };
   const submitEvent = (card: NonNullable<typeof eventCard>, d: EventDraft) => {
     setEventCard(null);
@@ -2369,7 +2361,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             ))}
           </div>}
 
-          {/* Decision 40 — add something without knowing the right-click: a plan or a repeating event. */}
+          {/* Decision 40 — add something without knowing the right-click: a plan or a
+              repeating event (the card's Once / Repeats switch). The only add
+              button in the header (owner, 2026-11-09: one +, no Repeating). */}
           <button
             type="button"
             data-testid="calendar-new"
@@ -2383,17 +2377,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', background: 'color-mix(in srgb, var(--acid) 12%, transparent)', color: 'var(--ink)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
           >
             <MenuIcon name="plus" size={12} />
-          </button>
-
-          {/* Add a repeating event (a class, a shift) in one click. */}
-          <button
-            type="button"
-            data-testid="calendar-new-repeating"
-            title="Add a repeating event: a class, a shift, a weekly call"
-            onClick={(e) => openNewRepeating(e.clientX - 160, e.clientY + 14)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 11 }}
-          >
-            <MenuIcon name="repeat" size={12} /><span className="cal-repeating-label">Repeating</span>
           </button>
 
           {/* Decision 40 — every repeating event, ended ones too: their home now
@@ -2698,7 +2681,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                   {String(hour).padStart(2, '0')}
                 </span>
                 {/* #5 ruler sub-marks — appear as the grid is zoomed in, so the
-                    gutter reads like a ruler (13:15 / 13:30 / 13:45). */}
+                    gutter reads like a ruler. Only the minutes, small, under
+                    their hour (13, :15, :30, :45): the hour is said once
+                    (owner, 2026-11-09 — "13 / 13:30" was too much). */}
                 {subMarks.map((min) => (
                   <span
                     key={min}
@@ -2708,12 +2693,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
                       right: 4,
                       visibility: hour >= win.endHour || hour < win.startHour ? 'hidden' : undefined,
                       fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
+                      fontSize: 9.5,
                       color: 'var(--ink-4)',
                       lineHeight: 1,
                     }}
+                    aria-label={`${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`}
                   >
-                    {String(hour).padStart(2, '0')}:{String(min).padStart(2, '0')}
+                    :{String(min).padStart(2, '0')}
                   </span>
                 ))}
               </div>

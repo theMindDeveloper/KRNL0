@@ -903,7 +903,7 @@ select option { background: var(--paper); color: var(--ink); }
    next square. */
 :where(
   [data-testid^="habit-view-"], [data-testid^="analytics-range-"], [data-testid="week-today"],
-  [data-testid="calendar-new"], [data-testid="calendar-events-list"], [data-testid="calendar-new-repeating"],
+  [data-testid="calendar-new"], [data-testid="calendar-events-list"],
   [data-testid^="calendar-layer-"], [data-testid="clock-week-toggle"], [data-testid="clock-dial-only"],
   [data-testid^="clock-window-"], [data-testid^="clock-day-"], [data-testid^="layout-toggle-"],
   [data-testid="topbar-canvas-switcher"], [data-testid^="pomo-mode-"], [data-testid="week-prev"],

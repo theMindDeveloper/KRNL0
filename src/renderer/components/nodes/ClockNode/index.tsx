@@ -25,7 +25,6 @@ import { Z } from '../../ui/layers';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { ClockBezel } from './ClockBezel';
 import { ClockWeek, buildWeek } from './ClockWeek';
-import { useAppMarkers } from '../../../store/appSessions';
 import { PagedView } from '../../ui/PagedView';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
@@ -309,7 +308,6 @@ export function ClockNode({
   );
 
   // #207 follow-up — app open / close markers for the shown day.
-  const appMarkers = useAppMarkers(selectedDate, selectedDate);
 
   // #207 — Week view model (built only while the week is shown).
   const week = useMemo(
@@ -964,26 +962,6 @@ export function ClockNode({
                 second hand passing under a still cursor) "leaves" the wedge
                 and the hover flickers / the click misses. */}
             <g data-testid="clock-face-overlay" pointerEvents="none">
-            {/* #207 follow-up — when KRNL0 was opened / closed (small rim ticks). */}
-            {appMarkers.map((m) => {
-              const d = new Date(m.ms);
-              const h = d.getHours() + d.getMinutes() / 60;
-              if (h < viewWindow * 12 || h >= viewWindow * 12 + 12) return null;
-              const a = pt(h, R_FACE + 2);
-              const b = pt(h, R_FACE - 4);
-              return (
-                <line
-                  key={`app-${m.kind}-${m.ms}`}
-                  data-testid={`clock-app-${m.kind}`}
-                  x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke={m.kind === 'open' ? 'var(--cyan, var(--ink-3))' : 'var(--ink-4)'}
-                  strokeWidth={1.6}
-                  strokeLinecap="round"
-                >
-                  <title>{`KRNL0 ${m.kind === 'open' ? 'opened' : 'closed'} ${fmtClockHM(m.ms)}`}</title>
-                </line>
-              );
-            })}
             {/* 60 tick marks */}
             {Array.from({ length: 60 }).map((_, i) => {
               const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
