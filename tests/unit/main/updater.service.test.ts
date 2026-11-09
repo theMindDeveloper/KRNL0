@@ -283,3 +283,30 @@ describe('UpdateService — disabled (F8) and offline (F9)', () => {
     expect((await service.check()).status).toBe('ready');
   });
 });
+
+describe('UpdateService — a restart that does not happen (audit 2026-11-09)', () => {
+  it('an install that fails later is an error, not "Already restarting" for good', async () => {
+    const { backend, downloads, quitAndInstall } = fakeBackend('auto', async () => release('0.11.0'));
+    const { service, timers } = makeService(backend, { installDelayMs: 5, installWatchdogMs: 50 });
+    quitAndInstall.mockImplementation(() => Promise.reject(new Error('installer missing')));
+    await service.check();
+    downloads[0]!.done.resolve();
+    await flush();
+    expect((await service.install()).ok).toBe(true);
+    timers.runOnce(5);
+    await flush();
+    expect(service.state().status).toBe('error');
+  });
+
+  it('the app never quit: after a while it is an error and can be tried again', async () => {
+    const { backend, downloads } = fakeBackend('auto', async () => release('0.11.0'));
+    const { service, timers } = makeService(backend, { installDelayMs: 5, installWatchdogMs: 50 });
+    await service.check();
+    downloads[0]!.done.resolve();
+    await flush();
+    await service.install();
+    timers.runOnce(5);
+    timers.runOnce(50);
+    expect(service.state().status).toBe('error');
+  });
+});

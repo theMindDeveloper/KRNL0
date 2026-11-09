@@ -36,7 +36,8 @@ export interface UpdateBackend {
   /** Auto mode: download the release `latest()` just found. */
   download?(onProgress: (percent: number) => void): Promise<void>;
   /** Auto mode: quit, install the downloaded update silently, relaunch. */
-  quitAndInstall?(): void;
+  /** Quits and runs the installer. A rejection (or never quitting) is a failed install. */
+  quitAndInstall?(): void | Promise<void>;
 }
 
 export interface UpdateServiceOptions {
@@ -55,6 +56,8 @@ export interface UpdateServiceOptions {
   log?: (message: string) => void;
   /** Delay between answering an install request and quitting, so a CLI reply reaches the terminal. */
   installDelayMs?: number;
+  /** How long to wait for the app to quit into the installer before calling it failed (default 20 s). */
+  installWatchdogMs?: number;
 }
 
 export class UpdateService implements UpdaterPort {
@@ -186,14 +189,25 @@ export class UpdateService implements UpdaterPort {
     }
     // Reply first, quit a moment later (F7): the terminal that ran
     // "krnl update install" dies with the app.
+    const failed = (err: unknown): void => {
+      if (!this.installing) return;
+      this.installing = false;
+      this.log(`quitAndInstall failed: ${errorMessage(err)}`);
+      this.set({ ...this.base(), status: 'error', error: errorMessage(err), checkedAt: this.now() });
+    };
     this.setTimeoutFn(() => {
+      // An async failure (the installer file gone, removed by antivirus) used
+      // to leave "Already restarting" for the rest of the run.
+      let quitting: void | Promise<void>;
       try {
-        backend.quitAndInstall!();
+        quitting = backend.quitAndInstall!();
       } catch (err) {
-        this.installing = false;
-        this.log(`quitAndInstall failed: ${errorMessage(err)}`);
-        this.set({ ...this.base(), status: 'error', error: errorMessage(err), checkedAt: this.now() });
+        failed(err);
+        return;
       }
+      if (quitting instanceof Promise) quitting.catch(failed);
+      // Still running a while later: the restart didn't happen.
+      this.setTimeoutFn(() => failed(new Error("KRNL0 couldn't restart into the update. Try again, or download it from the website.")), this.opts.installWatchdogMs ?? 20_000);
     }, this.opts.installDelayMs ?? 1200);
     return { ok: true, message: `Restarting into KRNL0 ${s.latestVersion ?? ''}…` };
   }

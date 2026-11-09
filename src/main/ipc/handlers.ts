@@ -390,8 +390,12 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       onEvent: send,
     });
     asking.set(id, cancel);
+    // The window reloads or closes: its questions stop too.
+    event.sender.once('destroyed', () => { asking.get(id)?.(); asking.delete(id); });
     return { ok: true };
   });
+  // Quitting stops every question still running.
+  app.once('before-quit', () => { for (const c of asking.values()) c(); asking.clear(); });
   // Is Claude Code installed and signed in? (the orb says so before you ask)
   ipcMain.handle('assistant:status', () => claudeStatus({ cwd: claudeHomeDir(), env: toolsEnv() }));
   ipcMain.handle('assistant:cancel', (_event, id: unknown) => {

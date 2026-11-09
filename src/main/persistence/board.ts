@@ -429,7 +429,14 @@ function migrateAddAnalyticsMother(board: Record<string, unknown>): Record<strin
   board['nodes'] = kept;
   const edges = board['edges'];
   if (Array.isArray(edges) && childIds.size > 0) {
-    board['edges'] = edges.filter((e) => !(isObj(e) && (childIds.has(e['source']) || childIds.has(e['target']))));
+    // Edges point by from.nodeId / to.nodeId (shared/types/edge.ts); the old
+    // source/target check never matched, so links to removed windows stayed.
+    const ends = (e: Record<string, unknown>): unknown[] => [
+      e['source'], e['target'],
+      isObj(e['from']) ? (e['from'] as Record<string, unknown>)['nodeId'] : undefined,
+      isObj(e['to']) ? (e['to'] as Record<string, unknown>)['nodeId'] : undefined,
+    ];
+    board['edges'] = edges.filter((e) => !(isObj(e) && ends(e).some((id) => typeof id === 'string' && childIds.has(id))));
   }
   return board;
 }

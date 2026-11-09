@@ -76,9 +76,9 @@ export function createNsisBackend(log: (m: string) => void): UpdateBackend {
         u.removeListener('download-progress', onEvent);
       }
     },
-    quitAndInstall(): void {
-      if (!loaded) throw new Error('no update was downloaded');
-      void loaded.then((u) => {
+    quitAndInstall(): Promise<void> {
+      if (!loaded) return Promise.reject(new Error('no update was downloaded'));
+      return loaded.then((u) => {
         // isSilent: no installer wizard; isForceRunAfter: reopen KRNL0 after.
         u.quitAndInstall(true, true);
       });
