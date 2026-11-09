@@ -2603,3 +2603,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Branch:** `experiment/new-user-review`
 **Files changed:** `Tour/tours.ts` (two voice lines reworded), `Tour/voice/*` (2 clips re-recorded, 2 removed), `docs/releases/pre-release-todo.md`.
 **Summary:** All 155 recordings were transcribed back with ElevenLabs speech-to-text and compared with their scripts (mean word match 0.98; no audio tag read aloud). Two slips — "Tick it" heard as "Ticket", "Tick the box" as "Take the box" — were reworded ("Then tick it off… right there in the list", "Then tick the little box on its row") and re-recorded; both now transcribe exactly. The real Electron build was driven over CDP with its own profile and board (the owner's running app untouched): windows open, the board tour opens, the orb answers through Claude Code. Claude CLI states checked on Windows: not installed, not signed in, ready, and a question with quotes and `&`. Issues #222–#229 closed with this evidence.
+
+## [2026-11-09] — What's new plates redrawn sharp (experimental)
+
+**Type:** Bug Fix
+**Branch:** `experiment/new-user-review`
+**Files changed:** `src/renderer/assets/launch/plate-guide.webp`, `src/renderer/assets/launch/plate-board.webp`.
+**Summary:** The two new 0.11 plates were made with a CSS tilt of a small HTML card, which smeared their tiny text. They are now rendered with the same 3D plate renderer as every older plate (flat texture on a real slab, ink outline): big type, few words — "Plan it." with progress, voice and Next for the guide; a Read habit row and a Wed 11 · Class · 17:00 event for the board. Checked at the dialog's real size; the approval board's three screenshots were retaken.
