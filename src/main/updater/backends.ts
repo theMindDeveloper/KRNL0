@@ -20,11 +20,26 @@ export function releasePageUrl(version: string): string {
   return `${RELEASES_URL}/tag/v${stripV(version)}`;
 }
 
+/**
+ * electron-updater is CommonJS and defines `autoUpdater` with a getter. Loaded
+ * through `import()` (the bundled main process keeps a real dynamic import),
+ * Node does not see that getter as a named export: `mod.autoUpdater` is
+ * undefined and the object is on `mod.default`. v0.10.1 and v0.11.0 read
+ * `mod.autoUpdater` and every check failed with "Cannot set properties of
+ * undefined (setting 'autoDownload')" — no install could update itself.
+ */
+export function pickAutoUpdater(mod: unknown): AppUpdater {
+  const m = mod as { autoUpdater?: AppUpdater; default?: { autoUpdater?: AppUpdater } } | null;
+  const u = m?.autoUpdater ?? m?.default?.autoUpdater;
+  if (!u) throw new Error('electron-updater did not load (no autoUpdater)');
+  return u;
+}
+
 export function createNsisBackend(log: (m: string) => void): UpdateBackend {
   let loaded: Promise<AppUpdater> | null = null;
   const updater = (): Promise<AppUpdater> => {
     loaded ??= import('electron-updater').then((mod) => {
-      const u = mod.autoUpdater;
+      const u = pickAutoUpdater(mod);
       // We decide when to download (UpdateService), never electron-updater.
       u.autoDownload = false;
       // "Later" still gets the update: installed silently when the app quits (F2).

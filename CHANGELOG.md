@@ -5,6 +5,11 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] — 2026-11-09
+
+### Fixed
+- Updates: the check failed on every Windows install with "Cannot set properties of undefined (setting 'autoDownload')" — electron-updater's `autoUpdater` is on the module's `default` when loaded through `import()`. Installs on 0.10.1 and 0.11.0 can't fetch this fix themselves: install 0.11.1 by hand once.
+
 ## [0.11.0] — 2026-11-09
 
 ### Added

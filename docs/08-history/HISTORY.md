@@ -2646,3 +2646,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `docs/releases/pre-release-todo.md`, this file.
 **Summary:** On the owner's OK ("Yes, publish it") v0.11.0 was published and marked Latest: PRs #230 (the release), #231 (tours checked in every mode, examples on an empty board, plain voice) and #232 (Calendar recorded time only from its line, no reminders in Easy, Crisp default sound, "To-do" in the voice). The CI draft was checked first: `KRNL0-Setup-0.11.0.exe`, its `.blockmap` and `latest.yml` (version 0.11.0, matching size and sha512), and the notes from `docs/releases/v0.11.0.md`. Two earlier drafts of 0.11.0, built before these fixes, were never published and were deleted. Windows installs on 0.10.1 now update by themselves; macOS has no `.dmg` yet (RELEASING.md, macOS build). Still open for the owner: rotate the ElevenLabs API key.
 
+## [2026-11-09] — Release 0.11.1 prepared: updates work again
+
+**Type:** Bug Fix / Release
+**Branch:** `chore/release-v0.11.1`
+**Files changed:** `src/main/updater/backends.ts` (`pickAutoUpdater`), `tests/unit/main/updater.backends.test.ts`, `package.json` / `package-lock.json` (0.11.1), `CHANGELOG.md`, `docs/releases/v0.11.1.md`.
+**Summary:** The owner's installed 0.10.1 showed "Couldn't check for updates: Cannot set properties of undefined (setting 'autoDownload')" and never offered 0.11.0. Cause: the bundled main process keeps a real `import('electron-updater')`; electron-updater is CommonJS and defines `autoUpdater` with a getter, which Node's import does not expose as a named export, so `mod.autoUpdater` was undefined (it is on `mod.default`). Every check on every Windows install failed, silently at start (the error only showed in Settings). Fixed by taking `autoUpdater` from either shape, with a clear error if neither; proven inside Electron (old way `undefined`, fixed way `NsisUpdater`) and pinned by tests. 0.10.1 and 0.11.0 still carry the bug, so their users install 0.11.1 by hand once (the notes say so); updates work by themselves from then on.
+
