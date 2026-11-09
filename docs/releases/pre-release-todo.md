@@ -23,7 +23,7 @@ Updated 2026-11-09 (overnight run). Everything that can be done without the owne
 
 - [x] **Approve What's new** — approved by the owner with the go-ahead to release (2026-11-09), after the two plates were redrawn sharp.
 - [ ] **Rotate the ElevenLabs API key** that was pasted in chat — it lives in your ElevenLabs account (it is in no file here).
-- [x] **Release** — the owner said go (2026-11-09): PR #230 merged, `v0.11.0` tagged on main, CI draft checked for `latest.yml`, published.
+- [ ] **Release** — the owner said go (2026-11-09), then stopped it: the tours were wrong for Easy / Advanced. PR #230 was merged and a `v0.11.0` draft built, **not published**. Now: the tour fixes (review: `docs/releases/tour-review-0.11.md`, approved "Scripts OK, A + 2") re-recorded and checked, merged; the old draft and tag deleted; tagged again; **published only after the owner's OK**.
 
 ## After the release
 

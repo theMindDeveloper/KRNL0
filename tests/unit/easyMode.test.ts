@@ -55,15 +55,16 @@ describe('Easy mode UI rules', () => {
     expect(labels(true)).toContain('Mark done');
   });
 
-  it('D12: Easy drops the plan-vs-actual and time-by-tag pages and closes the gap', () => {
+  it('D12: Easy drops the plan-vs-actual, time-by-tag and time-per-task pages and closes the gap', () => {
     const ids = pagesFor(true).map((p) => p.id);
     expect(ids).not.toContain('estimates');
     expect(ids).not.toContain('tags');
-    expect(pagesFor(false).length - ids.length).toBe(2);
+    // Time per task too (owner, 2026-11-09): Easy's Record never links time to a
+    // task, so the page showed one "untagged" row — and tags, which Easy hides.
+    expect(ids).not.toContain('log');
+    expect(pagesFor(false).length - ids.length).toBe(3);
     expect(cardPlacement('estimates.kpis', true)).toEqual({ display: 'none' });
-    // Easy keeps the Time log page (#207 — no task links needed): summary,
-    // activity, year, hours, log, insights → 'insights' is page index 5 → grid row 11
-    expect(pagesFor(true).map((p) => p.id)).toContain('log');
-    expect(cardPlacement('insights.radar', true).gridRow).toBe('11 / span 1');
+    // summary, activity, year, hours, insights → 'insights' is page index 4 → grid row 9
+    expect(cardPlacement('insights.radar', true).gridRow).toBe('9 / span 1');
   });
 });
