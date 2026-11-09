@@ -2639,3 +2639,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Files changed:** `Tour/tours.ts` (five `say` lines), `Tour/voice/*` (5 clips), `src/main/index.ts` (`autoplayPolicy`), `tests/unit/renderer/tourVoice.test.ts`.
 **Summary:** The voice read "Todo" as "toodoo": the five scripts that name it now say "To-do" (the screen still shows Todo), re-recorded and transcribed back exactly; a test keeps "Todo" out of every script. The main window allows audio without a user gesture, so the first-day tour's first step speaks on a fresh start (the tour already starts by itself with the voice on).
 
+## [2026-11-09] — v0.11.0 published
+
+**Type:** Release
+**Branch:** `main` (tag `v0.11.0` at b9ba542)
+**Files changed:** `docs/releases/pre-release-todo.md`, this file.
+**Summary:** On the owner's OK ("Yes, publish it") v0.11.0 was published and marked Latest: PRs #230 (the release), #231 (tours checked in every mode, examples on an empty board, plain voice) and #232 (Calendar recorded time only from its line, no reminders in Easy, Crisp default sound, "To-do" in the voice). The CI draft was checked first: `KRNL0-Setup-0.11.0.exe`, its `.blockmap` and `latest.yml` (version 0.11.0, matching size and sha512), and the notes from `docs/releases/v0.11.0.md`. Two earlier drafts of 0.11.0, built before these fixes, were never published and were deleted. Windows installs on 0.10.1 now update by themselves; macOS has no `.dmg` yet (RELEASING.md, macOS build). Still open for the owner: rotate the ElevenLabs API key.
+
