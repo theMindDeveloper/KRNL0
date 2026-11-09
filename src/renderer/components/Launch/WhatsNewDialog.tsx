@@ -16,9 +16,12 @@ import artMenubar from '../../assets/launch/plate-menubar.webp';
 import artFeedback from '../../assets/launch/plate-feedback.webp';
 import artStreak from '../../assets/launch/plate-streak.webp';
 import artSessions from '../../assets/launch/plate-sessions.webp';
+import artGuide from '../../assets/launch/plate-guide.webp';
+import artBoard from '../../assets/launch/plate-board.webp';
+import { startTour } from '../Tour/TourHost';
 
 const ART: Record<WhatsNewArt, string> = {
-  mini: artMini, menubar: artMenubar, feedback: artFeedback, streak: artStreak, sessions: artSessions,
+  mini: artMini, menubar: artMenubar, feedback: artFeedback, streak: artStreak, sessions: artSessions, guide: artGuide, board: artBoard,
 };
 
 function runAction(item: WhatsNewItem): void {
@@ -33,6 +36,7 @@ function runAction(item: WhatsNewItem): void {
     if (pomo) focusNode(pomo.id);
   }
   if (item.action === 'settings') window.dispatchEvent(new CustomEvent('krnl:open-settings'));
+  if (item.action === 'tour') window.setTimeout(() => startTour('first-day'), 200);
 }
 
 export function WhatsNewDialog() {

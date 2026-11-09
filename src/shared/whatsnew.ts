@@ -7,9 +7,9 @@
 
 import { minorOf } from './appState';
 
-export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions';
+export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board';
 /** What "Show me" does for a highlight. */
-export type WhatsNewAction = 'pomo' | 'feedback' | 'settings' | 'none';
+export type WhatsNewAction = 'pomo' | 'feedback' | 'settings' | 'tour' | 'none';
 
 export interface WhatsNewItem {
   /** Short line in the 01–03 list. */
@@ -40,53 +40,58 @@ export interface WhatsNewRelease {
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
     minor: '0.11',
-    date: '6 Nov 2026',
-    summary: 'floating timer, taskbar time, feedback',
+    date: 'Nov 2026',
+    summary: 'Easy mode and a voiced guide, plans, habits and events on one board, a floating timer',
     items: [
       {
+        label: 'Easy mode, and a guide',
+        kicker: 'New · Easy mode and voiced tours',
+        caption: 'Plan it, do it, see how it went. A spoken tour shows you every part.',
+        title: 'Start simple.\nWe’ll show you around.',
+        body: 'KRNL0 starts in Easy mode: plan your day, record what you do, see how it went. A guide walks you through your first day out loud, and every window has its own short tour. Advanced is one switch away.',
+        art: 'guide',
+        action: 'tour',
+      },
+      {
+        label: 'Your week on one board',
+        kicker: 'New · When, deadlines, board cards',
+        caption: 'Habits and repeating events get cards next to your plans.',
+        title: 'Plans, habits and\nevents, together.',
+        body: 'Give a plan a day and a time, or just a day, and a deadline if it has one. Classes and shifts repeat on the Calendar by themselves. Habits and events get cards: tick today’s square, skip a class, or Show anything on the Calendar.',
+        art: 'board',
+        action: 'none',
+      },
+      {
         label: 'A timer that floats',
-        kicker: 'New · floating timer',
-        caption: 'Minimise KRNL0 while the Pomo runs and the timer stays above your other windows.',
+        kicker: 'New · floating timer and taskbar',
+        caption: 'Minimise KRNL0 while the timer runs: it stays above your other windows.',
         title: 'Your timer, now on\ntop of everything.',
-        body: 'A small timer floats over whatever you work in. Pause, take a break or stop right from it, in Pomodoro and Observe.',
+        body: 'A small timer floats over whatever you work in, and the time left shows on the taskbar (Windows) or next to the clock (Mac). Pause, take a break or stop from either.',
         art: 'mini',
         action: 'pomo',
       },
-      {
-        label: 'Time left on your taskbar',
-        kicker: 'New · taskbar and menu bar',
-        caption: 'A progress bar on the KRNL0 taskbar icon on Windows, the minutes next to your clock on a Mac.',
-        title: 'Glance,\ndon’t switch.',
-        body: 'See how long is left without opening KRNL0. Hover the taskbar icon on Windows, or click the time in the Mac menu bar, to pause, break or stop.',
-        art: 'menubar',
-        action: 'pomo',
-      },
-      {
-        label: 'Send feedback from the app',
-        kicker: 'New · send feedback',
-        caption: 'Help › Send feedback. Your version and system are added for you.',
-        title: 'Tell us what\nto fix next.',
-        body: 'A short form, right in the app. It opens a filled-in GitHub issue, and nothing is sent until you post it.',
-        art: 'feedback',
-        action: 'feedback',
-      },
     ],
     more: [
-      'A copy of your board is saved before every update (Settings › Updates › Board backups).',
+      'Tours for every window, voiced, in Easy and Advanced (the orb’s menu). The first one starts on its own the first time you open KRNL0.',
+      'Ask the orb anything: it answers with Claude Code (when it is installed) and can change your board for you.',
+      'Show: one click lights up a plan on the board and on the Calendar.',
+      'The Calendar: double-click empty hours to add a plan, a Repeating button for classes and shifts, an ANY TIME strip for plans with a day but no time, deadlines as flags.',
+      'Habits: times a week, a daily goal (8 glasses), rest days that keep a streak, Week / Month / Year views, and archive.',
+      'Plans: a reminder before it starts (even with the window closed), and Won’t do for things you drop.',
+      'Quick add: type “Gym tomorrow 18:00 1h”, “Pay rent fri” or “Meeting 14:00-15:30” and it lands on the right day and time.',
+      'Close the day: in the evening, one card with what you did today.',
+      'Night shifts: a repeating event can run past midnight.',
+      'Sounds: three sound packs for ticks and the timer, with volume and an off switch (Settings › Sounds).',
+      'The floating timer comes in three looks (Dial, Capsule, Box), and the Pomo has a Minimal face.',
+      'Align to grid (Settings › Canvas): what you move settles into a neat spot, never on top of something. Cards only, or everything.',
+      'Station: a divider you let go near the line above or below clicks onto it.',
+      'A new board tour: notes, sticky notes, Show, the habit and event cards, Align to grid.',
+      'Send feedback from the app (Help › Send feedback): a filled-in GitHub issue, nothing sent until you post it.',
       'Welcome back: after two or more days away, a short list of what slipped, with one-click fixes.',
-      'Milestone cards for habit streaks and focus sessions, with a Celebrations switch in Settings.',
-      'Observe mode draws breaks as a thin line instead of stripes.',
-      'The Calendar shows your plan as blocks, habits as small pills you can tick, and what you recorded on a track at the left of each day that fills up to now, like the Clock; switch Recorded and Habits in its header.',
-      'Plans that overlap in a narrow day stand side by side as slim bars named by their first letters; Fix overlap puts them one after another, and dragging a plan to the strip at the bottom unschedules it.',
-      'The month view shows every plan of a day (a full day scrolls) and never hides one behind "+N".',
-      'A task card keeps the same shape when you tick it, so nothing moves under your click.',
-      'The floating timer comes in three looks (Dial, Capsule, Box) and asks what an Observe span was.',
-      'Easier to read: larger labels, stronger contrast in light and dark, and line icons throughout.',
-      'Habits & Routines: a routine (a class, a work shift) sits on your Calendar every week and is never ticked; skip one week, move one, or end it. Habits can be "any time".',
-      'Adding asks first: type a name, press Enter, and say whether you tick it off (a habit) or it just happens (a routine). Nothing is added with settings you did not choose.',
-      'Habits: aim for 3 times a week on any days, mark a rest day when you are sick or away, and archive a habit to keep its history.',
-      'Plans: a due date apart from the time, a reminder before it starts (even with the window closed), and Drop for things you are not doing any more.',
-      'New tour: Help › Staying on track.',
+      'Milestone cards for streaks and focus sessions, with a Celebrations switch in Settings.',
+      'A copy of your board is saved before every update (Settings › Updates › Board backups).',
+      'Easier to read: larger labels, stronger contrast, line icons, and button text that never spills out.',
+      'Fixed: new wires snapping onto hidden cards; a tour’s highlight jumping to another task when the board moved.',
     ],
   },
   {

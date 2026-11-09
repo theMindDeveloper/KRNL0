@@ -5,6 +5,37 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-11-09
+
+### Added
+- **Easy / Advanced modes** — Easy shows only what a first week needs (no tags, deadlines, chains, Calendar layers, terminal, frames, wires or extra canvases); Settings › Mode, `krnl settings mode`.
+- **Guided tours, voiced** — a first-day tour that starts on first launch, and a tour for every window (Welcome, Pomo, Todo, Calendar, Clock, Habits, Repeating events, Staying on track, Analytics, Easy and Advanced, The board, Terminal & AI), written per mode and per timer mode, recorded with ElevenLabs Eleven v4; practice data can be removed or kept; `krnl tour list|start`.
+- **Plans: one When and an optional Deadline** (Decision 40): ANY TIME strip, deadline flags in Week/Day/Month, reminders, Won't do with Undo, one plan card for adding, editing and the Calendar; quick add reads days, times, ranges, "in 2 hours", "noon", "every …".
+- **Repeating events** on the Calendar (Decision 39): skip, move, end after a day, night shifts, reminders; the Repeating button; double-click empty hours to add.
+- **Habits**: any-time habits, times a week, daily amounts, rest days, Week/Month/Year views in the header, archive/restore.
+- **Board cards for habits and repeating events** (Decision 42): today's square is the button; the event's date page with Skip this one and Show; no wire dots.
+- **Show** (`krnl show`): one highlight for a plan's card and its Calendar block; state colours on card icons.
+- **The orb answers through Claude Code** (Decision 41): streamed answers, krnl-only tools, sign-in help; the orb's lines re-recorded in the guide's voice.
+- **Floating timer** (Dial, Capsule, Box), taskbar progress (Windows) and menu-bar time (macOS).
+- **Launch experience**: splash, What's new, Welcome back, milestones and sharing, feedback form, board backups before updates.
+- **Close the day** recap; UI sound packs; Pomo Minimal and compact faces.
+- **Align to grid** (`alignGrid: 'cards' | 'all'`, `krnl settings grid`) and **Station soft snap**.
+- A dev-only overflow guard and an app-wide rule that keeps every control's label inside it.
+
+### Changed
+- Repeating plans are removed: something that repeats is a habit with a time or a repeating event (old boards still load).
+- Adding tasks never chains them automatically; Unschedule replaces Remove.
+- The old intro and Pomo/Todo walkthrough flows are replaced by the tours.
+- Labels say "window", not "mother" or "node".
+
+### Fixed
+- Wires snapped onto hidden (finished / layer-off) cards, and wires between hidden cards were drawn.
+- A tour's highlight jumped to another task when the board moved.
+- Cursor stutter between pointer and grab on cards (#226).
+- Clock kept the previous day; Clock hover flicker; terminal prompt two characters wide; recorded segments unclickable; tagged time looked untagged (#200–#204).
+- Calendar items that could not be deleted; deadlines of timed plans drawn nowhere (#220, #221).
+- Many readability, contrast and small-window fixes (11 px floor for functional text, nothing cut off in small windows).
+
 ## [0.10.1] — 2026-11-05
 
 ### Added
