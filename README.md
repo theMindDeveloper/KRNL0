@@ -55,11 +55,7 @@ KRNL0 puts every primitive on one canvas as a node, and lets them communicate. D
 
 **One file (`board.json`) is the only persisted state. Every view derives from it.**
 
-<div align="center">
-<img src="docs/assets/v0.10-canvas.webp" alt="KRNL0 v0.10 Canvas mode — task chains, shapes, embeds, sticky notes and the pen wheel on one canvas" width="94%" />
-<img src="docs/assets/v0.10-station.webp" alt="KRNL0 v0.10 Station mode — fixed windows around a live canvas" width="94%" />
 
-</div>
 
 ---
 
