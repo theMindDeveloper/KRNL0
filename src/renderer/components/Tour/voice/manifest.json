@@ -1,12 +1,12 @@
 {
-  "83092497": {
-    "text": "[warmly] Hi! Let's plan one real thing... and actually do it, together. [Brief pause] It takes about four minutes. Press \"Next\", or Enter, to go on, and Escape whenever you want to stop.",
+  "11036729": {
+    "text": "[warmly] This is your board. Every plan, habit and repeating event has a card here... and you can put your own notes and pictures around them.",
     "tours": [
-      "first-day"
+      "board"
     ]
   },
-  "4ff89993": {
-    "text": "[friendly] First, add something you'll do today. Click \"add a plan\" and type it. [Brief pause] A small card shows its day, its time and how long it takes. Pick any of them... or just press Enter.",
+  "83092497": {
+    "text": "[warmly] Hi! Let's plan one real thing... and actually do it, together. [Brief pause] It takes about four minutes. Press \"Next\", or Enter, to go on, and Escape whenever you want to stop.",
     "tours": [
       "first-day"
     ]
@@ -71,12 +71,6 @@
       "first-day"
     ]
   },
-  "400c1348": {
-    "text": "[warmly] One last thing. Add a habit you want to keep... reading, a walk, anything. [Brief pause] A card opens with every day, at any time. Just press Enter.",
-    "tours": [
-      "first-day"
-    ]
-  },
   "8da22065": {
     "text": "[happily] Did it today? Then click today's square.",
     "tours": [
@@ -105,6 +99,624 @@
     "text": "[calm] When you start working, press \"Start\". [Brief pause] The Pomo timer records what you really do.",
     "tours": [
       "first-day"
+    ]
+  },
+  "860b6ed1": {
+    "text": "[friendly] First, add something you'll do today. Click \"add a plan\" and type it. [Brief pause] A small card shows its day, its time and how long it takes. Pick any of them if you like, then press Enter to add it.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "1579f16d": {
+    "text": "[warmly] One last thing. Add a habit you want to keep... reading, a walk, anything. [Brief pause] A card opens with every day, at any time. Press Enter to add it.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "965f1288": {
+    "text": "[casually] Need a pause? Press the break button, the cup next to Pause. [Brief pause] Your work so far is saved, and the break is timed on its own.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "f4256e0c": {
+    "text": "[cheerfully] Back already? Press \"End break\". [Brief pause] The break is saved, and the timer waits for your next session.",
+    "tours": [
+      "first-day"
+    ]
+  },
+  "e3f2594f": {
+    "text": "[warmly] Hi, I'm your guide. [Brief pause] This app is one board, with a window for each part of your day. Press \"Next\", or Enter, to go on... and Escape to stop at any time.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "80b84f35": {
+    "text": "[calm] The Record timer records what you actually do. Start it when you begin, and stop it when you finish. [Brief pause] Only recorded time counts as time spent.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "b43e0820": {
+    "text": "[friendly] Todo is your list of plans. Each one can have a when... a day and a time, or just a day.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "c1258241": {
+    "text": "[friendly] The Calendar is your plan. Drag plans onto it, or double-click empty hours to add one. [Brief pause] Classes and shifts live here as repeating events, and your recorded time sits right next to the plan.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "265b8a0d": {
+    "text": "[curious] The Clock shows today on a dial: the plan around the edge, and what you did as coloured wedges.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "3d77b2c7": {
+    "text": "[warmly] Habits are the things you want to do regularly. Tick them off each day.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "36aadde1": {
+    "text": "[thoughtfully] Analytics answers one question: where did my time go? Per day, and per task.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "21391e46": {
+    "text": "[friendly] You're in Easy mode. You can switch here, in Settings, then Mode. [Brief pause] Advanced connects tasks, categories and focus... and the Easy and Advanced tour shows you the difference.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "a79c9358": {
+    "text": "[playfully] And this is me! [Brief pause] Ask me anything. I answer with Claude Code, and I can change your board for you. My menu also has a short tour of each window.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "fbd545e1": {
+    "text": "[calm] The Pomo timer records what you actually do. Start it when you begin, and stop it when you finish. [Brief pause] Only recorded time counts as time spent.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "cd2ef092": {
+    "text": "[friendly] Todo is your list of plans. Each one can have a when... a day and a time, or just a day. It can have a deadline, and it shows the time you really spent on it.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "9e3b0f07": {
+    "text": "[confidently] The Terminal runs a real shell. Every part of the app has a kernel command, and Claude Code can work on your board from here.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "fc1a7b92": {
+    "text": "[friendly] You're in Advanced mode. You can switch here, in Settings, then Mode. [Brief pause] Advanced connects tasks, categories and focus... and the Easy and Advanced tour shows you the difference.",
+    "tours": [
+      "welcome"
+    ]
+  },
+  "f25a832d": {
+    "text": "[warmly] The Record timer records what you really do. [Brief pause] Let's record a short session together. It only takes a few seconds.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "a3a0de3e": {
+    "text": "[encouraging] Press \"Start\".",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "fc29a029": {
+    "text": "[calm] It's running. [Brief pause] Started it by mistake? Hold the trash icon, and nothing is saved. [playfully] Don't do it now, though.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "38d4e1c0": {
+    "text": "[casually] Need a pause? Press \"Break\". The work so far is saved, and the break is timed on its own.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "7dc09306": {
+    "text": "[cheerfully] Back from the break? Press \"Back to work\".",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "27b89728": {
+    "text": "[pleased] Now press \"Stop\". [Brief pause] Your work and your break are saved, and they show on the Calendar and the Clock.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "22bc1505": {
+    "text": "[reassuring] Forgot to press Start earlier? No problem. Right-click an empty time on the Calendar, and choose \"Log time here\".",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "2f5b1e27": {
+    "text": "[friendly] Every recorded session is listed here. Open it to check one... or to delete a misclick.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "03528d25": {
+    "text": "[warmly] The Pomo timer records what you really do. [Brief pause] Let's record a short session together. It only takes a few seconds.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "4f8c7da4": {
+    "text": "[friendly] Here you say what you're doing. Pick a task, or a category like Code... and the time counts toward it.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "9ea79cec": {
+    "text": "[friendly] Pick which task this session is for, and its time counts toward that task. [Brief pause] It's optional.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "afcdc83a": {
+    "text": "[casually] Need a pause? Press the break button, the cup next to Pause. The work so far is saved, and the break is timed on its own.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "cf679ee9": {
+    "text": "[cheerfully] Back? Press \"End break\". [Brief pause] Work and break are saved, and show on the Calendar and the Clock. The square button stops a session at any time, and Pause holds it.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "3ff7d4e7": {
+    "text": "[friendly] This is your list. Let's add a task.",
+    "tours": [
+      "todo"
+    ]
+  },
+  "c39669fc": {
+    "text": "[encouraging] Click \"add a plan\" at the bottom, and type a name. A card shows its day, time and length. Pick any if you like, then press Enter to add it.",
+    "tours": [
+      "todo"
+    ]
+  },
+  "1de23ea3": {
+    "text": "[playfully] Faster: say when as you type. \"Gym tomorrow at six in the evening, one hour\" goes straight onto the Calendar, and \"Pay rent Friday\" lands on Friday, at any time. [Brief pause] The card above the field shows what Enter will do.",
+    "tours": [
+      "todo"
+    ]
+  },
+  "b5e2f383": {
+    "text": "[friendly] Change it later from its plan card: click the calendar icon on the row, or right-click, then \"When\". [Brief pause] The same card opens when you click its block on the Calendar.",
+    "tours": [
+      "todo"
+    ]
+  },
+  "3b3fbdf8": {
+    "text": "[excited] Done? Tick the box!",
+    "tours": [
+      "todo"
+    ]
+  },
+  "37d28ef4": {
+    "text": "[calm] Done tasks fold into \"Done today\". The next day they leave the list, and their recorded time stays in Analytics. [Brief pause] Untick one to reopen it.",
+    "tours": [
+      "todo"
+    ]
+  },
+  "5bd1dfd9": {
+    "text": "[playfully] Faster: say when as you type. \"Gym tomorrow at six in the evening, one hour\" goes straight onto the Calendar. \"Pay rent Friday\" lands on Friday, at any time. And \"by Saturday\" gives it a deadline. [Brief pause] The card above the field shows what Enter will do.",
+    "tours": [
+      "todo"
+    ]
+  },
+  "3852e176": {
+    "text": "[curious] The tag, like Code or Study, groups your time in Analytics. Click it to change it.",
+    "tours": [
+      "todo"
+    ]
+  },
+  "268a1f3f": {
+    "text": "[thoughtfully] The Calendar holds your plan, the blocks... and what really happened: the thin track at the left of each day.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "9393aab1": {
+    "text": "[encouraging] Drag a plan from the Todo onto a time here, to plan it.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "29508a09": {
+    "text": "[friendly] On a day, but no set time? Drop it in the \"any time\" strip under the day names, and drag it into the hours later to give it a time.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "a8524ccd": {
+    "text": "[friendly] Double-click empty hours, or press this plus, to add a plan right on the Calendar. [Brief pause] \"Repeating\", next to it, adds a class or a shift that comes back every week.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "3db565c8": {
+    "text": "[curious] Click a plan to open its card. Move it to another day or to any time, change how long it takes, set a reminder... mark it done, or delete it.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "bd6ff07b": {
+    "text": "[calm] The thin track at the left of each day fills with recorded time. Click a filled stretch to see it, and double-click its start or end time to fix it.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "e9ec096d": {
+    "text": "[reassuring] Forgot to record something? Right-click an empty time, and choose \"Log time here\".",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "f774522e": {
+    "text": "[friendly] On a day, but no set time? Drop it in the \"any time\" strip under the day names, and drag it into the hours later to give it a time. [Brief pause] A dashed flag there is a deadline.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "83e7daa5": {
+    "text": "[playfully] Once you work on it, the planned block tells you how it went... \"started twenty minutes late\", or \"thirty minutes over\".",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "cfd1e1c9": {
+    "text": "[warmly] The Clock shows today. Planned tasks run around the edge, and recorded work fills the face.",
+    "tours": [
+      "clock"
+    ]
+  },
+  "9389ac48": {
+    "text": "[curious] Click a coloured wedge to see that session... or right-click empty time to log time there.",
+    "tours": [
+      "clock"
+    ]
+  },
+  "dfe452c4": {
+    "text": "[encouraging] Press \"Week\" to see your last seven days as clocks.",
+    "tours": [
+      "clock"
+    ]
+  },
+  "2db081b3": {
+    "text": "[thoughtfully] Each clock is a day: the morning inside, the afternoon in the outer ring. Only today moves. [Brief pause] Click a day to open it.",
+    "tours": [
+      "clock"
+    ]
+  },
+  "3cdc32c2": {
+    "text": "[warmly] Habits are the things you want to do regularly... reading, exercise, a weekly review.",
+    "tours": [
+      "habits"
+    ]
+  },
+  "d5bce48c": {
+    "text": "[friendly] Click \"add a habit\" and type one. A card opens: every day, at any time, unless you pick days or a time. Press Enter to add it.",
+    "tours": [
+      "habits"
+    ]
+  },
+  "216ce9ee": {
+    "text": "[curious] Your habit also has a card on the board. It shows the week... and today's square is the button. Click it to tick today.",
+    "tours": [
+      "habits"
+    ]
+  },
+  "913ef0d2": {
+    "text": "[friendly] Right-click a habit. \"Days and time\" changes when it happens, \"Rest today\" keeps your streak on a sick day... and below, you can rename, recolour or archive it.",
+    "tours": [
+      "habits"
+    ]
+  },
+  "545ce88f": {
+    "text": "[friendly] Click \"add a habit\" and type one. A card opens: every day, at any time... unless you pick days, times a week, a time, or a goal, like eight glasses. Press Enter to add it.",
+    "tours": [
+      "habits"
+    ]
+  },
+  "741d258a": {
+    "text": "[calm] A class, a work shift, a weekly call... that's a repeating event. It sits on your Calendar every week, and it's never ticked, or missed. [Brief pause] Habits are the things you tick.",
+    "tours": [
+      "routines"
+    ]
+  },
+  "ded82750": {
+    "text": "[friendly] Press \"Repeating\" in the Calendar's header, or double-click empty hours and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
+    "tours": [
+      "routines"
+    ]
+  },
+  "b444f1d2": {
+    "text": "[curious] It has a card on the board too. It's never ticked: its page shows the next date, with \"Skip this one\", and \"Show\" on the Calendar.",
+    "tours": [
+      "routines"
+    ]
+  },
+  "a4ad3ec0": {
+    "text": "[thoughtfully] On the Calendar it's a hatched band, every week, with your plans on top. The list button in the header shows all your repeating events.",
+    "tours": [
+      "routines"
+    ]
+  },
+  "371f5e20": {
+    "text": "[casually] No class next time? Click the band, and choose \"Skip this one\". Only that day changes.",
+    "tours": [
+      "routines"
+    ]
+  },
+  "8d106730": {
+    "text": "[warmly] Semester over? Click the band and choose \"End after this day\". The days before it stay. [Brief pause] \"Restart\" is in the events list.",
+    "tours": [
+      "routines"
+    ]
+  },
+  "1b8fb0eb": {
+    "text": "[thoughtfully] On the Calendar it's a hatched band, every week, with your plans on top. The \"Events\" switch hides them, and the list button in the header shows them all.",
+    "tours": [
+      "routines"
+    ]
+  },
+  "e9ab00a3": {
+    "text": "[warmly] Not every week goes to plan... and that's fine. Three things keep you on track without lying to the app: rest days, reminders, and \"Won't do\".",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "5dc535ae": {
+    "text": "[gently] Sick, or away? Right-click a habit you haven't done today, and choose \"Rest today\". A rest day never breaks a streak... it shows as a quiet hatch.",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "ed0af607": {
+    "text": "[friendly] Want a nudge? Right-click a row, choose \"When\", give it a time, and set a reminder. A notification comes before it starts... even with the window closed.",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "0a3ded14": {
+    "text": "[calm] Not doing something any more? \"Won't do\" takes it off your list and the Calendar: not done, and not missed. [Brief pause] \"Undo\", in the notice, brings it back.",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "cfd724f5": {
+    "text": "[warmly] Not every week goes to plan... and that's fine. Four things keep you on track without lying to the app: weekly targets, rest days, deadlines, and reminders.",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "e9d3a53c": {
+    "text": "[friendly] Right-click a habit, choose \"Days and time\", then \"Times a week\"... say, three. Any days count, and the streak counts the weeks that reach it.",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "74ccd4f1": {
+    "text": "[curious] Some habits are an amount: eight glasses, twenty pages. In \"Days and time\", set a goal. Each click on the day adds one, and the day counts once the goal is reached.",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "9a198fd3": {
+    "text": "[thoughtfully] When you do something, and when it must be done, can differ. Right-click a Todo row and choose \"Deadline\". The row shows a flag, the Calendar a dashed flag on that day... and the Clock lists it.",
+    "tours": [
+      "on-track"
+    ]
+  },
+  "293f3f9a": {
+    "text": "[warmly] Analytics turns your recorded time into answers.",
+    "tours": [
+      "analytics"
+    ]
+  },
+  "e18c3033": {
+    "text": "[friendly] Each icon is a page: summary, activity, hours, time per task, and more. The name shows next to them.",
+    "tours": [
+      "analytics"
+    ]
+  },
+  "dc0b19e0": {
+    "text": "[encouraging] Open the \"Time per task\" page.",
+    "tours": [
+      "analytics"
+    ]
+  },
+  "2dbab1d1": {
+    "text": "[thoughtfully] Every row is a task, in its own colour, and every square is a day, with the minutes in it. On the right: worked, over planned. Below: time per tag.",
+    "tours": [
+      "analytics"
+    ]
+  },
+  "d4b19685": {
+    "text": "[friendly] Advanced mode adds two pages: \"Planned versus spent\", and \"Time by tag\". You can switch here, in Settings, then Mode.",
+    "tours": [
+      "analytics"
+    ]
+  },
+  "63f29639": {
+    "text": "[curious] \"Planned versus spent\" puts each task's estimate next to the time you really spent.",
+    "tours": [
+      "analytics"
+    ]
+  },
+  "b314dd64": {
+    "text": "[warmly] The app has two modes, on the same board, with the same data. Only what you see changes. [Brief pause] You're in Easy mode right now.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "0fb355fc": {
+    "text": "[friendly] This is where you switch: Settings, then Mode. Easy keeps it simple. Advanced connects tasks, categories and focus. [excited] Let me show you both.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "eb17329b": {
+    "text": "[calm] In Easy, the timer is called Record: a plain stopwatch, with Start, Break and Stop. Nothing to set up, nothing to name.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "15f157d2": {
+    "text": "[excited] I've switched to Advanced, and this switch appeared. Pomo gives you classic twenty-five minute sessions with breaks. Observe keeps the stopwatch.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "88e14d61": {
+    "text": "[friendly] Recorded sessions can be named. Give each one a task or a category, so you know what the time was for.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "4285a10d": {
+    "text": "[curious] Tasks get tags, like Code or Study. And right-click a plan for \"Focus on it\".",
+    "tours": [
+      "modes"
+    ]
+  },
+  "b51b6db2": {
+    "text": "[friendly] Plans get deadlines, like \"by Friday\"... and cards can be chained. A card's \"Add next\" plans what comes after, and wires show the order.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "418b4401": {
+    "text": "[curious] The Calendar gets layers: show or hide recorded time, habits and events... and a zoom for the hours.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "ee54c7ac": {
+    "text": "[excited] And the board grows: several canvases, frames to group cards, the Terminal with Claude Code... and weekly targets and goals for your habits.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "3b2a8835": {
+    "text": "[curious] \"Planned versus spent\": each task's estimate, next to the time you really spent on it.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "35d0cd01": {
+    "text": "[thoughtfully] \"Time by tag\": where your hours went. Code, study, health...",
+    "tours": [
+      "modes"
+    ]
+  },
+  "e0e06efe": {
+    "text": "[calm] Back in Easy, those two pages are gone. The overview stays: planned, worked, breaks, tasks done, and habits.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "c65e23b9": {
+    "text": "[warmly] So, which one do you want? You can come back here any time... Settings, then Mode.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "50fccc4c": {
+    "text": "[warmly] The app has two modes, on the same board, with the same data. Only what you see changes. [Brief pause] You're in Advanced mode right now.",
+    "tours": [
+      "modes"
+    ]
+  },
+  "43fd98ba": {
+    "text": "[friendly] The toolbar adds things: a text note, a sticky note, a shape, an image... and the pen.",
+    "tours": [
+      "board"
+    ]
+  },
+  "b9aa2d62": {
+    "text": "[encouraging] Add a sticky note: press this, or the S key, then type on it.",
+    "tours": [
+      "board"
+    ]
+  },
+  "73bb9a55": {
+    "text": "[curious] Right-click a plan's card, and choose \"Show\". It lights up here and on the Calendar, so you always find it.",
+    "tours": [
+      "board"
+    ]
+  },
+  "a4e1cdf5": {
+    "text": "[friendly] Habits and repeating events have cards too. On a habit, today's square ticks it. An event shows its next date, with \"Skip this one\" and \"Show\".",
+    "tours": [
+      "board"
+    ]
+  },
+  "f566698b": {
+    "text": "[playfully] Want things to line up? Settings, Canvas, \"Align to grid\". What you move settles into a neat spot, never on top of something. Cards only... or everything.",
+    "tours": [
+      "board"
+    ]
+  },
+  "b95dc813": {
+    "text": "[warmly] That's the board! [Brief pause] Ask me to show something, add a note, or tidy up... I can change it for you.",
+    "tours": [
+      "board"
+    ]
+  },
+  "26c34215": {
+    "text": "[friendly] The toolbar adds things: a text note, a sticky note, a shape, an image, the pen... and a frame, to group cards.",
+    "tours": [
+      "board"
+    ]
+  },
+  "e078aec9": {
+    "text": "[friendly] Need more room? Make another canvas here, one per project. Your windows are the same on every canvas.",
+    "tours": [
+      "board"
+    ]
+  },
+  "b30e329d": {
+    "text": "[curious] Drag from the dot on a card's side to another card, to put plans in order. The wire shows what comes next.",
+    "tours": [
+      "board"
+    ]
+  },
+  "7d3f85b2": {
+    "text": "[confidently] The Terminal runs a real shell. Everything in the app can also be done with kernel commands... try \"kernel help\".",
+    "tours": [
+      "terminal"
+    ]
+  },
+  "780d1a5d": {
+    "text": "[playfully] Click me... the orb, to open my menu.",
+    "tours": [
+      "terminal"
+    ]
+  },
+  "fd69bdf1": {
+    "text": "[thoughtfully] \"Claude code\" starts Claude Code in the terminal, ready to work on your board. [Brief pause] It runs without asking permission for each step.",
+    "tours": [
+      "terminal"
     ]
   }
 }

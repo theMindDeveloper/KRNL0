@@ -5,6 +5,8 @@
  * Add new clips: drop the .mp3 in the right audio/<bucket>/ folder and add a
  * mapping line below.
  */
+import { ORB_LINES } from './orbLines';
+
 export const CLIP_MAP: Record<string, string> = {
   // ── audio/click/ — orb click acknowledgments ───────────────────────────────
   'click_yes':       'yes',
@@ -22,13 +24,6 @@ export const CLIP_MAP: Record<string, string> = {
   'click_leave':     'canyouleavemelaone',
   'click_see_you_later': 'click_see_you_later',
 
-  // ── audio/intro/ — welcome tour ────────────────────────────────────────────
-  'intro_01': "Welcome to KRNL0. I'm your system assistant. jen",
-  'intro_02': "This is your canvas Everything you need to track tasks, habits, timers, calendars — lives right here in one infinite workspace you can see all at once",
-  'intro_03': "You can pan around by holding middle-click and dragging, or pinch to zoom. The canvas is yours to arrange however your brain works.",
-  'intro_04': "That dock on the left Use it to drop new nodes onto the canvas. Or right-click anywhere to get a quick menu",
-  'intro_06': "Down here in the corner — that's me. Click me anytime. Or hold Space to talk",
-  'intro_07': "Pick something from the menu and I'll walk you through it",
 
   // ── audio/flows/focus/ ─────────────────────────────────────────────────────
   'focus_01':    "Alright. Let's lock in",
@@ -37,58 +32,6 @@ export const CLIP_MAP: Record<string, string> = {
   'focus_none':  "I don't see a Pomodoro timer on your board yet. Let me add one",
   'focus_added': "Done. Your timer is ready. Hit start when you are",
 
-  // ── audio/tutorial/ — Tutorial 1: Pomodoro & Tasks ─────────────────────────
-  // Cold-open (music choreography)
-  'tut1_00a': 'tut1_00a_know_tutorials_are_boring',
-  'tut1_00b': 'tut1_00b_ill_make_it_more_fun',
-  'tut1_00c': 'tut1_00c_lets_play_some_music',
-  // Main script
-  'tut1_01': 'tut1_01_hey_again_im_jen',
-  'tut1_02': 'tut1_02_this_tutorial_pomo_and_tasks',
-  'tut1_03': 'tut1_03_look_at_the_left',
-  'tut1_04': 'tut1_04_thats_the_pomodoro_node',
-  'tut1_05': 'tut1_05_works_like_any_pomodoro',
-  'tut1_06': 'tut1_06_see_the_gear_icon',
-  'tut1_07': 'tut1_07_click_it_to_tweak',
-  'tut1_08': 'tut1_08_i_know_boring',
-  'tut1_09': 'tut1_09_heres_the_twist',
-  'tut1_10': 'tut1_10_krnl_combines_pomo_and_todo',
-  'tut1_11': 'tut1_11_add_a_new_task',
-  'tut1_12': 'tut1_12_call_it_learn_machine_learning',
-  'tut1_13': 'tut1_13_give_it_sixty_minutes',
-  'tut1_14': 'tut1_14_im_waiting',
-  'tut1_15': 'tut1_15_nice_task_spawned',
-  'tut1_16': 'tut1_16_now_connect_to_pomo',
-  'tut1_17': 'tut1_17_double_click_the_task',
-  'tut1_18': 'tut1_18_see_it_turned_green',
-  'tut1_19': 'tut1_19_krnl_split_into_sessions',
-  'tut1_20': 'tut1_20_lets_make_it_interesting',
-  'tut1_21': 'tut1_21_add_a_second_task',
-  'tut1_22': 'tut1_22_ninety_minutes',
-  'tut1_23': 'tut1_23_im_waiting_again',
-  'tut1_24': 'tut1_24_look_a_chain_appeared',
-  'tut1_25': 'tut1_25_chain_is_your_day_as_pipeline',
-  'tut1_26': 'tut1_26_want_to_see_on_calendar',
-  'tut1_27': 'tut1_27_calendar_and_clock_already_there',
-  'tut1_28': 'tut1_28_weekly_monthly_yearly',
-  'tut1_29': 'tut1_29_switch_to_weekly',
-  'tut1_30': 'tut1_30_red_line_is_now',
-  'tut1_31': 'tut1_31_drag_first_task_onto_today',
-  'tut1_32': 'tut1_32_there_it_is',
-  'tut1_33': 'tut1_33_both_tasks_landed_in_order',
-  'tut1_34': 'tut1_34_calendar_and_clock_in_sync',
-  'tut1_35': 'tut1_35_one_bonus',
-  'tut1_36': 'tut1_36_you_can_run_in_parallel',
-  'tut1_37': 'tut1_37_right_click_add_parallel',
-  'tut1_38': 'tut1_38_call_it_listen_to_music',
-  'tut1_39': 'tut1_39_two_tasks_side_by_side',
-  'tut1_40': 'tut1_40_thats_the_whole_flow',
-  'tut1_41': 'tut1_41_if_youre_lazy_use_ai_terminal',
-  'tut1_42': 'tut1_42_but_thats_another_tutorial',
-  'tut1_43': 'tut1_43_for_now_go_build_your_day',
-  'tut1_wait_take_your_time': 'tut1_wait_take_your_time',
-  'tut1_wait_still_here':     'tut1_wait_still_here',
-  'tut1_skip_no_worries':     'tut1_skip_no_worries',
 
   // ── audio/commander/ ───────────────────────────────────────────────────────
   'cmd_open':       "Commander online.",
@@ -130,6 +73,10 @@ export const CLIP_MAP: Record<string, string> = {
   'misc_not_found':  "I didn't find anything for that",
   'misc_running':    "Running",
 };
+
+// #225 — the lines the orb still says are re-recorded in the guide's voice
+// (orbLines.ts → audio/voice/<id>.mp3): their id is their file name.
+for (const id of Object.keys(ORB_LINES)) CLIP_MAP[id] = id;
 
 /** Pool of clips played randomly when the orb is clicked while idle. */
 export const CLICK_CLIPS = [

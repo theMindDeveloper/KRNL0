@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { spokenText, voiceKey } from '../../../src/renderer/components/Tour/tourVoice';
-import { stepsFor, tourById } from '../../../src/renderer/components/Tour/tours';
+import { TOURS, stepsFor } from '../../../src/renderer/components/Tour/tours';
 
 const VOICE = join(process.cwd(), 'src/renderer/components/Tour/voice');
 
@@ -21,24 +21,26 @@ describe('spoken text', () => {
   });
 });
 
-describe('Your first day is fully voiced', () => {
-  const tour = tourById('first-day')!;
-  // Paused on purpose (2026-11-09): the tour texts were corrected for the
-  // release (Enter adds, the Pomo-mode timer steps, the recap closing), so
-  // their clips are re-recorded once the user approves the new tours (#227).
-  // Re-enable after `scripts/gen-tour-voice.ts` has run.
-  const timers = ['stopwatch', 'pomo'] as const;
-  for (const mode of ['easy', 'advanced'] as const) for (const timer of timers) {
-    if (mode === 'easy' && timer === 'pomo') continue;
-    it.skip(`every step has its clip (${mode}, ${timer})`, () => {
-      for (const s of stepsFor(tour, mode, timer)) {
-        expect(s.say, s.text).toBeTruthy();
-        const key = voiceKey(spokenText(s.text, mode, s.say));
-        expect(existsSync(join(VOICE, `${key}.mp3`)), `${key}: ${s.text}`).toBe(true);
-      }
-    });
-  }
-  it('no script reads a key name or a symbol the voice would garble', () => {
-    for (const s of tour.steps) expect(s.say ?? '').not.toMatch(/\bEsc\b|→|\*\*|\b[A-Z]{3,}\b|\d/);
+describe('Every tour is voiced (#227)', () => {
+  it('each step has its own words for the voice, with audio tags, nothing the voice would garble', () => {
+    for (const t of TOURS) for (const s of t.steps) {
+      expect(s.say, `${t.id}: ${s.text}`).toBeTruthy();
+      expect(s.say!, `${t.id}: ${s.say}`).toMatch(/\[[a-zA-Z ]+\]/);
+      expect(s.say!, `${t.id}: ${s.say}`).not.toMatch(/\bEsc\b|→|\*\*|\b[A-Z]{3,}\b|\d|KRNL0/);
+    }
   });
+  // Every step a user can meet — each mode, each way the timer works — has its clip.
+  for (const t of TOURS) {
+    for (const mode of ['easy', 'advanced'] as const) {
+      if (t.onlyIn && t.onlyIn !== mode) continue;
+      for (const timer of mode === 'easy' ? (['stopwatch'] as const) : (['stopwatch', 'pomo'] as const)) {
+        it(`${t.id} (${mode}, ${timer}): every step has its clip`, () => {
+          for (const s of stepsFor(t, mode, timer)) {
+            const key = voiceKey(spokenText(s.text, mode, s.say));
+            expect(existsSync(join(VOICE, `${key}.mp3`)), `${key}: ${s.text}`).toBe(true);
+          }
+        });
+      }
+    }
+  }
 });

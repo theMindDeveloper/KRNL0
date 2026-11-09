@@ -21,7 +21,8 @@ import { timeLogEntriesFromBoards } from '../../shared/timelog';
 let snapshot: Board | null = null;
 
 /** Kinds made during a tour that go when the practice is removed. */
-const MADE_KINDS = new Set(['todo.task', 'habit.day', 'pomo.session']);
+// 'text': a note or sticky note made in the board tour.
+const MADE_KINDS = new Set(['todo.task', 'habit.day', 'pomo.session', 'text']);
 /** Mother windows whose state goes back to the snapshot. */
 const RESTORED_KINDS = new Set(['todo', 'habit', 'pomo']);
 
@@ -74,6 +75,9 @@ export function practiceSummary(now: Board | null = useBoardStore.getState().boa
   const ticks = habitsOf(now).filter((h) => beforeHabits.has(h.id))
     .reduce((n, h) => n + Math.max(0, (h.log?.length ?? 0) - (beforeHabits.get(h.id)!.log?.length ?? 0)), 0);
   if (ticks) lines.push(`${plural(ticks, 'habit tick', 'habit ticks')}`);
+  const beforeNodes = new Set(snapshot.nodes.map((n) => n.id));
+  const notes = now.nodes.filter((n) => n.kind === 'text' && !beforeNodes.has(n.id)).length;
+  if (notes) lines.push(plural(notes, 'note', 'notes'));
 
   const beforeRecs = new Set((pomoOf(snapshot).history ?? []).map((r) => r.id));
   const newRecs = (pomoOf(now).history ?? []).filter((r) => !beforeRecs.has(r.id));

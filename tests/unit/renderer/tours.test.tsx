@@ -52,7 +52,7 @@ describe('Easy and Advanced tour — a live demo', () => {
 
 describe('tour catalogue', () => {
   it('has a tour for each part of the app', () => {
-    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'on-track', 'analytics', 'modes', 'terminal']);
+    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'on-track', 'analytics', 'modes', 'board', 'terminal']);
     for (const t of TOURS) {
       expect(t.steps.length).toBeGreaterThan(1);
       for (const s of t.steps) expect(s.text.length).toBeGreaterThan(10);

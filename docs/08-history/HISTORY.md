@@ -2578,3 +2578,14 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Branch:** `experiment/new-user-review`
 **Files changed:** `Station/softSnap.ts` (new), `Station/StationLayout.tsx`, `tests/unit/renderer/stationSoftSnap.test.ts` (new).
 **Summary:** Let go of a Station divider within 14 px of a line and it clicks onto it: a divider in the other row (the Clock's edge under the Calendar's) or the divider's default spot. Further away it stays exactly where you put it — it helps, never forces. Checked in the preview: 8 px off → onto the Clock edge; 80 px away → stays; the bottom row snaps to the top row too.
+
+## [2026-11-09] — Every tour voiced, the orb in the same voice, the board tour (#225, #227) (experimental)
+
+**Type:** Feature
+**Branch:** `experiment/new-user-review`
+**Files changed:** `Tour/tours.ts` (board tour; a tagged `say` script on every step), `Tour/voice/*` (120 clips), `scripts/gen-tour-voice.ts` (both timer modes, dry run), `Assistant/orbLines.ts` (new), `scripts/gen-orb-voice.ts` (new), `Assistant/audio/voice/*` (35 clips), `Assistant/clipMap.ts`, `Assistant/flows/index.ts`, `Orb/index.tsx`, `store/tourPractice.ts`, `dev/overflowGuard.ts`, tests.
+**Summary:**
+- **The board tour** (new, both modes): cards, the toolbar, a sticky note (practice — removable at the end), Show, the habit/event cards, Align to grid; Advanced adds canvases and wires.
+- **Every step of every tour has a voice script written for the ear** with Eleven v4 audio tags ([warmly], [Brief pause], [playfully]…): numbers as words, button names as words, no symbols. 120 clips recorded with ElevenLabs `eleven_v4` (every tour, Easy and Advanced, both ways the timer works); stale clips pruned. A test checks that every step a user can meet has its clip and that no script has digits, capitals or markup the voice would garble.
+- **The orb speaks in the same voice (#225)**: greetings, click replies, the focus session, the Commander and short replies — 35 lines (`orbLines.ts`), recorded the same way; the old recordings are removed. The outdated intro and Pomo/Todo walkthrough flows (they said "hold Space to talk" and taught auto-chaining) are retired with their ~60 clips: the tours replaced them.
+- Overflow guard: no false alarms for SVG numerals or ellipsized text. The slow Station-cell test gets 20 s. Real boards on this machine (6) load with nothing lost or moved; a test pins the release fields.

@@ -38,6 +38,15 @@ export function findSpills(root: ParentNode = document): Spill[] {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (!n.textContent?.trim()) continue;
+      // SVG labels (a clock's numerals) follow the chart rule instead.
+      if (n.parentElement?.closest('svg')) continue;
+      // Text in a box that clips it (an ellipsis) can't spill: the browser
+      // still reports the full, unclipped width of the words.
+      let clipped = false;
+      for (let a = n.parentElement; a && a !== el; a = a.parentElement) {
+        if (getComputedStyle(a).overflow !== 'visible') { clipped = true; break; }
+      }
+      if (clipped) continue;
       const range = document.createRange();
       range.selectNodeContents(n);
       const rects = [...range.getClientRects()].filter((r) => r.width > 0.5);

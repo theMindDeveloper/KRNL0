@@ -33,17 +33,26 @@ async function main(): Promise<void> {
 
   let made = 0;
   let kept = 0;
+  const dry = process.env.DRY_RUN === '1';
+  let chars = 0;
+  const seen = new Set<string>();
   for (const tour of tours) {
     for (const mode of ['easy', 'advanced'] as const) {
       if (tour.onlyIn && tour.onlyIn !== mode) continue;
-      for (const step of stepsFor(tour, mode)) {
+      // Both ways the timer works (Advanced's stopwatch and Pomo have their own steps).
+      const all = [...stepsFor(tour, mode, 'stopwatch'), ...(mode === 'advanced' ? stepsFor(tour, mode, 'pomo') : [])];
+      for (const step of all) {
         const text = spokenText(step.text, mode, step.say);
+        if (seen.has(text)) continue;
+        seen.add(text);
         const key = voiceKey(text);
         const entry = manifest[key] ?? { text, tours: [] };
         if (!entry.tours.includes(tour.id)) entry.tours.push(tour.id);
         manifest[key] = entry;
         const file = join(OUT, `${key}.mp3`);
         if (existsSync(file)) { kept++; continue; }
+        chars += text.length;
+        if (dry) { made++; continue; }
         const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE}?output_format=mp3_44100_128`, {
           method: 'POST',
           headers: { 'xi-api-key': KEY, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
@@ -57,8 +66,9 @@ async function main(): Promise<void> {
       }
     }
   }
+  if (dry) { console.log(`dry run: ${made} to record (${chars} characters), ${kept} already there`); return; }
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`done: ${made} recorded, ${kept} already there`);
+  console.log(`done: ${made} recorded (${chars} characters), ${kept} already there`);
 }
 
 main().catch((err: unknown) => {

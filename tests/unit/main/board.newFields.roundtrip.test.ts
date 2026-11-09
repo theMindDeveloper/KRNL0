@@ -58,3 +58,24 @@ describe('new optional fields survive a load', () => {
     }
   });
 });
+
+describe('the release fields survive a load (Align to grid, board cards)', () => {
+  it('alignGrid (old true and new scope), habit/event cards and wires to them load unchanged', () => {
+    for (const alignGrid of [true, 'cards', 'all'] as const) {
+      const board = seedBoard() as unknown as { nodes: Array<Record<string, unknown>>; edges: unknown[]; alignGrid?: unknown };
+      board.alignGrid = alignGrid;
+      board.nodes.push({ id: 'lane-1', kind: 'habit.lane', isMother: false, position: { x: 160, y: 80 }, state: { habitId: 'h1' }, config: { days: 28 } });
+      board.edges.push({ id: 'e-old', from: { nodeId: 'mother-pomo', event: 'onComplete' }, to: { nodeId: 'lane-1', command: 'habit.markDone' } });
+      const dir = mkdtempSync(join(tmpdir(), 'krnl0-release-'));
+      try {
+        const p = join(dir, 'board.json');
+        writeFileSync(p, JSON.stringify(board), 'utf-8');
+        const loaded = loadBoardFrom(p) as typeof board;
+        expect(loaded.alignGrid).toBe(alignGrid);
+        const lane = loaded.nodes.find((n) => n['id'] === 'lane-1')!;
+        expect(lane['position']).toEqual({ x: 160, y: 80 });
+        expect((loaded.edges as Array<{ id: string }>).some((e) => e.id === 'e-old')).toBe(true);
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    }
+  });
+});

@@ -59,6 +59,7 @@ import { voicePlayer } from '../Assistant/VoicePlayer';
 import { ScriptRunner } from '../Assistant/ScriptRunner';
 import { FLOWS, sessionFromCommanderFlow } from '../Assistant/flows';
 import { CLICK_CLIPS } from '../Assistant/clipMap';
+import { ORB_LINES } from '../Assistant/orbLines';
 import { Commander } from '../Assistant/Commander';
 import type { Flow, BoardSnapshot } from '../Assistant/types';
 import { CloseButton } from '../ui/CloseButton';
@@ -68,7 +69,7 @@ import { useEasyMode } from '../../store/uiMode';
 import { useTourAnchor } from '../Tour/tourAnchor';
 
 /** Voice flows not offered in the chat for now. */
-const HIDDEN_FLOW_IDS = new Set(['intro', 'focus-session', 'tutorial-pomo-todo']);
+const HIDDEN_FLOW_IDS = new Set(['focus-session']);
 import { activeTour, startTour } from '../Tour/TourHost';
 import { askClaude, claudeStatus, type ClaudeStatus } from '../../store/askClaude';
 import { launchDialogOpen } from '../../launch/launchStore';
@@ -351,7 +352,7 @@ export function Orb() {
       // A brand-new board gets an introduction and a pointer to the tour,
       // not "welcome back". Read here: the board loads after the orb mounts.
       const pick = isFreshBoard(useBoardStore.getState().board)
-        ? { clip: 'intro_01', text: "Welcome to KRNL0. I'm your system assistant. Click me for a tour." }
+        ? { clip: 'intro_01', text: ORB_LINES.intro_01!.text }
         : pickGreeting(pool, useLaunchStore.getState().info?.awayMs ?? null, Math.random());
       setOrbState('speaking');
       setCaption(pick.text);
