@@ -185,7 +185,8 @@ export async function clockShow(
   const windowStartMin = viewWindow === 1 ? 720 : 0;
   const windowEndMin = viewWindow === 1 ? 1440 : 720;
   const windowStartISO = `${selectedDate}T${viewWindow === 1 ? '12:00' : '00:00'}`;
-  const windowEndISO = `${selectedDate}T${viewWindow === 1 ? '23:59' : '12:00'}`;
+  // The PM half ends at the next midnight (a plan at 23:59 is in it).
+  const windowEndISO = viewWindow === 1 ? `${nextDayYMD(selectedDate)}T00:00` : `${selectedDate}T12:00`;
   void windowStartMin; void windowEndMin;
 
   const boardAsBoard = board as unknown as Board;
@@ -252,4 +253,10 @@ export async function clockShow(
       placements: filtered.map((p) => ({ ...p, text: taskMeta.get(p.taskId)?.text ?? '(unknown)' })),
     },
   };
+}
+
+function nextDayYMD(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number) as [number, number, number];
+  const t = new Date(y, m - 1, d + 1);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }

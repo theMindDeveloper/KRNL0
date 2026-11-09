@@ -213,6 +213,21 @@ async function setHabitDay(
   const resolved = resolveHabit(mother.state, idOrName);
   if ('error' in resolved) return { ok: false, message: resolved.error };
   const data = { id: resolved.habit.id, date: targetDate, done };
+  const h = resolved.habit;
+  // A repeating event just happens: it is never ticked.
+  if (h.kind === 'routine') {
+    return { ok: false, message: `${verb}: "${h.name}" is a repeating event; it is never ticked (routine skip to skip one)` };
+  }
+  // An amount habit ("8 glasses"): done = the full amount, undo = none, as in
+  // the window. A plain toggle only added or removed one.
+  if (h.amount) {
+    const count = done ? h.amount.target : 0;
+    const now = countOn(h, targetDate);
+    if (now === count) return { ok: true, message: `${verb}: "${h.name}" already ${count} of ${h.amount.target} on ${targetDate}`, data };
+    mother.state = habitSetCount(mother.state, { id: h.id, date: targetDate, count });
+    writeBoard(ctx, board, mother);
+    return { ok: true, message: `${verb}: "${h.name}" ${count} of ${h.amount.target}${h.amount.unit ? ` ${h.amount.unit}` : ''} on ${targetDate}`, data };
+  }
   if (resolved.habit.log.includes(targetDate) === done) {
     return {
       ok: true,
@@ -519,7 +534,11 @@ export async function cliSchedule(
     return { ok: false, message: `"${resolved.habit.name}" is a routine: it needs --at HH:MM` };
   }
   const tod = at !== undefined ? { timeOfDay: at } : {};
-  const dur = at !== undefined && durationMin !== undefined ? { durationMin } : {};
+  // No --duration: it keeps the length it had (an 8-hour shift moved to 21:00
+  // stays 8 hours).
+  const keptLen = resolved.habit.schedule?.durationMin;
+  const len = durationMin ?? keptLen;
+  const dur = at !== undefined && len !== undefined ? { durationMin: len } : {};
 
   let schedule: HabitSchedule;
   if (scheduleKind === 'daily') {
@@ -856,7 +875,8 @@ export {
 // ── Decision 39 — routines and `habit kind` ──────────────────────────────────
 
 const DAY_NAMES = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-const YMD = /^\d{4}-\d{2}-\d{2}$/;
+// A real date (2026-02-31 was accepted and stored).
+const YMD = { test: (v: string) => isValidYMD(v) };
 
 function localYMD(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -891,10 +911,12 @@ function routineLine(h: Habit): string {
 /** The next date (today on) the routine happens, unskipped; null within 8 weeks. */
 function nextOccurrence(h: Habit, from: Date = new Date()): string | null {
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const nowMin = from.getHours() * 60 + from.getMinutes();
   for (let i = 0; i < 56; i++) {
     const ymd = localYMD(d);
     const occ = routineOccurrence(h, ymd);
-    if (occ && !occ.skipped) return ymd;
+    // Today's only counts if it hasn't started yet.
+    if (occ && !occ.skipped && (i > 0 || occ.startMin > nowMin)) return ymd;
     d.setDate(d.getDate() + 1);
   }
   return null;
@@ -929,7 +951,7 @@ export async function cliRoutineAdd(
   if ('error' in days) return { ok: false, message: `routine add: ${days.error}` };
   if (!at || !isValidTimeOfDay(at)) return { ok: false, message: `routine add: needs --at HH:MM (24-hour)` };
   const len = forMin ?? 60;
-  if (!(len >= 5 && len <= 720)) return { ok: false, message: 'routine add: --for must be 5–720 minutes' };
+  if (!(len >= 5 && len <= 720)) return { ok: false, message: 'routine add: --for must be 5–720 minutes (90, 90m, 2h, 1h30)' };
   const board = loadBoard(ctx);
   const mother = findMother(board);
   if (!mother) return notFound();

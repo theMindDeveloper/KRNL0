@@ -7,6 +7,7 @@ import type { SysResult } from '../SysFacade';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { ScheduledTaskPlacement } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
+import { routineOccurrence, type Habit } from '../../renderer/components/nodes/HabitNode/types';
 import type { TaskState } from '../../renderer/components/nodes/TaskNode/types';
 import type { AnyNode as SharedAnyNode } from '../../shared/dispatch/types';
 import { isValidYMD } from '../../shared/ymd';
@@ -93,19 +94,24 @@ export async function calShow(
     return { ok: true, message: JSON.stringify(payload), data: payload };
   }
 
-  if (filtered.length === 0) {
+  // Repeating events (a class, a shift) are on the Calendar too: listed for
+  // the dates asked, or this week (an event repeats for ever).
+  const events = eventLines(board, from, to);
+
+  if (filtered.length === 0 && events.length === 0) {
     return { ok: true, message: 'No scheduled tasks.', data: [] };
   }
 
-  const lines = filtered.map((p) => {
+  const taskLines = filtered.map((p) => {
     const meta = taskMeta.get(p.taskId);
     const text = meta?.text ?? '(unknown)';
     const prefix = p.isAnchor ? '[A]' : ' -> ';
     const dateTag = p.startISO.slice(0, 10);
     const timeRange = `${hhmm(p.startISO)}-${hhmm(p.endISO)}`;
     const parallel = p.parallelGroupId !== null ? ` [p${p.parallelBranchIndex ?? 0}]` : '';
-    return `${dateTag}  ${timeRange}${parallel}  ${prefix}  ${p.taskId.slice(0, 8)}  ${text}`;
+    return { key: p.startISO, line: `${dateTag}  ${timeRange}${parallel}  ${prefix}  ${p.taskId.slice(0, 8)}  ${text}` };
   });
+  const lines = [...taskLines, ...events].sort((a, b) => a.key.localeCompare(b.key)).map((l) => l.line);
 
   return {
     ok: true,
@@ -221,4 +227,28 @@ export async function calLineup(
   if (moves.length) ctx.onBoardChanged?.();
   const text = moves.length === 0 ? 'Already lined up.' : moves.map((m) => `${m.taskId.slice(0, 8)} -> ${m.scheduledFor.replace('T', ' ')}`).join('\n');
   return { ok: true, message: json ? JSON.stringify(moves) : text, data: moves };
+}
+
+/** Repeating events between `from` and `to` (inclusive; default: this Monday to Sunday). */
+function eventLines(board: Board, from: string | undefined, to: string | undefined): Array<{ key: string; line: string }> {
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now = new Date();
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  const start = from ?? ymd(monday);
+  const [sy, sm, sd] = start.split('-').map(Number) as [number, number, number];
+  const end = to ?? ymd(new Date(sy, sm - 1, sd + 6));
+  const habits = board.nodes.filter((n) => n.kind === 'habit').flatMap((n) => ((n.state as { habits?: Habit[] } | null)?.habits ?? []));
+  const out: Array<{ key: string; line: string }> = [];
+  const hm = (min: number) => `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  for (let i = 0; i < 400; i++) {
+    const day = ymd(new Date(sy, sm - 1, sd + i));
+    if (day > end) break;
+    for (const h of habits) {
+      const occ = routineOccurrence(h, day);
+      if (!occ || occ.skipped) continue;
+      const len = h.schedule?.durationMin ?? 60;
+      out.push({ key: `${day}T${hm(occ.startMin)}`, line: `${day}  ${hm(occ.startMin)}-${hm(occ.startMin + len)}  [E]  ${h.id.slice(0, 8)}  ${h.name} (repeating event${occ.moved ? ', moved this time' : ''})` });
+    }
+  }
+  return out;
 }

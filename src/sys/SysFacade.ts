@@ -251,7 +251,8 @@ export class SysFacade {
           : { ok: false, message: `Unknown subcommand: ${command.group} ${command.sub}` };
       }
       if (command.group) {
-        const text = generateGroupHelp(command.group);
+        // `event` is what people call repeating events; its commands are `routine`'s.
+        const text = generateGroupHelp(command.group === 'event' ? 'routine' : command.group);
         return text
           ? { ok: true, message: text }
           : { ok: false, message: `Unknown command group: ${command.group}` };
