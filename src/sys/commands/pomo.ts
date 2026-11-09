@@ -350,7 +350,7 @@ export function pomoEditSegmentCmd(ctx: PomoTagCtx, segmentId: string | undefine
     const startMs = start === undefined ? Date.parse(rec.startedAt) : parseOnDay(start, day);
     let endMs = end === undefined ? Date.parse(rec.endedAt) : parseOnDay(end, day);
     if (startMs === undefined || endMs === undefined) { result = { ok: false, message: 'times are HH:MM or YYYY-MM-DDTHH:MM' }; return; }
-    if (end !== undefined && HM_RE.test(end) && endMs <= startMs) endMs += 86_400_000;
+    if (end !== undefined && HM_RE.test(end) && endMs <= startMs) endMs = nextDaySameTime(endMs);
     const problem = spanProblem(prev, { startMs, endMs }, Date.now(), { exceptId: seg.id, kind: rec.kind });
     if (problem) { result = { ok: false, message: problem }; return; }
     node['state'] = { ...prev, history: fsmEditSegment(prev, { id: seg.id, startMs, endMs }).history };
@@ -369,7 +369,7 @@ export function pomoAddSegmentCmd(ctx: PomoTagCtx, start: string | undefined, en
   const startMs = parseOnDay(start, day);
   let endMs = parseOnDay(end, day);
   if (startMs === undefined || endMs === undefined) return { ok: false, message: 'times are HH:MM or YYYY-MM-DDTHH:MM' };
-  if (HM_RE.test(end) && endMs <= startMs) endMs += 86_400_000;
+  if (HM_RE.test(end) && endMs <= startMs) endMs = nextDaySameTime(endMs);
   let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
   mutatePomoBoard(ctx, (board) => {
     const node = findPomoNode(board);
@@ -663,4 +663,10 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
 
   saveBoardTo(boardPath, { ...(board as unknown as Record<string, unknown>), savedAt: new Date().toISOString() });
   return { ok: true, message: 'pomo config updated' };
+}
+
+/** The same clock time a day later (23 or 25 hours on a daylight-saving night). */
+function nextDaySameTime(ms: number): number {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, d.getHours(), d.getMinutes(), d.getSeconds()).getTime();
 }

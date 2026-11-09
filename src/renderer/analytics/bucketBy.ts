@@ -73,18 +73,44 @@ export function byDayOfWeek(events: readonly AnalyticsEvent[], range: RangeArg):
   return out;
 }
 
+/**
+ * Minutes of a recorded span per local hour. A span event carries its end
+ * (isoTimestamp, the last instant inside its day) and its length; its minutes
+ * go to the hours it covered, not all to the hour it ended in.
+ */
+export function minutesByHour(e: AnalyticsEvent): Array<{ hour: number; min: number }> {
+  const min = e.durationMin ?? 0;
+  const endMs = e.isoTimestamp ? Date.parse(e.isoTimestamp) + 1 : NaN;
+  if (!Number.isFinite(endMs) || min <= 0) return e.isoTimestamp ? [{ hour: hourOfIso(e.isoTimestamp), min }] : [];
+  const startMs = endMs - min * 60_000;
+  const out: Array<{ hour: number; min: number }> = [];
+  let cursor = startMs;
+  while (cursor < endMs) {
+    const d = new Date(cursor);
+    const nextHour = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime();
+    const to = Math.min(endMs, nextHour);
+    out.push({ hour: d.getHours(), min: (to - cursor) / 60_000 });
+    cursor = to;
+  }
+  return out;
+}
+
 export function byHourOfDay(events: readonly AnalyticsEvent[], range: RangeArg): HourBucket[] {
   const out: HourBucket[] = [];
   for (let h = 0; h < 24; h++) out.push({ hour: h, tasks: 0, focusMin: 0 });
   for (const e of events) {
     if (!inRange(e.date, range)) continue;
     if (!e.isoTimestamp) continue;
+    if (e.type === 'pomo.work') {
+      for (const part of minutesByHour(e)) out[part.hour]!.focusMin += part.min;
+      continue;
+    }
     const h = hourOfIso(e.isoTimestamp);
     if (h < 0 || h > 23) continue;
     const b = out[h]!;
     if (e.type === 'task.completed') b.tasks += 1;
-    else if (e.type === 'pomo.work') b.focusMin += e.durationMin ?? 0;
   }
+  for (const b of out) b.focusMin = Math.round(b.focusMin);
   return out;
 }
 

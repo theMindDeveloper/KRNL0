@@ -111,11 +111,13 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   const today = ymd(now);
 
   // Day.
+  let weekdayNamed = false;
   m = /\b(today|tonight)\b/i.exec(s);
   if (m) { out.day = today; cut(m); }
   else if ((m = /\b(tomorrow|tmrw|tmr)\b/i.exec(s))) {
     const d = new Date(now); d.setDate(d.getDate() + 1); out.day = ymd(d); cut(m);
   } else if ((m = DAY_RE.exec(s))) {
+    weekdayNamed = true;
     const want = DAYS.findIndex((w) => w.startsWith(m![2]!.toLowerCase().slice(0, 3)));
     let add = (want - now.getDay() + 7) % 7;
     if (m[1]) add += add === 0 ? 7 : 7; // "next friday" is the one after this week's
@@ -128,6 +130,15 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   if (!out.day) {
     const dm = parseDate(s, now);
     if (dm) { out.day = dm.day; s = s.slice(0, dm.index) + ' ' + s.slice(dm.index + dm.length); }
+  }
+
+  // Today's weekday named with a time already past ("gym fri 18:00" on
+  // Friday at 19:00): next week's, not a plan in the past.
+  if (out.time && out.day === today && weekdayNamed) {
+    const [h, mm] = out.time.split(':').map(Number) as [number, number];
+    if (h * 60 + mm <= now.getHours() * 60 + now.getMinutes()) {
+      const d = new Date(now); d.setDate(d.getDate() + 7); out.day = ymd(d);
+    }
   }
 
   // A time with no day: today, or tomorrow if it has passed.

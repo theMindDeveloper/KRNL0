@@ -16,7 +16,8 @@ import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { ContextMenu } from '../../ContextMenu';
 import { PagedView } from '../../ui/PagedView';
 import type { ContextMenuItem } from '../../ContextMenu';
-import { useBoardStore } from '../../../store/boardStore';
+import { useBoardStore, historyGroup, pushHistory } from '../../../store/boardStore';
+import { saveBoard } from '../../../store/eventLog';
 import { useShallow } from 'zustand/react/shallow';
 import type { PomoConfig } from '../PomoNode/types';
 import { defaultPomoConfig } from '../PomoNode/types';
@@ -282,20 +283,23 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   // and the card comes back when you click it or type again.
   const [addCardHidden, setAddCardHidden] = useState(false);
   useDismissOutside(inputFocused && pendingName.trim() !== '' && !addCardHidden, ['[data-testid="when-popover"]', addRowRef], () => setAddCardHidden(true));
-  // Easy: "by fri" sets no deadline (easy-mode D19).
-  const fromWords = (q: QuickAdd): PlanDraft => ({ day: q.day ?? null, time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: easy ? null : q.deadline ?? null });
+  // Easy has one date per plan (D19): "by fri" becomes its When.
+  const fromWords = (q: QuickAdd): PlanDraft => ({ day: q.day ?? (easy ? q.deadline ?? null : null), time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: easy ? null : q.deadline ?? null });
   const addPlan = (text: string, d: PlanDraft) => {
-    onCommand('todo.add', d.lengthMin ? { text, durationMin: d.lengthMin } : { text });
-    const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
-    const item = [...(st?.items ?? [])].filter((i) => i.text === text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    if (item) {
+    // Adding a plan with its time is one Ctrl+Z (scheduling lands after an await).
+    void historyGroup(async () => {
+      onCommand('todo.add', d.lengthMin ? { text, durationMin: d.lengthMin } : { text });
+      const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
+      const item = [...(st?.items ?? [])].filter((i) => i.text === text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      if (!item) return;
+      if (d.deadline) onCommand('todo.setDue', { id: item.id, dueOn: d.deadline });
       if (d.day && d.time && item.taskNodeId) {
         const taskId = item.taskNodeId;
         const remind = d.remindMin ?? null;
-        void scheduleTaskAt(taskId, `${d.day}T${d.time}`).then(() => { if (remind !== null) void setTaskReminder(taskId, remind); });
+        await scheduleTaskAt(taskId, `${d.day}T${d.time}`);
+        if (remind !== null) await setTaskReminder(taskId, remind);
       } else if (d.day) onCommand('todo.setOnDay', { id: item.id, onDay: d.day });
-      if (d.deadline) onCommand('todo.setDue', { id: item.id, dueOn: d.deadline });
-    }
+    });
     setPendingName('');
     setPlanOv({});
     setInputPhase('name');
@@ -311,14 +315,17 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
   };
 
   const quickSubmit = (q: QuickAdd) => {
-    onCommand('todo.add', q.durationMin ? { text: q.text, durationMin: q.durationMin } : { text: q.text });
-    const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
-    const item = [...(st?.items ?? [])].filter((i) => i.text === q.text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    if (item) {
-      if (q.time && q.day && item.taskNodeId) void scheduleTaskAt(item.taskNodeId, `${q.day}T${q.time}`);
+    void historyGroup(async () => {
+      onCommand('todo.add', q.durationMin ? { text: q.text, durationMin: q.durationMin } : { text: q.text });
+      const st = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as TodoState | undefined;
+      const item = [...(st?.items ?? [])].filter((i) => i.text === q.text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      if (!item) return;
+      if (q.deadline && !easy) onCommand('todo.setDue', { id: item.id, dueOn: q.deadline });
+      if (q.time && q.day && item.taskNodeId) await scheduleTaskAt(item.taskNodeId, `${q.day}T${q.time}`);
       else if (q.day && !q.time) onCommand('todo.setOnDay', { id: item.id, onDay: q.day });
-      if (q.deadline) onCommand('todo.setDue', { id: item.id, dueOn: q.deadline });
-    }
+      // Easy has one date (D19): "by fri" becomes its day.
+      else if (!q.day && q.deadline && easy) onCommand('todo.setOnDay', { id: item.id, onDay: q.deadline });
+    });
     setPendingName('');
     setInputPhase('name');
     setInputFocused(true);
@@ -526,12 +533,32 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           // Off the Calendar too: a dropped plan is not "missed". Dropped
           // plans leave the list, so the notice offers UNDO (time put back).
           const taskId = item.taskNodeId;
-          const was = taskId ? taskScheduledInfo.get(taskId)?.scheduledFor ?? null : null;
-          if (taskId) void unscheduleTask(taskId);
-          onCommand('todo.drop', { id: itemId });
+          const board0 = useBoardStore.getState().board;
+          const node0 = taskId ? board0?.nodes.find((n) => n.id === taskId) : undefined;
+          // Its own time (a chained plan has none: it follows the one before),
+          // and the "next" link into it, so UNDO puts both back.
+          const was = (node0?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor ?? null;
+          const links = taskId ? (board0?.edges ?? []).filter((e) => e.from.event === 'task.next' && e.to.nodeId === taskId) : [];
+          // One action, one Ctrl+Z (the unschedule lands after an await).
+          void historyGroup(async () => {
+            onCommand('todo.drop', { id: itemId });
+            if (taskId) await unscheduleTask(taskId);
+          });
           revertible(`Won't do "${item.text}"`, () => {
-            onCommand('todo.undrop', { id: itemId });
-            if (taskId && was) void scheduleTaskAt(taskId, was);
+            void historyGroup(async () => {
+              onCommand('todo.undrop', { id: itemId });
+              if (links.length) {
+                useBoardStore.setState((st) => {
+                  if (!st.board) return st;
+                  const ids = new Set(st.board.nodes.map((n) => n.id));
+                  const add = links.filter((l) => ids.has(l.from.nodeId) && !st.board!.edges.some((e) => e.id === l.id));
+                  return add.length ? { ...pushHistory(st), board: { ...st.board, edges: [...st.board.edges, ...add] } } : st;
+                });
+                const b = useBoardStore.getState().board;
+                if (b) void saveBoard(b);
+              }
+              if (taskId && was) await scheduleTaskAt(taskId, was);
+            });
           });
         },
       },

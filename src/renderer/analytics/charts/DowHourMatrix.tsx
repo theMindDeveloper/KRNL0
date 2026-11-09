@@ -4,6 +4,7 @@
 // from a list of events that carry an iso timestamp.
 
 import type { AnalyticsEvent } from '../types';
+import { minutesByHour } from '../bucketBy';
 import { COLOR_LABEL, DOW_LABELS } from './common';
 
 export interface DowHourMatrixProps {
@@ -43,10 +44,13 @@ export function DowHourMatrix({
     if (Number.isNaN(d.getTime())) continue;
     // getDay: Sun=0..Sat=6 → shift to Mon=0..Sun=6
     const dow = (d.getDay() + 6) % 7;
-    const hour = d.getHours();
-    const add = metric === 'focusMin' ? (e.durationMin ?? 0) : 1;
-    matrix[dow]![hour]! += add;
-    if (matrix[dow]![hour]! > peak) peak = matrix[dow]![hour]!;
+    // Focus minutes go to every hour the span covered (one day: spans are
+    // split at midnight upstream).
+    const parts = metric === 'focusMin' ? minutesByHour(e) : [{ hour: d.getHours(), min: 1 }];
+    for (const { hour, min } of parts) {
+      matrix[dow]![hour]! += min;
+      if (matrix[dow]![hour]! > peak) peak = matrix[dow]![hour]!;
+    }
   }
   if (peak === 0) peak = 1;
 
@@ -84,7 +88,7 @@ export function DowHourMatrix({
               rx={1}
             >
               <title>{`${DOW_LABELS[dow]} ${String(h).padStart(2, '0')}:00 · ${
-                metric === 'focusMin' ? `${v}m` : v
+                metric === 'focusMin' ? `${Math.round(v)}m` : v
               }`}</title>
             </rect>
           );

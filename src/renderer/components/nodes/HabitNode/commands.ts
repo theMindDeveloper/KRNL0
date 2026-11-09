@@ -452,13 +452,19 @@ export function calcWeekStreak(log: string[], today: string, perWeek: number, re
 }
 
 /** Longest run of weeks that reached the target. */
-export function bestWeekStreak(log: string[], perWeek: number): number {
-  const met = [...weekCounts(log).entries()].filter(([, c]) => c >= perWeek).map(([w]) => w).sort();
+export function bestWeekStreak(log: string[], perWeek: number, rest: readonly string[] = []): number {
+  const counts = weekCounts(log);
+  const rested = weekCounts([...rest]);
+  const met = [...counts.entries()].filter(([, c]) => c >= perWeek).map(([w]) => w).sort();
   let best = 0;
   let run = 0;
   let prev: string | null = null;
   for (const w of met) {
-    run = prev !== null && shiftWeek(prev, 1) === w ? run + 1 : 1;
+    // Same rule as the current streak: a short week with rest days between
+    // two met weeks is stepped over, not a break.
+    let gap = prev === null ? null : shiftWeek(prev, 1);
+    while (gap !== null && gap < w && rested.has(gap) && (counts.get(gap) ?? 0) < perWeek) gap = shiftWeek(gap, 1);
+    run = gap === w ? run + 1 : 1;
     best = Math.max(best, run);
     prev = w;
   }
@@ -475,9 +481,14 @@ export function habitStreak(
   today: string,
 ): { current: number; best: number; unit: 'day' | 'week' } {
   const target = h.kind !== 'routine' && typeof h.perWeek === 'number' && h.perWeek >= 1 && h.perWeek <= 6 ? h.perWeek : null;
-  if (target) return { current: calcWeekStreak(h.log, today, target, h.rest), best: bestWeekStreak(h.log, target), unit: 'week' };
+  if (target) {
+    const current = calcWeekStreak(h.log, today, target, h.rest);
+    return { current, best: Math.max(current, bestWeekStreak(h.log, target, h.rest)), unit: 'week' };
+  }
   const schedule = h.schedule ?? undefined;
-  return { current: calcStreak(h.log, today, schedule, h.rest), best: bestStreak(h.log, schedule, h.rest), unit: 'day' };
+  const current = calcStreak(h.log, today, schedule, h.rest);
+  // "Best" is never below the streak shown next to it.
+  return { current, best: Math.max(current, bestStreak(h.log, schedule, h.rest)), unit: 'day' };
 }
 
 function prevDayStr(dateStr: string): string {
@@ -512,6 +523,9 @@ export function bestStreak(log: string[], schedule?: HabitSchedule, rest: readon
   const logSet = new Set(sorted);
   let best = 0;
   for (const day of sorted) {
+    // A tick on an off day (a weekdays habit on Saturday) counts toward no run,
+    // as for the current streak.
+    if (!on(day)) continue;
     // Only start counting at the first day of a run.
     let prev = prevDayStr(day);
     let safety = 366;
@@ -622,11 +636,22 @@ export function routineEnd(state: HabitState, args: { id: string; date: string }
   return mapHabit(state, args.id, (h) => (h.kind === 'routine' ? { ...h, endsOn: args.date } : h));
 }
 
-export function routineRestart(state: HabitState, args: { id: string }): HabitState {
+export function routineRestart(state: HabitState, args: { id: string; today?: string }): HabitState {
+  const today = args.today ?? todayLocal();
   return mapHabit(state, args.id, (h) => {
     if (h.kind !== 'routine' || h.endsOn === undefined) return h;
-    const { endsOn: _e, ...rest } = h;
-    void _e;
-    return rest as Habit;
+    const { endsOn, ...rest } = h;
+    // It starts again today; the days it was ended stay empty (a class that
+    // never happened is not drawn back on the Calendar).
+    const from = addDayYMD(endsOn, 1);
+    const to = addDayYMD(today, -1);
+    if (from > to) return rest as Habit;
+    return { ...rest, pauses: [...(h.pauses ?? []), { from, to }] } as Habit;
   });
+}
+
+function addDayYMD(ymd: string, n: number): string {
+  const [y, m, d] = ymd.split('-').map(Number) as [number, number, number];
+  const t = new Date(y, m - 1, d + n);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }

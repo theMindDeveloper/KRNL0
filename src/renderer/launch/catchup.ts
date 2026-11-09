@@ -6,6 +6,7 @@
 // or is still going. Shared by the dialog and `krnl catchup`. Nothing here
 // changes the board: every fix is a button the user presses.
 
+import { droppedTaskIds } from '../../shared/droppedPlans';
 import { calcStreak, habitStreak } from '../components/nodes/HabitNode/commands';
 import { dueOnDay, type DueItem } from '../../shared/dueOn';
 import { isDayScheduled } from '../components/nodes/HabitNode/types';
@@ -58,9 +59,11 @@ const rec = (v: unknown): Record<string, unknown> => (typeof v === 'object' && v
 export { bestStreak } from '../components/nodes/HabitNode/commands';
 import { bestStreak } from '../components/nodes/HabitNode/commands';
 
-export function computeCatchup(board: CatchupBoard, today: string): Catchup {
+export function computeCatchup(board: CatchupBoard, today: string, nowMs: number = Date.now()): Catchup {
   const tasks = new Map<string, NodeLike>();
-  for (const n of board.nodes) if (n.kind === 'todo.task') tasks.set(n.id, n);
+  // "Won't do" plans are not missed.
+  const dropped = droppedTaskIds(board.nodes as never);
+  for (const n of board.nodes) if (n.kind === 'todo.task' && !dropped.has(n.id)) tasks.set(n.id, n);
 
   const nexts = new Map<string, string[]>();
   const prevs = new Map<string, string[]>();
@@ -74,8 +77,13 @@ export function computeCatchup(board: CatchupBoard, today: string): Catchup {
   // Slipped: planned before today and not done.
   const isSlipped = (id: string): boolean => {
     const s = rec(tasks.get(id)?.state);
-    const day = (typeof s['scheduledFor'] === 'string' ? s['scheduledFor'] : '').slice(0, 10);
-    return s['done'] !== true && /^\d{4}-\d{2}-\d{2}$/.test(day) && day < today;
+    const at = typeof s['scheduledFor'] === 'string' ? s['scheduledFor'] : '';
+    const day = at.slice(0, 10);
+    if (s['done'] === true || !/^\d{4}-\d{2}-\d{2}$/.test(day) || day >= today) return false;
+    // A block from last night still running (22:30–01:00) is not missed yet.
+    const len = [s['scheduledDurationMin'], s['plannedMin']].find((v): v is number => typeof v === 'number' && v > 0) ?? 25;
+    const startMs = new Date(at.length >= 16 ? at.slice(0, 16) : `${day}T00:00`).getTime();
+    return !(Number.isFinite(startMs) && startMs + len * 60_000 > nowMs);
   };
   // A slipped task moves with an earlier slipped task in its chain (it is
   // listed under it). Only then: a done or not-yet-due head carries nothing,

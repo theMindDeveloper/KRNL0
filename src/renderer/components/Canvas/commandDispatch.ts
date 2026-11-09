@@ -1595,6 +1595,16 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       return;
     }
 
+    // ── todo.drop: "Won't do" stops a timer running on that plan, like done ──
+    if (node.kind === 'todo' && command === 'todo.drop' && result.state !== undefined) {
+      updateNode(nodeId, { state: result.state });
+      const item = (node.state as TodoState).items.find((i) => i.id === args['id']);
+      if (item?.taskNodeId) stopPomoOnFinishedTask(item.taskNodeId);
+      const updated = useBoardStore.getState().board;
+      if (updated) void saveBoard(updated);
+      return;
+    }
+
     // ── todo.remove: cascade to linked TaskNode + descendants ─────────────
     if (node.kind === 'todo' && command === 'todo.remove' && result.state !== undefined) {
       const prevState = node.state as TodoState;
@@ -1814,6 +1824,12 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const mother = after?.nodes.find((n) => n.id === nodeId);
       const added = ((mother?.state as HabitState | null)?.habits ?? []).filter((h) => !before.has(h.id) && !h.archived);
       if (after && mother) for (const h of added) spawnHabitCard(after, mother, h.id);
+    }
+    // Unarchived: its card comes back (archive took it away).
+    if (command === 'habit.unarchive' && node.kind === 'habit' && typeof args['id'] === 'string') {
+      const after = useBoardStore.getState().board;
+      const mother = after?.nodes.find((n) => n.id === nodeId);
+      if (after && mother) spawnHabitCard(after, mother, args['id']);
     }
 
     const updatedBoard = useBoardStore.getState().board;

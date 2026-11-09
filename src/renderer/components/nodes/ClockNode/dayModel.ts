@@ -65,6 +65,10 @@ export interface ScheduledHabit {
   /** Decision 39 — a routine: drawn as an outline, never ticked; its own
    *  record so skips, moves and its end apply. */
   routine?: Habit;
+  /** Habit only: days it is resting (not drawn then). */
+  rest?: readonly string[];
+  /** When it was added: not drawn on days before it existed. */
+  createdAt?: string;
 }
 
 export type DaySegment = RealitySegment & { startH: number; endH: number };
@@ -148,7 +152,7 @@ export function collectScheduledHabits(board: Pick<Board, 'nodes'> | null): Sche
     for (const h of hs.habits) {
       // Untimed ("Any time") habits are not on the dial (Decision 39).
       if (h.archived || !hasTimeOfDay(h)) continue;
-      out.push({ id: h.id, name: h.name, color: h.color ?? 'acid', schedule: h.schedule, ...(isRoutine(h) ? { routine: h } : {}) });
+      out.push({ id: h.id, name: h.name, color: h.color ?? 'acid', schedule: h.schedule, createdAt: h.createdAt, ...(h.rest?.length ? { rest: h.rest } : {}), ...(isRoutine(h) ? { routine: h } : {}) });
     }
   }
   return out;
@@ -212,6 +216,9 @@ export function planForDay(
       endH = occ.endMin / 60;
       durMin = occ.endMin - occ.startMin;
     } else {
+      // A rest day, or a day before the habit was added: nothing planned.
+      if (h.rest?.includes(ymd)) continue;
+      if (h.createdAt && ymd < localYMDOf(h.createdAt)) continue;
       const [hhStr, mmStr] = h.schedule.timeOfDay.split(':');
       const hh = Number.parseInt(hhStr ?? '0', 10);
       const mm = Number.parseInt(mmStr ?? '0', 10);
@@ -339,4 +346,10 @@ export function fmtMinutes(min: number): string {
   const r = m % 60;
   if (h === 0) return `${r}m`;
   return r ? `${h}h ${r}m` : `${h}h`;
+}
+
+function localYMDOf(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '0000-00-00';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

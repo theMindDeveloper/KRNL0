@@ -2,6 +2,7 @@
 // span is tagged with (#204). Shared by the Pomo picker / span labeler and the
 // Calendar retag list so every surface offers the same tasks.
 
+import { droppedTaskIds } from '../../../../shared/droppedPlans';
 import type { TaskState } from '../TaskNode/types';
 
 export interface TaskTarget {
@@ -35,10 +36,11 @@ export function spanTaskTargets(
 ): TaskTarget[] {
   const open: TaskTarget[] = [];
   const done: Array<TaskTarget & { at: number }> = [];
+  const dropped = droppedTaskIds(nodes);
   for (const n of nodes ?? []) {
     if (n.kind !== 'todo.task') continue;
     const s = n.state as TaskState;
-    if (s.parentTaskId !== null) continue;
+    if (s.parentTaskId !== null || dropped.has(n.id)) continue;
     if (!s.done) {
       open.push({ id: n.id, text: s.text, done: false });
       continue;
