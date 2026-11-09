@@ -59,8 +59,10 @@ const LAYOUT: Partial<Record<AnalyticsCardId | 'summary', Slot>> = {
   'sources.list':                { page: 'habits',    row: 0, rows: 2, col: 4, cols: 3 },
 };
 
-/** Easy mode hides the pages built on links (per-task plan vs actual, time by tag). */
-export const EASY_HIDDEN_PAGES: ReadonlySet<PageId> = new Set<PageId>(['estimates', 'tags']);
+/** Easy mode hides the pages built on links (per-task plan vs actual, time by tag, time per task). */
+// 'log' (Time per task): Easy never links recorded time to a task, so the page
+// would show one "untagged" row (and tags, which Easy hides).
+export const EASY_HIDDEN_PAGES: ReadonlySet<PageId> = new Set<PageId>(['estimates', 'tags', 'log']);
 export const pagesFor = (easy: boolean): readonly AnalyticsPage[] =>
   easy ? PAGES.filter((p) => !EASY_HIDDEN_PAGES.has(p.id)) : PAGES;
 const pageIndex = (easy: boolean) => new Map<PageId, number>(pagesFor(easy).map((p, i) => [p.id, i]));

@@ -2,14 +2,14 @@
 //
 //   ELEVENLABS_API_KEY=… ELEVENLABS_VOICE_ID=… npx vite-node scripts/gen-tour-voice.ts [tourId …]
 //
-// No ids: every tour. For each step, in Easy and in Advanced, it works out
+// No ids: every tour. For each step, in Easy and in Advanced (Observe and Pomo), it works out
 // what the guide says (tourVoice.spokenText) and writes
 // src/renderer/components/Tour/voice/<key>.mp3 unless that clip exists, so a
 // rerun only records new or reworded steps. voice/manifest.json lists every
 // clip with its words. The key is read from the environment only: never put
 // it in a file.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { TOURS, stepsFor } from '../src/renderer/components/Tour/tours';
 import { spokenText, voiceKey } from '../src/renderer/components/Tour/tourVoice';
@@ -24,10 +24,11 @@ async function main(): Promise<void> {
   if (!KEY || !VOICE) throw new Error('Set ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID');
   mkdirSync(OUT, { recursive: true });
   const manifestPath = join(OUT, 'manifest.json');
-  const manifest: Record<string, { text: string; tours: string[] }> = existsSync(manifestPath)
+  const only = process.argv.slice(2);
+  // A full run rebuilds the list (clips no step says any more are removed at the end).
+  const manifest: Record<string, { text: string; tours: string[] }> = existsSync(manifestPath) && only.length
     ? JSON.parse(readFileSync(manifestPath, 'utf8'))
     : {};
-  const only = process.argv.slice(2);
   const tours = only.length ? TOURS.filter((t) => only.includes(t.id)) : TOURS;
   if (tours.length === 0) throw new Error(`No tour called ${only.join(', ')}`);
 
@@ -37,12 +38,12 @@ async function main(): Promise<void> {
   let chars = 0;
   const seen = new Set<string>();
   for (const tour of tours) {
-    for (const mode of ['easy', 'advanced'] as const) {
+    // Every view a user can be in: Easy (Record), Advanced with Observe, Advanced with Pomo.
+    // The timer's name and its steps differ between them.
+    for (const [mode, timer] of [['easy', 'stopwatch'], ['advanced', 'stopwatch'], ['advanced', 'pomo']] as const) {
       if (tour.onlyIn && tour.onlyIn !== mode) continue;
-      // Both ways the timer works (Advanced's stopwatch and Pomo have their own steps).
-      const all = [...stepsFor(tour, mode, 'stopwatch'), ...(mode === 'advanced' ? stepsFor(tour, mode, 'pomo') : [])];
-      for (const step of all) {
-        const text = spokenText(step.text, mode, step.say);
+      for (const step of stepsFor(tour, mode, timer)) {
+        const text = spokenText(step.text, mode, step.say, timer);
         if (seen.has(text)) continue;
         seen.add(text);
         const key = voiceKey(text);
@@ -68,6 +69,11 @@ async function main(): Promise<void> {
   }
   if (dry) { console.log(`dry run: ${made} to record (${chars} characters), ${kept} already there`); return; }
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  if (!only.length) {
+    let removed = 0;
+    for (const f of readdirSync(OUT)) if (f.endsWith('.mp3') && !manifest[f.slice(0, -4)]) { unlinkSync(join(OUT, f)); removed++; }
+    if (removed) console.log(`removed ${removed} clips no step says any more`);
+  }
   console.log(`done: ${made} recorded (${chars} characters), ${kept} already there`);
 }
 

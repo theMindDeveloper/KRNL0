@@ -2374,7 +2374,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               const day = weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!;
               openNewAt(day, Math.min(23 * 60, (now.getHours() + 1) * 60), e.clientX - 120, e.clientY + 14);
             }}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 20, borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', background: 'color-mix(in srgb, var(--acid) 12%, transparent)', color: 'var(--ink)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', background: 'color-mix(in srgb, var(--acid) 12%, transparent)', color: 'var(--ink)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
           >
             <MenuIcon name="plus" size={12} />
           </button>

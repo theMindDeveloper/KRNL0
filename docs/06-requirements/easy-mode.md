@@ -41,7 +41,7 @@ Each row is one link. **Proposed** is my recommendation. Change any cell you dis
 | D9 | **To-do "Start pomo" / Focus** (Todo menu, task popup, task right-click) | Hidden | Shown |
 | D10 | **Task popup** (left-click on the Clock/Calendar) | Name, time, Done / Reopen, Show, Unplan | + category, tracked time, Focus |
 | D11 | **Calendar "tracked" and overrun badges on planned blocks** | Hidden: planned blocks show the plan only | Shown |
-| D12 | **Analytics** | Overview with planned time, worked time, breaks per day, tasks done and habits. The Time-by-tag and Estimates pages are hidden. | All pages |
+| D12 | **Analytics** | Overview with planned time, worked time, breaks per day, tasks done and habits. The Time-by-tag, Estimates and Time per task pages are hidden (Easy never links recorded time to a task). | All pages |
 | D13 | **Untagged Pomo start suggests the planned task** (time-model F5) | Off: an Easy span is never linked automatically | On |
 | D14 | **Task chains, sequence and parallel** (the cascade on the Calendar) | Kept: it's scheduling, not tracking | Kept |
 | D15 | **Task → Habit links** (finishing a task ticks a habit card) | Creating them is refused with a notice; existing ones keep working | Allowed |
@@ -165,6 +165,7 @@ Feature: Easy mode hides the links, keeps the data
     Given Easy mode
     Then the Analytics window shows planned, worked and break time
     And the Time-by-tag page is not offered
+    And the Time per task page is not offered
 
   Scenario: F6 — CLI sets the mode
     When I run "krnl settings mode easy"

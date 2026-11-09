@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Easy / Advanced modes** — Easy shows only what a first week needs (no tags, deadlines, chains, Calendar layers, terminal, frames, wires or extra canvases); Settings › Mode, `krnl settings mode`.
-- **Guided tours, voiced** — a first-day tour that starts on first launch, and a tour for every window (Welcome, Pomo, Todo, Calendar, Clock, Habits, Repeating events, Staying on track, Analytics, Easy and Advanced, The board, Terminal & AI), written per mode and per timer mode, recorded with ElevenLabs Eleven v4; practice data can be removed or kept; `krnl tour list|start`.
+- **Guided tours, voiced** — a first-day tour that starts on first launch, and a tour for every window (Welcome, Pomo, Todo, Calendar, Clock, Habits, Repeating events, Staying on track, Analytics, Easy and Advanced, The board, Terminal & AI), written for Easy, Advanced with Pomo and Advanced with Observe (the timer is named as its window shows it: Record, Pomo, Observe), recorded with ElevenLabs Eleven v4 in a plain, natural voice; on an empty board a tour brings examples ("Example: …") and always removes them; practice data can be removed or kept; `krnl tour list|start`.
 - **Plans: one When and an optional Deadline** (Decision 40): ANY TIME strip, deadline flags in Week/Day/Month, reminders, Won't do with Undo, one plan card for adding, editing and the Calendar; quick add reads days, times, ranges, "in 2 hours", "noon", "every …".
 - **Repeating events** on the Calendar (Decision 39): skip, move, end after a day, night shifts, reminders; the Repeating button; double-click empty hours to add.
 - **Habits**: any-time habits, times a week, daily amounts, rest days, Week/Month/Year views in the header, archive/restore.
@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Wires snapped onto hidden (finished / layer-off) cards, and wires between hidden cards were drawn.
 - A tour's highlight jumped to another task when the board moved.
+- Tours: the plan card's reminder is described as it works (once the plan has a time); a habit or event card off screen is brought into view; removing practice also removes a practice habit's card.
+- Easy: the Time per task page is hidden (Easy never links recorded time to a task, so it showed one "untagged" row and tags).
+- Calendar: the + button is as tall as Repeating.
 - Cursor stutter between pointer and grab on cards (#226).
 - Clock kept the previous day; Clock hover flicker; terminal prompt two characters wide; recorded segments unclickable; tagged time looked untagged (#200–#204).
 - Calendar items that could not be deleted; deadlines of timed plans drawn nowhere (#220, #221).
