@@ -67,17 +67,21 @@ export function HabitContextMenu({
 
   // Close on outside mousedown or Escape.
   useEffect(() => {
-    const onDown = (e: MouseEvent) => {
+    // Capture phase: a canvas card that stops the press (React Flow's node
+    // drag) must still close the menu.
+    const onDown = (e: PointerEvent) => {
       if (!ref.current) return;
-      if (!ref.current.contains(e.target as Node)) onClose();
+      const t = e.target as Element;
+      if (ref.current.contains(t) || (t instanceof Element && t.closest('.krnl-popover'))) return;
+      onClose();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    document.addEventListener('mousedown', onDown);
+    document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('pointerdown', onDown, true);
       document.removeEventListener('keydown', onKey);
     };
   }, [onClose]);

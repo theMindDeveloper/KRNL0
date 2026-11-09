@@ -2,6 +2,7 @@
 // time; its length; a reminder) and, on its own tab, its Deadline. Replaces
 // "Edit time", "Due date…" and "Reminder…". App-styled: no native pickers.
 
+import { pickerOpen } from './Popover';
 import { useEasyMode } from '../../store/uiMode';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -109,8 +110,8 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
-      if (e.key === 'Enter' && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); apply(); }
+      if (e.key === 'Escape') { if (pickerOpen()) return; e.stopPropagation(); onClose(); }
+      if (e.key === 'Enter' && !(e.target instanceof HTMLInputElement) && !pickerOpen()) { e.preventDefault(); apply(); }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -136,10 +137,11 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
 
   return createPortal(
     <>
-      {!anchorAbove && <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />}
+      {!anchorAbove && <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />}
       <div
         ref={cardRef}
         data-testid="when-popover"
+        data-owns-keys="true"
         data-adding={anchorAbove ? 'true' : undefined}
         role="dialog"
         aria-label={tab === 'when' ? 'When' : 'Deadline'}

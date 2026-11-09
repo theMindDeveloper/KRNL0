@@ -31,7 +31,8 @@ interface Props {
   /** Save the edited time; `time` overrides the draft when the caller has a
    *  fresher value than the last render (Enter in the time field). */
   onApply: (time?: string) => void;
-  onActivate: () => void;
+  /** Absent in Easy (D9/D10: no timer actions on plans). */
+  onActivate?: () => void;
   onJump: () => void;
   onUnschedule: () => void;
   /** The timer item's words: "Focus on it" (Pomo) or "Track it now" (Observe). */
@@ -86,6 +87,7 @@ export function TaskPopup(p: Props) {
       <div
         data-testid="calendar-task-popup"
         role="dialog"
+        data-owns-keys="true"
         aria-label={task.text}
         onMouseDown={(e) => e.stopPropagation()}
         style={{
@@ -145,7 +147,7 @@ export function TaskPopup(p: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
               <button type="button" aria-label="5 minutes less" onClick={() => p.onDuration(String(Math.max(5, dur - 5)))} style={stepBtn}>−</button>
               <div style={{ ...input, flex: 1, justifyContent: 'center', gap: 4, padding: '0 8px' }}>
-                <input data-testid="task-popup-duration" type="number" min={1} value={p.duration} placeholder="—" onChange={(e) => p.onDuration(e.target.value)}
+                <input data-testid="task-popup-duration" type="text" inputMode="numeric" value={p.duration} placeholder="—" onChange={(e) => p.onDuration(e.target.value.replace(/[^0-9]/g, ''))}
                   style={{ width: 48, border: 'none', background: 'transparent', color: 'var(--ink)', font: 'inherit', textAlign: 'right', outline: 'none', padding: '6px 0' }} />
                 <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>min</span>
               </div>
@@ -166,13 +168,13 @@ export function TaskPopup(p: Props) {
 
         {/* Actions */}
         <div style={{ display: 'grid', gridTemplateColumns: p.onDelete ? '1fr 1fr' : '1fr 1fr 1fr', gap: 6, padding: '10px 12px', borderTop: '1px solid var(--paper-3)', background: 'var(--paper-2)' }}>
-          <button type="button" data-testid="calendar-task-activate" onClick={p.onActivate} style={actionBtn}>
+          {p.onActivate && <button type="button" data-testid="calendar-task-activate" onClick={p.onActivate} style={actionBtn}>
             <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M3 1.5v9l7.5-4.5z" /></svg>
             {p.timerLabel ?? 'Focus on it'}
-          </button>
+          </button>}
           <button type="button" data-testid="calendar-task-jump" onClick={p.onJump} style={actionBtn}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4"><circle cx="6" cy="6" r="4" /><circle cx="6" cy="6" r="1.2" fill="currentColor" /></svg>
-            Show in Todo
+            Show
           </button>
           <button type="button" data-testid="calendar-task-unschedule" onClick={p.onUnschedule} title="Take it out of the hours: it stays on this day, at any time" style={actionBtn}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="1.5" y="2.5" width="9" height="8" rx="1.5" /><path d="M1.5 5h9M4.5 7l3 2M7.5 7l-3 2" /></svg>

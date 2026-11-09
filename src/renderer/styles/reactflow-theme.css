@@ -334,7 +334,7 @@
 .cal-subhead { container-type: inline-size; }
 @container (max-width: 600px) { .cal-weekof { display: none; } }
 @container (max-width: 470px) { .cal-layer-label { display: none; } }
-/* The Repeating button keeps its icon and drops its word when the header is tight. */
+/* The week label switches to its short form when the header is tight. */
 .cal-wl-short { display: none; }
 @container (max-width: 470px) { .cal-wl-long { display: none; } .cal-wl-short { display: inline; } }
 @container (max-width: 470px) { .cal-zoom { display: none !important; } } /* (its inline display would win otherwise) */

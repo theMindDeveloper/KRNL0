@@ -42,7 +42,7 @@ export function DuePicker({ x, y, today, value, onPick, onClose, canClear = true
 
   return createPortal(
     <>
-      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />
       <div
         data-testid="due-picker"
         onMouseDown={(e) => e.stopPropagation()}

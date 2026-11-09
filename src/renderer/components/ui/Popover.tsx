@@ -15,18 +15,35 @@ interface Props {
   children: ReactNode;
 }
 
+/**
+ * A picker list (hour / minute, a select) is open. A card that closes on
+ * Escape checks this first: Escape then closes only the list, not the card
+ * and what was typed in it.
+ */
+export function pickerOpen(): boolean {
+  return typeof document !== 'undefined' && document.querySelector('.krnl-popover') !== null;
+}
+
 export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
 
   useLayoutEffect(() => {
     if (!open || !anchor) return;
-    const r = anchor.getBoundingClientRect();
-    const h = ref.current?.offsetHeight ?? 240;
-    const w = Math.max(minWidth ?? 0, r.width);
-    const below = r.bottom + 4;
-    const top = below + h > window.innerHeight - 8 && r.top - 4 - h > 8 ? r.top - 4 - h : below;
-    setPos({ left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)), top, width: w });
+    const place = () => {
+      const r = anchor.getBoundingClientRect();
+      const h = ref.current?.offsetHeight ?? 240;
+      const w = Math.max(minWidth ?? 0, r.width);
+      const below = r.bottom + 4;
+      const top = below + h > window.innerHeight - 8 && r.top - 4 - h > 8 ? r.top - 4 - h : below;
+      const next = { left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)), top, width: w };
+      setPos((cur) => (cur && cur.left === next.left && cur.top === next.top && cur.width === next.width ? cur : next));
+    };
+    place();
+    // Follow the field while open: the card around it can grow (a Reminder
+    // row appears once a time is set) or the canvas can pan under it.
+    let raf = requestAnimationFrame(function tick() { place(); raf = requestAnimationFrame(tick); });
+    return () => cancelAnimationFrame(raf);
   }, [open, anchor, minWidth]);
 
   useEffect(() => {
@@ -60,7 +77,16 @@ export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
     <div
       ref={ref}
       className="krnl-popover nodrag nowheel"
-      onPointerDown={stop} onMouseDown={stop} onClick={stop} onWheel={stop} onContextMenu={stop}
+      onPointerDown={stop}
+      // Picking an option keeps the focus where the user was typing (the add
+      // field, the time field): without this the focus fell to <body> when the
+      // list closed, and further typing fired canvas shortcuts.
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        const t = e.target as HTMLElement;
+        if (!t.closest('input, textarea, [contenteditable="true"]')) e.preventDefault();
+      }}
+      onClick={stop} onWheel={stop} onContextMenu={stop}
       style={{
         position: 'fixed', zIndex: Z.popover,
         left: pos?.left ?? -9999, top: pos?.top ?? -9999, minWidth: pos?.width,

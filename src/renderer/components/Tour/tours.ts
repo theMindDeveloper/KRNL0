@@ -76,6 +76,8 @@ export interface Tour {
   id: string;
   title: string;
   summary: string;
+  /** Easy's line, when the summary names things Easy hides (reminders, deadlines, pages). */
+  summaryEasy?: string;
   steps: TourStep[];
   /** A tour about something only one mode has (the Terminal: Advanced). */
   onlyIn?: 'easy' | 'advanced';
@@ -86,7 +88,8 @@ export interface Tour {
 
 /** The tours listed in a mode (menus); `krnl tour start` can still run any. */
 export function toursIn(mode: 'easy' | 'advanced'): Tour[] {
-  return TOURS.filter((t) => !t.onlyIn || t.onlyIn === mode);
+  return TOURS.filter((t) => !t.onlyIn || t.onlyIn === mode)
+    .map((t) => (mode === 'easy' && t.summaryEasy ? { ...t, summary: t.summaryEasy } : t));
 }
 
 /** The steps a user in `mode` sees (drops steps for the other mode, and for
@@ -325,6 +328,7 @@ export const TOURS: readonly Tour[] = [
     examples: ['plan', 'habit'],
     title: 'Staying on track',
     summary: 'Weekly targets, amounts, rest days, deadlines, reminders',
+    summaryEasy: 'Rest days and Won’t do',
     steps: [
       { say: "Not every week goes to plan, and that's fine! Four things keep you on track without lying to the app: weekly targets, rest days, deadlines and reminders.", onlyIn: 'advanced', node: 'mother-habit', target: HABIT, badge: 'REAL LIFE', text: 'Not every week goes to plan. Four things keep you on track without lying to the app: **weekly targets**, **rest days**, **deadlines** and **reminders**.' },
       { say: "Not every week goes to plan, and that's fine! Two things keep you on track without lying to the app: rest days, and \"Won't do\".", onlyIn: 'easy', node: 'mother-habit', target: HABIT, badge: 'REAL LIFE', text: 'Not every week goes to plan. Two things keep you on track without lying to the app: **rest days** and **Won\u2019t do**.' },
@@ -341,6 +345,7 @@ export const TOURS: readonly Tour[] = [
     examples: ['plan', 'recorded'],
     title: 'Analytics — where the time went',
     summary: 'Pages, time per task, planned vs spent',
+    summaryEasy: 'Pages: your summary, activity and hours',
     steps: [
       { say: "Analytics turns your recorded time into answers!", node: 'mother-analytics', target: ANALYTICS, badge: 'ANALYTICS', text: 'Analytics turns your **recorded time** into answers.' },
       { say: "Each icon is a page: summary, activity, hours, time per task, and more. The name shows next to them.", onlyIn: 'advanced', target: '[data-testid="analytics-page-nav"]', badge: 'PAGES', text: '**Each icon is a page** — summary, activity, hours, time per task, and more. The name shows next to them.' },

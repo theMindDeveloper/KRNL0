@@ -13,7 +13,7 @@ function Shell({ x, y, h, testId, onClose, children }: { x: number; y: number; h
   }, [onClose]);
   return createPortal(
     <>
-      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />
       <div
         data-testid={testId}
         onMouseDown={(e) => e.stopPropagation()}

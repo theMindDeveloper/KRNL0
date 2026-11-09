@@ -42,7 +42,8 @@ export const ORB_LINES: Record<string, OrbLine> = {
   cmd_locked:       { say: "Session locked in!", text: 'Session locked in.' },
   // Short replies.
   misc_done:        { say: "Done!", text: 'Done' },
-  misc_error:       { say: "Something went wrong. Check the terminal for details.", text: 'Something went wrong. Check the terminal for details' },
+  // No "check the terminal": Easy has none (D23).
+  misc_error:       { say: "Something went wrong. Please try again.", text: 'Something went wrong. Please try again' },
   misc_wait:        { say: "Give me a second.", text: 'Give me a second' },
   misc_not_found:   { say: "I didn't find anything for that.", text: "I didn't find anything for that" },
   misc_running:     { say: "Running!", text: 'Running' },

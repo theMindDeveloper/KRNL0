@@ -25,7 +25,7 @@ export function RemindPicker({ x, y, value, onPick, onClose }: Props) {
   const W = 240;
   return createPortal(
     <>
-      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popover - 1 }} />
+      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />
       <div
         data-testid="remind-picker"
         onMouseDown={(e) => e.stopPropagation()}

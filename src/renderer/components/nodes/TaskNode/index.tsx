@@ -429,6 +429,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
 
           {isEditing ? (
             <input
+              className="nodrag"
               type="text"
               value={editValue}
               autoFocus
@@ -498,6 +499,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             inline textarea (Enter+Cmd/Ctrl commits, Escape cancels, blur commits). */}
         {isEditingNote ? (
           <textarea
+            className="nodrag nowheel"
             data-testid="task-note-editor"
             value={noteValue}
             autoFocus
@@ -561,6 +563,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           left={trackedMin >= 1 ? fmtDur(trackedMin) + (over ? ` · +${fmtDur(trackedMin - plannedMin)}` : '') : isActive ? 'Started' : 'Not started'}
           rightNode={isEditingEta ? (
             <input
+              className="nodrag"
               type="number"
               min={1}
               value={etaValue}
@@ -590,6 +593,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         {/* Two-phase inline input for subtask / sibling */}
         {inlineMode !== null && (
           <input
+            className="nodrag"
             type={inlinePhase === 'duration' ? 'number' : 'text'}
             min={inlinePhase === 'duration' ? 1 : undefined}
             max={inlinePhase === 'duration' ? 480 : undefined}

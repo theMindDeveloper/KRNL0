@@ -97,7 +97,7 @@ export const sessionFromCommanderFlow: Flow = {
       ],
       onFail: [
         { kind: 'speak', clip: 'misc_error',
-          text: "Something went wrong scheduling the session. Check the terminal." },
+          text: "Something went wrong scheduling the session. Please try again." },
       ],
     });
 

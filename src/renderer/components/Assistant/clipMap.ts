@@ -68,7 +68,7 @@ export const CLIP_MAP: Record<string, string> = {
 
   // ── audio/misc/ — utility ──────────────────────────────────────────────────
   'misc_done':       "Done",
-  'misc_error':      "Something went wrong. Check the terminal for details",
+  'misc_error':      "Something went wrong. Please try again",
   'misc_wait':       "Give me a second",
   'misc_not_found':  "I didn't find anything for that",
   'misc_running':    "Running",
