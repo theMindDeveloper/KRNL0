@@ -2717,3 +2717,10 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Branch:** `chore/release-v0.11.3`
 **Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/releases/v0.11.3.md`, `README.md` (badge), this file.
 **Summary:** Patch release for the full audit (PR #246, issues #241–#245) and the new window commands (PR #247). What's new is per feature release (0.11), so no new slides; the notes page is `docs/releases/v0.11.3.md`. The owner asked for the release to be done end to end ("make new release … do all by yourself").
+
+## [2026-11-09] — v0.11.3 published
+
+**Type:** Release
+**Branch:** `docs/v0.11.3-published`
+**Files changed:** this file; the v0.11.3 GitHub release; the website (theminddeveloper.github.io, fallback version 0.11.3).
+**Summary:** Tag `v0.11.3` built by CI run 42706418592 (draft with `KRNL0-Setup-0.11.3.exe`, `.blockmap`, `latest.yml` at 0.11.3), checked and published on the owner's go-ahead. It is Latest; 0.11.1+ installs update to it by themselves. The website reads the version from the newest release on every visit (its HTML fallback now says 0.11.3).
