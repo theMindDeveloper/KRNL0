@@ -389,3 +389,17 @@ No text in the app may touch or cross the edge of the shape it sits in: a chart 
 - **Controls (buttons, tabs, menu items, options, chips).** A control's label stays on one line and inside its box. `tokens.css` sets `white-space: nowrap` on every control that holds a plain label, so a crowded row (a header with a title and two buttons) can never squeeze a button narrower than its words; the title gives way instead (`min-width: 0` + ellipsis). A control that holds a title *and* a description (a `div`, a `p`, a `*hint*`/`*desc*` part) wraps as before; `data-wrap` opts out on purpose. In a flex row, the text that may shrink is the title, never a button: give the title `min-width: 0; overflow: hidden; text-overflow: ellipsis`.
 - **Guarded in dev** by `src/renderer/dev/overflowGuard.ts`: every few seconds it warns in the console, once per control, about any label that wraps, spills or is cut off without an ellipsis (`[ui-rule] text spills out of "New chat"`). Fix the layout, don't silence the warning.
 - **Enforced by** `tests/unit/renderer/analytics.textContainment.test.tsx`. It checks 3,000 random slice layouts plus rendered donuts, and fails if any label's box leaves its slice. New chart types add a case there.
+
+
+## Rule — board cards tell their kind at a glance (0.11, Decision 42)
+
+Plan, habit and event cards share the task card's size (220 × 120) but never look alike:
+
+- **Plan**: the plain card, square check box, wire dots on its sides.
+- **Habit**: tinted in its own colour (border 38 %, fill 6 %; 60 % / 11 % when done today), its week as seven lettered squares; **today's square is the button** (a faint check in an acid outline; "+1" and "n/goal" filling from the bottom for an amount). No wire dots.
+- **Event**: a calendar page on the left (weekday or TODAY / NOW, the day, the month) with the next date it happens; the time span and the rule beside it; **Skip this one** and **Show** as small outlined buttons. No wire dots.
+
+## Rule — Align to grid and Station soft snap
+
+- **Align to grid** is invisible: an 80 px grid (a task card = 3 × 2 cells). A drop settles on the nearest free spot with a 260 ms glide (none with reduced motion).
+- **Station soft snap**: a divider let go within 14 px of a line (the other row's divider, or its default spot) clicks onto it; further away it stays.

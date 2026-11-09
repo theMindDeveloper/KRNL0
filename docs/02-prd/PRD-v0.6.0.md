@@ -142,3 +142,18 @@ Live demo: **July 20, 2026**.
 ---
 
 *Architecture locked. Build starts week 1.*
+
+
+---
+
+## Addendum — what 0.11 adds (2026-11-09)
+
+Scope stays as above; 0.11 adds, all specified in `docs/06-requirements/`:
+
+- **Easy / Advanced** modes (`easy-mode.md`) — the same data, Easy shows less.
+- **Plans: one When and an optional Deadline**, the ANY TIME strip, repeating events on the Calendar (`plans-when-deadline.md`, Decision 40).
+- **Habit and event board cards** (`board-cards.md`, Decision 42).
+- **Show** — one eye for the card and its Calendar block; `krnl show` for the agent.
+- **The orb answers through Claude Code** (`orb-ask.md`, Decision 41).
+- **Guided tours** for every part of the app, voiced, in both modes (`guided-tours.md`).
+- **Align to grid** (`align-grid.md`) and **Station soft snap**.

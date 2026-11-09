@@ -136,6 +136,19 @@ Image nodes reference assets by id only (`state.assetId`); bytes never appear in
 
 **Round-trip contract:** `load → save → byte-identical` (modulo `savedAt`). This is tested.
 
+### 7.5.0 Board-level preferences (0.11)
+
+Optional top-level fields; absent means the default, so no migration:
+
+| Field | Values | Meaning |
+|---|---|---|
+| `uiMode` | `'easy'` \| `'advanced'` | Easy / Advanced (absent = Advanced) |
+| `alignGrid` | `'cards'` \| `'all'` | Align to grid (absent = off). `true` (first build) reads as `'cards'`. `krnl settings grid off\|cards\|all` |
+
+### 7.5.0.1 Board cards for habits and events (`habit.lane`, Decision 42)
+
+A `habit.lane` node holds only `{ habitId }`; it draws the habit's card (week of squares, today's square ticks) or, for a repeating event, the event's card (date page with the next date, Skip this one, Show). It has **no wire dots**: nothing runs "after" a habit or an event. Wires made before 0.11 stay in `edges` (they still fire) but are not drawn. Commands: `habit.lane.toggleToday`, `habit.lane.skip|unskip { date }`, `habit.lane.rename|setColor|setIcon|setNote|removeHabit`.
+
 ### 7.5.1 Optional `state.width` / `state.height` (Decision 21)
 
 Resizable nodes (TextNode, ImageNode) may persist `state.width` and `state.height`. When absent, the renderer applies kind-specific defaults — the kernel does NOT migrate absent values on load. This preserves the round-trip contract for older boards.
