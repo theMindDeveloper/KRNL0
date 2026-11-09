@@ -5,7 +5,7 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.3] — 2026-11-09
 
 ### Fixed (full audit, 2026-11-09)
 - **Your board is safer:** if board.json gets damaged, KRNL0 writes the open window's board back instead of merging it with an empty board (which looked like everything deleted); terminal commands refuse to write over it; it is copied aside once, not every 30 seconds.
