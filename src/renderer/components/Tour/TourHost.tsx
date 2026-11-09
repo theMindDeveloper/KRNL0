@@ -16,11 +16,12 @@ import { useBoardStore } from '../../store/boardStore';
 import { saveBoard } from '../../store/eventLog';
 import { CALENDAR_REVEAL_EVENT, focusNode } from '../../store/scheduleActions';
 import { beginPractice, keepPractice, practiceActive, practiceSummary, removePractice, type PracticeSummary } from '../../store/tourPractice';
+import { addExamples, removeExamples } from '../../store/tourExamples';
 import { isStationHidden } from '../Station/stationVisibility';
 import { Z } from '../ui/layers';
 import { stepsFor, tourById, type Tour } from './tours';
 import { setGuideSpeaking, setTourActive, setTourAnchor } from './tourAnchor';
-import { spokenText, voiceKey } from './tourVoice';
+import { fillTour, spokenText, voiceKey } from './tourVoice';
 import { voicePlayer } from '../Assistant/VoicePlayer';
 
 // The guide's recorded voice (tourVoice.ts): ./voice/<key>.mp3, bundled by Vite.
@@ -304,6 +305,8 @@ export function TourHost(): JSX.Element | null {
   const [rect2, setRect2] = useState<Rect | null>(null);
   // What the user did that isn't what the step needs (dropped on another day).
   const [nudge, setNudge] = useState<string | null>(null);
+  // Examples the tour added to an empty board (tourExamples.ts): said on the card.
+  const [examplesNote, setExamplesNote] = useState(false);
   // The tour ended with practice items left: ask to remove or keep them.
   const [practiceEnd, setPracticeEnd] = useState<PracticeSummary | null>(null);
   // The guide reads each step aloud (when a clip exists); the speaker on the card mutes it.
@@ -323,6 +326,8 @@ export function TourHost(): JSX.Element | null {
   // The user's own mode, put back when a tour that switched modes ends
   // without the user choosing one.
   const ownMode = useRef<'easy' | 'advanced' | null>(null);
+  // How the user's timer works (Record/Observe = stopwatch, Pomo = sessions): names it in the words.
+  const [timer, setTimer] = useState<'stopwatch' | 'pomo'>('pomo');
   const modeChosen = useRef(false);
   // The guide opened Settings for a step; close it again when moving on.
   const openedSettings = useRef(false);
@@ -347,6 +352,9 @@ export function TourHost(): JSX.Element | null {
     rectRef.current = null;
     stopVoice();
     setTour(null); setI(0); setRect(null); setRect2(null); setNudge(null); setReadyKey('');
+    // The examples always go (before the question about the user's own practice).
+    removeExamples();
+    setExamplesNote(false);
     // Practice left behind? Ask (nothing made: just stop pausing the log).
     if (practiceActive()) {
       const sum = practiceSummary();
@@ -381,12 +389,16 @@ export function TourHost(): JSX.Element | null {
       // work, Stop); POMO has End break and the ■ button.
       const pomoCfg = b?.nodes.find((n) => n.kind === 'pomo' && n.isMother)?.config as { mode?: string } | undefined;
       const timer = mode === 'easy' || pomoCfg?.mode === 'observe' ? 'stopwatch' : 'pomo';
+      setTimer(timer);
       setTour({ ...t, steps: stepsFor(t, mode, timer) });
       tourStartIds.current = new Set(idsOnBoard(useBoardStore.getState().board));
       setI(0);
       setPracticeEnd(null);
       // A tour where the user makes things: what they make is practice.
-      if (practises(t) && !practiceActive()) beginPractice();
+      if ((practises(t) || t.examples) && !practiceActive()) beginPractice();
+      // On an empty board, what the tour shows is added as examples first.
+      setExamplesNote(false);
+      if (t.examples) void addExamples(t.examples, mode === 'easy').then((added) => setExamplesNote(added.length > 0));
     };
     window.addEventListener(TOUR_EVENT, on);
     return () => window.removeEventListener(TOUR_EVENT, on);
@@ -456,7 +468,11 @@ export function TourHost(): JSX.Element | null {
         // Present but scrolled out of sight inside its window (a Calendar
         // block below the fold): bring it into view once.
         scrolled = true;
-        try { (found.el as HTMLElement).scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch { /* never break a tour */ }
+        // A card on the canvas off screen: the camera goes to it (scrolling can't move the canvas).
+        const card = (found.el as HTMLElement).closest?.('.react-flow__node');
+        const cardId = card?.getAttribute('data-id');
+        if (cardId && useBoardStore.getState().board?.layoutMode !== 'station') focusNode(cardId);
+        else try { (found.el as HTMLElement).scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch { /* never break a tour */ }
       }
       // A floating panel covering it steps aside for this step (put back when the step ends).
       if (found?.box) {
@@ -519,7 +535,7 @@ export function TourHost(): JSX.Element | null {
     stopVoice();
     if (!voiceReady || !voiceOn || !step) return;
     const mode = (ownMode.current ?? uiMode) === 'easy' ? 'easy' : 'advanced';
-    const url = clipFor(voiceKey(spokenText(step.text, mode, step.say)));
+    const url = clipFor(voiceKey(spokenText(step.text, mode, step.say, timer)));
     if (!url) return;
     // One voice at a time: the orb's own lines (its greeting) stop for the guide.
     voicePlayer.stop();
@@ -614,10 +630,10 @@ export function TourHost(): JSX.Element | null {
   }
   anchorPos.current = pos;
   const ownEasy = (ownMode.current ?? uiMode) === 'easy';
-  const ownLabel = ownEasy ? 'Easy' : 'Advanced';
   // The step text decides the highlight (write `**{mode}**`). `{pomo}` is the
-  // timer's name: "Record" in Easy, "Pomo" in Advanced (research C6).
-  const text = step.text.split('{mode}').join(ownLabel).split('{pomo}').join(ownEasy ? 'Record' : 'Pomo');
+  // timer's name as its window shows it: Record, Pomo or Observe (timerName).
+  const ownM = ownEasy ? 'easy' : 'advanced';
+  const text = fillTour(step.text, ownM, timer);
 
   const btn = (primary: boolean): React.CSSProperties => ({
     fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.06em', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
@@ -650,7 +666,7 @@ export function TourHost(): JSX.Element | null {
               position: 'absolute', left: -2, top: -26, padding: '3px 9px', borderRadius: 5,
               background: 'var(--acid)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 11,
               fontWeight: 700, letterSpacing: '0.08em', whiteSpace: 'nowrap',
-            }}>{step.badge}</span>
+            }}>{fillTour(step.badge, ownM, timer)}</span>
           )}
         </div>
       ) : (
@@ -675,7 +691,7 @@ export function TourHost(): JSX.Element | null {
         ref={cardRef}
         data-testid="tour-card"
         role="dialog"
-        aria-label={tour.title}
+        aria-label={fillTour(tour.title, ownM, timer)}
         style={{
           position: 'fixed', left: pos.left, top: pos.top, width: W, boxSizing: 'border-box', zIndex: Z.tour,
           background: 'var(--paper)', border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', borderRadius: 14,
@@ -686,7 +702,7 @@ export function TourHost(): JSX.Element | null {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-mono)' }}>
-          <span style={{ fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-2)', fontWeight: 700 }}>{tour.title}</span>
+          <span style={{ fontSize: 11.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-2)', fontWeight: 700 }}>{fillTour(tour.title, ownM, timer)}</span>
           <span style={{ flex: 1 }} />
           <button type="button" data-testid="tour-voice" aria-pressed={voiceOn} aria-label={voiceOn ? 'Mute the guide' : 'Read steps aloud'} title={voiceOn ? 'Mute the guide' : 'Read steps aloud'}
             onClick={() => { const on = !voiceOn; setVoiceOn(on); try { localStorage.setItem(VOICE_PREF, on ? 'on' : 'off'); } catch { /* private window */ } }}
@@ -718,6 +734,11 @@ export function TourHost(): JSX.Element | null {
         {nudge && !revisit && (
           <div data-testid="tour-nudge" style={{ fontSize: 13, lineHeight: 1.5, fontFamily: 'var(--font-sans)', color: 'var(--ink)', padding: '8px 10px', borderRadius: 8, background: 'color-mix(in srgb, var(--rust) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--rust) 40%, transparent)' }}>
             {nudge}
+          </div>
+        )}
+        {examplesNote && (
+          <div data-testid="tour-examples-note" style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--ink-3)', fontFamily: 'var(--font-sans)' }}>
+            Your board is still empty, so I added examples named “Example: …” to show you. They go when the tour ends.
           </div>
         )}
         {i === 0 && practises(tour) && (

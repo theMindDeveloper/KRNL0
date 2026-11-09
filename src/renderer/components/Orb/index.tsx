@@ -41,6 +41,7 @@ import {
 } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useBoardStore } from '../../../renderer/store/boardStore';
+import { tourTitleOn } from '../Tour/tourVoice';
 import { isFreshBoard } from './freshBoard';
 
 const FIRST_DAY_KEY = 'krnl0-first-day-offered';
@@ -878,7 +879,7 @@ export function Orb() {
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}
                       >
-                        {t.title.split(' — ')[0]}
+                        {tourTitleOn(t.title, useBoardStore.getState().board).split(' — ')[0]}
                       </button>
                     ))}
                   </div>

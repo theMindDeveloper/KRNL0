@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { Popover } from '../ui/Popover';
 import { startTour } from '../Tour/TourHost';
 import { toursIn } from '../Tour/tours';
+import { tourTitleOn } from '../Tour/tourVoice';
 import { useEasyMode } from '../../store/uiMode';
 import { openFeedback, openShare, openWelcomeBack, openWhatsNew, todayYMD, useLaunchStore } from '../../launch/launchStore';
 import { allShareCards } from '../../launch/milestones';
@@ -69,7 +70,7 @@ export function HelpMenu() {
           </button>
           {toursOpen && listed.map((t) => (
             <button key={t.id} type="button" role="menuitem" className="ln-menu__item" data-testid={`help-tour-${t.id}`} title={t.summary} onClick={run(() => { startTour(t.id); })} style={{ paddingLeft: 22 }}>
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{t.title}</span><span />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{tourTitleOn(t.title, useBoardStore.getState().board)}</span><span />
             </button>
           ))}
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { openWelcomeBack(true, null); })} data-testid="help-catchup">

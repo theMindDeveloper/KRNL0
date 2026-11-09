@@ -21,8 +21,9 @@ import { timeLogEntriesFromBoards } from '../../shared/timelog';
 let snapshot: Board | null = null;
 
 /** Kinds made during a tour that go when the practice is removed. */
-// 'text': a note or sticky note made in the board tour.
-const MADE_KINDS = new Set(['todo.task', 'habit.day', 'pomo.session', 'text']);
+// 'text': a note or sticky note made in the board tour. 'habit.lane': the card a
+// practice habit or event gets on the board (else it stays, pointing at nothing).
+const MADE_KINDS = new Set(['todo.task', 'habit.day', 'pomo.session', 'text', 'habit.lane']);
 /** Mother windows whose state goes back to the snapshot. */
 const RESTORED_KINDS = new Set(['todo', 'habit', 'pomo']);
 
