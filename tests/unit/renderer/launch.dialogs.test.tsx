@@ -108,7 +108,7 @@ describe('Welcome back moves a chain together (F14)', () => {
     useBoardStore.setState({ board: board as never });
     act(() => { openWelcomeBack(true, 4 * 86_400_000); });
     render(<WelcomeBack />);
-    fireEvent.click(screen.getByTestId('welcome-done'));
+    fireEvent.click(screen.getByTestId('welcome-move-all'));
     return (id: string) => (useBoardStore.getState().board!.nodes.find((n) => n.id === id)!.state as { scheduledFor?: string }).scheduledFor;
   };
 
@@ -123,6 +123,56 @@ describe('Welcome back moves a chain together (F14)', () => {
     const st = await runBringAll('2026-11-07T19:07:00');
     await vi.waitFor(() => expect(st('a')).toBe('2026-11-07T19:15'), { timeout: 5000 });
     expect(st('b')).toBe('2026-11-07T19:45');
+    vi.useRealTimers();
+  }, 20_000);
+});
+
+describe('Welcome back never moves by accident; Did it and Won’t do', () => {
+  const setup = async () => {
+    await import('../../../src/renderer/components/Canvas/commandDispatch');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-18T06:05:00'));
+    bridge();
+    const board = {
+      nodes: [
+        { id: 'todo', kind: 'todo', isMother: true, position: { x: 0, y: 0 }, config: {}, state: { items: [
+          { id: 'it-a', text: 'Day 3', done: false, createdAt: '2026-11-10T00:00:00.000Z', completedAt: null, taskNodeId: 'a', scheduledFor: '2026-11-15T10:00' },
+        ] } },
+        { id: 'a', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Day 3', done: false, scheduledFor: '2026-11-15T10:00', plannedMin: 360, parentTodoId: 'todo', parentTaskId: null, todoItemId: 'it-a' } },
+      ],
+      edges: [],
+    };
+    useBoardStore.setState({ board: board as never });
+    act(() => { openWelcomeBack(true, 4 * 86_400_000); });
+    render(<WelcomeBack />);
+    const node = (id: string) => useBoardStore.getState().board!.nodes.find((n) => n.id === id)!.state as Record<string, unknown>;
+    return node;
+  };
+
+  it('the main button closes the dialog and moves nothing', async () => {
+    const node = await setup();
+    fireEvent.click(screen.getByTestId('welcome-done'));
+    expect(useLaunchStore.getState().welcome).toBeNull();
+    expect(node('a')['scheduledFor']).toBe('2026-11-15T10:00');
+    vi.useRealTimers();
+  });
+
+  it('"Did it" ticks the task where it was planned, done at the end of its block', async () => {
+    const node = await setup();
+    fireEvent.click(screen.getByTestId('welcome-did-a'));
+    await vi.waitFor(() => expect(node('a')['done']).toBe(true), { timeout: 5000 });
+    expect(node('a')['scheduledFor']).toBe('2026-11-15T10:00');
+    expect(node('a')['completedAt']).toBe(new Date('2026-11-15T16:00').toISOString());
+    vi.useRealTimers();
+  }, 20_000);
+
+  it('Won’t do drops the row and takes it off the calendar (not deleted)', async () => {
+    const node = await setup();
+    fireEvent.click(screen.getByTestId('welcome-wontdo-a'));
+    await vi.waitFor(() => expect(node('a')['scheduledFor']).toBeUndefined(), { timeout: 5000 });
+    const items = node('todo')['items'] as Array<{ id: string; droppedAt?: string }>;
+    expect(items.find((i) => i.id === 'it-a')?.droppedAt).toBeTruthy();
+    expect(useBoardStore.getState().board!.nodes.some((n) => n.id === 'a')).toBe(true);
     vi.useRealTimers();
   }, 20_000);
 });

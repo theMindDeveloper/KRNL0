@@ -13,7 +13,7 @@ import { CloseButton } from '../ui/CloseButton';
 import { closeWelcomeBack, refreshWelcomeBack, todayYMD, useLaunchStore } from '../../launch/launchStore';
 import { landingTimes, type Catchup, type SlippedTask } from '../../launch/catchup';
 import { useBoardStore } from '../../store/boardStore';
-import { focusNode } from '../../store/scheduleActions';
+import { focusNode, unscheduleTask } from '../../store/scheduleActions';
 import { toneVarForTask } from '../../utils/taskColor';
 
 const DAY = 86_400_000;
@@ -78,6 +78,36 @@ async function plan(tasks: readonly SlippedTask[], day: string | null): Promise<
 
 const moveAll = (tasks: readonly SlippedTask[]): Promise<void> => plan(tasks, todayYMD());
 
+/**
+ * "Did it": the task was done, just not ticked. It stays where it was planned
+ * and counts on that day — done at the end of its block (never later than
+ * now). Its followers are not ticked: they show up on their own if they slipped.
+ */
+async function didIt(t: SlippedTask): Promise<void> {
+  const { makeCommandHandler } = await import('../Canvas/commandDispatch');
+  const end = new Date(`${t.wasDay}T${t.time}`).getTime() + lengthOf(t.id) * 60_000;
+  const at = Number.isFinite(end) ? new Date(Math.min(end, Date.now())).toISOString() : undefined;
+  makeCommandHandler(t.id)('task.toggle', at ? { at } : {});
+  refreshWelcomeBack();
+}
+
+/** The Todo row behind a task card, for "Won't do". */
+function todoRowOf(taskId: string): { todoId: string; itemId: string } | null {
+  const n = useBoardStore.getState().board?.nodes.find((x) => x.id === taskId);
+  const s = (n?.state ?? {}) as { parentTodoId?: unknown; todoItemId?: unknown };
+  return typeof s.parentTodoId === 'string' && typeof s.todoItemId === 'string' ? { todoId: s.parentTodoId, itemId: s.todoItemId } : null;
+}
+
+/** "Won't do": skipped on purpose — off the Calendar, not missed, not deleted. */
+async function wontDo(t: SlippedTask): Promise<void> {
+  const row = todoRowOf(t.id);
+  if (!row) return;
+  const { makeCommandHandler } = await import('../Canvas/commandDispatch');
+  makeCommandHandler(row.todoId)('todo.drop', { id: row.itemId });
+  await unscheduleTask(t.id);
+  refreshWelcomeBack();
+}
+
 const PATHS: Record<string, ReactNode> = {
   today: <><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></>,
   tomorrow: <path d="M5 12h12M13 7l5 5-5 5" />,
@@ -88,6 +118,7 @@ const PATHS: Record<string, ReactNode> = {
   flame: <path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" />,
   locate: <><circle cx="12" cy="12" r="3" /><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" /></>,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  drop: <><circle cx="12" cy="12" r="8.5" /><path d="M6 18L18 6" /></>,
 };
 
 function Icon({ name, size = 14 }: { name: keyof typeof PATHS; size?: number }) {
@@ -184,6 +215,8 @@ export function WelcomeBack() {
                     <div className="wb-task__actions">
                       <button type="button" className="ln-btn ln-btn--xs ln-btn--primary wb-ic" onClick={() => { void plan([t], today); }} title={`Plan it today at ${t.time} (or from now, if that time has passed)`}><Icon name="today" size={13} />Today</button>
                       <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { void plan([t], addDays(today, 1)); }} title={`Tomorrow at ${t.time}`} aria-label="Tomorrow"><Icon name="tomorrow" size={14} /></button>
+                      <button type="button" className="ln-btn ln-btn--xs wb-icon" data-testid={`welcome-did-${t.id}`} onClick={() => { void didIt(t); }} title="I did it — tick it done on the day it was planned" aria-label="Did it"><Icon name="check" size={14} /></button>
+                      {todoRowOf(t.id) && <button type="button" className="ln-btn ln-btn--xs wb-icon" data-testid={`welcome-wontdo-${t.id}`} onClick={() => { void wontDo(t); }} title="Won't do — skip it on purpose (kept in your list as won't do, not counted as missed)" aria-label="Won't do"><Icon name="drop" size={14} /></button>}
                       <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { void plan([t], null); }} title="Take it off the calendar (it stays in your list)" aria-label="Unplan"><Icon name="unplan" size={14} /></button>
                       <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { closeWelcomeBack(); focusNode(t.id); }} title="Show it on the canvas" aria-label="Show on the canvas"><Icon name="locate" size={14} /></button>
                     </div>
@@ -241,9 +274,9 @@ export function WelcomeBack() {
         <footer className="wb-foot">
           <button type="button" className="ln-btn ln-btn--sm wb-ic" onClick={closeWelcomeBack}><Icon name="later" size={14} />Later</button>
           <span style={{ flex: 1 }} />
-          {n > 0
-            ? <button type="button" className="ln-btn ln-btn--sm ln-btn--primary wb-ic" data-testid="welcome-done" onClick={() => { void moveAll(catchup.tasks).then(closeWelcomeBack); }}><Icon name="bring" size={14} />Bring all {n} to today</button>
-            : <button type="button" className="ln-btn ln-btn--sm ln-btn--primary wb-ic" data-testid="welcome-done" onClick={closeWelcomeBack}><Icon name="check" size={14} />Plan today</button>}
+          {/* The main button never moves anything: a bulk move is a deliberate
+              choice ("Move all to today" above), not the way out of the dialog. */}
+          <button type="button" className="ln-btn ln-btn--sm ln-btn--primary wb-ic" data-testid="welcome-done" onClick={closeWelcomeBack}><Icon name="check" size={14} />{n > 0 ? 'Keep as is' : 'Plan today'}</button>
         </footer>
       </div>
     </div>,
