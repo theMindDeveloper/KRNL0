@@ -20,7 +20,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     subcommands: [
       { name: 'add', usage: 'task add "<text>" [--todo <todoId>] [--duration <min>]', summary: 'Create a task + linked TodoItem' },
       { name: 'edit', usage: 'task edit <id> "<text>"', summary: 'Update task text' },
-      { name: 'toggle', usage: 'task toggle <id>', summary: 'Toggle done/undone (mirrors to TodoItem)' },
+      { name: 'toggle', usage: 'task toggle <id> [--at <YYYY-MM-DDTHH:MM>]', summary: 'Toggle done/undone (mirrors to TodoItem); --at says when it was really done' },
       { name: 'delete', usage: 'task delete <id>', summary: 'Delete task and all descendants; cancels active pomo' },
       { name: 'pomo', usage: 'task pomo <id>', summary: 'Tag the pomo with this task and start it if idle' },
       { name: 'subtask', usage: 'task subtask <parentId> "<text>"', summary: 'Add a child task' },

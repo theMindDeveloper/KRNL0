@@ -296,6 +296,26 @@ describe('sys task toggle', () => {
     const res = await taskToggle(ctx, undefined);
     expect(res.ok).toBe(false);
   });
+  it('--at backdates the completion (task, Todo row and ledger) to when it was really done', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'did it last week');
+    const taskId = (addRes.data as { id: string }).id;
+    const res = await taskToggle(ctx, taskId, '2026-11-15T16:00');
+    expect(res.ok).toBe(true);
+    const want = new Date('2026-11-15T16:00').toISOString();
+    expect((findTasks().find((t) => t.id === taskId)!.state as TaskState).completedAt).toBe(want);
+    const item = (findTodoMother().state as TodoState).items.find((i) => i.taskNodeId === taskId)!;
+    expect(item.completedAt).toBe(want);
+    const board = JSON.parse(readFileSync(boardPath, 'utf8')) as { completions?: Array<{ taskId: string; completedAt: string }> };
+    expect(board.completions?.find((c) => c.taskId === taskId)?.completedAt).toBe(want);
+  });
+
+  it('--at refuses a future or unreadable time and changes nothing', async () => {
+    const addRes = await taskAdd(ctx, TODO_MOTHER_ID, 'not yet');
+    const taskId = (addRes.data as { id: string }).id;
+    expect((await taskToggle(ctx, taskId, '2999-01-01T09:00')).ok).toBe(false);
+    expect((await taskToggle(ctx, taskId, 'yesterday-ish')).ok).toBe(false);
+    expect((findTasks().find((t) => t.id === taskId)!.state as TaskState).done).toBe(false);
+  });
 });
 
 // ── taskDelete ─────────────────────────────────────────────────────────────────
