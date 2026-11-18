@@ -2358,6 +2358,8 @@ Documenting unbuilt commands is how AI agents learn to hallucinate them. The gat
 
 **Consequences:** A "backwards-in-time" anchor (Decision 27 test 15) no longer renders before its predecessor. It is pushed after it. The stored `scheduledFor` is not rewritten, so removing the predecessor restores the original time.
 
+**Amendment (2026-11-18, UX review):** a **done** anchor is history and is never pushed: it renders at its own `scheduledFor`, and the chain after it continues from the later of its end and the cursor. Without this, moving an unfinished head forward (Welcome back "Today", a calendar drag) dragged its finished successors onto today and tomorrow.
+
 ---
 
 ## Decision 31 — Plan vs reality: the pomo tags, never plans (retires Decision 22 per-task accounting) (2026-11-01)

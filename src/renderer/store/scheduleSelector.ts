@@ -337,15 +337,20 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
           if (isAnchor) {
             // Explicit anchor: reset cursor to scheduledFor — unless the
             // previous task in the chain ends later, then push (#168).
+            // A done plan is history: it keeps its own slot and is never
+            // pushed, and the chain after it continues from the later of
+            // its end and the cursor.
             const sf = ts.scheduledFor as string;
-            cursor = cursor !== null ? laterISO(sf, cursor) : sf;
+            const prevCursor: string | null = cursor;
+            const isDone = ts.done === true;
+            const start = prevCursor !== null && !isDone ? laterISO(sf, prevCursor) : sf;
             cursorAnchorId = unit.taskId;
 
             const { effectiveMin, cursorAdvanceMin, breakdown } = computeEffective(ts, true, cfg);
             placements.set(unit.taskId, {
               taskId: unit.taskId,
-              startISO: cursor,
-              endISO: addMinutesISO(cursor, effectiveMin),
+              startISO: start,
+              endISO: addMinutesISO(start, effectiveMin),
               anchorTaskId: unit.taskId,
               parallelGroupId: null,
               parallelBranchIndex: null,
@@ -355,7 +360,8 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
             });
             // cursorAdvanceMin: for focus = effectiveMin (includes breaks),
             // for event = plannedMin (ADR 0003 §3.7 — cursor advances by work time only).
-            cursor = addMinutesISO(cursor, cursorAdvanceMin);
+            const after = addMinutesISO(start, cursorAdvanceMin);
+            cursor = isDone && prevCursor !== null ? laterISO(after, prevCursor) : after;
           } else if (cursor !== null && cursorAnchorId !== null) {
             // Derived: emit at current cursor.
             const { effectiveMin, cursorAdvanceMin, breakdown } = computeEffective(ts, false, cfg);
@@ -417,7 +423,7 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
               typeof ts.scheduledFor === 'string' &&
               ts.scheduledFor.length > 0;
             const branchStart = isBranchAnchor
-              ? cursor !== null
+              ? cursor !== null && ts!.done !== true
                 ? laterISO(ts!.scheduledFor as string, cursor)
                 : (ts!.scheduledFor as string)
               : groupStart!;

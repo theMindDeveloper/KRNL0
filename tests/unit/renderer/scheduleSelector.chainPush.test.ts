@@ -113,3 +113,39 @@ describe('DST — blocks keep their wall-clock length', () => {
   });
 });
 
+
+// A done plan is history: moving an earlier, unfinished task in the chain
+// (Welcome back "Today", a calendar drag) must not drag finished ones along.
+describe('done plans keep their own slot', () => {
+  it('a done anchored successor is not pushed by a moved, unfinished head', () => {
+    seq = 0;
+    const b = board(
+      [
+        task('head', 720, { scheduledFor: '2026-11-18T10:00' }),
+        task('day3', 360, { scheduledFor: '2026-11-15T10:00', done: true, completedAt: '2026-11-15T16:00:00.000Z' }),
+        task('premiere', 240, { scheduledFor: '2026-11-15T18:00', done: true, completedAt: '2026-11-15T22:00:00.000Z' }),
+      ],
+      [edge('head', 'day3'), edge('day3', 'premiere')],
+    );
+    const { placements } = selectSchedule(b);
+    expect(placements.get('head')?.startISO).toBe('2026-11-18T10:00');
+    expect(placements.get('day3')?.startISO).toBe('2026-11-15T10:00');
+    expect(placements.get('premiere')?.startISO).toBe('2026-11-15T18:00');
+  });
+
+  it('an open task after a done one still waits for the chain cursor', () => {
+    seq = 0;
+    const b = board(
+      [
+        task('t1', 120, { scheduledFor: '2026-11-02T09:00' }),
+        task('t2', 30, { scheduledFor: '2026-11-02T09:30', done: true }),
+        task('t3', 15),
+      ],
+      [edge('t1', 't2'), edge('t2', 't3')],
+    );
+    const { placements } = selectSchedule(b);
+    expect(placements.get('t2')?.startISO).toBe('2026-11-02T09:30');
+    // t1 ends 11:00, later than done t2's end (10:00): t3 follows t1.
+    expect(placements.get('t3')?.startISO).toBe('2026-11-02T11:00');
+  });
+});
