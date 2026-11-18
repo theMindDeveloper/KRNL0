@@ -5,6 +5,7 @@
 // HabitSwapModal. NowLine is rendered as an overlay.
 
 import { pickerOpen } from '../../ui/Popover';
+import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
 import { CALENDAR_REVEAL_EVENT, showTask, unscheduleTask } from '../../../store/scheduleActions';
 import { highlightElement } from '../../../store/highlight';
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
@@ -745,6 +746,18 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       }
       return out;
   }, [boardForCal, weekRangeFromISO, weekRangeToISO]);
+
+  // calendar-clock-visuals F30 — a chained plan names the task it follows.
+  const afterOf = useMemo(() => {
+    const out = new Map<string, string>();
+    const textOf = new Map((boardForCal?.nodes ?? []).filter((n) => n.kind === 'todo.task').map((n) => [n.id, String((n.state as { text?: string }).text ?? '')]));
+    for (const e of boardForCal?.edges ?? []) {
+      if (e.from.event !== 'task.next') continue;
+      const t = textOf.get(e.from.nodeId);
+      if (t !== undefined && textOf.has(e.to.nodeId) && !out.has(e.to.nodeId)) out.set(e.to.nodeId, t || 'Untitled');
+    }
+    return out;
+  }, [boardForCal]);
 
   // Read scheduled habits from the board store (ADR 0002 §6).
   const scheduledHabits = useMemo((): ScheduledHabit[] => {
@@ -1565,6 +1578,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             (overrunMin > 0 ? ` (${fmtDur(overrunMin)} over plan)` : '') +
             (overlapRoutines.length ? ` · overlaps ${overlapRoutines.join(', ')}` : '') +
             (isMissed ? ' · missed' : '') +
+            (afterOf.has(task.id) ? ` · after ${afterOf.get(task.id)}` : '') +
             (isContinuation ? ' (continued from previous day)' : '')
           }
           className="cal-block"
@@ -1721,6 +1735,11 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
               </span>
               {startNote && <span data-testid={`task-start-delta-${task.id}`} style={{ whiteSpace: 'nowrap' }}>{startNote.replace(/^ · /, '')}</span>}
               {isMissed && !isContinuation && <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-2)', fontWeight: 600 }}>Missed</span>}
+              {afterOf.has(task.id) && !isContinuation && (
+                <span data-testid={`task-after-${task.id}`} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', color: 'var(--ink-3)' }}>
+                  after {afterOf.get(task.id)}
+                </span>
+              )}
               {overrunMin > 0
                 ? <span data-testid={`task-overrun-${task.id}`} style={{ whiteSpace: 'nowrap', color: 'var(--rust)', fontWeight: 700 }}>+{fmtDur(overrunMin)} over</span>
                 : trackedMin > 0 ? <span style={{ whiteSpace: 'nowrap' }}>{task.done ? `took ${fmtDur(trackedMin)}` : `${fmtDur(trackedMin)} tracked`}</span> : null}
@@ -2919,11 +2938,13 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             y={taskPopup.y}
             today={todayYMD()}
             value={plan.value}
-            title={{ text: plan.text, tone: toneVarForTask(taskPopup.task.id) }}
+            title={{ text: plan.text, tone: toneVarForTask(taskPopup.task.id), ...(afterOf.has(taskPopup.task.id) ? { sub: `after ${afterOf.get(taskPopup.task.id)}` } : {}) }}
             actions={[
               // Easy (D9/D10): no timer action on a plan, as on the Todo card.
               ...(easy ? [] : [{ key: 'timer', label: observe ? 'Track it now' : 'Focus on it', icon: (observe ? 'observe' : 'play') as 'observe' | 'play', onClick: () => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); close(); } }]),
-              { key: 'done', label: taskPopup.task.done ? 'Not done yet' : 'Mark done', icon: taskPopup.task.done ? 'undo' : 'check', onClick: () => { void toggleTaskDone(taskPopup.task.id); close(); } },
+              // task-node F21 — a plan whose block is over counts on that day.
+              { key: 'done', label: taskPopup.task.done ? 'Not done yet' : doneLabel(plannedEndMs(taskPopup.task.id)), icon: taskPopup.task.done ? 'undo' : 'check', onClick: () => { const t = taskPopup.task.id; if (taskPopup.task.done) void toggleTaskDone(t); else void markDoneAsPlanned(t); close(); } },
+              ...(!taskPopup.task.done && todoRowOf(taskPopup.task.id) ? [{ key: 'wontdo', label: "Won't do", icon: 'drop' as const, onClick: () => { wontDoTask(taskPopup.task.id); close(); } }] : []),
               { key: 'show', label: 'Show', icon: 'show', onClick: () => { const t = taskPopup.task.id; close(); void showTask(t); } },
               { key: 'delete', label: 'Delete', icon: 'delete', danger: true, onClick: () => { void deletePlanOfTask(taskPopup.task.id); close(); } },
             ]}

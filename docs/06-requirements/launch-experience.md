@@ -33,6 +33,7 @@ Everything here is about the moments around using KRNL0: opening it, after an up
 - **F13** It lists tasks whose planned day is before today and that are not done. Tasks chained after one (`task.next`) are listed under it as `follows the task above`; only the first task of a chain gets buttons, and the rest move with it.
 - **F14** Buttons: **Move all to today**, and per task **Today**, **Tomorrow**, **Unplan** (takes it off the calendar; the task stays). Moves keep the time of day. Nothing moves by itself; every change goes through the task node's own command.
 - **F14b** (UX review 2026-11-18) Per task also **Did it** (✓: ticks it done where it was planned, `completedAt` = the end of its block, never later than now, so analytics count it on that day — `krnl task toggle <id> --at <YYYY-MM-DDTHH:MM>`) and **Won't do** (⊘: the Todo row's Won't do — off the calendar, not missed, not deleted). The dialog's main button is **Keep as is** and moves nothing; a bulk move is only the explicit **Move all to today**. (Before, the main button was "Bring all N to today", and owners pressed it to close the dialog, moving plans they had already done to today.)
+- **F14c** (UX review pick 1A, 2026-11-18) **Checklist first.** The task section is one list, fixed when the dialog opens: each slipped task and each open follower of it is a row with a checkbox. Ticking a row marks it done **on the day it was planned** (`completedAt` = the end of its calendar block, never later than now); unticking reopens it. A done row stays in the list, struck through, with "done · counts <day>". Open rows show **Move** (Today · Tomorrow · Off the calendar) and **Won't do**. The footer counts "N done · M open", offers **Move the M open to today** as a line button, and closes with **Close** (moves nothing). A follower without its own time is listed under its head with its own checkbox.
 - **F15** Habits: a broken streak is said plainly with the best run (`best 12 · start again today`); a running one says `▲ 6 · still going`. `krnl catchup [--json]` prints the same; `krnl catchup show` opens the dialog even when nothing slipped.
 
 **Help and feedback**
@@ -159,3 +160,22 @@ Feature: Time at a glance (F10–F11)
 - A date picker in Welcome back (Today / Tomorrow / Unplan cover it without a native picker).
 - What's new as a note on the canvas (draft D) and the other splash / What's new drafts.
 - The website download page (separate branch `feat/krnl0-website`).
+
+```gherkin
+Feature: Welcome back checklist (F14c)
+
+  Scenario: Ticking counts on the planned day
+    Given "Day 3" was planned Sun 15 10:00–16:00 and is not done
+    When I tick it in Welcome back
+    Then it is done with completedAt Sun 15 16:00
+    And it stays in the list as "done · counts Sun 15"
+
+  Scenario: Unticking reopens
+    Given I ticked "Day 3" in Welcome back
+    When I untick it
+    Then "Day 3" is not done
+
+  Scenario: Close moves nothing
+    When I press Close
+    Then no task's scheduledFor changed
+```

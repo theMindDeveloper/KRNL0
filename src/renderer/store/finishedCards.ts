@@ -73,9 +73,26 @@ type Loose = Record<string, unknown>;
  */
 export function finishedTaskIds(board: Pick<Board, 'nodes' | 'edges'> | null | undefined, policy: FinishedPolicy, nowMs: number): Set<string> {
   const out = new Set<string>();
-  if (!board || policy === 'keep') return out;
+  if (!board) return out;
+  // task-node F22 — an archived done card leaves now, whatever its chain says.
+  for (const n of board.nodes) {
+    if (n.kind !== 'todo.task') continue;
+    const s = n.state as Loose;
+    if (s['done'] === true && typeof s['archivedAt'] === 'string') out.add(n.id);
+  }
+  if (policy === 'keep') return out;
+  for (const g of finishedGroups(board)) {
+    if (g.allDone && hasLeft(policy, g.lastMs, nowMs)) g.members.forEach((id) => out.add(id));
+  }
+  return out;
+}
+
+interface FinishedGroup { allDone: boolean; lastMs: number; members: string[]; open: string[] }
+
+/** Task cards grouped by subtask links and by edges between cards (chains). */
+function finishedGroups(board: Pick<Board, 'nodes' | 'edges'>): FinishedGroup[] {
   const tasks = board.nodes.filter((n) => n.kind === 'todo.task');
-  if (tasks.length === 0) return out;
+  if (tasks.length === 0) return [];
   const ids = new Set(tasks.map((t) => t.id));
   const parent = new Map<string, string>(tasks.map((t) => [t.id, t.id]));
   const find = (x: string): string => {
@@ -91,20 +108,38 @@ export function finishedTaskIds(board: Pick<Board, 'nodes' | 'edges'> | null | u
   }
   for (const e of board.edges ?? []) join(e.from.nodeId, e.to.nodeId);
 
-  const groups = new Map<string, { allDone: boolean; lastMs: number; members: string[] }>();
+  const groups = new Map<string, FinishedGroup>();
   for (const t of tasks) {
     const s = t.state as Loose;
-    const g = groups.get(find(t.id)) ?? { allDone: true, lastMs: 0, members: [] };
+    const g = groups.get(find(t.id)) ?? { allDone: true, lastMs: 0, members: [], open: [] };
     g.members.push(t.id);
-    if (s['done'] !== true) g.allDone = false;
+    if (s['done'] !== true) { g.allDone = false; g.open.push(t.id); }
     else {
       const at = typeof s['completedAt'] === 'string' ? Date.parse(s['completedAt']) : NaN;
       if (Number.isFinite(at)) g.lastMs = Math.max(g.lastMs, at);
     }
     groups.set(find(t.id), g);
   }
-  for (const g of groups.values()) {
-    if (g.allDone && hasLeft(policy, g.lastMs, nowMs)) g.members.forEach((id) => out.add(id));
+  return [...groups.values()];
+}
+
+/**
+ * engagement.md F20 — done cards that would have left the board by now on
+ * their own, but stay because their chain (or subtasks) is not all done.
+ * Maps each such card to an open task of its group (the one holding it).
+ */
+export function waitingOnChain(board: Pick<Board, 'nodes' | 'edges'> | null | undefined, policy: FinishedPolicy, nowMs: number): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!board || policy === 'keep') return out;
+  const byId = new Map(board.nodes.map((n) => [n.id, n]));
+  for (const g of finishedGroups(board)) {
+    if (g.allDone || g.open.length === 0) continue;
+    for (const id of g.members) {
+      const s = byId.get(id)?.state as Loose | undefined;
+      if (!s || s['done'] !== true || typeof s['archivedAt'] === 'string') continue;
+      const at = typeof s['completedAt'] === 'string' ? Date.parse(s['completedAt']) : 0;
+      if (hasLeft(policy, Number.isFinite(at) ? at : 0, nowMs)) out.set(id, g.open[0]!);
+    }
   }
   return out;
 }

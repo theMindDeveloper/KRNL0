@@ -24,6 +24,7 @@ import {
   taskUnschedule,
   taskEdit,
   taskToggle,
+  taskArchive,
   taskDelete,
   taskStartPomo,
   taskSubtask,
@@ -315,6 +316,35 @@ describe('sys task toggle', () => {
     expect((await taskToggle(ctx, taskId, '2999-01-01T09:00')).ok).toBe(false);
     expect((await taskToggle(ctx, taskId, 'yesterday-ish')).ok).toBe(false);
     expect((findTasks().find((t) => t.id === taskId)!.state as TaskState).done).toBe(false);
+  });
+});
+
+// ── taskArchive (task-node F22) ───────────────────────────────────────────────
+
+describe('sys task archive', () => {
+  it('archives a done task and mirrors it to its Todo row; --undo brings it back', async () => {
+    const taskId = ((await taskAdd(ctx, TODO_MOTHER_ID, 'archive me')).data as { id: string }).id;
+    await taskToggle(ctx, taskId);
+    const res = await taskArchive(ctx, taskId);
+    expect(res.ok).toBe(true);
+    const at = (findTasks().find((t) => t.id === taskId)!.state as TaskState).archivedAt;
+    expect(typeof at).toBe('string');
+    expect((findTodoMother().state as TodoState).items.find((i) => i.taskNodeId === taskId)!.archivedAt).toBe(at);
+    await taskArchive(ctx, taskId, true);
+    expect((findTasks().find((t) => t.id === taskId)!.state as TaskState).archivedAt).toBeUndefined();
+  });
+
+  it('refuses an open task', async () => {
+    const taskId = ((await taskAdd(ctx, TODO_MOTHER_ID, 'not done')).data as { id: string }).id;
+    expect((await taskArchive(ctx, taskId)).ok).toBe(false);
+  });
+
+  it('reopening an archived task clears the archive', async () => {
+    const taskId = ((await taskAdd(ctx, TODO_MOTHER_ID, 'reopen me')).data as { id: string }).id;
+    await taskToggle(ctx, taskId);
+    await taskArchive(ctx, taskId);
+    await taskToggle(ctx, taskId);
+    expect((findTasks().find((t) => t.id === taskId)!.state as TaskState).archivedAt).toBeUndefined();
   });
 });
 

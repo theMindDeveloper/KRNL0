@@ -28,6 +28,7 @@ import {
   renumberSiblings as sharedRenumberSiblings,
   taskToggleMirror,
   doneAtISO,
+  archiveTask,
   renameTask,
 } from '../../shared/dispatch/task';
 import type { BoardShape as SharedBoardShape } from '../../shared/dispatch/types';
@@ -305,6 +306,28 @@ export async function taskToggle(
     ok: true,
     message: `Task marked ${nextState.done ? 'done' : 'undone'}.`,
     data: { id: taskId, done: nextState.done },
+  };
+}
+
+export async function taskArchive(
+  ctx: TaskCtx,
+  taskId: string | undefined,
+  undo = false,
+): Promise<SysResult> {
+  if (!taskId) return { ok: false, message: 'task archive requires a <id>' };
+  const board = loadBoard(ctx);
+  const taskNode = findTaskNode(board, taskId);
+  if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
+  taskId = taskNode.id;
+  if (!undo && (taskNode.state as { done?: boolean }).done !== true) {
+    return { ok: false, message: 'Only a done task can be archived (tick it first: task toggle <id>).' };
+  }
+  const changed = archiveTask(board as unknown as SharedBoardShape, taskId, undo ? null : new Date().toISOString());
+  if (changed) saveBoard(ctx, board);
+  return {
+    ok: true,
+    message: changed ? (undo ? 'Task back on the board.' : 'Task archived: off the board, still in Todo Archive and Analytics.') : (undo ? 'Task was not archived.' : 'Task already archived.'),
+    data: { id: taskId, archived: !undo },
   };
 }
 

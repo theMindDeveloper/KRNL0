@@ -8,7 +8,8 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } f
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
 import { Popover } from '../ui/Popover';
-import { activeCanvasOf, DEFAULT_CANVAS_ID, DEFAULT_CANVAS_NAME, type CanvasMeta } from '../../../shared/canvas';
+import { activeCanvasOf, DEFAULT_CANVAS_ID, DEFAULT_CANVAS_NAME, isSharedNode, type CanvasMeta } from '../../../shared/canvas';
+import type { Board } from '../../../shared/types';
 
 /** How long a row click waits for a second click before closing the list. */
 const DBLCLICK_MS = 250;
@@ -26,9 +27,37 @@ const input: CSSProperties = {
   fontFamily: 'var(--font-mono)', fontSize: 11, outline: 'none',
 };
 
+/** canvases F9 — what is on each canvas, in words ("3 notes, 2 images", "empty"). */
+export function canvasContents(board: Pick<Board, 'nodes'> & { drawings?: ReadonlyArray<{ canvasId?: string }> } | null | undefined, ids: readonly string[], activeId: string): Record<string, string> {
+  const notes: Record<string, number> = {};
+  const images: Record<string, number> = {};
+  const other: Record<string, number> = {};
+  const strokes: Record<string, number> = {};
+  for (const n of board?.nodes ?? []) {
+    if (isSharedNode(n)) continue;
+    const c = (n as { canvasId?: string }).canvasId ?? activeId;
+    const bucket = n.kind === 'text' ? notes : n.kind === 'image' || n.kind === 'media' ? images : other;
+    bucket[c] = (bucket[c] ?? 0) + 1;
+  }
+  for (const d of board?.drawings ?? []) { const c = d.canvasId ?? activeId; strokes[c] = (strokes[c] ?? 0) + 1; }
+  const word = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  const out: Record<string, string> = {};
+  for (const id of ids) {
+    const parts = [
+      notes[id] ? word(notes[id]!, 'note', 'notes') : '',
+      images[id] ? word(images[id]!, 'image', 'images') : '',
+      other[id] ? word(other[id]!, 'item', 'items') : '',
+      strokes[id] ? 'drawing' : '',
+    ].filter(Boolean);
+    out[id] = parts.length ? parts.slice(0, 2).join(', ') : 'empty';
+  }
+  return out;
+}
+
 export function CanvasSwitcher() {
   const canvases = useBoardStore(useShallow((s) => s.board?.canvases ?? FALLBACK));
   const activeId = useBoardStore((s) => (s.board ? activeCanvasOf(s.board) : DEFAULT_CANVAS_ID));
+  const contents = useBoardStore(useShallow((s) => canvasContents(s.board, canvases.map((c) => c.id), activeId)));
   const [open, setOpen] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
@@ -63,7 +92,7 @@ export function CanvasSwitcher() {
         type="button"
         data-testid="topbar-canvas-switcher"
         className="krnl-topbar-btn"
-        title="Canvases — free content per canvas; mothers and their data are shared"
+        title="Canvases: notes, images and drawings are per canvas; plans, calendar, habits and timer are on every canvas"
         onClick={() => (open ? close() : setOpen(true))}
         style={{
           background: 'transparent', border: '1px solid var(--paper-3)', borderRadius: 'var(--radius)',
@@ -75,7 +104,7 @@ export function CanvasSwitcher() {
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{active?.name ?? DEFAULT_CANVAS_NAME}</span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: 'var(--ink-3)', flexShrink: 0 }}><path d="M6 9l6 6 6-6" /></svg>
       </button>
-      <Popover anchor={anchor.current} open={open} onClose={close} minWidth={220}>
+      <Popover anchor={anchor.current} open={open} onClose={close} minWidth={260}>
         <div data-testid="canvas-switcher-list" style={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)', fontSize: 11 }}>
           {canvases.map((c) => {
             const isActive = c.id === activeId;
@@ -130,6 +159,7 @@ export function CanvasSwitcher() {
               >
                 <span style={{ width: 12, color: 'var(--acid-ink, var(--acid))' }}>{isActive ? <LineGlyph name="check" size={11} /> : null}</span>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                <span data-testid={`canvas-contents-${c.id}`} style={{ color: 'var(--ink-3)', fontWeight: 400, fontSize: 10.5, whiteSpace: 'nowrap' }}>{contents[c.id]}</span>
                 <button
                   type="button" title="Rename" aria-label={`Rename ${c.name}`} style={rowBtn}
                   onClick={(e) => { e.stopPropagation(); setDraft(c.name); setRenaming(c.id); }}
@@ -143,6 +173,11 @@ export function CanvasSwitcher() {
               </div>
             );
           })}
+          {/* canvases F9 — said, not discovered: what every canvas shares. */}
+          <div data-testid="canvas-shared-note" style={{ margin: '6px 2px 2px', padding: '8px 9px', borderRadius: 6, background: 'var(--paper-2)', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10.5, lineHeight: 1.45 }}>
+            <span><span style={{ color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>On every canvas</span><br /><span style={{ color: 'var(--ink)' }}>plans, calendar, habits, timer</span></span>
+            <span><span style={{ color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Only on this one</span><br /><span style={{ color: 'var(--ink)' }}>notes, images, drawings</span></span>
+          </div>
           <div style={{ borderTop: '1px solid var(--paper-3)', margin: '3px 2px' }} />
           {adding ? (
             <div style={{ display: 'flex', gap: 4, padding: 3 }}>

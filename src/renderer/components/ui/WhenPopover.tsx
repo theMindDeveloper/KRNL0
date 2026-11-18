@@ -34,7 +34,8 @@ interface Props {
   onApply: (next: WhenValue) => void;
   onClose: () => void;
   /** The plan card (Decision 40): the plan's name at the top… */
-  title?: { text: string; tone?: string };
+  /** `sub`: a quiet line under the name, e.g. "after Day 2" for a chained plan. */
+  title?: { text: string; tone?: string; sub?: string };
   /** …and what you can do with it (the timer, show it, delete it), the same
    *  from the Todo row and from its block on the Calendar. */
   actions?: ReadonlyArray<{ key: string; label: string; icon: MenuIconName; onClick: () => void; danger?: boolean }>;
@@ -156,7 +157,10 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
         {title && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             {title.tone && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: title.tone, flexShrink: 0, marginTop: 5 }} />}
-            <span data-testid="plan-card-title" style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 650, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{title.text}</span>
+            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span data-testid="plan-card-title" style={{ fontSize: 13.5, fontWeight: 650, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{title.text}</span>
+              {title.sub && <span data-testid="plan-card-sub" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', overflowWrap: 'anywhere' }}>{title.sub}</span>}
+            </span>
             <button type="button" aria-label="Close" onClick={onClose} style={{ border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', padding: 2, display: 'inline-flex', flexShrink: 0 }}>
               <MenuIcon name="drop" size={12} />
             </button>

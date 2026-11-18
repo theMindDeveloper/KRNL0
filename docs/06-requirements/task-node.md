@@ -28,6 +28,8 @@
 | F18 | Clicking the task body dispatches `task.loadIntoPomo` (no auto-start). The pomo FSM goes to `paused` with the task's `currentSessionElapsedSec` as `pausedElapsedMs` if non-zero, else `idle`. The `+ pomo` header button continues to dispatch `task.spawnPomo` for explicit auto-start. (Supersedes F17 — Decision 22.1) |
 | F19 | Double-clicking the ETA badge in the footer enters inline edit mode (numeric input, pre-filled with current `plannedMin`); Enter dispatches `task.setPlannedMin` with the parsed minutes; ESC cancels with no dispatch. |
 | F20 | `TaskState` gains `currentSessionElapsedSec: number` (Decision 22.1). Default 0. Backfilled by `STATE_DEFAULTS['todo.task']`. Written when a task is swapped out of the active slot; cleared on `pomo.cancel` / `pomo.complete` after the final commit to `secondsAccumulated`. |
+| F21 | (UX review pick 2B, 2026-11-18) **A missed plan has honest choices in its menus.** The task card's right-click menu and the calendar block's popup list, above Delete: **Done on <day>** for a plan whose time has passed (ticks it with `completedAt` = the end of its block, CLI `task toggle <id> --at`), **Mark done** otherwise, and **Won't do** when the task has a Todo row (the Todo row's Won't do: off the calendar, not missed, kept as "won't do", one Ctrl+Z / UNDO puts it and its links back). Delete stays last. The checkbox itself always means "done now". |
+| F22 | **Archive a done card.** A done card has an Archive button next to Reopen and an **Archive** menu item: the card leaves the board now (`TaskState.archivedAt`, mirrored to the Todo row's `archivedAt`), even when its chain is not finished; it stays in Todo → Archive and in Analytics. Reopening clears it. UNDO restores it. CLI: `task archive <id>`. |
 
 ---
 
@@ -184,3 +186,24 @@ Feature: TaskNode display and interaction
 ---
 
 *Last updated: 2026-05-13 — Decision 22.1 (load-without-start, ETA inline edit, currentSessionElapsedSec)*
+
+```gherkin
+Feature: Missed plan choices and Archive (F21, F22)
+
+  Scenario: F21 — Done on its day from the menu
+    Given a task planned Mon 16 14:00–16:00, not done, and now is Wed 18
+    When I choose "Done on Mon 16" in its menu
+    Then it is done with completedAt Mon 16 16:00
+
+  Scenario: F21 — Won't do from the card
+    Given a missed task with a Todo row
+    When I choose "Won't do"
+    Then its Todo row is dropped and the task is off the calendar
+    And the task card still exists
+
+  Scenario: F22 — Archive hides one card of an unfinished chain
+    Given a chain A → B where A is done and B is open
+    When I archive A
+    Then A is not on the board and B is
+    And A's completion is still in the ledger
+```

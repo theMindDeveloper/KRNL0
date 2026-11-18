@@ -203,8 +203,9 @@ export function stampCompletedAt(
 ): TaskState {
   if (!prev.done && next.done) return { ...next, completedAt: ctx.now() };
   if (prev.done && !next.done) {
-    const { completedAt: _ca, ...rest } = next;
-    void _ca;
+    // Reopening also brings an archived card back (task-node F22).
+    const { completedAt: _ca, archivedAt: _ar, ...rest } = next;
+    void _ca; void _ar;
     return rest;
   }
   return next;
@@ -263,6 +264,40 @@ export function renameTask(board: BoardShape, taskId: string, text: string): boo
   }
 
   if (ts.done) syncCompletion(board, taskId);
+  return true;
+}
+
+// ── archiveTask ───────────────────────────────────────────────────────────
+// task-node F22 — take one done card off the board now (or bring it back with
+// `at` = null). Mirrored to its Todo row's `archivedAt`, so the row moves to
+// the Archive too. Only done tasks can be archived. Mutates `board`; returns
+// false when nothing changed.
+
+export function archiveTask(board: BoardShape, taskId: string, at: string | null): boolean {
+  const idx = board.nodes.findIndex((n) => n.id === taskId && n.kind === 'todo.task');
+  if (idx === -1) return false;
+  const taskNode = board.nodes[idx]!;
+  const ts = taskNode.state as TaskState;
+  if (at !== null && !ts.done) return false;
+  if ((ts.archivedAt ?? null) === at) return false;
+  const { archivedAt: _old, ...rest } = ts;
+  void _old;
+  board.nodes[idx] = { ...taskNode, state: at === null ? rest : { ...rest, archivedAt: at } };
+
+  if (ts.todoItemId !== null) {
+    const todoIdx = board.nodes.findIndex((n) => n.id === ts.parentTodoId && n.kind === 'todo');
+    const todoNode = todoIdx === -1 ? undefined : board.nodes[todoIdx];
+    if (todoNode) {
+      const st = todoNode.state as TodoState;
+      const items = st.items.map((i) => {
+        if (i.id !== ts.todoItemId) return i;
+        const { archivedAt: _a, ...r } = i;
+        void _a;
+        return at === null ? r : { ...r, archivedAt: at };
+      });
+      board.nodes[todoIdx] = { ...todoNode, state: { ...st, items } };
+    }
+  }
   return true;
 }
 

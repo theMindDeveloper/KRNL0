@@ -2736,3 +2736,30 @@ The first-day voice clips no longer match the corrected words: the clip check is
 - a done anchor is never pushed by its chain
 
 The full user-journey review, with proposals for canvases, archive and chains, is in `docs/research/ux-review-2026-11-18.md`. Typecheck is at 0 errors. 2,609 tests pass. The one failure, `routines.test.ts`, depends on the date and also fails on the unchanged branch. Not yet walked in the real window: the owner checks it.
+
+## [2026-11-18] — UX review picks: Welcome back checklist, Won't do / Done-on-day in menus, Archive, canvas note, chain captions
+
+**Type:** Feature (UX)
+**Branch:** `feat/ux-review-picks` (builds on `fix/ux-review-welcome-back`, PR #251)
+**Files changed:**
+- **New code:** `src/renderer/store/planActions.ts`
+- **Store:** `store/finishedCards.ts` (archive, `waitingOnChain`)
+- **Shared:** `shared/dispatch/task.ts` (`archiveTask`; reopening clears the archive)
+- **Task card:** `TaskNode/index.tsx` (menu), `TaskNode/DoneCard.tsx`, `TaskNode/CardParts.tsx`, `TaskNode/types.ts`
+- **Todo:** `TodoNode/index.tsx` (Won't do moved to the shared helper)
+- **Calendar:** `CalendarNode/WeekView.tsx` (popup actions, "after X")
+- **UI:** `ui/WhenPopover.tsx` (title `sub`), `TopBar/CanvasSwitcher.tsx`
+- **Welcome back:** `Launch/WelcomeBack.tsx` (checklist)
+- **CLI:** `sys/parser.ts`, `SysFacade.ts`, `commands/task.ts` (`task archive`), `shared/cli/commandRegistry.ts`, `claude/CLAUDE.md`
+- **Requirements:** launch-experience F14c, task-node F21–F22, engagement F20, canvases F9, calendar-clock-visuals F30
+- **Tests:** `uxReviewPicks.test.ts` (new); launch dialogs and the sys task tests updated
+
+**Summary:** The owner asked for the option a senior UX designer would choose in each row of the review canvas. The picks, adapted to the code:
+
+- **1A: Welcome back is a checklist.** A tick counts on the planned day and unticking reopens the task. Open rows get Move (Today / Tomorrow / Off the calendar) and Won't do. Followers have their own rows. **Close** moves nothing.
+- **2B: the card menu and the calendar popup offer the real choices.** "Done on Mon 16" (or "Done at 14:00", or "Mark done") and Won't do sit above Delete. 2A was dropped because the card keeps one fixed shape. The rule: the checkbox means "now", and the menu dates the tick to the plan.
+- **3A, adapted to the fixed card.** Done cards get an Archive button and an Archive menu item, and say **waits on chain** when an unfinished chain is what holds them on the board. `krnl task archive <id> [--undo]`.
+- **4A, box only.** The switcher says what every canvas shares and what is on each one. Renaming "canvas" to "page" touches about 100 strings, so it is left as its own change.
+- **5A-lite.** Chained calendar blocks and their popup say "after <task>". Drawn connectors are left out. 5B was dropped: its default ("keep their own days") is already Decision 30 behaviour.
+
+Won't do now has one implementation (`planActions.wontDoItem`, with UNDO restoring links and time) used everywhere. Typecheck 0. Tests: 2,620 passed; one date-dependent routines test also fails on the unchanged branch. **Open, blocks Done:** the guided tour for these changes. It needs recorded voice clips for every step (guided-tours F12). Not yet walked in the real window.

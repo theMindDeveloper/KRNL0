@@ -14,6 +14,7 @@
 | F6 | Deleting a canvas removes its free nodes, its strokes, and the edges touching them. Tasks, habits, the completion ledger, pomo history and analytics are unchanged. The last canvas cannot be deleted. |
 | F7 | New free nodes and strokes land on the active canvas. Pen **Clear all** and `draw clear` clear the active canvas only. |
 | F8 | CLI: `canvas list [--json]`, `canvas add <name>`, `canvas switch <id\|name>`, `canvas rename <id\|name> <new name>`, `canvas delete <id\|name>`. |
+| F9 | (UX review pick 4A, 2026-11-18) **The switcher says what is shared.** Under the list, always: "On every canvas: plans, calendar, habits, timer" and "Only on this one: notes, images, drawings". Each row shows what is on it ("12 notes", "empty"). Renaming canvases to "pages" is a separate change. |
 
 ## Use Cases
 

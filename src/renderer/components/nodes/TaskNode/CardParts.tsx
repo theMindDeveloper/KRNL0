@@ -53,6 +53,8 @@ const ICONS = {
   grip: <><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /><path d="M12 13v4M10 15h4" /></>,
   replan: <><path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 4.5V11h-6.5" /></>,
   note: <><path d="M5 4.5h10l4 4V19.5H5z" /><path d="M8.5 11h7M8.5 14.5h5" /></>,
+  archive: <><rect x="3.5" y="4.5" width="17" height="4.5" rx="1" /><path d="M5 9v10.5h14V9M10 13h4" /></>,
+  follows: <path d="M6 4v8a3 3 0 0 0 3 3h10M15 11l4 4-4 4" />,
 } satisfies Record<string, ReactNode>;
 
 export type CardIconName = keyof typeof ICONS;
