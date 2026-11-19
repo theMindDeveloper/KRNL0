@@ -2795,3 +2795,26 @@ While checking every line against the app, one claim turned out to be wrong: the
 - **The tour says what each choice does in the step where you choose.** The separate "what happened" step is gone (Easy 7 steps, Advanced 11). "Staying on track" now says how Won't do differs from Delete. 2 clips re-recorded; 5 clips no step uses were removed.
 
 The three, in one line each: **Won't do** = skipped on purpose, kept as "won't do", not missed. **Archive** = a done card off the board now. **Delete** = erased.
+
+## [2026-11-19] — Line layout (evaluation build): the day as one line
+
+**Type:** Feature (new layout, evaluation build)
+**Branch:** `feat/line-layout` (builds on `feat/ux-review-picks`, PR #253)
+**Files changed:**
+- **New:** `src/renderer/components/Line/` (`dayData.ts`, `lineActions.ts`, `DayLine.tsx`, `DayClock.tsx`, `Cards.tsx`, `Parts.tsx`, `Views.tsx`, `LineLayout.tsx`, `line.css`), `src/renderer/store/lineLayout.ts`
+- **Wiring:** `App.tsx`, `ui/LayoutModeToggle.tsx` (LINE), `TopBar/index.tsx`, `Canvas/CanvasFlow.tsx` (no windows on the Line board), `Orb/index.tsx` (a seat beside the field), `AmbientRadio/index.tsx` (`data-edge`)
+- **CLI:** `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `store/useCliDispatch.ts` (`krnl line …`), `claude/CLAUDE.md`
+- **Docs:** `docs/06-requirements/line-layout.md` (new), Decision 41
+- **Tests:** `tests/unit/renderer/lineLayout.test.tsx` (new, 20 tests)
+
+**Summary:** The owner said the app is overloaded and not unified. A count in the running app (demo board, Advanced, 1920 × 1080) found 163 clickable controls and 306 pieces of text on one screen, and every plan drawn four times. After design drafts (rows 6 to 9 of the UX review canvas) the owner asked for a build to try before deciding on the change.
+
+The Line layout is a third layout next to Station and Free:
+- **One picture.** Hours run left to right, a PLAN lane above a REAL lane, a hand for now. It can be drawn as a 24-hour clock instead.
+- **One field.** A name records, a time plans, repeating words make a habit. A line above the field says what Enter will do.
+- **Honest states.** A plan is done, covered by recording, missed or open. A missed plan has Did it, Later and Skip in its row. Long empty stretches are hatched and can be named.
+- **Pages.** Today, Week, Habits, Board, in the same frame.
+
+It is a preference of this install (localStorage), so `board.json` is unchanged and nothing needs a migration. It reads the same board and writes through the same commands as the windows. The same demo board shows 72 clickable controls in this layout at 1440 × 900.
+
+**Not built yet:** the Month page, dragging plans on the line, the habit menu, and the guided tour (written once the owner decides to keep the layout). Checked as rendered screenshots of all five pages on the demo board; not yet used by the owner.

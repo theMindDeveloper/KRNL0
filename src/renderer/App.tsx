@@ -14,6 +14,8 @@ import { useEffect, useRef, useState, Component, type ReactNode } from 'react';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
 import { StationLayout } from './components/Station/StationLayout';
+import { LineLayout } from './components/Line/LineLayout';
+import { useLineLayout } from './store/lineLayout';
 import { useStationViewportGate } from './components/Station/useStationViewportGate';
 import { Orb } from './components/Orb';
 import { AmbientRadio } from './components/AmbientRadio';
@@ -103,6 +105,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 // can safely read boardStore after board is loaded.
 function AppInner() {
   const { effectiveMode, isFallingBack } = useStationViewportGate();
+  // line-layout.md — the day line instead of the windows (a preference of this install).
+  const lineOn = useLineLayout((s) => s.on);
   const { fitView } = useReactFlow();
 
   // Centre the viewport on the mother row whenever the layout mode changes,
@@ -171,7 +175,7 @@ function AppInner() {
       <TopBar />
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {/* ADR 0008 § 9.3 strategy A — one remount on toggle, same provider. */}
-        {effectiveMode === 'station' ? <StationLayout /> : <Canvas />}
+        {lineOn ? <LineLayout /> : effectiveMode === 'station' ? <StationLayout /> : <Canvas />}
         {/* Orb (AI bubble) is available in both modes — tutorials and chat
             work the same. ScriptRunner gates camera moves so station mode
             doesn't yank the embedded canvas around. */}

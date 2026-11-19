@@ -2631,3 +2631,19 @@ Plans get a card on the board (TaskNode, CardParts: 220 × 120, name + box, kind
 
 ### Round two (2026-11-09)
 The user found the cards unclear (a bare "0" in a circle, no clear click target, an event with nothing to do, a time tile without a day) and questioned the wire dots. Picked draft A of "Habit and event cards, round two": **no wire dots** on either card (wires mean "this plan, then that one"; a habit or an event never sits in that order — old wires are not drawn but kept); the **habit** keeps its week as seven lettered squares and **today's square is the button** (tick, or "+1 · 1/2" for an amount); the **event** carries a calendar page with the **next date** it happens, its time span and rule, and two buttons — **Skip this one** (`habit.lane.skip|unskip`) and **Show** (rings its block on the Calendar; `krnl show <event>`).
+
+## Decision 43 — The Line layout is a view preference, not board data (2026-11-19)
+
+**Context.** The owner found the app overloaded: 163 clickable controls on one screen and every plan drawn four times (Todo row, board card, Calendar block, Clock entry). The Line layout draws a day once, as a PLAN lane over a REAL lane (`docs/06-requirements/line-layout.md`). It had to be tried in the real app before deciding whether it replaces the windows.
+
+**Decision.**
+- The Line layout is a **third layout** next to Station and Free, chosen in the same top-bar switch.
+- Its state (on/off, page, line or clock) is a **preference of this install** in `localStorage` (`krnl0-line-layout`). `board.layoutMode` keeps its two values and `board.json` gets no new field.
+- It **derives everything** from the existing board: plans from the schedule selector (Decision 30), recorded time from the timer's history, habits from the Habits node. It writes only through the existing node commands and `planActions`.
+- "Covered" (recorded through at least half of a plan) is **derived and shown, never written**: the app does not tick a plan by itself.
+
+**Consequences.**
+- No migration, and an older app version opens the same board unchanged.
+- Switching layouts never changes data; both can be used on the same day.
+- The windows are not mounted in this layout, so anything that lives only in a window component (the timer's away prompt, window tours) does not run there.
+- If the layout becomes the default, that is a new decision; this one only makes it safe to try.

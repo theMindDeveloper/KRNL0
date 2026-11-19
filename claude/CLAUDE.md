@@ -226,6 +226,9 @@ krnl task edit <id> "<new text>"
 krnl task toggle <id>                  # mark done / undone (mirrors to TodoItem)
 krnl task toggle <id> --at <YYYY-MM-DDTHH:MM>  # done, counted when it really happened (a late tick)
 krnl task archive <id> [--undo]        # take a done card off the board and Done today now (Analytics keeps it)
+krnl line on|off|status               # the Line layout: the day as one line instead of the windows
+krnl line view <today|week|habits|board>
+krnl line shape <line|clock>          # draw the day as a line or a 24-hour clock
 krnl task duration <id> <minutes>      # set plannedMin override
 krnl task note <id> "<text>"           # set note  (use --clear to remove)
 krnl task sibling <id>                 # fork a parallel branch

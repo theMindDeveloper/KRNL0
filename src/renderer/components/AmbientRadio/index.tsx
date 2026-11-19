@@ -1144,7 +1144,7 @@ export function AmbientRadio() {
         <div id="krnl0-ambient-radio-yt-iframe" />
       </div>
 
-      <div data-testid="ambient-radio" style={wrap}>
+      <div data-testid="ambient-radio" data-edge={hidden ? '' : edge ?? ''} style={wrap}>
         {edge === 'left' && (
           <div
             data-testid="ambient-radio-edge-tab-left"

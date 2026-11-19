@@ -17,6 +17,7 @@
  */
 
 import { useLaunchStore } from '../../launch/launchStore';
+import { useLineLayout } from '../../store/lineLayout';
 
 /** Lines that only make sense after a real absence. */
 const AWAY_LINES = new Set(['pa_been_a_minute', 'pa_welcome_back']);
@@ -251,6 +252,7 @@ export function Orb() {
 
   // ── Drag state ────────────────────────────────────────────────────────────
   const [pos, setPos]           = useState<OrbPos>(loadPos);
+  const lineOn = useLineLayout((s) => s.on);
   // During a guided tour the orb itself rides on the tour card (no copy).
   const tourAt = useTourAnchor((s) => s.at);
   const tourActive = useTourAnchor((s) => s.active);
@@ -634,8 +636,9 @@ export function Orb() {
       data-orb-root
       style={{
         position: 'fixed',
-        left: tourAt ? tourAt.x : pos.x,
-        top: tourAt ? tourAt.y : pos.y,
+        // line-layout.md F11 — in the Line layout the orb has a fixed seat beside the field.
+        left: tourAt ? tourAt.x : lineOn ? 16 : pos.x,
+        top: tourAt ? tourAt.y : lineOn ? 'calc(100vh - 97px)' : pos.y,
         // Above a tour's dimming, at its own place and size.
         zIndex: tourAt || tourActive ? Z.tour + 1 : Z.widget,
         fontFamily: 'var(--font-mono)',

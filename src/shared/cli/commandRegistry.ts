@@ -295,6 +295,17 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'line',
+    summary: 'The Line layout: your day as one line instead of the windows',
+    subcommands: [
+      { name: 'status', usage: 'line status', summary: 'Whether the Line layout is on, its page and its shape' },
+      { name: 'on', usage: 'line on', summary: 'Show the Line layout' },
+      { name: 'off', usage: 'line off', summary: 'Back to the windows (Station / Free)' },
+      { name: 'view', usage: 'line view <today|week|habits|board>', summary: 'Open one of its pages (turns the layout on)' },
+      { name: 'shape', usage: 'line shape <line|clock>', summary: 'Draw the day as a line or as a clock' },
+    ],
+  },
+  {
     group: 'finished',
     summary: 'Finished task cards on the canvas (same as Settings → Finished cards)',
     subcommands: [

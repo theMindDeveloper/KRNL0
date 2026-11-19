@@ -666,6 +666,15 @@ export class SysFacade {
       if (command.sub === 'list') return this.deps.cliDispatch('sfx.list', {});
     }
 
+    if (command.kind === 'line') {
+      if (!this.deps.cliDispatch) {
+        return { ok: false, message: 'line requires an open renderer window', data: { exitCode: 2 } };
+      }
+      if (command.sub === 'view') return this.deps.cliDispatch('line.view', { view: command.view });
+      if (command.sub === 'shape') return this.deps.cliDispatch('line.shape', { shape: command.shape });
+      return this.deps.cliDispatch(`line.${command.sub}`, {});
+    }
+
     if (command.kind === 'finished' || command.kind === 'recap') {
       if (!this.deps.cliDispatch) {
         return { ok: false, message: `${command.kind} requires an open renderer window`, data: { exitCode: 2 } };

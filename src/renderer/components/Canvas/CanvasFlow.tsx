@@ -75,6 +75,7 @@ import { defaultFrameState, defaultFrameConfig } from '../nodes/FrameNode/types'
 import { MOTHER_WIDTH, MOTHER_HEIGHT } from '../nodes/MotherFrame';
 import { isStationHidden } from '../Station/stationVisibility';
 import { isStationShown, useStationViewportGate } from '../Station/useStationViewportGate';
+import { useLineLayout } from '../../store/lineLayout';
 import { Z } from '../ui/layers';
 import { shortcutBlocked, isControlTarget } from '../../utils/keyboardTargets';
 import { requestTextEdit } from '../nodes/TextNode/editEvent';
@@ -1423,7 +1424,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // they aren't drawn twice. ADR 0008 § 2.5.
   // The effective mode: below the station minimum size the window falls
   // back to the canvas, and the mothers must be drawn here (ADR 0008 § 9.5).
-  const isStation = useStationViewportGate().effectiveMode === 'station';
+  // In the Line layout the windows are not drawn at all: its Board shows only
+  // your own things, like Station's embedded canvas (line-layout.md F9).
+  const lineOn = useLineLayout((s) => s.on);
+  const isStation = useStationViewportGate().effectiveMode === 'station' || lineOn;
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.

@@ -12,12 +12,18 @@ import { useEffect } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import type { LayoutMode } from '../../../shared/types';
 import { isModalOpen } from '../../utils/keyboardTargets';
+import { useLineLayout } from '../../store/lineLayout';
 
 export function LayoutModeToggle() {
   const layoutMode = useBoardStore((s) => s.board?.layoutMode ?? 'canvas');
   const setLayoutMode = useBoardStore((s) => s.setLayoutMode);
+  // line-layout.md — a third way to look at the same board.
+  const lineOn = useLineLayout((s) => s.on);
+  const setLineOn = useLineLayout((s) => s.setOn);
 
   const toggle = () => {
+    // From the Line layout the chord goes back to the windows as they were.
+    if (lineOn) { setLineOn(false); return; }
     const next: LayoutMode = layoutMode === 'station' ? 'canvas' : 'station';
     setLayoutMode(next);
   };
@@ -37,14 +43,15 @@ export function LayoutModeToggle() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutMode]);
+  }, [layoutMode, lineOn]);
 
-  const isStation = layoutMode === 'station';
+  const isStation = layoutMode === 'station' && !lineOn;
+  const isFree = layoutMode !== 'station' && !lineOn;
 
   return (
     <div
       data-testid="layout-mode-toggle"
-      title="Station: windows in fixed places · Free: put anything anywhere (⌘⇧L)"
+      title="Line: your day as one line · Station: windows in fixed places · Free: put anything anywhere (⌘⇧L)"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -58,13 +65,20 @@ export function LayoutModeToggle() {
         label="◳ STATION"
         active={isStation}
         testId="layout-toggle-station"
-        onClick={() => { if (!isStation) setLayoutMode('station'); }}
+        onClick={() => { setLineOn(false); if (layoutMode !== 'station') setLayoutMode('station'); }}
       />
       <PillSegment
         label="◰ FREE"
-        active={!isStation}
+        active={isFree}
         testId="layout-toggle-canvas"
-        onClick={() => { if (isStation) setLayoutMode('canvas'); }}
+        onClick={() => { setLineOn(false); if (layoutMode === 'station') setLayoutMode('canvas'); }}
+        borderLeft
+      />
+      <PillSegment
+        label="― LINE"
+        active={lineOn}
+        testId="layout-toggle-line"
+        onClick={() => setLineOn(true)}
         borderLeft
       />
     </div>

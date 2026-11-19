@@ -139,6 +139,10 @@ export type SysCommand =
   | { kind: 'sfx'; sub: 'list' }
   | { kind: 'finished'; sub: 'status' | 'show' | 'hide' }
   | { kind: 'finished'; sub: 'policy'; policy: string }
+  // line-layout.md — the Line layout (a preference of this install).
+  | { kind: 'line'; sub: 'status' | 'on' | 'off' }
+  | { kind: 'line'; sub: 'view'; view: string | undefined }
+  | { kind: 'line'; sub: 'shape'; shape: string | undefined }
   | { kind: 'recap'; sub: 'today' | 'yesterday' | 'week' | 'show' }
   | { kind: 'sound'; sub: 'status' | 'list' | 'on' | 'off' }
   | { kind: 'sound'; sub: 'pack'; pack: string | undefined }
@@ -1059,6 +1063,14 @@ export class SysParser {
       if (sub === 'play') return { kind: 'sfx', sub: 'play', clipId: rest[0] };
       if (sub === 'stop') return { kind: 'sfx', sub: 'stop' };
       if (sub === 'list') return { kind: 'sfx', sub: 'list' };
+    }
+
+    // The Line layout (line-layout.md F12): on/off, which page, line or clock.
+    if (cmd === 'line') {
+      if (sub === undefined || sub === 'status') return { kind: 'line', sub: 'status' };
+      if (sub === 'on' || sub === 'off') return { kind: 'line', sub };
+      if (sub === 'view') return { kind: 'line', sub: 'view', view: rest[0] };
+      if (sub === 'shape') return { kind: 'line', sub: 'shape', shape: rest[0] };
     }
 
     // Finished task cards on the canvas (engagement.md F6).

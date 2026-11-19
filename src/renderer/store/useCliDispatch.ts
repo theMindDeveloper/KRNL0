@@ -20,6 +20,7 @@ import { TERM_CLEAR_EVENT, TERM_FONT_MIN, TERM_FONT_MAX } from '../components/no
 import { sfxEngine } from '../sfx/sfxEngine';
 import { runSoundCommand } from '../sfx/soundCli';
 import { runEngagementCommand } from './engagementCli';
+import { runLineCommand } from './lineLayout';
 import { useEventLog } from './eventLog/store';
 import type { Board } from '../../shared/types';
 import type { Node } from '../../shared/types';
@@ -326,6 +327,15 @@ export function useCliDispatch(): void {
             sfxEngine.stop();
             ok = true;
             message = 'SFX stopped';
+            break;
+          }
+
+          case 'line.status':
+          case 'line.on':
+          case 'line.off':
+          case 'line.view':
+          case 'line.shape': {
+            ({ ok, message } = runLineCommand(command, args as Record<string, unknown>));
             break;
           }
 

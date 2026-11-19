@@ -24,6 +24,7 @@ import { CanvasSwitcher } from './CanvasSwitcher';
 import { Z } from '../ui/layers';
 import { SettingsModal, type SettingsSection } from './SettingsModal';
 import { HelpMenu } from '../Launch/HelpMenu';
+import { useLineLayout } from '../../store/lineLayout';
 
 type Theme = 'light' | 'dark';
 
@@ -73,6 +74,8 @@ function writeFrameBeforeLight(style: DockStyle | null): void {
 
 export function TopBar() {
   const easyMode = useEasyMode();
+  // line-layout.md — the Line layout has no windows to toggle or fit.
+  const lineOn = useLineLayout((st) => st.on);
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
   const [dockStyle, setDockStyle] = useDockStyle();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -233,7 +236,7 @@ export function TopBar() {
 
       {/* Centre: panel toggles (ADR 0009 F9) — in Station AND Canvas mode; a
           hidden mother disappears and the rest close the gap. */}
-      {MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
+      {!lineOn && MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
         <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center' }}>
           <StationToolbar variant="inline" />
         </div>
@@ -242,7 +245,7 @@ export function TopBar() {
       {/* Right: action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <LayoutModeToggle />
-        <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
+        {!lineOn && <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />}
         <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
         <HelpMenu />
         <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
