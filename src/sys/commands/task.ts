@@ -326,7 +326,7 @@ export async function taskArchive(
   if (changed) saveBoard(ctx, board);
   return {
     ok: true,
-    message: changed ? (undo ? 'Task back on the board.' : 'Task archived: off the board, still in Todo Archive and Analytics.') : (undo ? 'Task was not archived.' : 'Task already archived.'),
+    message: changed ? (undo ? 'Task back on the board.' : 'Task archived: off the board and out of Done today; Analytics keeps it.') : (undo ? 'Task was not archived.' : 'Task already archived.'),
     data: { id: taskId, archived: !undo },
   };
 }

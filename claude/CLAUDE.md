@@ -225,7 +225,7 @@ krnl task subtask <parentId> "<text>"
 krnl task edit <id> "<new text>"
 krnl task toggle <id>                  # mark done / undone (mirrors to TodoItem)
 krnl task toggle <id> --at <YYYY-MM-DDTHH:MM>  # done, counted when it really happened (a late tick)
-krnl task archive <id> [--undo]        # take a done card off the board now (stays in Todo Archive + Analytics)
+krnl task archive <id> [--undo]        # take a done card off the board and Done today now (Analytics keeps it)
 krnl task duration <id> <minutes>      # set plannedMin override
 krnl task note <id> "<text>"           # set note  (use --clear to remove)
 krnl task sibling <id>                 # fork a parallel branch
