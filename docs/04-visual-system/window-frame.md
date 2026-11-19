@@ -49,7 +49,7 @@ Each window used to be built on its own. Switching views sat in four different p
 | Calendar | name; DAY / WEEK / MONTH / YEAR; one menu (what it shows besides plans, repeating events, zoom) | ‹ week or day › Today; in the day view also the day's recorded total and the hour arrows | add a plan (day and week views) |
 | Clock | name ("Clock"); DAY / BIG CLOCK / WEEK | ‹ day › Today (back to today and this half of the day), AM / PM | — (under the dial: only the day's list) |
 | Habits | name with the week; WEEK / MONTH / YEAR; settings | — | add a habit |
-| Analytics | name; totals; settings | ‹ page name › (the name opens the list of pages), then the range switch | — |
+| Analytics | name; totals as plain words; settings | the page icons (one each, the current page named beside them), then the range switch; the range moves to a second line in a narrow window | — |
 | Terminal | traffic lights, label, live badge | — | — |
 
 ## Rows inside a window
@@ -99,3 +99,12 @@ Advanced: workspace, Claude, the Timer (rounds and state), the day; nodes, edges
 ## Floating widgets
 
 A widget tucked at a screen edge (the ambient radio) shows only its 14px tab. No part of its body may sit on top of a window.
+
+## Alignment (2026-11-20)
+
+- Every control in a header or time row is 22 px tall and centred on one line, the label included. No rule may make one segment of a switch taller than the switch.
+- A window's body fills the window in both layouts: the footer is always at the bottom edge, never with empty space under it.
+- **Today** is the same button in every window (the Clock's is no longer wider, bolder or filled).
+- A range on a card is written "15:30 – 17:30": the field, then the other end at the same size.
+- Popups that open from a plan (the Clock's plan popup, the "what are you doing" list) follow the card rules: reading font, sentence case, filled buttons, no outlined boxes.
+- **Calendar, Year:** the months always fit with 12 px clear at each side; an empty day is one clear shade above the window; the time row is ‹ year Today ›; one line under the months names the two colours.

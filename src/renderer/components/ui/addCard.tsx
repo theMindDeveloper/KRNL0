@@ -50,8 +50,8 @@ export const cardRow: CSSProperties = { display: 'flex', alignItems: 'center', g
 export const cardLabel: CSSProperties = { flex: 1, minWidth: 0, fontFamily: READ, fontSize: 13.5, color: 'var(--ink-2)', whiteSpace: 'nowrap' };
 /** The controls of one line, side by side at its right end. */
 export const cardCtls: CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 };
-/** A quiet note beside a control ("to 00:00"). */
-export const cardNote: CSSProperties = { fontFamily: MONO, fontSize: 12.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' };
+/** The other end of a range, after its field ("– 17:30"): the same size as the field's text. */
+export const cardNote: CSSProperties = { fontFamily: MONO, fontSize: 13, color: 'var(--ink-2)', whiteSpace: 'nowrap', paddingRight: 4 };
 
 /** A two-way switch across the card (Once / Repeats). */
 export const cardSeg: CSSProperties = { display: 'flex', gap: 2, padding: 3, borderRadius: 10, background: 'var(--paper-2)' };
@@ -69,7 +69,7 @@ export const cardDay = (on: boolean): CSSProperties => ({
   height: 34, minWidth: 0, borderRadius: CTL_R, border: 'none', cursor: 'pointer', padding: '0 4px',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
   fontFamily: READ, fontSize: 13, whiteSpace: 'nowrap', fontWeight: on ? 600 : 500,
-  background: on ? 'var(--acid)' : 'transparent', color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-2)',
+  background: on ? 'var(--acid)' : 'color-mix(in srgb, var(--paper-3) 55%, transparent)', color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-2)',
 });
 
 /** An option you switch on inside a line (Any time, Tick): tinted when on. */

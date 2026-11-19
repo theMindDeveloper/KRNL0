@@ -346,7 +346,7 @@ export function LogTimeHost(): JSX.Element | null {
           <div style={cardRow}>
             <span style={cardLabel}>To</span>
             <div style={cardCtls}>
-              {times && <span style={cardNote}>{durLabel(times.endMs - times.startMs)}{crossesMidnight ? ' · next day' : ''}</span>}
+              {crossesMidnight && <span style={cardNote}>next day</span>}
               <TimeField testId="log-time-end" value={endHM} onChange={(v) => { setEndHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} style={cardTime} />
             </div>
           </div>

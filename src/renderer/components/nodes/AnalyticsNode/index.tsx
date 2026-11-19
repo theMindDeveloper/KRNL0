@@ -186,15 +186,12 @@ const titlebarStyle: React.CSSProperties = {
 
 const dotStyle: React.CSSProperties = { background: 'var(--acid, #c9f158)' };
 
+// window-frame.md — the header's context is plain words (no pills).
 const summaryChipStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  letterSpacing: '0.06em',
-  padding: '2px 8px',
-  border: '1px solid var(--k-an-line-2, #2a2e33)',
-  borderRadius: 999,
-  background: 'var(--k-an-bg-3, rgba(20,22,24,0.6))',
-  color: 'var(--k-an-ink-1, #eef1f4)',
+  fontSize: 10.5,
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
   whiteSpace: 'nowrap',
   flexShrink: 0,
 };
@@ -215,7 +212,13 @@ const gearBtnStyle = (active: boolean): React.CSSProperties => ({
 });
 
 const toolbarStyle: React.CSSProperties = {
-  // The frame's time row, in the Analytics' own colours.
+  // The frame's time row in the Analytics' own colours. The page icons come
+  // first; the range switch moves to a second line when the window is narrow.
+  height: 'auto',
+  minHeight: 32,
+  flexWrap: 'wrap',
+  gap: '6px 8px',
+  padding: '5px 12px',
   borderBottom: '1px solid var(--k-an-line-2, #2a2e33)',
   color: 'var(--k-an-ink-2, #c8cdd3)',
 };
@@ -594,11 +597,11 @@ export function AnalyticsNode({
         </button>
       </div>
 
-      {/* window-frame.md — the time row: which page (earlier, its name, later), then the range. */}
+      {/* window-frame.md — the time row: which page (an icon each, the current one named), then the range. */}
       <div className="kw-range" style={toolbarStyle}>
         <PageNav current={currentPage} pages={pages} onPick={(id) => setJumpTo(pageSelector(id))} />
         {/* window-frame.md — the range is the same switch every window uses. */}
-        <div className="kw-views" role="group" aria-label="Range">
+        <div className="kw-views" role="group" aria-label="Range" style={{ marginLeft: 'auto' }}>
           {RANGE_PRESETS.map((days) => (
             <button
               key={days}

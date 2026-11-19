@@ -180,3 +180,16 @@
    "pick something else" hides the card and the picker row comes back. */
 .pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"]) > [data-testid="pomo-now"],
 .pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"]) > [data-testid="pomo-tag"] { display: none !important; }
+
+/* One height for header and time-row controls. A wider rule (tokens.css, the
+   24 px click floor) made some segments 24 px inside a 22 px switch, so the
+   chosen segment sat off its neighbours and labels sat above the buttons. */
+.kw-views > button { min-height: 0; }
+.kw-btn { min-height: 0; line-height: 1; }
+.kw-range__label, .kw-range > span { min-height: 0; display: inline-flex; align-items: center; line-height: 1; }
+.kw-range__label { height: 22px; }
+/* The Clock's Today is the same button as every window's Today. */
+.kw-btn.clock-day-today { font-size: 10.5px; font-weight: 500; letter-spacing: 0.05em; padding: 0 5px; }
+.kw-btn.clock-day-today[data-state="other"] { background: transparent; color: var(--ink); border-color: var(--ink-4); }
+.kw-btn.clock-day-today[data-state="other"]:hover { background: transparent; color: var(--ink); border-color: var(--ink-3); }
+.kw-btn.clock-day-today:disabled:hover { background: transparent; color: var(--ink-3); }

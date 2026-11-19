@@ -1,9 +1,9 @@
-// The Analytics page switcher, in the window frame's time row (window-frame.md):
-// earlier, the page's name (press it for the named list of pages), later.
-// It was a row of ten unlabelled icons; a page is now always named.
+// The Analytics page switcher: one icon button per page (line icons, 16px),
+// the active one filled. Hover shows the page name; the current page's name is
+// printed next to the icons. (It was a named list for a day, 2026-11-19; the
+// owner preferred the icons, so they are back.)
 
 import { PAGES, type AnalyticsPage, type PageId } from './guide';
-import { AppSelect } from '../../ui/AppSelect';
 
 const ICONS: Record<PageId, React.ReactNode> = {
   summary: (<><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>),
@@ -26,38 +26,42 @@ export function PageIcon({ page, size = 16 }: { page: PageId; size?: number }) {
   );
 }
 
-const Chevron = ({ dir }: { dir: 'prev' | 'next' }) => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d={dir === 'prev' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'} />
-  </svg>
-);
-
 export function PageNav({ current, onPick, pages = PAGES }: { current: PageId; onPick: (id: PageId) => void; pages?: readonly AnalyticsPage[] }) {
-  const at = Math.max(0, pages.findIndex((p) => p.id === current));
-  const step = (by: number) => { const to = pages[at + by]; if (to) onPick(to.id); };
-  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  const label = pages.find((p) => p.id === current)?.label ?? '';
   return (
-    <div data-testid="analytics-page-nav" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: '1 1 auto' }}>
-      <button type="button" className="kw-btn nodrag" data-testid="analytics-page-prev" aria-label="Previous page" title="Previous page"
-        disabled={at === 0} onMouseDown={stop} onClick={(e) => { stop(e); step(-1); }}>
-        <Chevron dir="prev" />
-      </button>
-      <AppSelect
-        testId="analytics-page"
-        ariaLabel="Page"
-        value={pages[at]?.id ?? current}
-        options={pages.map((p) => ({ value: p.id, label: p.label }))}
-        onChange={(v) => onPick(v as PageId)}
-        style={{
-          height: 22, boxSizing: 'border-box', flex: '0 1 150px', minWidth: 0, padding: '0 8px', borderRadius: 5,
-          background: 'transparent', color: 'var(--k-an-ink, #f4f6f8)',
-          border: '1px solid var(--k-an-line-2, #2a2e33)', fontSize: 11, fontWeight: 600,
-        }}
-      />
-      <button type="button" className="kw-btn nodrag" data-testid="analytics-page-next" aria-label="Next page" title="Next page"
-        disabled={at >= pages.length - 1} onMouseDown={stop} onClick={(e) => { stop(e); step(1); }}>
-        <Chevron dir="next" />
-      </button>
+    <div data-testid="analytics-page-nav" style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+      {pages.map((p) => {
+        const on = p.id === current;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            data-testid={`analytics-page-${p.id}`}
+            aria-label={p.label}
+            aria-current={on ? 'page' : undefined}
+            title={p.label}
+            onClick={(e) => { e.stopPropagation(); onPick(p.id); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              width: 24, height: 24, flexShrink: 0, display: 'grid', placeItems: 'center', padding: 0,
+              borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: on ? 'var(--acid, #c9f158)' : 'transparent',
+              color: on ? 'var(--k-an-on-accent, #0e1012)' : 'var(--k-an-ink-3, #9aa1a8)',
+              transition: 'background 120ms, color 120ms',
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {ICONS[p.id]}
+            </svg>
+          </button>
+        );
+      })}
+      <span
+        data-testid="analytics-page-label"
+        style={{ marginLeft: 6, fontFamily: 'var(--font-read)', fontSize: 12.5, fontWeight: 600, letterSpacing: 0, color: 'var(--k-an-ink, #f4f6f8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}
+      >
+        {label}
+      </span>
     </div>
   );
 }

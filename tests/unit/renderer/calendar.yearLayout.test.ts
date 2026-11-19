@@ -6,8 +6,10 @@ const fits = (w: number, h: number) => {
   const { cols, cell } = yearLayout(w, h);
   const rows = 12 / cols;
   const monthW = cell * 7 + 2 * 6;
-  const monthH = 34 + cell * 6 + 2 * 5;
-  return { cols, cell, ok: monthW * cols + 14 * (cols - 1) <= w && monthH * rows + 14 * (rows - 1) <= h };
+  // Weekday letters are drawn from 12 px cells; smaller months have the label only.
+  const monthH = (cell >= 12 ? 34 : 17) + cell * 6 + 2 * 5;
+  // 12 px stays clear at each side, so no month touches or leaves the window's edge.
+  return { cols, cell, ok: monthW * cols + 14 * (cols - 1) <= w - 24 && monthH * rows + 14 * (rows - 1) <= h };
 };
 
 describe('yearLayout', () => {
@@ -18,8 +20,9 @@ describe('yearLayout', () => {
   });
 
   it('every month fits inside the box at every size', () => {
-    for (const [w, h] of [[1000, 760], [520, 760], [380, 560], [700, 520], [1400, 400], [300, 900], [1920, 1000]] as const) {
-      expect(fits(w, h).ok).toBe(true);
+    // 372 x 215 is the Calendar at Station size: it used to round up to 6 px cells and cut January off.
+    for (const [w, h] of [[1000, 760], [520, 760], [380, 560], [700, 520], [1400, 400], [300, 900], [1920, 1000], [372, 215], [356, 200]] as const) {
+      expect(fits(w, h).ok, `${w}x${h}`).toBe(true);
     }
   });
 
@@ -28,8 +31,8 @@ describe('yearLayout', () => {
     expect(yearLayout(300, 900).cols).toBeLessThanOrEqual(3);
   });
 
-  it('cells are capped at 28 px and never below 6', () => {
+  it('cells are capped at 28 px; in a tiny box they shrink to fit instead of being cut off', () => {
     expect(yearLayout(4000, 3000).cell).toBe(28);
-    expect(yearLayout(50, 50).cell).toBe(6);
+    expect(yearLayout(50, 50).cell).toBe(3);
   });
 });

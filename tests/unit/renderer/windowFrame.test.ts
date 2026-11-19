@@ -116,12 +116,12 @@ describe('One name per window; no second summary rows (window-frame.md)', () => 
   it('the Timer shows one progress row (the session dots), not two counters', () => {
     expect(src('PomoNode/index.tsx')).not.toContain('CycleCounter');
   });
-  it('Analytics: pages are a named list in the time row, not a row of icons', () => {
+  it('Analytics: pages are a row of icons in the time row, the current one named (owner, 2026-11-20)', () => {
     expect(src('AnalyticsNode/index.tsx')).toContain('<div className="kw-range" style={toolbarStyle}>');
     const nav = src('AnalyticsNode/PageNav.tsx');
-    expect(nav).toContain('testId="analytics-page"');
-    expect(nav).toContain('data-testid="analytics-page-prev"');
-    expect(nav).not.toContain('data-testid={`analytics-page-${p.id}`}');
+    expect(nav).toContain('data-testid={`analytics-page-${p.id}`}');
+    expect(nav).toContain('data-testid="analytics-page-label"');
+    expect(nav).not.toContain('AppSelect');
   });
   it('Clock: named Clock; no week rings and no "now" box under the dial', () => {
     const s = src('ClockNode/index.tsx');
@@ -199,5 +199,34 @@ describe('Cards are a list you read; the Timer is a clock first (window-frame.md
     expect(d).toContain("'Not running'");
     expect(d).not.toContain("'work today'");
     expect(read('styles/window-frame.css')).toContain('.pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"])');
+  });
+});
+
+describe('Aligned and unified (owner list, 2026-11-20)', () => {
+  const root = join(process.cwd(), 'src/renderer');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('header and time-row controls keep one height (no 24 px segment inside a 22 px switch)', () => {
+    const css = read('styles/window-frame.css');
+    expect(css).toContain('.kw-views > button { min-height: 0; }');
+    expect(css).toContain('.kw-btn.clock-day-today {');
+  });
+  it('the Timer body fills its window in both layouts, so nothing is left empty under START', () => {
+    expect(read('components/nodes/PomoNode/index.tsx')).toContain("gap: bodyGap, flex: '1 1 auto', minHeight: 0 }}>");
+  });
+  it('a card shows a time range as "start – end" after the field, not a grey "to" before it', () => {
+    const c = read('components/nodes/CalendarNode/EventCard.tsx');
+    expect(c).toContain('data-testid="event-end"');
+    expect(c).not.toContain('`to ${end}`');
+  });
+  it('the plan popup and the task picker use filled buttons in the reading font', () => {
+    expect(read('components/ui/TaskInfoPopup.tsx')).toContain("fontFamily: 'var(--font-read)', fontSize: 13, whiteSpace: 'nowrap'");
+    const p = read('components/nodes/PomoNode/DoingPicker.tsx');
+    expect(p).not.toContain("textTransform: 'uppercase'");
+    expect(p).toContain("'Or a kind of work'");
+  });
+  it('the Year view has the standard time row and names its colours', () => {
+    const y = read('components/nodes/CalendarNode/YearView.tsx');
+    expect(y).toContain('data-testid="calendar-year-today"');
+    expect(y).toContain('data-testid="calendar-year-legend"');
   });
 });

@@ -2,7 +2,7 @@
 
 Written 2026-11-19, after the overnight pass. Everything here is on the branch `feat/unified-windows` (draft PR #257, on top of #253 and #251). The dev app from this worktree shows all of it; restart it with `npm run dev` if it is closed.
 
-Nothing is merged or released. Typecheck is clean and all 2,663 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
+Nothing is merged or released. Typecheck is clean and all 2,668 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
 
 ## The rule behind every change
 
@@ -206,6 +206,21 @@ I went through Advanced and Easy again, window by window, and fixed what stood o
 **Why:** a timer should show the time first. The tiles repeated Analytics and were zeros most of the day. Two rows that both ask "what are you doing?" became one: the plan card, with "pick something else" for the list.
 
 **Different from the draft:** today's line sits above the plan card (in the draft it was below), because the strip belongs to the face. In Sessions the face itself (the blocks) is unchanged.
+
+## 18. Your list of 20 November
+
+| What you sent | What I did | Where |
+|---|---|---|
+| Timer: empty space under START | The Timer fills its window in the Free layout too; START is at the bottom edge and the clock sits in the middle | Timer, Free layout, any height |
+| Calendar Year: January cut off, days invisible | The months always fit (they shrink instead of being cut); empty days are a visible shade; the row reads ‹ 2026 Today ›; a line under the months says what the colours mean | Calendar, YEAR |
+| Clock: date not centred, DAY chip off | One height for every header control. A rule meant to make small buttons easier to click had made some 24 px inside a 22 px switch | Clock header and time row; also fixes the Timer's SESSIONS / STOPWATCH and Analytics' 7D / 30D |
+| Card: "to 17:30" before the time | The range reads "15:30 – 17:30", the end after the field at the same size | Calendar, + |
+| The day line looked like plain text | Days that are not chosen have a soft fill, so they read as buttons | Todo's add card |
+| The Clock's plan popup (FOCUS DONE SHOW UNPLAN) | Same design as the cards: the name, when, "Planned / Recorded", filled buttons; the first button is **Start** | Click a plan in the Clock |
+| The "what are you doing" list | Reading font, "Your plans" and "Or a kind of work", filled chips | Timer, the Next line |
+| Analytics: you preferred the icons | The icon row is back, with the page's name beside it. I had replaced it with a list on my own judgement; that was the wrong call | Analytics |
+| Analytics: DONE / FOCUS pills | Plain words, like the other headers | Analytics header |
+| Log time | Shows "next day" only when it crosses midnight; the length is on the button ("Add 1h") | Timer, Log past time |
 
 ## Your three answers
 

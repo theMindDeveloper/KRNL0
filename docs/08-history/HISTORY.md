@@ -2924,3 +2924,20 @@ Typecheck clean; all tests pass. Checked in the preview at 800 × 600; not yet u
 - No behaviour, command or test id changed.
 
 Typecheck clean; all tests pass. Checked as full-size screenshots of each card and the Timer; not yet used by the owner.
+
+## [2026-11-20] — Alignment and unification pass; the Analytics icon row is back
+
+**Type:** Bug Fix (alignment, clipping) + Feature (UI unification)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `styles/window-frame.css`, `PomoNode/index.tsx`, `PomoNode/DoingPicker.tsx`, `CalendarNode/YearView.tsx`, `CalendarNode/EventCard.tsx`, `AnalyticsNode/PageNav.tsx`, `AnalyticsNode/index.tsx`, `ui/TaskInfoPopup.tsx`, `ui/TaskTimeline.tsx`, `ui/SpanEditor.tsx`, `ui/addCard.tsx`, `Tour/tours.ts`, tour voice clips, tests (`windowFrame.test.ts`, `calendar.yearLayout.test.ts`, `TaskInfoPopup.test.tsx`), docs (`window-frame.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Header controls:** one height. The 24 px click-floor rule made some segments taller than their 22 px switch (Clock DAY / BIG CLOCK, AM / PM, Timer modes, Analytics range), so the chosen segment sat off and the Clock's date sat above its buttons. The Clock's Today is the standard button.
+- **Timer:** the body fills the window in the Free layout, so START is at the bottom edge (it left an empty half below it).
+- **Calendar Year:** the layout never rounds a cell up past the room (January was cut off at Station size); empty days are visible; standard time row with Today; a legend line.
+- **Cards:** a range reads "15:30 – 17:30"; unchosen days have a soft fill.
+- **Plan popup and task picker:** the card design (reading font, sentence case, filled buttons).
+- **Analytics:** the page icon row is restored (owner preferred it to the named list), with the page name beside it; the header totals are plain words. Tutorial lines and their recorded clips are back to the icon wording; nothing new was recorded.
+- No behaviour or command changed.
+
+Typecheck clean; all tests pass. Checked as full-size screenshots; the plan popup was not captured; not yet used by the owner.

@@ -629,7 +629,7 @@ export function PomoNode({
           )}
         </div>
       ) : (
-        <div ref={setBodyEl} className="pomo-body" data-idle={state.status === 'idle' || state.status === 'done' ? 'true' : undefined} style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap, ...(inStation ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
+        <div ref={setBodyEl} className="pomo-body" data-idle={state.status === 'idle' || state.status === 'done' ? 'true' : undefined} style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap, flex: '1 1 auto', minHeight: 0 }}>
           {/* PR4 — timer face switch: swap inner face without touching outer chrome.
               In a station slot the face is fitted to the room left, so the
               controls below it (START, task) are never cut off. */}
