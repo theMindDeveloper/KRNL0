@@ -222,6 +222,9 @@ interface WeekViewProps {
   onCommand: (cmd: string, args: Record<string, unknown>) => void;
   /** #10 — when true, render a single day (anchorDate) instead of Mon–Sun. */
   singleDay?: boolean;
+  /** window-frame.md — where the Calendar's menu button goes: a slot in the
+   *  window's header (the header is drawn by the Calendar window itself). */
+  headSlot?: HTMLElement | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -283,7 +286,7 @@ type HabitScheduleKind = 'weekly' | 'daily';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function WeekView({ state, config, onCommand, singleDay = false }: WeekViewProps) {
+export function WeekView({ state, config, onCommand, singleDay = false, headSlot = null }: WeekViewProps) {
   // Width of the per-day reality rail (left edge of each column), as a CSS
   // length so it scales with the column: wide in the day view (carries a
   // minutes label), at most 12% of a narrow week column (station panels can
@@ -797,6 +800,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
 
   // Decision 39 — routines: bands behind the plans (F6), never ticked.
   const [eventsOpen, setEventsOpen] = useState<{ x: number; y: number } | null>(null);
+  // window-frame.md — the Calendar's one menu (header, last button): what it
+  // shows besides your plans, the repeating events, the zoom.
+  const [calMenu, setCalMenu] = useState<{ x: number; y: number } | null>(null);
   const routinesForCal = useMemo((): Habit[] => {
     const out: Habit[] = [];
     for (const n of boardForCal?.nodes ?? []) {
@@ -2334,54 +2340,14 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
           >
             {/* Narrow: "Nov 2", never a cut "Nove…" (new-user review 1.6). */}
             {singleDay ? weekLabel : <><span className="cal-weekof">Week of </span><span className="cal-wl-long">{weekLabel}</span><span className="cal-wl-short">{parseYMD(baseYMD).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span></>}
+            {singleDay && layers.recorded && (() => {
+              const day = weekDays[0]!;
+              const min = Math.round((realityByDay.get(day) ?? []).filter((x) => x.kind === 'work').reduce((acc, x) => acc + (x.endMin - x.startMin), 0));
+              return min > 0 ? <span data-testid={`week-col-tracked-${day}`} title="Recorded this day" style={{ marginLeft: 8, color: 'var(--ink-3)' }}>{fmtDur(min)}</span> : null;
+            })()}
           </span>
 
-          {/* Layers — what the rail and the pills mean, and a switch for each. */}
-          {/* easy-mode D22 — the layer switches and zoom are Advanced. */}
-          {!easy && <div data-testid="week-legend" role="group" aria-label="Calendar layers" style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
-            {([
-              ['recorded', 'Recorded', 'What you really did: the rail at the left of each day. Breaks are gaps.'],
-              ['habits', 'Habits', 'Habits at their time. Click one to tick it.'],
-              ['routines', 'Events', 'Repeating events (a class, a shift) as hatched bands behind your plans. Right-click empty hours → New here… to add one; click one to skip, move, edit or end it.'],
-            ] as const).map(([k, label, tip]) => (
-              <button
-                key={k}
-                type="button"
-                data-testid={`calendar-layer-${k}`}
-                aria-pressed={layers[k]}
-                title={`${tip} Click to ${layers[k] ? 'hide' : 'show'}.`}
-                onClick={() => toggleLayer(k)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5, height: 20, padding: '0 7px', borderRadius: 999, cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.02em', flexShrink: 0,
-                  border: `1px solid ${layers[k] ? 'color-mix(in srgb, var(--acid) 45%, var(--paper-3))' : 'var(--paper-3)'}`,
-                  background: layers[k] ? 'color-mix(in srgb, var(--acid) 10%, var(--paper-2))' : 'transparent',
-                  color: layers[k] ? 'var(--ink)' : 'var(--ink-4)',
-                }}
-              >
-                {k === 'recorded'
-                  ? <span aria-hidden style={{ width: 4, height: 12, borderRadius: 999, background: layers[k] ? 'var(--acid)' : 'var(--paper-3)' }} />
-                  : k === 'routines'
-                    ? <span aria-hidden style={{ width: 12, height: 8, borderTop: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}`, borderBottom: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}`, background: layers[k] ? 'color-mix(in srgb, var(--ink-2) 18%, transparent)' : 'transparent' }} />
-                    : <span aria-hidden style={{ width: 12, height: 8, borderRadius: 999, border: `1px solid ${layers[k] ? 'var(--ink-2)' : 'var(--paper-3)'}` }} />}
-                <span className="cal-layer-label">{label}</span>
-              </button>
-            ))}
-          </div>}
 
-          {/* Decision 40 — every repeating event, ended ones too: their home now
-              that the Habits window lists only habits. */}
-          <button
-            type="button"
-            data-testid="calendar-events-list"
-            title="Repeating events: list, edit, end, delete, or add one"
-            aria-label="Repeating events"
-            onClick={(e) => setEventsOpen({ x: e.clientX, y: e.clientY })}
-            className="kw-btn"
-            aria-expanded={!!eventsOpen}
-          >
-            <MenuIcon name="list" size={12} />
-          </button>
 
           {/* #9 — jump to the current week (like the clock's "now"). */}
           <button
@@ -2394,57 +2360,26 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             Today
           </button>
 
-          {/* #5 — ruler zoom controls. Stretch the grid to read pomo/task
-              section boundaries; the gutter gains :30/:15 sub-marks as you go. */}
-          {!easy && <div
-            data-testid="week-zoom"
-            className="cal-zoom"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}
-          >
-            <button
-              type="button"
-              data-testid="week-zoom-out"
-              aria-label="Zoom out"
-              disabled={zoom <= CAL_ZOOM_MIN}
-              onClick={() => setZoom(zoom - CAL_ZOOM_STEP)}
-              style={zoomBtnStyle(zoom <= CAL_ZOOM_MIN)}
-            >
-              −
-            </button>
-            <span
-              data-testid="week-zoom-level"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                color: 'var(--ink-3)',
-                minWidth: 28,
-                textAlign: 'center',
-                letterSpacing: '0.02em',
-              }}
-            >
-              {zoom.toFixed(1)}×
-            </span>
-            <button
-              type="button"
-              data-testid="week-zoom-in"
-              aria-label="Zoom in"
-              disabled={zoom >= CAL_ZOOM_MAX}
-              onClick={() => setZoom(zoom + CAL_ZOOM_STEP)}
-              style={zoomBtnStyle(zoom >= CAL_ZOOM_MAX)}
-            >
-              +
-            </button>
-          </div>}
         </div>
+        {singleDay && !useAgenda && win.pages > 1 && (
+          <span data-testid="calendar-hour-pager" style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
+            <button type="button" className="kw-btn nodrag" aria-label={`Earlier hours (now ${String(win.startHour).padStart(2, '0')}–${String(win.endHour).padStart(2, '0')})`}
+              title="Earlier hours" disabled={win.startHour === 0}
+              onClick={() => flipHours(-1)}><CalIcon name="chevUp" size={12} /></button>
+            <button type="button" className="kw-btn nodrag" aria-label={`Later hours (now ${String(win.startHour).padStart(2, '0')}–${String(win.endHour).padStart(2, '0')})`}
+              title="Later hours" disabled={win.endHour >= rowCount}
+              onClick={() => flipHours(1)}><CalIcon name="chevDown" size={12} /></button>
+          </span>
+        )}
         <button type="button" className="kw-btn" data-testid="week-next" onClick={handleNext} aria-label="Next">
           <CalIcon name="next" size={13} />
         </button>
       </div>
 
-      {/* Day column headers (Mon-Sun). The corner above the time gutter
-          holds the hour pager: up for earlier hours, down for later — beside
-          the hour labels it moves, never over a plan. */}
-      <div
+      {/* Day names (Mon–Sun), with the hour pager in the corner above the time
+          gutter. In the day view the time row already names the day, so this row
+          is not drawn there (window-frame.md: no repeated rows). */}
+      {!singleDay && <div
         style={{
           display: 'flex',
           flexShrink: 0,
@@ -2501,7 +2436,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {/* Decision 40 — the ANY TIME strip, always under the day names. A plan
           dropped here (a Todo row or a block from the hours) is on that day
@@ -2840,6 +2775,46 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       </div>
 
 
+      {headSlot && createPortal(
+        <button
+          type="button"
+          className="kw-btn nodrag"
+          data-testid="week-legend"
+          aria-label="Calendar menu"
+          aria-expanded={!!calMenu}
+          title={easy ? 'Repeating events' : 'What the Calendar shows, repeating events, zoom'}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setCalMenu({ x: r.right - 200, y: r.bottom + 4 }); }}
+        >
+          <MenuIcon name="list" size={12} />
+        </button>,
+        headSlot,
+      )}
+      {calMenu && (
+        <ContextMenu
+          x={calMenu.x}
+          y={calMenu.y}
+          onDismiss={() => setCalMenu(null)}
+          items={[
+            // easy-mode D22 — the layer switches and zoom are Advanced.
+            ...(easy ? [] : ([
+              ['recorded', 'Recorded time'],
+              ['habits', 'Habits'],
+              ['routines', 'Repeating events'],
+            ] as const).map(([k, label]): ContextMenuItem => ({
+              label,
+              icon: layers[k] ? <MenuIcon name="check" /> : <span />,
+              hint: layers[k] ? 'shown' : 'hidden',
+              onSelect: () => toggleLayer(k),
+            }))),
+            { label: 'Repeating events…', icon: <MenuIcon name="repeat" />, ...(easy ? {} : { divider: true }), onSelect: () => setEventsOpen({ x: calMenu.x, y: calMenu.y }) },
+            ...(easy ? [] : [
+              { label: 'Zoom in', icon: <MenuIcon name="plus" />, hint: `${zoom.toFixed(1)}×`, divider: true, disabled: zoom >= CAL_ZOOM_MAX, onSelect: () => setZoom(zoom + CAL_ZOOM_STEP) },
+              { label: 'Zoom out', icon: <span />, disabled: zoom <= CAL_ZOOM_MIN, onSelect: () => setZoom(zoom - CAL_ZOOM_STEP) },
+            ] as ContextMenuItem[]),
+          ]}
+        />
+      )}
       {/* window-frame.md — the standard footer: the one thing you add here. Opens
           the same card as a double-click on empty hours (a plan, or Repeats). */}
       <div className="kw-foot">

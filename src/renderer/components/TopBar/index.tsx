@@ -73,6 +73,7 @@ function writeFrameBeforeLight(style: DockStyle | null): void {
 
 export function TopBar() {
   const easyMode = useEasyMode();
+  const stationShown = useBoardStore((st) => st.board?.layoutMode === 'station');
   const [theme, setTheme] = useState<Theme>(readStoredTheme);
   const [dockStyle, setDockStyle] = useDockStyle();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -124,13 +125,11 @@ export function TopBar() {
       flushSync(() => setTheme(next));
     });
   };
-  const handleThemeToggle = () => chooseTheme(shownTheme === 'dark' ? 'light' : 'dark');
 
   const handleFit = () => {
     rf.fitView({ padding: CANVAS_FIT_PADDING, duration: 300 });
   };
 
-  const themeLabel = <><SettingsIcon name={shownTheme === 'dark' ? 'moon' : 'sun'} size={12} />{shownTheme === 'dark' ? 'DARK' : 'LIGHT'}</>;
 
   return (
     <div
@@ -186,22 +185,6 @@ export function TopBar() {
           </span>
         </span>
 
-        {/* Breadcrumb */}
-        <span
-          data-testid="topbar-breadcrumb"
-          className="krnl-breadcrumb"
-          title="Your canvases — switch or add one with the menu next to it"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-3)',
-            letterSpacing: '0.03em',
-            userSelect: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          ~/krnl0 / canvas /
-        </span>
         {/* Decision 33 — canvas switcher (the breadcrumb's last segment).
             easy-mode D24: one canvas in Easy. */}
         {!easyMode && <CanvasSwitcher />}
@@ -242,8 +225,10 @@ export function TopBar() {
       {/* Right: action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <LayoutModeToggle />
-        <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />
-        <TopBarButton label={themeLabel} onClick={handleThemeToggle} testId="topbar-theme-toggle" />
+        {/* window-frame.md, top bar — FIT only where it does something (the
+            Free layout; Station's small canvas has its own fit control). The
+            light / dark switch lives in Settings → General. */}
+        {!stationShown && <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />}
         <HelpMenu />
         <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
       </div>

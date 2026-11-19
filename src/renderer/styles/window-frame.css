@@ -26,7 +26,8 @@
   min-width: 0;
 }
 .kw-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-4); flex-shrink: 0; display: inline-block; }
-.kw-title { color: var(--ink-2); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+/* In a narrow window the name gives way first; the views and buttons stay whole. */
+.kw-title { color: var(--ink-2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 36px; flex-shrink: 1; }
 .kw-ctx { color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .kw-sp { flex: 1; min-width: 0; }
 
@@ -146,3 +147,14 @@
 .pomo-foot > .pomo-controls { flex: 1; min-width: 0; }
 .pomo-foot .pomo-controls > button { height: 30px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
 .pomo-foot--tall { height: auto; padding-top: 8px; padding-bottom: 8px; }
+
+/* Todo rows stay on one line in a narrow window (window-frame.md, rows):
+   the name, when and how long. The tag shrinks to its dot and the tracked
+   time steps aside; both are a hover or a click away (the tag's tooltip, the
+   plan card). In a wide window the full row shows. */
+.todo-win { container-type: inline-size; }
+@container (max-width: 560px) {
+  .todo-win .todo-tag__label { display: none; }
+  .todo-win .todo-tag { padding: 1px 4px !important; border-color: transparent !important; background: transparent !important; }
+  .todo-win [data-testid="todo-item-tracked"] { display: none !important; }
+}

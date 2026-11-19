@@ -610,15 +610,16 @@ export function AnalyticsNode({
       <div style={toolbarStyle}>
         <PageNav current={currentPage} pages={pages} onPick={(id) => setJumpTo(pageSelector(id))} />
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 4 }}>
+        {/* window-frame.md — the range is the same switch every window uses. */}
+        <div className="kw-views" role="group" aria-label="Range">
           {RANGE_PRESETS.map((days) => (
             <button
               key={days}
               type="button"
               data-testid={`analytics-range-${days}`}
+              aria-pressed={state.rangeDays === days}
               onClick={(e) => { e.stopPropagation(); onCommand('analytics.setRangeDays', { days }); }}
               onMouseDown={(e) => e.stopPropagation()}
-              style={chipBtn(state.rangeDays === days)}
             >
               {days}d
             </button>

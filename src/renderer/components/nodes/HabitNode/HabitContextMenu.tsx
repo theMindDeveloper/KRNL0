@@ -62,6 +62,8 @@ export function HabitContextMenu({
   const cancelledRef = useRef(false);
   const [draft, setDraft] = useState(habit.name);
   const [pickerOpen, setPickerOpen] = useState<'color' | 'icon' | 'note' | null>(null);
+  // menus.md — colour, icon, note and the canvas card are used rarely: behind More.
+  const [more, setMore] = useState(false);
   // Inline note draft — window.prompt() is blocked in Electron renderer.
   const [noteDraft, setNoteDraft] = useState(habit.note ?? '');
 
@@ -223,6 +225,13 @@ export function HabitContextMenu({
           setPickerOpen(null);
         }}
       />
+      <MenuItem
+        label={more ? 'Less' : 'More'}
+        icon="more"
+        testId="habit-menu-more"
+        onClick={() => { setMore((m) => !m); setPickerOpen(null); }}
+      />
+      {more && (<>
       <MenuItem
         label="Color"
         icon="color"
@@ -485,6 +494,8 @@ export function HabitContextMenu({
           />
         </>
       )}
+
+      </>)}
 
       <div
         style={{

@@ -514,27 +514,31 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     // The eye: its card on the canvas and its place on the Calendar, at once.
     const taskId = item.taskNodeId;
     const missedEnd = taskId ? plannedEndMs(taskId) : null;
-    const show: ContextMenuItem[] = taskId ? [
-      { label: 'Show', icon: <MenuIcon name="show" />, hint: w.day ? 'card + Calendar' : 'card', divider: true, onSelect: () => { void showTask(taskId); } },
-    ] : [];
-    return [
-      { label: 'When…', icon: <MenuIcon name="when" />, ...(whenText(w) ? { hint: whenText(w)! } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId) },
+    // menus.md — the plan menu, the same from its row, its card and its
+    // Calendar block: what happened, when, its name, More, then Won't do and
+    // Delete. Everything used less often sits behind More.
+    const more: ContextMenuItem[] = [
       // easy-mode D19 — Deadline is Advanced (one date per plan in Easy).
-      ...(easy ? [] : [{ label: 'Deadline…', icon: <MenuIcon name="deadline" />, ...(w.deadline ? { hint: dayWord(w.deadline, todayYMD) } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId, 'deadline') }]),
-      ...show,
       ...(easy ? [] : [
-        ...(hasTaskNode ? [{ ...timer, divider: true }] : []),
-        { label: 'Tag…', icon: <MenuIcon name="tag" />, ...(tagLabel ? { hint: tagLabel } : {}), ...(hasTaskNode ? {} : { divider: true }), onSelect: () => setTagPicker({ x: at.x, y: at.y, itemId }) },
+        { label: 'Deadline…', icon: <MenuIcon name="deadline" />, ...(w.deadline ? { hint: dayWord(w.deadline, todayYMD) } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId, 'deadline') },
+        { label: 'Tag…', icon: <MenuIcon name="tag" />, ...(tagLabel ? { hint: tagLabel } : {}), onSelect: () => setTagPicker({ x: at.x, y: at.y, itemId }) },
+        ...(hasTaskNode ? [timer] : []),
       ]),
-      { ...rename, ...(easy ? { divider: true } : {}) },
-      // task-node F21 — the same choices as its card: a plan whose time has
-      // passed can be ticked for that day (the checkbox means "done now").
-      ...(missedEnd !== null && taskId ? [{ label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, divider: true, onSelect: () => { void markDoneAsPlanned(taskId); } }] : []),
+      ...(taskId ? [{ label: 'Show', icon: <MenuIcon name="show" />, hint: w.day ? 'card + Calendar' : 'card', onSelect: () => { void showTask(taskId); } }] : []),
+    ];
+    return [
+      // A plan whose time has passed counts on that day ("Done on Mon 16").
+      missedEnd !== null && taskId
+        ? { label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, onSelect: () => { void markDoneAsPlanned(taskId); } }
+        : { label: 'Mark done', icon: <MenuIcon name="check" />, onSelect: () => onCommand('todo.toggle', { id: itemId }) },
+      { label: 'When…', icon: <MenuIcon name="when" />, ...(whenText(w) ? { hint: whenText(w)! } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId) },
+      rename,
+      ...(more.length > 0 ? [{ label: 'More', icon: <MenuIcon name="more" />, children: more, onSelect: () => {} }] : []),
       {
         label: "Won't do",
         icon: <MenuIcon name="drop" />,
-        hint: 'off the board, not missed',
-        divider: missedEnd === null,
+        hint: 'not missed',
+        divider: true,
         // Off the Calendar too: a dropped plan is not "missed"; one Ctrl+Z,
         // and the notice's UNDO puts its time and links back (planActions).
         onSelect: () => wontDoItem(node.id, itemId),
@@ -849,7 +853,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   return (
     <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
-      <div style={{ overflow: 'hidden', borderRadius: 6, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="todo-win" style={{ overflow: 'hidden', borderRadius: 6, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
         {/* window-frame.md — the standard header row. */}
         <div className="krnl-node-header kw-head">

@@ -503,84 +503,13 @@ export function ClockNode({
             title="Next day"
             aria-label="Next day"
           ><LineGlyph name="chevron" /></button>
+          {/* window-frame.md — the dial's half of the day, in the time row (was a row of its own). */}
+          <span className="kw-views" role="group" aria-label="Half of the day" style={{ marginLeft: 6 }}>
+            <button type="button" data-testid="clock-window-am" aria-pressed={viewWindow === 0} title="Midnight to noon" onClick={() => onCommand('clock.setViewWindow', { window: 0 })}>AM</button>
+            <button type="button" data-testid="clock-window-pm" aria-pressed={viewWindow === 1} title="Noon to midnight" onClick={() => onCommand('clock.setViewWindow', { window: 1 })}>PM</button>
+          </span>
         </div>
 
-        {/* 12-hour window toggle bar — prominent, above the clock face.
-            Shows which half-day the arcs reflect and lets users swap. */}
-        <div
-          data-testid="clock-window-bar"
-          style={{
-            display: dialOnly ? 'none' : 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            padding: '4px 0 2px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            userSelect: 'none',
-          }}
-        >
-          <button
-            type="button"
-            data-testid="clock-window-am"
-            onClick={() => onCommand('clock.setViewWindow', { window: 0 })}
-            style={{
-              padding: '3px 10px',
-              background: viewWindow === 0 ? 'var(--rust-deep, var(--rust))' : 'transparent',
-              color: viewWindow === 0 ? 'var(--paper)' : 'var(--ink-3)',
-              border: `1px solid ${viewWindow === 0 ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: 'inherit',
-              fontWeight: viewWindow === 0 ? 700 : 400,
-            }}
-          >
-            AM · 0–12
-          </button>
-          <button
-            type="button"
-            data-testid="clock-window-swap"
-            onClick={() => onCommand('clock.setViewWindow', { window: viewWindow === 0 ? 1 : 0 })}
-            title="Show next 12 hours"
-            style={{
-              padding: '3px 8px',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 12,
-              lineHeight: 1,
-            }}
-          >
-            ⇆
-          </button>
-          <button
-            type="button"
-            data-testid="clock-window-pm"
-            onClick={() => onCommand('clock.setViewWindow', { window: 1 })}
-            style={{
-              padding: '3px 10px',
-              // rust-deep: the paper-coloured label reads on it in both themes.
-              background: viewWindow === 1 ? 'var(--rust-deep, var(--rust))' : 'transparent',
-              color: viewWindow === 1 ? 'var(--paper)' : 'var(--ink-3)',
-              border: `1px solid ${viewWindow === 1 ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: 'inherit',
-              fontWeight: viewWindow === 1 ? 700 : 400,
-            }}
-          >
-            PM · 12–24
-          </button>
-        </div>
 
         {/* Clock face — container wider than SVG viewBox so outward-growing
             train tracks don't clip on the parent div edge. Station mode:

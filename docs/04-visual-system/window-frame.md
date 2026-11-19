@@ -44,15 +44,25 @@ Each window used to be built on its own. Switching views sat in four different p
 |---|---|---|---|
 | Timer | name, session code; POMO / OBSERVE switch (Advanced); recorded spans, settings | — | START / BREAK / STOP, and "log past time" when idle |
 | Todo | name with the open count, overdue count | — | add a plan |
-| Calendar | name; DAY / WEEK / MONTH / YEAR | ‹ week › layers (Advanced), repeating events, Today, zoom (Advanced) | add a plan (day and week views) |
-| Clock | name; DAY / BIG CLOCK / WEEK | ‹ day › Today, Now | — |
+| Calendar | name; DAY / WEEK / MONTH / YEAR; one menu (what it shows besides plans, repeating events, zoom) | ‹ week or day › Today; in the day view also the day's recorded total and the hour arrows | add a plan (day and week views) |
+| Clock | name; DAY / BIG CLOCK / WEEK | ‹ day › Today, Now, AM / PM | — |
 | Habits | name with the week; WEEK / MONTH / YEAR; settings | — | add a habit |
-| Analytics | name, page; totals; settings | (its own page row and range presets: not converted yet) | — |
+| Analytics | name, page; totals; settings | (its own page row: not converted yet); the range uses the shared switch | — |
 | Terminal | traffic lights, label, live badge | — | — |
 
 ## Not converted yet
 
-- The Analytics page row (icons) and its 7d / 30d / 90d presets are still its own rows.
+- The Analytics page row (icons) is still its own row.
 - The Calendar's Month and Year views keep their own month/year arrows.
-- The Clock's AM / PM switch sits under its time row.
 - Popups and cards (the plan card, the event card) have their own layout; a standard for cards is a separate step.
+
+## Rows inside a window
+
+- **A list row is one line** in a narrow window: the name, when, how long. The tag shrinks to its dot and the tracked time steps aside (tooltip, plan card). The full row shows in a wide window.
+- **No unlabelled switches.** A group of icon-only toggles goes into the window's menu as named rows (the Calendar's layers).
+- **No repeated rows.** A row that says what another row already says is not drawn (the Calendar's day view has no day-name row: the time row names the day).
+- **In a narrow window the name gives way first**; the view switch and buttons stay whole.
+
+## The top bar
+
+Brand, the canvas switcher (Advanced), "saved", the window toggles, the layout switch, Help, Settings. FIT shows only in the Free layout (Station's canvas has its own fit control). Light / dark is in Settings → General. No breadcrumb.

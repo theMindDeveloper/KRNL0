@@ -1,3 +1,4 @@
+import { useState } from 'react';
 // ADR 0001 — CalendarNode (Slice 2: MonthView wired).
 // Slice 1 shell upgraded: 'month' case now renders the real MonthView.
 // Week and year remain placeholder stubs for Slices 3/4.
@@ -17,6 +18,8 @@ export function CalendarNode({
   slotTotal = MOTHER_TOTAL,
 }: NodeProps<CalendarState, CalendarConfig>) {
   const config = (node.config ?? defaultCalendarConfig()) as CalendarConfig;
+  // window-frame.md — the header's last slot: the day and week views put the Calendar's menu there.
+  const [headSlot, setHeadSlot] = useState<HTMLElement | null>(null);
 
   // Placeholder body — replaced by real views in Slices 2/3/4.
   const renderBody = () => {
@@ -28,6 +31,7 @@ export function CalendarNode({
             config={config}
             onCommand={onCommand}
             singleDay
+            headSlot={headSlot}
           />
         );
       case 'week':
@@ -36,6 +40,7 @@ export function CalendarNode({
             state={node.state as CalendarState}
             config={config}
             onCommand={onCommand}
+            headSlot={headSlot}
           />
         );
       case 'month':
@@ -84,6 +89,7 @@ export function CalendarNode({
             </button>
           ))}
         </span>
+        <span ref={setHeadSlot} style={{ display: 'inline-flex' }} />
       </div>
 
       {/* View placeholder body */}

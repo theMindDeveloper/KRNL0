@@ -2821,3 +2821,20 @@ What moved:
 All test ids and commands are unchanged; this is placement and size only. The rules are written in `docs/04-visual-system/window-frame.md`, and `windowFrame.test.ts` fails if a window builds its own header or footer again.
 
 **Not converted yet:** the Analytics page row and range presets, the Calendar's Month and Year arrows, the Clock's AM / PM switch, and popups and cards. Checked as screenshots in Advanced and Easy on the demo board; not yet used by the owner.
+
+## [2026-11-19] — Simpler menus, one-line Todo rows, a shorter top bar
+
+**Type:** Feature (UI simplification)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ContextMenu/index.tsx` (a row can hold rarer rows behind it), `ui/menuIcons.tsx`, `TodoNode/index.tsx`, `TaskNode/index.tsx`, `HabitNode/HabitContextMenu.tsx`, `CalendarNode/WeekView.tsx`, `ClockNode/index.tsx`, `AnalyticsNode/index.tsx`, `TopBar/index.tsx`, `styles/window-frame.css`, `Tour/tours.ts` + 6 voice clips, `docs/04-visual-system/menus.md` (new), `window-frame.md`, `docs/research/simplify-checklist.md` (new), tests.
+
+**Summary:** The owner said the first pass was only "kind of better": menus were long and each one different, Todo rows wrapped onto two lines, the top bar was crowded, and the Calendar had unlabelled icon switches.
+
+- **Menus:** six rows at most, the same order and words everywhere (what happened, When…, Rename, More, then Won't do / Archive and Delete). The Todo row menu went from 8 rows to 6, the card menu from 9 to 6, the habit menu from 9 to 6. Rarer rows sit behind **More**. The card menu now says "Rename" and "When…" like the Todo row, and "When…" opens the same plan card.
+- **Todo rows:** one line each in a narrow window (name, when, length). The tag shrinks to its dot and the tracked time steps aside.
+- **Top bar:** the breadcrumb and the DARK button are gone (light / dark is in Settings); FIT shows only in the Free layout.
+- **Calendar:** its top went from four rows to two. The three unlabelled layer switches, the events list and the zoom are one menu button in the header; the time row is just ‹ date › Today; the day view no longer draws a second row with the day's name.
+- **Clock:** AM / PM moved into the time row, one row less.
+- **Analytics:** its range buttons use the shared switch.
+
+Eight tutorial lines changed with the menus and were re-recorded. The owner's message is split point by point, with what is done and what is open, in `docs/research/simplify-checklist.md`. Checked as screenshots at 1457 × 945 in Advanced and Easy on the demo board; not yet used by the owner.
