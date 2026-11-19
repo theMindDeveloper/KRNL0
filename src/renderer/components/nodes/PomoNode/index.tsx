@@ -629,10 +629,13 @@ export function PomoNode({
           )}
         </div>
       ) : (
-        <div ref={setBodyEl} style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap, ...(inStation ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
+        <div ref={setBodyEl} className="pomo-body" data-idle={state.status === 'idle' || state.status === 'done' ? 'true' : undefined} style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap, ...(inStation ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
           {/* PR4 — timer face switch: swap inner face without touching outer chrome.
               In a station slot the face is fitted to the room left, so the
               controls below it (START, task) are never cut off. */}
+          {/* window-frame.md, Timer — the stopwatch face sits in the middle of
+              the room it has (this and the footer share the free space). */}
+          <div aria-hidden style={{ marginTop: 'auto' }} />
           <FaceWrap
             fit={inStation}
             compact={observe
@@ -764,18 +767,18 @@ export function PomoNode({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '4px 8px',
-              border: `1px solid ${isTaskMode ? 'var(--acid)' : 'var(--paper-3)'}`,
-              borderRadius: 5,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.06em',
+              gap: 8,
+              height: 40,
+              padding: '0 8px 0 14px',
+              borderRadius: 10,
+              background: 'var(--paper-2)',
+              fontFamily: 'var(--font-read)',
+              fontSize: 12.5,
               color: 'var(--ink-3)',
             }}
           >
             <span aria-hidden style={{ color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', lineHeight: 0 }}><SettingsIcon name={isTaskMode ? 'finished' : 'box'} size={12} /></span>
-            <span>TASK</span>
+            <span>Task</span>
             <AppSelect
               ariaLabel="Link this session to a task"
               testId="pomo-tag-select"
@@ -789,7 +792,7 @@ export function PomoNode({
                 // The running session can only be on an open task (a done one is reopened first).
                 ...tagOptions.filter((o) => !o.done).map((o) => ({ value: o.id, label: truncate(o.text, 28) })),
               ]}
-              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 11, padding: '2px 0' }}
+              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontFamily: 'var(--font-read)', fontSize: 13.5, padding: '2px 0' }}
             />
           </label>
           )}

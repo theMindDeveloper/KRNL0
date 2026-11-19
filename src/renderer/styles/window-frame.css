@@ -171,3 +171,12 @@
   .kw-card button { transition: none; }
   .kw-card button:active:not(:disabled) { transform: none; }
 }
+
+/* Cards (ui/addCard.tsx): the filled block of lines, with a hairline between lines. */
+.kc-group { background: var(--paper-2); border-radius: 12px; overflow: hidden; }
+.kc-group > * + * { border-top: 1px solid var(--paper-3); }
+
+/* Timer, not running: when a plan is due now its card is the one choice shown;
+   "pick something else" hides the card and the picker row comes back. */
+.pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"]) > [data-testid="pomo-now"],
+.pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"]) > [data-testid="pomo-tag"] { display: none !important; }

@@ -85,7 +85,8 @@ export function FaceFit({ children }: { children: ReactNode; compact?: ReactNode
           // face keeps its proportions across the whole window.
           width: `${100 / scale}%`,
           flexShrink: 0,
-          alignSelf: 'flex-start',
+          // With room to spare the face sits in the middle of it (window-frame.md, Timer).
+          alignSelf: scale >= 1 ? 'center' : 'flex-start',
           transform: scale < 1 ? `scale(${scale})` : undefined,
           transformOrigin: 'top center',
           // Labels inside the face are drawn at 11 px / scale, so after the

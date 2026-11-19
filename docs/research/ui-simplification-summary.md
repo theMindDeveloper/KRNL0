@@ -2,7 +2,7 @@
 
 Written 2026-11-19, after the overnight pass. Everything here is on the branch `feat/unified-windows` (draft PR #257, on top of #253 and #251). The dev app from this worktree shows all of it; restart it with `npm run dev` if it is closed.
 
-Nothing is merged or released. Typecheck is clean and all 2,659 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
+Nothing is merged or released. Typecheck is clean and all 2,663 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
 
 ## The rule behind every change
 
@@ -184,6 +184,28 @@ I went through Advanced and Easy again, window by window, and fixed what stood o
 **Where:** type a name in Todo's "add a plan"; press + in the Calendar; type a name in "add a habit". The plan card that opens from "When…" changed the same way.
 
 **Why this and not something else:** you sent the three side by side and asked for the gaps and sizes to be one. I took the Calendar and Habit card as the standard because two of three already agreed, and moved the Todo card to it. The sizes live in one file, so a fourth card cannot drift. One rule came out of it: a day you pick is solid lime, an option you switch on is tinted.
+
+## 16. The cards, redesigned to be read (your pick A)
+
+**What:** you said the cards were still ugly and unreadable after section 15, and you were right: I had made them the same size and kept the look. They are now a different design. A card is the name, then one filled block with a line per setting (Time, Length, Deadline on the left; what it is set to on the right), then one big button. There are no outlined boxes. Words are in a reading font; only times stay in the code font. Labels are normal words, not small capitals.
+
+**Where:** type a name in Todo's "add a plan"; click a plan's block on the Calendar (the same card, with Mark done / Won't do / Delete); press + in the Calendar; type a name in "add a habit"; "Log past time" in the Timer.
+
+**The day line:** you did not like the first version (a "Day" line that repeated "Today" and wrapped onto two rows). It is one line of four choices: Today, Tomorrow, one more day, Date. Always visible, one press. Press the chosen day again to clear it.
+
+**Why this and not the other two drafts:** B (questions with big answers) was the tallest and pushed deadline and reminder behind "More"; C (one sentence) hides that the words can be pressed. A is the layout people already know from phone settings.
+
+**Costs:** the plan card is about 30 px taller. "Won't do" shows as an icon when the first button needs the room ("Done on Mon 16"). The reading font is loaded from the web like the app's other fonts; offline it falls back to the system font.
+
+## 17. The Timer is a clock first (your pick A)
+
+**What:** not running, the Timer showed three tiles saying 0m, 0m, 0, two picker rows, and an empty lower half. Now: the time, large and centred; "Not running" under it; today as one line ("2h 35m recorded · 15m break") over the day strip; and, when a plan is due now, one card with its name and **Start on it**. The content sits in the middle of the window at any height, in Sessions too.
+
+**Where:** the Timer window. Switch to STOPWATCH to see the face; make the window taller to see it stay centred.
+
+**Why:** a timer should show the time first. The tiles repeated Analytics and were zeros most of the day. Two rows that both ask "what are you doing?" became one: the plan card, with "pick something else" for the list.
+
+**Different from the draft:** today's line sits above the plan card (in the draft it was below), because the strip belongs to the face. In Sessions the face itself (the blocks) is unchanged.
 
 ## Your three answers
 

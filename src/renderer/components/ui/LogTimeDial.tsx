@@ -174,13 +174,13 @@ export function LogTimeDayStepper({ dayYMD, onChange }: { dayYMD: string; onChan
   const date = new Date(y, m - 1, d);
   const label = dayYMD === today ? 'Today' : dayYMD === addDaysYMD(today, -1) ? 'Yesterday' : `${DOW[date.getDay()]}, ${MON[date.getMonth()]} ${date.getDate()}`;
   const arrow = (disabled: boolean): React.CSSProperties => ({
-    width: 28, height: 28, borderRadius: 999, border: '1px solid var(--paper-3)', background: 'transparent',
+    width: 28, height: 28, borderRadius: 8, border: 'none', background: 'var(--paper-3)',
     color: 'var(--ink-2)', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.3 : 1, fontSize: 13,
   });
   return (
     <div data-testid="log-time-day" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <button type="button" aria-label="Day before" style={arrow(false)} onClick={() => onChange(addDaysYMD(dayYMD, -1))}><LineGlyph name="chevronLeft" /></button>
-      <span data-testid="log-time-date" style={{ flex: 1, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{label}</span>
+      <span data-testid="log-time-date" style={{ flex: 1, textAlign: 'center', fontFamily: 'var(--font-read)', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{label}</span>
       <button type="button" aria-label="Day after" style={arrow(dayYMD >= today)} disabled={dayYMD >= today} onClick={() => onChange(addDaysYMD(dayYMD, 1))}><LineGlyph name="chevron" /></button>
     </div>
   );
@@ -193,7 +193,7 @@ export function LogTimeGaps({ dayYMD, onChange }: { dayYMD: string; onChange: (s
   if (gaps.length === 0) return null;
   return (
     <div data-testid="log-time-quick" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>Fill a gap:</span>
+      <span style={{ fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-3)' }}>Fill a gap:</span>
       {gaps.map((g) => (
         <button key={g.startMin} type="button" data-testid="log-time-gap" style={chip()} onClick={() => onChange(toHM(g.startMin), toHM(g.endMin))}>
           {toHM(g.startMin)}–{toHM(g.endMin)}

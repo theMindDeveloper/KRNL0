@@ -403,3 +403,9 @@ Plan, habit and event cards share the task card's size (220 × 120) but never lo
 
 - **Align to grid** is invisible: an 80 px grid (a task card = 3 × 2 cells). A drop settles on the nearest free spot with a 260 ms glide (none with reduced motion).
 - **Station soft snap**: a divider let go within 14 px of a line (the other row's divider, or its default spot) clicks onto it; further away it stays.
+
+## Reading font (Decision 47, 2026-11-19)
+
+`--font-read` (Geist, then the system's sans-serif) is for **words you read**: names, labels and sentences on cards and in the Timer's lines. `--font-mono` stays for times, numbers, the window headers and anything that should line up in columns. Labels set in the reading font are sentence case, 12.5 px or larger, and are never small capitals.
+
+It is used where a window or card has been moved to the new design (the cards, the Timer). Other windows keep the code font until they are moved.

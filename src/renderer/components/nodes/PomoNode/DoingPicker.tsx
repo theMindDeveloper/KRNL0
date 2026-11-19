@@ -110,10 +110,10 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
     <>
       <div
         data-testid="pomo-now"
-        style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30, padding: '0 4px 0 8px', border: `1px solid ${curCat?.color ?? (current ? 'var(--acid)' : 'var(--paper-3)')}`, borderRadius: 5 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 8px 0 14px', borderRadius: 10, background: 'var(--paper-2)', fontFamily: 'var(--font-read)' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <span style={mono}>{caption}</span>
+        <span style={{ fontSize: 12.5, color: 'var(--ink-3)', flexShrink: 0 }}>{caption === 'doing' ? 'Doing' : 'Next'}</span>
         <button
           ref={anchor}
           type="button"
@@ -123,12 +123,12 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
           style={{
             flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: '100%', padding: 0,
             background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-            fontFamily: 'var(--font-mono)', fontSize: 11, color: current ? 'var(--ink)' : 'var(--ink-4)',
+            fontFamily: 'var(--font-read)', fontSize: 13.5, fontWeight: current ? 600 : 400, color: current ? 'var(--ink)' : 'var(--ink-4)',
           }}
         >
           {current && icon(current)}
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {current ? current.label : 'pick or type what you’re doing…'}
+            {current ? current.label : 'pick or type what you are doing'}
           </span>
           {curCat && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{curCat.label}</span>}
           <span aria-hidden style={{ opacity: 0.6, fontSize: 11, color: 'var(--ink-3)' }}><LineGlyph name="caretDown" size={9} /></span>

@@ -2657,3 +2657,13 @@ The timer window had five names (RECORD, TIME LOG, POMO, DEEP WORK · POMO.025, 
 - Words only. The node kind (`pomo`), the config values (`mode: 'pomodoro' | 'observe'`), the commands (`krnl pomo …`) and every test id are unchanged, so no board migration and no CLI change.
 - The Clock's header says "Clock" for the same reason (it said "Today · Schedule").
 - Guard: `tests/unit/renderer/windowFrame.test.ts`.
+
+## Decision 47 — Cards are a list you read; words get a reading font (2026-11-19)
+
+The owner found the add cards "ugly, unreadable, not user friendly" after their sizes were unified (same width and gaps, but still rows of identical outlined boxes labelled in small capitals in the code font). Three redesigns were drafted (a list, questions, one sentence); the owner picked the list (A) and, for the Timer, "the time, and the one plan" (A).
+
+- **Cards:** a name, one filled block with a line per setting, one main button. No outlined boxes. Rule and sizes: `docs/04-visual-system/window-frame.md`, "Cards"; code: `ui/addCard.tsx`.
+- **Type:** a second font token, `--font-read` (Geist), for words; `--font-mono` keeps times and numbers. This is the first change to the app's type since the cyber theme; it applies only where a surface has been moved to the new design.
+- **Timer:** the stopwatch face is the time, its state in words and today as one line; the three total tiles are gone (Analytics has them). A plan due now is one card with one button.
+- No behaviour, command, test id or board field changed, so no migration and no CLI change.
+- Guard: `tests/unit/renderer/windowFrame.test.ts`.

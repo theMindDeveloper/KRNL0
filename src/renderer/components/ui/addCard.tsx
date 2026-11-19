@@ -1,91 +1,117 @@
 // One layout for the small cards that add or edit one thing: the plan card
-// (WhenPopover), the Calendar's "New here" card (EventCard) and the habit card
-// (HabitAddAsk). docs/04-visual-system/window-frame.md, "Cards".
+// (WhenPopover), the Calendar's "New here" card (EventCard), the habit card
+// (HabitAddAsk) and "Log time you didn't record" (LogTimeCard).
+// docs/04-visual-system/window-frame.md, "Cards" (owner pick A, 2026-11-19).
 //
-// The rule: one width, one padding, one gap between rows; a name on top with
-// an X; rows are a 64 px label and controls that are all 30 px tall with the
-// same corner; one footer line with a full-width main button.
+// The rule: a card is a name with an X, then one filled block with a line per
+// setting (its name on the left, what it is set to on the right), then one
+// main button across the card. No outlined boxes. Words are set in the reading
+// font; only times and numbers keep the code font.
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { LineGlyph } from './LineGlyph';
 
 /** Every card is this wide. */
 export const CARD_W = 330;
-/** Every control in a row (pill, stepper, time field, select) is this tall. */
+/** Every control in a line (pill, stepper button, time field, select) is this tall. */
 export const CTL_H = 30;
-/** Corner of a control. */
 const CTL_R = 8;
+const READ = 'var(--font-read)';
+const MONO = 'var(--font-mono)';
 
 export const cardBox: CSSProperties = {
-  width: CARD_W, boxSizing: 'border-box', padding: 14, borderRadius: 12,
+  width: CARD_W, boxSizing: 'border-box', padding: 16, borderRadius: 14,
   background: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--paper-3)',
   boxShadow: '0 18px 44px rgba(0,0,0,0.5)',
-  display: 'flex', flexDirection: 'column', gap: 12,
-  fontFamily: 'var(--font-mono)', fontSize: 12,
+  display: 'flex', flexDirection: 'column', gap: 14,
+  fontFamily: READ, fontSize: 13.5, lineHeight: 1.35,
 };
 
 /** The top line: the name, then the X. */
-export const cardHead: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, minHeight: 28 };
-export const cardTitle: CSSProperties = { flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, lineHeight: 1.3 };
+export const cardHead: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, minHeight: 28 };
+export const cardTitle: CSSProperties = { flex: 1, minWidth: 0, fontFamily: READ, fontSize: 17, fontWeight: 600, lineHeight: 1.3, letterSpacing: '-0.01em' };
 
 export function CardClose({ onClick, label = 'Close' }: { onClick: () => void; label?: string }) {
   return (
     <button type="button" aria-label={label} title={label} onClick={onClick}
-      style={{ width: 24, height: 24, flexShrink: 0, border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      style={{ width: 28, height: 28, flexShrink: 0, border: 'none', borderRadius: CTL_R, background: 'var(--paper-2)', color: 'var(--ink-3)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
       <LineGlyph name="close" size={12} />
     </button>
   );
 }
 
-/** A row: its label, then its controls. */
-export const cardRow: CSSProperties = { display: 'grid', gridTemplateColumns: '64px 1fr', alignItems: 'center', gap: 8, minHeight: CTL_H };
-export const cardLabel: CSSProperties = { fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' };
-/** The controls of one row, side by side. */
-export const cardCtls: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 };
+/** The filled block that holds the card's lines (hairlines between them: `.kc-group` in window-frame.css). */
+export function CardGroup({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+  return <div className="kc-group" style={style}>{children}</div>;
+}
+
+/** A line: its name on the left, its controls on the right. */
+export const cardRow: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, minHeight: 42, padding: '0 10px 0 14px', boxSizing: 'border-box' };
+export const cardLabel: CSSProperties = { flex: 1, minWidth: 0, fontFamily: READ, fontSize: 13.5, color: 'var(--ink-2)', whiteSpace: 'nowrap' };
+/** The controls of one line, side by side at its right end. */
+export const cardCtls: CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 };
+/** A quiet note beside a control ("to 00:00"). */
+export const cardNote: CSSProperties = { fontFamily: MONO, fontSize: 12.5, color: 'var(--ink-3)', whiteSpace: 'nowrap' };
 
 /** A two-way switch across the card (Once / Repeats). */
-export const cardSeg: CSSProperties = { display: 'flex', gap: 2, padding: 2, borderRadius: CTL_R, background: 'var(--paper-2)', border: '1px solid var(--paper-3)' };
+export const cardSeg: CSSProperties = { display: 'flex', gap: 2, padding: 3, borderRadius: 10, background: 'var(--paper-2)' };
 export const cardSegBtn = (on: boolean): CSSProperties => ({
-  flex: 1, height: 26, borderRadius: 6, border: 'none', cursor: 'pointer', padding: '0 4px',
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-  fontFamily: 'var(--font-mono)', fontSize: 11.5, whiteSpace: 'nowrap', fontWeight: on ? 650 : 500,
-  background: on ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent',
-  color: on ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
+  flex: 1, height: 30, borderRadius: CTL_R, border: 'none', cursor: 'pointer', padding: '0 6px',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  fontFamily: READ, fontSize: 13, whiteSpace: 'nowrap', fontWeight: on ? 600 : 500,
+  background: on ? 'var(--paper-3)' : 'transparent',
+  color: on ? 'var(--ink)' : 'var(--ink-3)',
 });
 
-/** An option you switch on (Any time, Tick): tinted when on. */
+/** The day line: equal choices across the block; the chosen one is solid. */
+export const cardDays: CSSProperties = { display: 'grid', gridAutoFlow: 'column', gridAutoColumns: '1fr', gap: 4, padding: 6 };
+export const cardDay = (on: boolean): CSSProperties => ({
+  height: 34, minWidth: 0, borderRadius: CTL_R, border: 'none', cursor: 'pointer', padding: '0 4px',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  fontFamily: READ, fontSize: 13, whiteSpace: 'nowrap', fontWeight: on ? 600 : 500,
+  background: on ? 'var(--acid)' : 'transparent', color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-2)',
+});
+
+/** An option you switch on inside a line (Any time, Tick): tinted when on. */
 export const cardPill = (on: boolean): CSSProperties => ({
   height: CTL_H, padding: '0 10px', borderRadius: CTL_R, cursor: 'pointer', boxSizing: 'border-box', border: 'none',
-  fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'nowrap', fontWeight: on ? 650 : 500,
-  boxShadow: on ? 'inset 0 0 0 1px color-mix(in srgb, var(--acid) 40%, transparent)' : 'inset 0 0 0 1px var(--paper-3)',
-  background: on ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
-  color: on ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
+  fontFamily: READ, fontSize: 13, whiteSpace: 'nowrap', fontWeight: on ? 600 : 500,
+  background: on ? 'color-mix(in srgb, var(--acid) 18%, var(--paper-3))' : 'var(--paper-3)',
+  color: on ? 'var(--acid-ink, var(--acid))' : 'var(--ink-2)',
 });
 
-/** − value + as one control. */
-export const cardStepper = (on = false): CSSProperties => ({
-  display: 'inline-flex', alignItems: 'center', height: CTL_H, borderRadius: CTL_R, boxSizing: 'border-box', overflow: 'hidden', width: 'fit-content', border: 'none',
-  boxShadow: on ? 'inset 0 0 0 1px color-mix(in srgb, var(--acid) 40%, transparent)' : 'inset 0 0 0 1px var(--paper-3)',
-  background: on ? 'color-mix(in srgb, var(--acid) 7%, transparent)' : 'transparent',
-});
+/** − value + : two filled buttons around the value. */
+export const cardStepper = (_on = false): CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 2, width: 'fit-content' });
 export const cardStepBtn: CSSProperties = {
-  width: 28, height: CTL_H, border: 'none', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0, fontFamily: 'var(--font-mono)',
+  width: 28, height: 28, border: 'none', borderRadius: CTL_R, background: 'var(--paper-3)', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 0, fontFamily: MONO,
 };
-export const cardStepValue: CSSProperties = { minWidth: 48, textAlign: 'center', fontSize: 12.5, fontWeight: 650 };
+export const cardStepValue: CSSProperties = { minWidth: 54, textAlign: 'center', fontFamily: MONO, fontSize: 13, fontWeight: 500 };
 
 /** A weekday circle. */
 export const cardDayDot = (on: boolean): CSSProperties => ({
-  width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 11.5, fontWeight: on ? 700 : 500, border: 'none',
-  boxShadow: on ? 'none' : 'inset 0 0 0 1px var(--paper-3)', background: on ? 'var(--acid)' : 'transparent', color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
+  width: 34, height: 34, borderRadius: '50%', cursor: 'pointer', padding: 0, fontFamily: READ, fontSize: 12.5, fontWeight: 600, border: 'none',
+  background: on ? 'var(--acid)' : 'var(--paper-2)', color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
 });
 
-/** The time field in a row. */
-export const cardTime: CSSProperties = { width: 96, height: CTL_H };
+/** The time field in a line. */
+export const cardTime: CSSProperties = { width: 96, height: CTL_H, background: 'var(--paper-3)', border: '1px solid transparent' };
+/** A select in a line. */
+export const cardSelect: CSSProperties = { height: CTL_H, minWidth: 0, background: 'var(--paper-3)', border: '1px solid transparent', borderRadius: CTL_R, fontFamily: READ, fontSize: 13 };
 
-/** The last line: a rule, then the main button across the card. */
-export const cardFoot: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--paper-3)', paddingTop: 12 };
+/** A row of things you can do with it (Mark done, Won't do, Delete, More). */
+export const cardAct: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 8, height: 36, padding: '0 12px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap',
+  border: 'none', background: 'var(--paper-2)', fontFamily: READ, fontSize: 13, boxSizing: 'border-box',
+};
+
+/** The last part: the main button across the card (and, under it, one quiet line). */
+export const cardFoot: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 10 };
 export const cardPrimary = (ready: boolean): CSSProperties => ({
-  height: 34, padding: '0 12px', borderRadius: CTL_R, border: 'none', cursor: ready ? 'pointer' : 'default',
-  background: ready ? 'var(--btn-primary-bg, var(--acid))' : 'var(--paper-3)', color: ready ? 'var(--btn-primary-fg, #111)' : 'var(--ink-4)',
-  fontFamily: 'inherit', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  height: 40, padding: '0 12px', borderRadius: 10, border: 'none', cursor: ready ? 'pointer' : 'default',
+  background: ready ? 'var(--btn-primary-bg, var(--acid))' : 'var(--paper-2)', color: ready ? 'var(--btn-primary-fg, #111)' : 'var(--ink-4)',
+  fontFamily: READ, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
 });
+/** The quiet second action beside the main button ("No day"). */
+export const cardGhost: CSSProperties = { height: 40, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontFamily: READ, fontSize: 13, whiteSpace: 'nowrap' };
+/** A quiet line under the button ("Not something you tick? …"). */
+export const cardLink: CSSProperties = { fontFamily: READ, fontSize: 12.5, color: 'var(--ink-3)' };

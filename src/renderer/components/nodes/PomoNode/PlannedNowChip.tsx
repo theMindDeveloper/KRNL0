@@ -32,40 +32,37 @@ export function PlannedNowChip({ state, easy, onCommand }: {
     <div
       data-testid="pomo-planned-now"
       className="nodrag"
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '5px 8px',
-        border: '1px dashed var(--paper-3)', borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 11,
-        color: 'var(--ink-2)', minWidth: 0,
-      }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 14px', borderRadius: 12, background: 'var(--paper-2)', fontFamily: 'var(--font-read)', minWidth: 0 }}
     >
-      <span style={{ color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 11, flexShrink: 0 }}>Planned now</span>
-      <span title={planned.text} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)' }}>
-        {planned.text}
+      <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Planned now</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <span title={planned.text} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 15.5, fontWeight: 600, color: 'var(--ink)' }}>
+          {planned.text}
+        </span>
+        <button
+          type="button"
+          data-testid="pomo-planned-accept"
+          onClick={() => (running
+            ? onCommand('pomo.tag', { taskId: planned.id })
+            : onCommand('pomo.start', { activeTaskId: planned.id, label: planned.text }))}
+          style={{ flexShrink: 0, cursor: 'pointer', height: 34, padding: '0 12px', borderRadius: 10, border: 'none', background: 'var(--paper-3)', color: 'var(--ink)', fontFamily: 'var(--font-read)', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
+          title={running ? `Count this session toward "${planned.text}"` : `Start a session on "${planned.text}"`}
+        >
+          {running ? 'Track it' : 'Start on it'}
+        </button>
+      </div>
+      <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+        {'or '}
+        <button
+          type="button"
+          data-testid="pomo-planned-dismiss"
+          title="Hide this suggestion and pick what you are doing"
+          onClick={() => setDismissed(planned.id)}
+          style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0, color: 'var(--ink-2)', fontFamily: 'inherit', fontSize: 12.5, boxShadow: 'inset 0 -1px 0 var(--ink-4)' }}
+        >
+          {running ? 'leave it untagged' : 'pick something else'}
+        </button>
       </span>
-      <button
-        type="button"
-        data-testid="pomo-planned-accept"
-        onClick={() => (running
-          ? onCommand('pomo.tag', { taskId: planned.id })
-          : onCommand('pomo.start', { activeTaskId: planned.id, label: planned.text }))}
-        style={{
-          flexShrink: 0, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em',
-          textTransform: 'uppercase', padding: '3px 7px', borderRadius: 4,
-          border: '1px solid var(--ink)', background: 'var(--ink)', color: 'var(--paper)',
-        }}
-        title={running ? `Count this session toward "${planned.text}"` : `Start a session on "${planned.text}"`}
-      >
-        {running ? 'Track it' : 'Start on it'}
-      </button>
-      <button
-        type="button"
-        aria-label="Hide suggestion"
-        data-testid="pomo-planned-dismiss"
-        onClick={() => setDismissed(planned.id)}
-        style={{ flexShrink: 0, cursor: 'pointer', background: 'none', border: 'none', color: 'var(--ink-4)', fontSize: 12, padding: 0, lineHeight: 1 }}
-      >
-        ×
-      </button>
     </div>
   );
 }

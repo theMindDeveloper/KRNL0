@@ -43,6 +43,8 @@ Each window used to be built on its own. Switching views sat in four different p
 | Window | Header | Time row | Footer |
 |---|---|---|---|
 | Timer | name ("Timer" in every mode; "· break" while on a break); recorded spans; SESSIONS / STOPWATCH switch (Advanced); settings | — | START / BREAK / STOP, and "log past time" when idle |
+
+**The Timer is a clock first** (owner pick A, 2026-11-19). The stopwatch face is the time, large and centred; its state in words under it (Not running, Recording, On break); then today as one line over the day strip ("2h 35m recorded · 15m break"). There are no total tiles. The face sits in the middle of the room the window has, in both modes. When a plan is due now and the Timer is not running, its card (the plan's name and **Start on it**) is the one choice shown; "pick something else" hides it and the picker line comes back.
 | Todo | name with the open count, overdue count | — | add a plan |
 | Calendar | name; DAY / WEEK / MONTH / YEAR; one menu (what it shows besides plans, repeating events, zoom) | ‹ week or day › Today; in the day view also the day's recorded total and the hour arrows | add a plan (day and week views) |
 | Clock | name ("Clock"); DAY / BIG CLOCK / WEEK | ‹ day › Today (back to today and this half of the day), AM / PM | — (under the dial: only the day's list) |
@@ -62,22 +64,26 @@ Each window used to be built on its own. Switching views sat in four different p
 
 Brand, the canvas switcher (Advanced), "saved", the window toggles, the layout switch, Help, Settings. A toggle carries the name its window shows: Timer, Todos, Habits, Calendar, Terminal, Analytics, Clock (no abbreviations). FIT shows only in the Free layout (Station's canvas has its own fit control). Light / dark is in Settings → General. No breadcrumb.
 
-## Cards (the plan card, the Calendar card, the habit card)
+## Cards (the plan card, the Calendar card, the habit card, Log time)
 
-**One layout for every card that adds or edits one thing** (`ui/addCard.tsx`): the plan card (Todo's add card and "When…"), the Calendar's "New here" card and the habit card.
+**One design for every card that adds or edits one thing** (`ui/addCard.tsx`; owner pick A of three drafts, 2026-11-19): the plan card (Todo's add card and "When…"), the Calendar's "New here" card, the habit card and "Log time you didn't record".
+
+**A card is a list you read.** The name with an X, then one filled block with a line per setting (its name on the left, what it is set to on the right), then one main button across the card.
 
 | Part | Rule |
 |---|---|
-| Box | 330 px wide, 14 px padding, 12 px between rows, 12 px corner |
-| Top line | the name (15 px, bold), then the X (24 px) |
-| Row | a 64 px label in small capitals (TIME, LENGTH, GOAL, REMIND, DEADLINE), then its controls |
-| Control | 30 px tall, 8 px corner, 8 px apart: the option pill (Any time, Tick), the − value + stepper as one control, the time field, the select |
-| A day you pick | a round chip or circle, solid lime when chosen (Today, Tmrw, M T W) |
-| An option you switch on | tinted lime, never solid (Once / Repeats, Any time, Tick) |
-| Footer | a rule, 12 px, then the main button across the card, 34 px tall. A quiet second action (No day) sits to its left at the same height |
+| Box | 330 px wide, 16 px padding, 14 px between parts, 14 px corner |
+| Top line | the name (17 px, semibold, reading font), then the X in a 28 px filled square |
+| The block | one filled block (`--paper-2`, 12 px corner), a hairline between lines. **No outlined boxes anywhere on a card** |
+| A line | 42 px: the setting's name in sentence case on the left (Time, Length, Deadline; never small capitals), its value or control at the right |
+| The day line (plan card) | the first line of the block: at most three days and **Date**, equal widths, always visible, one press. The chosen day is solid lime. Days are named in full (Tomorrow, not Tmrw). A date that is none of the three shows on Date. Pressing the chosen day again clears it |
+| Controls in a line | 30 px tall, filled one shade lighter (`--paper-3`), 8 px corner: the option pill, the two stepper buttons around a value, the time field, the select |
+| Chosen | a day you pick is solid lime; an option you switch on (Any time, Tick) is tinted lime; a two-way switch (Once / Repeats) lifts the chosen side |
+| Type | words in the reading font (`--font-read`); times and numbers in the code font |
+| Things you can do | one row of filled buttons, 36 px; the long "Done on Mon 16" label keeps its room (Won't do then shows as its icon) |
+| Footer | the main button across the card, 40 px. A quiet second action (No day) sits to its left, only when there is a day to clear |
 
 A card does not set its own width, padding, gap, control height or button size.
-
 
 - **Short by default.** Day chips (Today, Tmrw, one more) and **Date**; the month opens only when Date is pressed. Then time, length; a reminder once it has a time; the deadline as one row ("Add a deadline"), which opens the same day picker.
 - **One action row, in the menus' order:** what happened (Mark done / Done on … / Not done yet), Won't do, Delete (the one icon-only button), and More for the rest (the timer, Show).

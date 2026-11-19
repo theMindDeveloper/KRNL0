@@ -13,7 +13,7 @@ import { createPortal } from 'react-dom';
 import { Z } from '../../ui/layers';
 import { TimeField, parseTime } from '../../ui/TimeField';
 import { MenuIcon } from '../../ui/menuIcons';
-import { CARD_W, CardClose, cardBox, cardCtls, cardDayDot, cardFoot, cardHead, cardLabel, cardPrimary, cardRow, cardSeg, cardSegBtn, cardStepBtn, cardStepValue, cardStepper, cardTime, cardTitle } from '../../ui/addCard';
+import { CARD_W, CardClose, CardGroup, cardBox, cardCtls, cardDayDot, cardFoot, cardHead, cardLabel, cardNote, cardPrimary, cardRow, cardSeg, cardSegBtn, cardStepBtn, cardStepValue, cardStepper, cardTime, cardTitle } from '../../ui/addCard';
 import { fmtLength } from '../../ui/WhenPopover';
 
 export interface EventDraft {
@@ -93,7 +93,7 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
             value={d.name}
             onChange={(e) => setD((p) => ({ ...p, name: e.target.value }))}
             onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-            style={{ ...cardTitle, height: 28, border: 'none', borderBottom: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', padding: 0, fontFamily: 'inherit', outline: 'none' }}
+            style={{ ...cardTitle, height: 28, border: 'none', background: 'transparent', color: 'var(--ink)', padding: 0, outline: 'none' }}
           />
           <CardClose onClick={onClose} />
         </div>
@@ -102,54 +102,56 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
           <div role="tablist" aria-label="Once or repeating" style={segWrap}>
             {(['once', 'repeat'] as const).map((m) => (
               <button key={m} type="button" role="tab" aria-selected={d.mode === m} data-testid={`event-mode-${m}`} onClick={() => setD((p) => ({ ...p, mode: m }))} style={segBtn(d.mode === m)}>
-                {m === 'repeat' && <MenuIcon name="repeat" size={11} />}{m === 'once' ? 'Once' : 'Repeats'}
+                {m === 'repeat' && <MenuIcon name="repeat" size={12} />}{m === 'once' ? 'Once' : 'Repeats'}
               </button>
             ))}
           </div>
         )}
 
-        {/* Days (Repeats) or the one day (Once): always the same height. */}
-        <div style={{ height: 32, display: 'flex', alignItems: 'center' }}>
-          {d.mode === 'repeat' ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-              {LETTERS.map((l, i) => {
-                const on = d.days.includes(i + 1);
-                return (
-                  <button key={i} type="button" aria-pressed={on} data-testid={`event-day-${i + 1}`} aria-label={NAMES[i]} title={NAMES[i]} onClick={() => toggleDay(i + 1)}
-                    style={cardDayDot(on)}>
-                    {l}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-2)', fontSize: 12.5 }}>
-              <MenuIcon name="day" size={13} />On {dayLabel}, once
-            </span>
-          )}
-        </div>
-
-        <div style={rowGrid}>
-          <span style={rowLabel}>Time</span>
-          <div style={cardCtls}>
-            <TimeField value={timeText} onChange={setTimeText} testId="event-time" minuteStep={15} onEnter={submit} onEscape={onClose} style={cardTime} />
-            <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{time ? `to ${end}` : ''}</span>
+        {/* One block, a line per setting: the day(s), the time, the length. */}
+        <CardGroup>
+          <div style={{ ...cardRow, minHeight: 46 }}>
+            {d.mode === 'repeat' ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', paddingRight: 4 }}>
+                {LETTERS.map((l, i) => {
+                  const on = d.days.includes(i + 1);
+                  return (
+                    <button key={i} type="button" aria-pressed={on} data-testid={`event-day-${i + 1}`} aria-label={NAMES[i]} title={NAMES[i]} onClick={() => toggleDay(i + 1)}
+                      style={{ ...cardDayDot(on), width: 32, height: 32, ...(on ? {} : { background: 'var(--paper-3)' }) }}>
+                      {l}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <>
+                <span style={cardLabel}>Day</span>
+                <span data-testid="event-day-once" style={{ fontWeight: 500, paddingRight: 4 }}>{dayLabel}</span>
+              </>
+            )}
           </div>
-        </div>
-        <div style={rowGrid}>
-          <span style={rowLabel}>Length</span>
-          <span style={stepper}>
-            <button type="button" aria-label="Shorter" onClick={() => setD((p) => ({ ...p, lengthMin: Math.max(15, p.lengthMin - 15) }))} style={stepBtn}>−</button>
-            <span data-testid="event-length" style={cardStepValue}>{fmtLength(d.lengthMin)}</span>
-            <button type="button" aria-label="Longer" onClick={() => setD((p) => ({ ...p, lengthMin: Math.min(16 * 60, p.lengthMin + 15) }))} style={stepBtn}>+</button>
-          </span>
-        </div>
+          <div style={cardRow}>
+            <span style={cardLabel}>Time</span>
+            <div style={cardCtls}>
+              <span style={cardNote}>{time ? `to ${end}` : ''}</span>
+              <TimeField value={timeText} onChange={setTimeText} testId="event-time" minuteStep={15} onEnter={submit} onEscape={onClose} style={cardTime} />
+            </div>
+          </div>
+          <div style={cardRow}>
+            <span style={cardLabel}>Length</span>
+            <span style={cardStepper()}>
+              <button type="button" aria-label="Shorter" onClick={() => setD((p) => ({ ...p, lengthMin: Math.max(15, p.lengthMin - 15) }))} style={cardStepBtn}>−</button>
+              <span data-testid="event-length" style={cardStepValue}>{fmtLength(d.lengthMin)}</span>
+              <button type="button" aria-label="Longer" onClick={() => setD((p) => ({ ...p, lengthMin: Math.min(16 * 60, p.lengthMin + 15) }))} style={cardStepBtn}>+</button>
+            </span>
+          </div>
+        </CardGroup>
 
         <div style={{ ...cardFoot, marginTop: 'auto' }}>
           <button type="button" data-testid="event-submit" disabled={!valid} onClick={submit}
             title={summary ? `${label} · ${summary}` : undefined}
             style={{ ...cardPrimary(valid), width: '100%' }}>
-            {label}{summary && valid ? <span style={{ fontWeight: 500, opacity: 0.75 }}> · {summary}</span> : null} ↵
+            {label}{summary && valid ? <span style={{ fontWeight: 500, opacity: 0.72 }}> · {summary}</span> : null}
           </button>
         </div>
       </div>
@@ -161,7 +163,3 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
 // One layout for every add card (ui/addCard.tsx).
 const segWrap = cardSeg;
 const segBtn = cardSegBtn;
-const rowGrid = cardRow;
-const rowLabel = cardLabel;
-const stepper = cardStepper();
-const stepBtn = cardStepBtn;

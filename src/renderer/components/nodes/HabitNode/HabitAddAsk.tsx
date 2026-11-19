@@ -13,7 +13,7 @@ import type { HabitSchedule, IsoDow } from './types';
 import { Z } from '../../ui/layers';
 import { TimeField, parseTime } from '../../ui/TimeField';
 import { MenuIcon } from '../../ui/menuIcons';
-import { CARD_W, CardClose, cardBox, cardCtls, cardDayDot, cardFoot, cardHead, cardLabel, cardPill, cardPrimary, cardRow, cardSeg, cardSegBtn, cardStepBtn, cardStepper, cardTime, cardTitle } from '../../ui/addCard';
+import { CARD_W, CardClose, CardGroup, cardBox, cardCtls, cardDayDot, cardFoot, cardHead, cardLabel, cardLink, cardPill, cardPrimary, cardRow, cardSeg, cardSegBtn, cardStepBtn, cardStepper, cardTime, cardTitle } from '../../ui/addCard';
 
 export interface AddAnswer {
   kind: 'habit' | 'routine';
@@ -157,18 +157,18 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
     </div>
   );
   const perWeek = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34 }}>
       <span style={stepper(true)}>
         <button type="button" aria-label="Fewer" onClick={() => set({ perWeek: Math.max(1, d.perWeek - 1) })} style={stepBtn}>−</button>
-        <span data-testid="habit-ask-per" style={{ minWidth: 22, textAlign: 'center', fontSize: 12.5, fontWeight: 650 }}>{d.perWeek}</span>
+        <span data-testid="habit-ask-per" style={{ minWidth: 26, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500 }}>{d.perWeek}</span>
         <button type="button" aria-label="More" onClick={() => set({ perWeek: Math.min(6, d.perWeek + 1) })} style={stepBtn}>+</button>
       </span>
-      <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>times a week, any days</span>
+      <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>times a week, any days</span>
     </div>
   );
   // Days, or times a week: always the same height, so nothing below moves.
   const daysBlock = (
-    <div style={{ height: 32 }}>
+    <div style={{ height: 34 }}>
       {d.mode === 'days' ? dayDots : perWeek}
     </div>
   );
@@ -187,16 +187,16 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
           <button type="button" aria-label="Fewer" onClick={() => set({ amount: { target: Math.max(2, (d.amount?.target ?? 2) - 1), unit: amountUnit } })} style={stepBtn}>−</button>
           <input data-habit-card="" data-testid="habit-ask-amount-n" inputMode="numeric" aria-label="How many a day" value={d.amount.target || ''}
             onChange={(e) => { const n = Number(e.target.value.replace(/\D/g, '').slice(0, 3)); set({ amount: { target: n, unit: amountUnit } }); }}
-            style={{ width: 26, height: 30, border: 'none', background: 'transparent', color: 'var(--ink)', textAlign: 'center', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 650, outline: 'none', padding: 0 }} />
+            style={{ width: 28, height: 28, border: 'none', background: 'transparent', color: 'var(--ink)', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, outline: 'none', padding: 0 }} />
           <button type="button" aria-label="More" onClick={() => set({ amount: { target: Math.min(999, (d.amount?.target ?? 1) + 1), unit: amountUnit } })} style={stepBtn}>+</button>
           <input data-habit-card="" data-testid="habit-ask-amount-unit" aria-label="Unit" placeholder="glasses" maxLength={16} value={amountUnit}
             onChange={(e) => set({ amount: { target: d.amount?.target ?? 0, unit: e.target.value } })}
-            style={{ width: 70, height: 30, border: 'none', borderLeft: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 12, outline: 'none', padding: '0 8px', boxSizing: 'border-box' }} />
+            style={{ width: 70, height: 28, marginLeft: 4, border: 'none', borderRadius: 8, background: 'var(--paper-3)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 13, outline: 'none', padding: '0 8px', boxSizing: 'border-box' }} />
         </span>
       ) : (
         <button type="button" data-testid="habit-ask-amount-open" onClick={() => set({ amount: { target: 8, unit: '' } })} title="Count something each day: 8 glasses, 20 pages"
-          style={{ ...stepper(false), cursor: 'pointer', fontFamily: 'inherit', color: 'var(--ink-4)', padding: '0 10px', gap: 8, fontSize: 12 }}>
-          <span aria-hidden>−</span><span>8</span><span aria-hidden>+</span><span style={{ borderLeft: '1px solid var(--paper-3)', paddingLeft: 8 }}>glasses</span>
+          style={{ ...pill(false), display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--ink-4)' }}>
+          <span aria-hidden>−</span><span>8</span><span aria-hidden>+</span><span>glasses</span>
         </button>
       )}
     </div>
@@ -204,7 +204,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
   // The number is the day's goal, not the size of one tick: said once, always
   // on one line (the card keeps its height).
   const goalHelp = (
-    <span data-testid="habit-ask-goal-help" style={{ fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+    <span data-testid="habit-ask-goal-help" style={{ fontSize: 12.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
       {d.amount
         ? `Each click adds 1${amountUnit ? ` ${amountUnit.replace(/s$/, '')}` : ''} · done at ${d.amount.target || '?'}`
         : 'One click a day marks it done'}
@@ -216,9 +216,11 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
     <>
       {showWeekMode && modeSeg(false)}
       {daysBlock}
-      <div style={rowGrid}><span style={rowLabel}>Time</span>{timeCtl}</div>
-      {showGoal && <div style={rowGrid}><span style={rowLabel}>Goal</span>{goalCtl}</div>}
-      {showGoal && <div style={{ ...rowGrid, minHeight: 0, marginTop: -6 }}><span />{goalHelp}</div>}
+      <CardGroup>
+        <div style={rowGrid}><span style={rowLabel}>Time</span>{timeCtl}</div>
+        {showGoal && <div style={rowGrid}><span style={rowLabel}>Goal</span>{goalCtl}</div>}
+      </CardGroup>
+      {showGoal && <div style={{ display: 'flex', marginTop: -6, padding: '0 2px' }}>{goalHelp}</div>}
     </>
   );
   const card = (
@@ -270,13 +272,13 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
         >
           {!answer
             ? (d.mode === 'days' && d.days.length === 0 ? 'Pick a day' : 'Check the time or amount')
-            : <>{saveLabel ?? 'Add'} <span style={{ fontWeight: 500, opacity: 0.75 }}>{cardSummary(d)}</span> ↵</>}
+            : <>{saveLabel ?? 'Add'} <span style={{ fontWeight: 500, opacity: 0.72 }}>{cardSummary(d)}</span></>}
         </button>
         {!initial && onCalendar && (
-          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-            {"Don't tick it? "}
+          <div style={cardLink}>
+            {"Not something you tick? "}
             <button type="button" data-testid="habit-ask-calendar" onClick={onCalendar} title="Something you don't tick, like a class: a repeating event on the Calendar"
-              style={{ padding: 0, border: 'none', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11, boxShadow: 'inset 0 -1px 0 var(--ink-4)' }}>
+              style={{ padding: 0, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, boxShadow: 'inset 0 -1px 0 var(--ink-4)' }}>
               Put it on the Calendar
             </button>
           </div>

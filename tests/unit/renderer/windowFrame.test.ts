@@ -172,3 +172,32 @@ describe('One layout for the cards that add something (window-frame.md, cards)',
     }
   });
 });
+
+describe('Cards are a list you read; the Timer is a clock first (window-frame.md; owner pick A)', () => {
+  const root = join(process.cwd(), 'src/renderer');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('every card puts its settings in one filled block, a line each', () => {
+    for (const f of ['components/ui/WhenPopover.tsx', 'components/nodes/CalendarNode/EventCard.tsx', 'components/nodes/HabitNode/HabitAddAsk.tsx', 'components/ui/SpanEditor.tsx']) {
+      expect(read(f), f).toContain('<CardGroup>');
+    }
+  });
+  it('words are set in the reading font; the card file draws no outlined boxes', () => {
+    expect(read('styles/tokens.css')).toContain("--font-read:  'Geist'");
+    const card = read('components/ui/addCard.tsx');
+    expect(card).toContain("const READ = 'var(--font-read)'");
+    expect(card).not.toContain('inset 0 0 0 1px');
+    expect(card).not.toContain("textTransform: 'uppercase'");
+  });
+  it('the plan card: the day is one line of at most four choices, named in full', () => {
+    const c = read('components/ui/WhenPopover.tsx');
+    expect(c).toContain("['tmrw', 'Tomorrow', tomorrow]");
+    expect(c).toContain('<div style={cardDays}>');
+  });
+  it('the Timer face: the time, its state in words, today as one line; no total tiles', () => {
+    const d = read('components/nodes/PomoNode/ObserveDash.tsx');
+    expect(d).toContain('data-testid="pomo-observe-today"');
+    expect(d).toContain("'Not running'");
+    expect(d).not.toContain("'work today'");
+    expect(read('styles/window-frame.css')).toContain('.pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"])');
+  });
+});

@@ -30,6 +30,7 @@ import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { Popover } from './Popover';
 import { retagSegment } from '../../store/scheduleActions';
 import { LineGlyph } from './LineGlyph';
+import { CARD_W, CardClose, CardGroup, cardBox, cardCtls, cardFoot, cardHead, cardLabel, cardNote, cardPrimary, cardRow, cardTime, cardTitle } from './addCard';
 
 const chip = (active: boolean, accent = false): CSSProperties => ({
   fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums', padding: '3px 8px', borderRadius: 4,
@@ -218,8 +219,8 @@ export function TaskPickButton({ value, onChange, testId, emptyLabel = 'untagged
         onClick={() => setOpen((o) => !o)}
         style={{
           flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: SPACE.caption, cursor: 'pointer', textAlign: 'left',
-          padding: '6px 10px', borderRadius: 6, border: '1px solid var(--paper-3)', background: 'var(--paper-2)',
-          color: value ? 'var(--ink)' : 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'none', letterSpacing: 0,
+          height: 30, padding: '0 10px', borderRadius: 8, border: 'none', background: 'var(--paper-3)', boxSizing: 'border-box',
+          color: value ? 'var(--ink)' : 'var(--ink-3)', fontFamily: 'var(--font-read)', fontSize: 13, textTransform: 'none', letterSpacing: 0,
         }}
       >
         {value && <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(value) }} />}
@@ -310,12 +311,11 @@ export function LogTimeHost(): JSX.Element | null {
     if (err) { setError(err); return; }
     setReq(null);
   };
-  const W = 320;
+  const W = CARD_W;
   // Overlap with recorded time → offer to trim to the free part.
   const fit = problem && problem.startsWith('Overlaps') && times && !crossesMidnight
     ? freeStretchWithin(daySpans, toMin(startHM), toMin(endHM))
     : null;
-  const label: React.CSSProperties = { fontSize: 11, color: 'var(--ink-3)', width: 40, flexShrink: 0 };
 
   return createPortal(
     <>
@@ -324,36 +324,43 @@ export function LogTimeHost(): JSX.Element | null {
         data-testid="log-time-popover"
         role="dialog"
         aria-label="Log time"
+        className="kw-card"
         style={{
-          position: 'fixed', left: Math.max(8, Math.min(req.x + 4, window.innerWidth - W - 8)),
-          top: Math.max(8, Math.min(req.y + 6, window.innerHeight - 470)), width: W, zIndex: Z.popup,
-          background: 'var(--paper)', border: '1px solid var(--paper-3)', borderRadius: 10, padding: SPACE.panelPad,
-          fontFamily: 'var(--font-mono)', color: 'var(--ink)', boxShadow: 'var(--shadow-1)',
-          ...popupColumn,
+          ...cardBox, position: 'fixed', left: Math.max(8, Math.min(req.x + 4, window.innerWidth - W - 8)),
+          top: Math.max(8, Math.min(req.y + 6, window.innerHeight - 480)), zIndex: Z.popup,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}>Log time you didn't record</span>
-        {/* #207 — simple: day, from/to, what it was for. The strip only shows it. */}
-        <LogTimeDayStepper dayYMD={day} onChange={(d2) => { setDay(d2); setError(null); }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.inline }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline }}>
-            <span style={label}>From</span>
-            <TimeField testId="log-time-start" value={startHM} onChange={(v) => { setStartHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline }}>
-            <span style={label}>To</span>
-            <TimeField testId="log-time-end" value={endHM} onChange={(v) => { setEndHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} />
-            {times && <span style={{ fontSize: 11, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>{durLabel(times.endMs - times.startMs)}{crossesMidnight ? ' · next day' : ''}</span>}
-          </div>
+        <div style={cardHead}>
+          <span style={cardTitle}>Log time you didn't record</span>
+          <CardClose onClick={() => setReq(null)} label="Cancel" />
         </div>
+        {/* #207 — simple: day, from/to, what it was for. The strip only shows it. */}
+        <CardGroup>
+          <div style={{ padding: '7px 8px' }}>
+            <LogTimeDayStepper dayYMD={day} onChange={(d2) => { setDay(d2); setError(null); }} />
+          </div>
+          <div style={cardRow}>
+            <span style={cardLabel}>From</span>
+            <TimeField testId="log-time-start" value={startHM} onChange={(v) => { setStartHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} style={cardTime} />
+          </div>
+          <div style={cardRow}>
+            <span style={cardLabel}>To</span>
+            <div style={cardCtls}>
+              {times && <span style={cardNote}>{durLabel(times.endMs - times.startMs)}{crossesMidnight ? ' · next day' : ''}</span>}
+              <TimeField testId="log-time-end" value={endHM} onChange={(v) => { setEndHM(v); setError(null); }} onEnter={save} onEscape={() => setReq(null)} minuteStep={5} style={cardTime} />
+            </div>
+          </div>
+          <div style={cardRow}>
+            <span style={{ ...cardLabel, flex: '0 0 auto' }}>For</span>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end' }}>
+              <TaskPickButton testId="log-time-task" value={taskId || null} onChange={(id) => setTaskId(id ?? '')} />
+            </div>
+          </div>
+        </CardGroup>
         <LogTimeBar dayYMD={day} startHM={startHM} endHM={endHM} />
         <LogTimeGaps dayYMD={day} onChange={setRange} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline }}>
-          <span style={label}>For</span>
-          <TaskPickButton testId="log-time-task" value={taskId || null} onChange={(id) => setTaskId(id ?? '')} />
-        </div>
         {(error ?? problem) && (
-          <div role="alert" data-testid="log-time-problem" style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline, fontSize: 11, color: 'var(--rust)' }}>
+          <div role="alert" data-testid="log-time-problem" style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline, fontSize: 12.5, color: 'var(--rust)' }}>
             <span style={{ flex: 1 }}>{error ?? problem}</span>
             {fit && (
               <button type="button" data-testid="log-time-trim" style={btn(false)} onClick={() => setRange(toHM(fit.startMin), toHM(fit.endMin))}>
@@ -362,9 +369,8 @@ export function LogTimeHost(): JSX.Element | null {
             )}
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: SPACE.inline }}>
-          <button type="button" onClick={() => setReq(null)} style={btn(false)}>Cancel</button>
-          <button type="button" data-testid="log-time-save" disabled={!!problem} onClick={save} style={btn(true, !!problem)}>
+        <div style={cardFoot}>
+          <button type="button" data-testid="log-time-save" disabled={!!problem} onClick={save} style={{ ...cardPrimary(!problem), width: '100%' }}>
             {times && !problem ? `Add ${durLabel(times.endMs - times.startMs)}` : 'Add'}
           </button>
         </div>

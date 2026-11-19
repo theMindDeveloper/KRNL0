@@ -1,7 +1,8 @@
-// Observe mode face — the running time of the current span, today's spans on
-// a day strip (work as rounded segments in its category / task colour, breaks
-// as a thin quiet line in the gap) and three small totals. Replaces the pomodoro timer faces, which assume a session
-// length Observe mode doesn't have.
+// The Timer's stopwatch face (window-frame.md, "Timer"; owner pick A,
+// 2026-11-19): the running time, large and centred; its state in words; then
+// today as one quiet line over a day strip (work as rounded segments in its
+// category / task colour, breaks as a thin line in the gap). The three total
+// tiles are gone: they showed 0m, 0m, 0 most of the day, and Analytics has them.
 
 import type { PomoState } from './types';
 import type { TagDef } from '../../../../shared/tags/classify';
@@ -20,7 +21,7 @@ export interface ObserveDashProps {
 
 
 export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: ObserveDashProps) {
-  const { d0, spans, workMs, breakMs, workSpans, live } = todaySpans(state, library, nowMs, plain);
+  const { d0, spans, workMs, breakMs, workSpans } = todaySpans(state, library, nowMs, plain);
 
   // Show the waking part of the day: 06–22 by default, widened to fit spans.
   const firstH = Math.min(6, ...spans.map((s) => Math.floor((s.start - d0) / 3_600_000)));
@@ -35,32 +36,34 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  const status = state.status === 'running' ? 'working' : state.status === 'break' ? 'on break' : 'idle';
-  const statusColor = state.status === 'running' ? 'var(--acid)' : state.status === 'break' ? 'var(--ink-2)' : 'var(--ink-4)';
+  const status = state.status === 'running' ? 'Recording' : state.status === 'break' ? 'On break' : 'Not running';
+  const statusColor = state.status === 'running' ? 'var(--acid-ink, var(--acid))' : state.status === 'break' ? 'var(--ink-2)' : 'var(--ink-3)';
+  const todayLine = workMs <= 0 && breakMs <= 0 ? 'nothing recorded yet'
+    : `${fmtMin(workMs)} recorded${breakMs > 0 ? ` · ${fmtMin(breakMs)} break` : ''}${workSpans > 1 ? ` · ${workSpans} spans` : ''}`;
 
   const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' };
 
   return (
-    <div data-testid="pomo-observe-dash" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
-        <div data-testid="pomo-observe-clock" style={{ display: 'flex', alignItems: 'baseline', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-          <span style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-0.03em', color: live ? 'var(--ink)' : 'var(--ink-3)' }}>
-            {h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${String(m).padStart(2, '0')}`}
-          </span>
-          <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink-3)', marginLeft: 2 }}>
-            :{String(s).padStart(2, '0')}
-          </span>
-          <span style={{ ...mono, fontSize: 'var(--face-label, 11px)', color: 'var(--ink-4)', marginLeft: 8 }}>{h > 0 ? 'h:m:s' : 'min:s'}</span>
+    <div data-testid="pomo-observe-dash" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <div data-testid="pomo-observe-clock" style={{ display: 'flex', alignItems: 'baseline', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, fontSize: 64, fontWeight: 500, letterSpacing: '-0.03em', color: 'var(--ink)' }}>
+          <span>{h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${String(m).padStart(2, '0')}`}</span>
+          <span style={{ color: 'var(--ink-4)' }}>:</span>
+          <span>{String(s).padStart(2, '0')}</span>
         </div>
-        <span style={{ ...mono, fontSize: 'var(--face-label, 11px)', color: statusColor, display: 'inline-flex', alignItems: 'center', gap: 5, paddingBottom: 4 }}>
-          <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: statusColor, boxShadow: state.status === 'running' ? '0 0 6px var(--acid)' : 'none' }} />
+        <span data-testid="pomo-observe-status" style={{ fontFamily: 'var(--font-read)', fontSize: 13.5, color: statusColor, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          {state.status === 'running' && <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--acid)', boxShadow: '0 0 6px var(--acid)' }} />}
           {status}
         </span>
       </div>
 
       {/* Today on a strip: where the time went. */}
       <div>
-        <div data-testid="pomo-observe-strip" style={{ position: 'relative', height: 10, background: 'var(--paper-2)', borderRadius: 999 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8, fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-3)' }}>
+          <span>Today</span>
+          <span data-testid="pomo-observe-today" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{todayLine}</span>
+        </div>
+        <div data-testid="pomo-observe-strip" style={{ position: 'relative', height: 8, background: 'var(--paper-2)', borderRadius: 999 }}>
           {spans.map((sp) => {
             const w = ((sp.end - sp.start) / (hi - lo)) * 100;
             // Work: a rounded segment, 1px clear of its neighbours so spans
@@ -96,18 +99,6 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-        {[
-          ['work today', fmtMin(workMs)],
-          ['breaks', fmtMin(breakMs)],
-          ['spans', String(workSpans)],
-        ].map(([label, value]) => (
-          <div key={label} style={{ padding: '6px 8px', background: 'var(--paper-2)', borderRadius: 4 }}>
-            <div style={{ ...mono, fontSize: 'var(--face-label, 11px)', color: 'var(--ink-4)' }}>{label}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{value}</div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

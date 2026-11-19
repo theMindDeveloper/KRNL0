@@ -2908,3 +2908,19 @@ Typecheck clean; all tests pass. Checked as screenshots at 1457 × 945 and 1920 
 - No behaviour, command or test id changed.
 
 Typecheck clean; all tests pass. Checked in the preview at 800 × 600; not yet used by the owner.
+
+## [2026-11-20] — Cards redesigned as a list you read; the Timer is a clock first
+
+**Type:** Feature (UI redesign, owner picks A and A of the drafts; Decision 47)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ui/addCard.tsx`, `ui/WhenPopover.tsx`, `CalendarNode/EventCard.tsx`, `HabitNode/HabitAddAsk.tsx`, `ui/SpanEditor.tsx`, `ui/LogTimeDial.tsx`, `PomoNode/ObserveDash.tsx`, `PomoNode/PlannedNowChip.tsx`, `PomoNode/DoingPicker.tsx`, `PomoNode/FaceFit.tsx`, `PomoNode/index.tsx`, `styles/tokens.css`, `styles/window-frame.css`, tests (`windowFrame.test.ts`, `schedule-menu-parity.test.tsx`), docs (`window-frame.md`, `design-tokens.md`, Decision 47, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Cards (plan, Calendar, habit, Log time):** a name, one filled block with a line per setting (name left, value right), one main button. No outlined boxes; labels are sentence-case words, not small capitals.
+- **Reading font:** new token `--font-read` (Geist) for words on these surfaces; times and numbers keep the code font.
+- **Plan card:** the day is one line (Today, Tomorrow, one more, Date); pressing the chosen day clears it; "Tmrw" is written "Tomorrow".
+- **Timer:** the stopwatch face is the time (large, centred), its state in words and today as one line; the three total tiles are gone. A plan due now is one card with **Start on it**; the picker line shows after "pick something else". The face is centred in the window in both modes.
+- **Test fix:** `schedule-menu-parity.test.tsx` seeded a span at 10:00 "today" against the real clock and failed before 10:25; the clock is now pinned.
+- No behaviour, command or test id changed.
+
+Typecheck clean; all tests pass. Checked as full-size screenshots of each card and the Timer; not yet used by the owner.
