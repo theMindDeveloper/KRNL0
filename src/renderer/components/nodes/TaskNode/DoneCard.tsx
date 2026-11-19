@@ -121,7 +121,7 @@ export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onCon
           data-testid="done-card-archive"
           onClick={(e) => { e.stopPropagation(); archiveDoneTask(taskId); }}
           onMouseDown={(e) => e.stopPropagation()}
-          title="Archive: off the board now (still in Todo and Analytics)"
+          title="Archive: off the board and Done today now (Analytics keeps it)"
           aria-label="Archive"
           style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, border: 0, cursor: 'pointer', background: 'transparent', color: 'var(--ink-3)' }}
         >

@@ -63,6 +63,6 @@ describe('Examples always go', () => {
 describe('Which tours bring examples', () => {
   it('the tours that point at plans, recorded time or cards', () => {
     const withEx = TOURS.filter((t) => t.examples?.length).map((t) => t.id).sort();
-    expect(withEx).toEqual(['analytics', 'board', 'calendar', 'clock', 'modes', 'on-track', 'welcome']);
+    expect(withEx).toEqual(['analytics', 'board', 'calendar', 'clock', 'modes', 'on-track', 'plans-change', 'welcome']);
   });
 });

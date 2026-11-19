@@ -18,6 +18,7 @@ Follow-up to #207. Code: `src/renderer/components/Tour/` (`tours.ts`, `TourHost.
 | F10 | **Each mode, each timer gets its own steps.** `onlyIn` drops steps for the other mode; `timer` ('stopwatch' \| 'pomo') picks the steps that match how the timer works (BACK TO WORK / STOP vs END BREAK / ■), decided when the tour starts. |
 | F11 | **The ring stays on what it found.** A step keeps the element it first pointed at while the camera moves, and prefers what was made during the tour (your new task card, habit row, plan row) over older ones. |
 | F12 | **Voiced in both modes.** Every step has a `say` script for the ear with Eleven v4 audio tags; every step a user can meet has its recorded clip (`Tour/voice/`, `scripts/gen-tour-voice.ts`), checked by `tests/unit/renderer/tourVoice.test.ts`. The speaker button mutes it. |
+| F13 | **When plans change** (`plans-change`, UX review 2026-11-18). What to do with a plan whose time has passed and with done cards, by doing it: right-click a missed card and pick **Done on …** (counts on its day) or **Won't do** (the step waits for either); the Calendar has the same two; tick a plan for today and **Archive** its done card (waits for each). Advanced adds Settings → Finished cards, **waits on chain**, the Calendar's **after …**, and what every canvas shares. Welcome back is explained in words (it only opens after missed days). On a board with no missed plan, an example from yesterday is added (`missed`); examples and their completions go when the tour ends. Missed cards carry `data-missed` so the ring finds one. |
 
 ## Gherkin
 
@@ -28,6 +29,13 @@ Feature: Guided tours
     Given the Clock tour is on "Press WEEK to see your last 7 days"
     When the user clicks the WEEK button
     Then the tour shows the next step by itself
+
+  Scenario: F13 — a missed plan is settled for real
+    Given the "When plans change" tour on a board with no missed plan
+    Then an example plan from yesterday is on the board, ringed
+    When the user right-clicks it and picks "Done on <its day>" or "Won't do"
+    Then the tour moves on by itself
+    And when the tour ends the example and its completion are gone
 
   Scenario: F1 — first start
     Given a new board

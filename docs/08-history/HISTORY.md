@@ -2763,3 +2763,20 @@ The full user-journey review, with proposals for canvases, archive and chains, i
 - **5A-lite.** Chained calendar blocks and their popup say "after <task>". Drawn connectors are left out. 5B was dropped: its default ("keep their own days") is already Decision 30 behaviour.
 
 Won't do now has one implementation (`planActions.wontDoItem`, with UNDO restoring links and time) used everywhere. Typecheck 0. Tests: 2,620 passed; one date-dependent routines test also fails on the unchanged branch. **Open, blocks Done:** the guided tour for these changes. It needs recorded voice clips for every step (guided-tours F12). Not yet walked in the real window.
+
+## [2026-11-19] — Guided tour "When plans change"
+
+**Type:** Feature (tutorial)
+**Branch:** `feat/ux-review-picks` (PR #253)
+**Files changed:** `Tour/tours.ts` (new tour `plans-change`, example kind `missed`), `store/tourExamples.ts` (missed example; examples take their completions with them), `TaskNode/index.tsx` (`data-missed` on a card whose time has passed), `TaskNode/DoneCard.tsx` and `store/planActions.ts` (Archive wording), `docs/06-requirements/guided-tours.md` F13, `task-node.md` F22 wording, tests (`tourPlansChange.test.ts` new; catalogue and examples lists).
+
+**Summary:** This is the tour for the UX review picks. The user does each thing for real:
+- **Missed plan.** They right-click a plan they missed and pick **Done on …** or **Won't do**, and the step waits for either one.
+- **Calendar.** The Calendar's popup has the same two choices.
+- **Archive.** They tick a plan for today and **Archive** its done card.
+
+Advanced adds Settings → Finished cards, **waits on chain**, the Calendar's **after …**, and what every canvas shares. Welcome back is explained in words. Easy has 8 steps and Advanced has 12. On a board with no missed plan, a yesterday example ("Example: Read chapter 2") is added and removed again, along with any completion it got, so Analytics never counts it.
+
+While checking every line against the app, one claim turned out to be wrong: there is no "Todo → Archive" to look in. An archived card also leaves **Done today**, and Analytics keeps it. The tour, the button's tooltip and task-node F22 now say that.
+
+**Open:** the voice clips for the new steps still need recording with `scripts/gen-tour-voice.ts plans-change`. Until they exist, `tourVoice.test.ts` fails for this tour.

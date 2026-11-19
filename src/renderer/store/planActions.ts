@@ -128,7 +128,7 @@ export function wontDoTask(taskId: string): boolean {
   return true;
 }
 
-/** Take a done card off the board now (still in Todo → Archive and Analytics). */
+/** Take a done card off the board and out of Done today now (Analytics keeps it). */
 export function archiveDoneTask(taskId: string): void {
   const ts = taskState(taskId);
   if (!ts?.done) return;

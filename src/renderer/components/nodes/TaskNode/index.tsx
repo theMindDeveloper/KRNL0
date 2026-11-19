@@ -418,6 +418,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     <div
       data-testid="task-node-root"
       data-done={undefined}
+      // Its time has passed and it is not done (the "When plans change" tour rings it).
+      data-missed={isPastScheduled ? 'true' : undefined}
       data-active={isActive ? 'true' : undefined}
       data-card-tone={cardTone}
       className={isActive ? 'active' : undefined}
