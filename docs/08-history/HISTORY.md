@@ -2882,3 +2882,15 @@ Typecheck clean; all tests pass. Checked as screenshots at 1457 × 945 and 1920 
 - **Analytics:** the header writes focus as hours and minutes; the summary says "sessions".
 
 Typecheck clean; all tests pass. Checked as screenshots in Advanced and Easy; not yet used by the owner.
+
+## [2026-11-19] — Calendar week: a narrow block shows its name, wrapped
+
+**Type:** Feature (UI, owner pick A of three drafts)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `CalendarNode/WeekView.tsx`, `styles/reactflow-theme.css`, tests (`WeekView.clash.test.tsx`), docs (`calendar-clock-visuals.md` F31, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Calendar, week view at Station width (F31):** a plan alone in a day column too narrow for a one-line name shows its name in 10 px type, wrapped down the block in whole lines (words first). It showed only its first character. Plans that clash keep their letters (F28); a wide Calendar is unchanged.
+- No new command: it is how a block is drawn, not an action.
+
+Typecheck clean; all tests pass. Checked as screenshots at 1457 × 945 and 1920 × 1080; not yet used by the owner.

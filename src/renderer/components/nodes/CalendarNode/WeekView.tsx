@@ -233,6 +233,9 @@ interface WeekViewProps {
 export const SHOW_ROUTINES_EVENT = 'krnl:calendar-show-routines';
 const GUTTER_WIDTH = 40; // px — time gutter width (hours, with ":30" sub-marks under them)
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
+/** F31 — the wrapped name in a narrow block: 10 px mono, one letter about 5.5 px wide, 11 px a line. */
+const WRAP_CH_PX = 5.5;
+const WRAP_LINE_PX = 11;
 const MIN_BLOCK_PX = 14; // px — a planned block is never thinner than one text line
 /** Space between two blocks that touch in time. */
 const BLOCK_GAP = 3;
@@ -1553,14 +1556,22 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // letter (the name is in the tooltip and the popup).
       // A block alone but too narrow for a readable name (the Station week)
       // follows the same rule: its first character, not "O…".
-      const letter = letterOf.get(task.id) ?? (widthPx < MIN_LANE_PX ? clashLabels([task.text])[0] : undefined);
-      const detail: 'none' | 'letter' | 'title' | 'full' =
-        letter !== undefined ? 'letter'
+      // F31 — a block alone in a column too narrow for a one-line name (the
+      // Station week) wraps its name down the block in small type: whole
+      // lines only, words first, a long word where it must. It falls back to
+      // the first character only when not even three letters fit across.
+      const blockH = Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP);
+      const wrapCols = Math.floor((widthPx - 4) / WRAP_CH_PX);
+      const wrapLines = Math.floor((blockH - 3) / WRAP_LINE_PX);
+      const wrap = !letterOf.has(task.id) && widthPx < MIN_LANE_PX && wrapCols >= 3 && wrapLines >= 1;
+      const letter = letterOf.get(task.id) ?? (widthPx < MIN_LANE_PX && !wrap ? clashLabels([task.text])[0] : undefined);
+      const detail: 'none' | 'wrap' | 'letter' | 'title' | 'full' =
+        wrap ? 'wrap'
+        : letter !== undefined ? 'letter'
         : heightPx < 14 || widthPx < 34 ? 'none'
         : widthPx < 110 || heightPx < 40 ? 'title' : 'full';
       const textual = detail === 'title' || detail === 'full';
       // The letter shows when it fits the bar; the tick under it when there is room.
-      const blockH = Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP);
       // A name too wide for the bar stands its letters one above the other
       // (never rotated) when the bar is tall enough; 11px mono is ~6.6px a letter.
       const letterRow = letter !== undefined && blockH >= 12 && widthPx >= letter.length * 6.6 + 3;
@@ -1626,7 +1637,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             cursor: isContinuation ? 'pointer' : 'grab',
             overflow: 'hidden',
             zIndex: 2,
-            padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : detail === 'letter' ? (letterTop ? '3px 0 0' : 0) : 0,
+            padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : detail === 'letter' ? (letterTop ? '3px 0 0' : 0) : detail === 'wrap' ? '2px 0 0 1px' : 0,
             opacity: 1,
             boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
             display: 'flex',
@@ -1709,6 +1720,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           )}
           {/* Label — only what fits (see `detail`). Everything else is in the
               hover title and the click popup. */}
+          {detail === 'wrap' && (
+            <span data-testid={`task-wrap-${task.id}`} className="cal-wrap" style={{ maxHeight: wrapLines * WRAP_LINE_PX }}>{task.text}</span>
+          )}
+          {detail === 'wrap' && isDone && !isContinuation && blockH >= Math.min(wrapLines, Math.ceil(task.text.length / wrapCols) + 1) * WRAP_LINE_PX + 15 && (
+            <span aria-hidden style={{ color: 'var(--acid-ink, var(--acid))', lineHeight: 0, position: 'relative', zIndex: 1, paddingLeft: 1 }}><CalIcon name="check" size={10} /></span>
+          )}
           {detail === 'letter' && letterFits && (
             <span data-testid={`task-letter-${task.id}`} className={`cal-letter${letterStack ? ' cal-letter--stack' : ''}`} aria-hidden>{letter}</span>
           )}

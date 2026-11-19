@@ -2,7 +2,7 @@
 
 Written 2026-11-19, after the overnight pass. Everything here is on the branch `feat/unified-windows` (draft PR #257, on top of #253 and #251). The dev app from this worktree shows all of it; restart it with `npm run dev` if it is closed.
 
-Nothing is merged or released. Typecheck is clean and all 2,656 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
+Nothing is merged or released. Typecheck is clean and all 2,657 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
 
 ## The rule behind every change
 
@@ -155,7 +155,15 @@ I went through Advanced and Easy again, window by window, and fixed what stood o
 | Clock: **Today** also returns to the current half of the day; the separate **Now** button is gone | The Clock's time row | Two buttons that both mean "take me back to now" |
 | Analytics: "Focus 6h 15m" in the header (it said 375M); the summary says "sessions" (it said "pomodoros") | The Analytics header and Summary page | The same number was written two ways in one window; "pomodoro" was the last old timer word on screen |
 
-Looked at and left alone: on the Calendar's week view in a small window, a block shows only the first letter of its plan. That is a rule the Calendar already has for narrow columns (the name is in the tooltip and in the Day view), and changing how blocks are named is a design question for you, not a tidy-up.
+**Update:** you picked option A from three drafts, so this is now done (section 14). Before: on the Calendar's week view in a small window, a block shows only the first letter of its plan. That is a rule the Calendar already has for narrow columns (the name is in the tooltip and in the Day view), and changing how blocks are named is a design question for you, not a tidy-up.
+
+## 14. Calendar week in a small window: blocks say their name
+
+**What:** a plan alone in a narrow day column shows its name, in small type, wrapped down the block ("Study / math"). It showed one letter ("S"). A short block shows the first line of its name; plans at the same time are still slim letter bars.
+
+**Where:** the Calendar, WEEK, at the Station size (about 360 px wide). In a wide Calendar nothing changes.
+
+**Why this and not something else:** you chose it from three drafts (row 10 of the design board). The other two were a wider column for today, and three days instead of seven. This one moves nothing and adds nothing to press. Its cost, which the draft showed: the text is 10 px, the smallest in the app, and a long word breaks in the middle ("Physic / s").
 
 ## Your three answers
 
