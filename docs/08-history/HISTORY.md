@@ -2779,4 +2779,4 @@ Advanced adds Settings → Finished cards, **waits on chain**, the Calendar's **
 
 While checking every line against the app, one claim turned out to be wrong: there is no "Todo → Archive" to look in. An archived card also leaves **Done today**, and Analytics keeps it. The tour, the button's tooltip and task-node F22 now say that.
 
-**Open:** the voice clips for the new steps still need recording with `scripts/gen-tour-voice.ts plans-change`. Until they exist, `tourVoice.test.ts` fails for this tour.
+**Voice:** 12 clips recorded with `scripts/gen-tour-voice.ts plans-change` (about 1,700 characters, 1.9 MB). `tourVoice.test.ts` passes for Easy, Observe and Pomo.
