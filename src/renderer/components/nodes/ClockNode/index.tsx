@@ -472,21 +472,13 @@ export function ClockNode({
             className="kw-btn clock-day-today"
             data-testid="clock-day-today"
             data-state={isToday ? 'today' : 'other'}
-            onClick={() => onCommand('clock.goToday', {})}
-            disabled={isToday}
-            title="Jump back to today"
+            // One button: today, and the half of the day that holds this hour
+            // (it was two, Today and Now).
+            onClick={() => onCommand('clock.goNow', {})}
+            disabled={isToday && viewWindow === (new Date().getHours() < 12 ? 0 : 1)}
+            title="Back to today, now"
           >
             Today
-          </button>
-          {/* #9 — snap to NOW: today + the 12-hour half that contains this hour. */}
-          <button
-            type="button"
-            className="kw-btn"
-            data-testid="clock-day-now"
-            onClick={() => onCommand('clock.goNow', {})}
-            title="Jump to now (today + current 12-hour half)"
-          >
-            Now
           </button>
           <button
             type="button"

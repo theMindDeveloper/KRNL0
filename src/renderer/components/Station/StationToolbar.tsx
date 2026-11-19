@@ -28,10 +28,10 @@ interface MotherEntry {
 // Order matches the layout: top-row mothers left → right, then bottom-row.
 const MOTHER_ORDER: MotherEntry[] = [
   { kind: 'pomo',     label: 'Timer' },
-  { kind: 'todo',     label: 'Todo' },
-  { kind: 'habit',    label: 'Habit' },
-  { kind: 'calendar', label: 'Cal' },
-  { kind: 'term',     label: 'Term' },
+  { kind: 'todo',     label: 'Todos' },
+  { kind: 'habit',    label: 'Habits' },
+  { kind: 'calendar', label: 'Calendar' },
+  { kind: 'term',     label: 'Terminal' },
   // Decision 32 — bottom row, beside the terminal.
   { kind: 'analytics', label: 'Analytics' },
   { kind: 'clock',    label: 'Clock' },

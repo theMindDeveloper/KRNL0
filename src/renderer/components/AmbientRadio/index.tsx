@@ -138,6 +138,10 @@ const FAVS_MAX   = 50;
 const Z = LAYERS.widget;
 const SNAP_PAST_EDGE = 30;
 const PEEK_PX = 14;
+// Tucked at an edge, the widget itself is fully off screen: only its 14px tab
+// shows. (14px of the body used to show too, with clipped text, on top of the
+// window beside it.)
+const TUCK_PX = 0;
 
 type EdgeState = 'none' | 'left' | 'right';
 
@@ -205,8 +209,8 @@ function loadEdge(): EdgeState {
 }
 
 function placeForEdge(edge: EdgeState, p: Pos): Pos {
-  if (edge === 'right') return { x: window.innerWidth - PEEK_PX, y: p.y };
-  if (edge === 'left') return { x: -(WIDTH - PEEK_PX), y: p.y };
+  if (edge === 'right') return { x: window.innerWidth - TUCK_PX, y: p.y };
+  if (edge === 'left') return { x: -(WIDTH - TUCK_PX), y: p.y };
   return p;
 }
 
@@ -830,12 +834,12 @@ export function AmbientRadio() {
       setPos((p) => {
         const W = window.innerWidth;
         if (p.x < -SNAP_PAST_EDGE) {
-          const snapped = { x: -(WIDTH - PEEK_PX), y: p.y };
+          const snapped = { x: -(WIDTH - TUCK_PX), y: p.y };
           savePos(snapped); setEdge('left');
           return snapped;
         }
         if (p.x + WIDTH > W + SNAP_PAST_EDGE) {
-          const snapped = { x: W - PEEK_PX, y: p.y };
+          const snapped = { x: W - TUCK_PX, y: p.y };
           savePos(snapped); setEdge('right');
           return snapped;
         }
@@ -860,8 +864,8 @@ export function AmbientRadio() {
     const center = pos.x + WIDTH / 2;
     const goLeft = center < W / 2;
     const next: Pos = goLeft
-      ? { x: -(WIDTH - PEEK_PX), y: pos.y }
-      : { x: W - PEEK_PX, y: pos.y };
+      ? { x: -(WIDTH - TUCK_PX), y: pos.y }
+      : { x: W - TUCK_PX, y: pos.y };
     setPos(next); savePos(next); setEdge(goLeft ? 'left' : 'right');
   }, [edge, pos.x, pos.y, restoreFromEdge]);
 
@@ -1035,7 +1039,7 @@ export function AmbientRadio() {
     // out of the way but still discoverable.
     const onSnapToEdge = () => {
       setPos((p) => {
-        const next: Pos = { x: window.innerWidth - PEEK_PX, y: p.y };
+        const next: Pos = { x: window.innerWidth - TUCK_PX, y: p.y };
         savePos(next);
         return next;
       });
@@ -1062,7 +1066,9 @@ export function AmbientRadio() {
   const wrap: CSSProperties = {
     position: 'fixed',
     display: hidden ? 'none' : undefined,
-    left: pos.x,
+    // Tucked right: pinned to the viewport's own edge, so only the tab shows
+    // whatever width the window reports while it is still settling.
+    left: edge === 'right' && !isDragging ? '100vw' : pos.x,
     top: pos.y,
     width: WIDTH,
     zIndex: Z,

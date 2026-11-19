@@ -2867,3 +2867,18 @@ Canvases were already one-per-board in Easy (D24); nothing to change. The timer'
 - **Tutorials:** the lines that named these things are reworded and re-recorded; the Analytics tour now opens a page from the list.
 
 Typecheck clean; all tests pass. Checked as screenshots at 1457 × 945 and 1920 × 1080 in Advanced and Easy on the demo board; not yet used by the owner.
+
+## [2026-11-19] — Names in the top bar, a quieter status bar in Easy, the radio tab
+
+**Type:** Feature (UI simplification) + Bug Fix (the tucked radio covered the Calendar)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `Station/StationToolbar.tsx`, `StatusBar/index.tsx`, `AmbientRadio/index.tsx`, `ClockNode/index.tsx`, `AnalyticsNode/index.tsx`, `analytics/summary.ts`, tests (`windowFrame.test.ts`, `ambientRadio.resize.test.tsx`), docs (`window-frame.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Top bar:** the toggles read Todos, Habits, Calendar, Terminal (they read TODO, HABIT, CAL, TERM), the names their windows show.
+- **Ambient radio:** tucked at an edge it shows only its tab. 14px of its body, with clipped text, sat on top of the Calendar's last column and menu button.
+- **Status bar in Easy:** the Timer's state in a word, the day, the version. Workspace, Claude, nodes, edges and zoom stay in Advanced.
+- **Clock:** Today also returns to the current half of the day; the Now button is gone.
+- **Analytics:** the header writes focus as hours and minutes; the summary says "sessions".
+
+Typecheck clean; all tests pass. Checked as screenshots in Advanced and Easy; not yet used by the owner.

@@ -24,11 +24,13 @@ describe('Ambient Radio on window resize', () => {
   it('a tab tucked right stays on the right edge when the window grows and shrinks', () => {
     // First run: the radio starts tucked at the right edge.
     render(<AmbientRadio />);
-    const left = () => parseFloat(screen.getByTestId('ambient-radio').style.left);
-    expect(left()).toBe(1200 - 14);
+    // Tucked right, it is pinned to the viewport's edge: only its tab shows.
+    const left = () => screen.getByTestId('ambient-radio').style.left;
+    expect(left()).toBe('100vw');
     act(() => { setWindow(1600, 900); window.dispatchEvent(new Event('resize')); });
-    expect(left()).toBe(1600 - 14);
+    expect(left()).toBe('100vw');
     act(() => { setWindow(800, 600); window.dispatchEvent(new Event('resize')); });
-    expect(left()).toBe(800 - 14);
+    expect(left()).toBe('100vw');
+    expect(screen.getByTestId('ambient-radio-edge-tab-right')).toBeTruthy();
   });
 });

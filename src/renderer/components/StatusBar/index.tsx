@@ -21,6 +21,7 @@ import { useStore } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import { useBoardStore } from '../../store/boardStore';
 import { Z } from '../ui/layers';
+import { useEasyMode } from '../../store/uiMode';
 import { primaryUpdateAction, useUpdateStore } from '../../store/updateStore';
 
 // Injected from package.json at build time (electron.vite.config.ts).
@@ -71,7 +72,12 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
     .toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
     .toUpperCase();
 
-  const pomoText = `${pomoSessions}/${pomoEvery} · ${pomoStatus}`;
+  // Easy: no rounds to count (the Timer is a stopwatch there), and none of the
+  // board's plumbing (workspace, Claude, nodes, edges, zoom): the day, what the
+  // Timer is doing, the version.
+  const easy = useEasyMode();
+  const TIMER_WORD: Record<string, string> = { idle: 'idle', running: 'recording', paused: 'paused', break: 'break', done: 'idle' };
+  const pomoText = easy ? (TIMER_WORD[pomoStatus] ?? pomoStatus) : `${pomoSessions}/${pomoEvery} · ${pomoStatus}`;
 
   return (
     <div
@@ -98,12 +104,12 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
     >
       {/* Left cluster: workspace · claude · pomo · day */}
       <div style={leftRightStyle}>
-        <StatusItem label="workspace" testId="statusbar-workspace">
+        {!easy && <StatusItem label="workspace" testId="statusbar-workspace">
           ~/krnl0/{boardName}
-        </StatusItem>
-        <StatusItem label="claude" testId="statusbar-claude" valueColor="var(--k-status-ok, var(--accent-on-dark))">
+        </StatusItem>}
+        {!easy && <StatusItem label="claude" testId="statusbar-claude" valueColor="var(--k-status-ok, var(--accent-on-dark))">
           <LineGlyph name="dot" size={9} /> connected
-        </StatusItem>
+        </StatusItem>}
         <StatusItem label="timer" testId="statusbar-pomo" valueColor="var(--k-status-warn, color-mix(in srgb, var(--rust) 75%, var(--ink)))">
           {pomoText}
         </StatusItem>
@@ -129,15 +135,15 @@ export function StatusBar({ fallbackNotice = false }: StatusBarProps) {
 
       {/* Right cluster: nodes · edges · zoom · version */}
       <div style={leftRightStyle}>
-        <StatusItem label="nodes" testId="statusbar-nodes">
+        {!easy && <StatusItem label="nodes" testId="statusbar-nodes">
           {nodeCount}
-        </StatusItem>
-        <StatusItem label="edges" testId="statusbar-edges">
+        </StatusItem>}
+        {!easy && <StatusItem label="edges" testId="statusbar-edges">
           {edgeCount}
-        </StatusItem>
-        <StatusItem label="zoom" testId="statusbar-zoom">
+        </StatusItem>}
+        {!easy && <StatusItem label="zoom" testId="statusbar-zoom">
           {zoomPct}%
-        </StatusItem>
+        </StatusItem>}
         <VersionItem />
       </div>
     </div>

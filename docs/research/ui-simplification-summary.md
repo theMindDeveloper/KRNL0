@@ -2,7 +2,7 @@
 
 Written 2026-11-19, after the overnight pass. Everything here is on the branch `feat/unified-windows` (draft PR #257, on top of #253 and #251). The dev app from this worktree shows all of it; restart it with `npm run dev` if it is closed.
 
-Nothing is merged or released. Typecheck is clean and all 2,652 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
+Nothing is merged or released. Typecheck is clean and all 2,656 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
 
 ## The rule behind every change
 
@@ -141,6 +141,21 @@ Standard: `docs/04-visual-system/menus.md`.
 **Where:** the Timer window in Advanced, Sessions, at a larger window size (in a small window both were already hidden).
 
 **Why:** two ways of counting the same sessions made you work out which was which. I kept the dots because they answer the question you have while working ("how far to the long break?").
+
+## 13. A second walk through the app as a user
+
+I went through Advanced and Easy again, window by window, and fixed what stood out.
+
+| What | Where to see it | Why |
+|---|---|---|
+| The top bar says **Todos, Habits, Calendar, Terminal** (it said TODO, HABIT, CAL, TERM) | The top bar | The toggle and the window it opens had different names. One name per thing, and no abbreviations to decode |
+| The tucked music widget shows only its small tab | The right edge of the screen, beside the Calendar | A strip of it, with cut-off text, sat on top of the Calendar's last column and its menu button |
+| Easy: the bottom bar shows the Timer's state, the day and the version | The bottom bar in Easy | Workspace path, Claude, nodes, edges and zoom mean nothing when you are planning a day. Advanced keeps them |
+| Easy: the bottom bar says "idle / recording / break" (it said "0/4 · idle") | Same | There are no rounds to count in Easy |
+| Clock: **Today** also returns to the current half of the day; the separate **Now** button is gone | The Clock's time row | Two buttons that both mean "take me back to now" |
+| Analytics: "Focus 6h 15m" in the header (it said 375M); the summary says "sessions" (it said "pomodoros") | The Analytics header and Summary page | The same number was written two ways in one window; "pomodoro" was the last old timer word on screen |
+
+Looked at and left alone: on the Calendar's week view in a small window, a block shows only the first letter of its plan. That is a rule the Calendar already has for narrow columns (the name is in the tooltip and in the Day view), and changing how blocks are named is a design question for you, not a tidy-up.
 
 ## Your three answers
 

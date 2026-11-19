@@ -80,7 +80,7 @@ export function summarizeAnalytics(
     sentences.push('Finish a task, run a pomo or check off a habit and this fills in.');
   } else {
     if (tot.focusMin > 0) {
-      const over = tot.sessions > 0 ? ` over ${tot.sessions} pomodoro${tot.sessions === 1 ? '' : 's'}` : '';
+      const over = tot.sessions > 0 ? ` over ${tot.sessions} session${tot.sessions === 1 ? '' : 's'}` : '';
       const breaks = tot.breakMin ? `, plus ${fmtMinutes(tot.breakMin)} of breaks` : '';
       sentences.push(`Focus: ${fmtMinutes(tot.focusMin)}${over}${breaks}${trendWord(focusDelta)}.`);
     }

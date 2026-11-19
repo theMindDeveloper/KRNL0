@@ -578,7 +578,7 @@ export function AnalyticsNode({
         </span>
         <span className="an-chip an-chip--focus" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>focus </span>
-          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin}m</span>
+          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin >= 60 ? `${Math.floor(tot.focusMin / 60)}h ${String(tot.focusMin % 60).padStart(2, '0')}m` : `${tot.focusMin}m`}</span>
         </span>
         <button
           type="button"

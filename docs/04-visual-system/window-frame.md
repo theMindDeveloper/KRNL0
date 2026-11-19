@@ -45,7 +45,7 @@ Each window used to be built on its own. Switching views sat in four different p
 | Timer | name ("Timer" in every mode; "· break" while on a break); recorded spans; SESSIONS / STOPWATCH switch (Advanced); settings | — | START / BREAK / STOP, and "log past time" when idle |
 | Todo | name with the open count, overdue count | — | add a plan |
 | Calendar | name; DAY / WEEK / MONTH / YEAR; one menu (what it shows besides plans, repeating events, zoom) | ‹ week or day › Today; in the day view also the day's recorded total and the hour arrows | add a plan (day and week views) |
-| Clock | name ("Clock"); DAY / BIG CLOCK / WEEK | ‹ day › Today, Now, AM / PM | — (under the dial: only the day's list) |
+| Clock | name ("Clock"); DAY / BIG CLOCK / WEEK | ‹ day › Today (back to today and this half of the day), AM / PM | — (under the dial: only the day's list) |
 | Habits | name with the week; WEEK / MONTH / YEAR; settings | — | add a habit |
 | Analytics | name; totals; settings | ‹ page name › (the name opens the list of pages), then the range switch | — |
 | Terminal | traffic lights, label, live badge | — | — |
@@ -60,7 +60,7 @@ Each window used to be built on its own. Switching views sat in four different p
 
 ## The top bar
 
-Brand, the canvas switcher (Advanced), "saved", the window toggles, the layout switch, Help, Settings. FIT shows only in the Free layout (Station's canvas has its own fit control). Light / dark is in Settings → General. No breadcrumb.
+Brand, the canvas switcher (Advanced), "saved", the window toggles, the layout switch, Help, Settings. A toggle carries the name its window shows: Timer, Todos, Habits, Calendar, Terminal, Analytics, Clock (no abbreviations). FIT shows only in the Free layout (Station's canvas has its own fit control). Light / dark is in Settings → General. No breadcrumb.
 
 ## Cards (the plan card)
 
@@ -70,3 +70,11 @@ Brand, the canvas switcher (Advanced), "saved", the window toggles, the layout s
 - **The close button is an X.** No icon is used for two meanings.
 - **Feedback at once.** Every button answers the press (a 3% squeeze); the card arrives from where it was opened in 140 ms; neither moves with reduced motion.
 - The same card opens from the Todo row, the Calendar block and the board card's "When…".
+
+## The status bar
+
+Advanced: workspace, Claude, the Timer (rounds and state), the day; nodes, edges, zoom, version. Easy: the Timer's state in a word (idle, recording, break), the day, the version. The board's plumbing is not shown in Easy.
+
+## Floating widgets
+
+A widget tucked at a screen edge (the ambient radio) shows only its 14px tab. No part of its body may sit on top of a window.

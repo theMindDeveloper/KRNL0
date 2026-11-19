@@ -130,3 +130,22 @@ describe('One name per window; no second summary rows (window-frame.md)', () => 
     expect(s).not.toContain('`free · ');
   });
 });
+
+describe('The bars around the windows (window-frame.md, top bar and status bar)', () => {
+  const read = (rel: string): string => readFileSync(join(process.cwd(), 'src/renderer/components', rel), 'utf8');
+  it('a top-bar toggle carries the name its window shows', () => {
+    const bar = read('Station/StationToolbar.tsx');
+    for (const name of ['Timer', 'Todos', 'Habits', 'Calendar', 'Terminal', 'Analytics', 'Clock']) expect(bar).toContain(`label: '${name}'`);
+    expect(bar).not.toMatch(/label: '(Cal|Habit|Term|Todo)'/);
+  });
+  it('Easy: the status bar leaves out the board\'s plumbing', () => {
+    const s = read('StatusBar/index.tsx');
+    for (const id of ['workspace', 'claude', 'nodes', 'edges', 'zoom']) expect(s).toContain(`{!easy && <StatusItem label="${id}"`);
+  });
+  it('Clock: one button back to now (Today), not two', () => {
+    expect(src('ClockNode/index.tsx')).not.toContain('data-testid="clock-day-now"');
+  });
+  it('the tucked radio shows only its tab', () => {
+    expect(read('AmbientRadio/index.tsx')).toContain('const TUCK_PX = 0;');
+  });
+});
