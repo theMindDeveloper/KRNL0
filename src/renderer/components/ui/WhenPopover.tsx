@@ -16,7 +16,7 @@ import { addDays } from '../../../shared/due';
 import { TimeField, parseTime } from './TimeField';
 import { AppSelect } from './AppSelect';
 import { MenuIcon, type MenuIconName } from './menuIcons';
-import { LineGlyph } from './LineGlyph';
+import { CARD_W, CardClose, cardBox, cardCtls, cardFoot, cardHead, cardLabel, cardPill, cardPrimary, cardRow, cardStepBtn, cardStepValue, cardStepper, cardTime, cardTitle } from './addCard';
 
 export interface WhenValue {
   /** YYYY-MM-DD, or null for no day. */
@@ -147,7 +147,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   const mainActions = (actions ?? []).filter((a) => MAIN.includes(a.key)).sort((a, b) => MAIN.indexOf(a.key) - MAIN.indexOf(b.key));
   const moreActions = (actions ?? []).filter((a) => !MAIN.includes(a.key));
 
-  const W = 300;
+  const W = CARD_W;
   const left = Math.max(8, Math.min(anchorAbove ? anchorAbove.left : x, window.innerWidth - W - 8));
   const top = anchorAbove ? Math.max(8, anchorAbove.top - cardH - 8) : Math.max(8, Math.min(y, window.innerHeight - cardH - 8));
   const monthLabel = new Date(`${days[14]}T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -166,27 +166,23 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
         // Adding: clicks on the card never take the focus from the text field.
         onMouseDown={(e) => { e.stopPropagation(); if (anchorAbove && !(e.target instanceof HTMLInputElement)) e.preventDefault(); }}
         style={{
-          position: 'fixed', left, top, width: W, zIndex: Z.popover, boxSizing: 'border-box', padding: 10, borderRadius: 12,
-          background: 'var(--paper)', border: '1px solid var(--paper-3)', boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
-          display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)',
+          ...cardBox, position: 'fixed', left, top, zIndex: Z.popover,
         }}
       >
         {title && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            {title.tone && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: title.tone, flexShrink: 0, marginTop: 5 }} />}
+          <div style={{ ...cardHead, alignItems: 'flex-start' }}>
+            {title.tone && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: title.tone, flexShrink: 0, marginTop: 6 }} />}
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span data-testid="plan-card-title" style={{ fontSize: 13.5, fontWeight: 650, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{title.text}</span>
+              <span data-testid="plan-card-title" style={{ ...cardTitle, flex: 'none', overflowWrap: 'anywhere' }}>{title.text}</span>
               {title.sub && <span data-testid="plan-card-sub" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', overflowWrap: 'anywhere' }}>{title.sub}</span>}
             </span>
-            <button type="button" aria-label="Close" onClick={onClose} style={{ border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', padding: 2, display: 'inline-flex', flexShrink: 0 }}>
-              <LineGlyph name="close" size={12} />
-            </button>
+            <CardClose onClick={onClose} />
           </div>
         )}
         {/* Picking the deadline uses the same day picker, named, with a way back. */}
         {tab === 'deadline' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button type="button" role="tab" aria-selected={false} data-testid="when-tab-when" onClick={() => { setTab('when'); setGridOpen(false); }} style={{ ...ghost, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 6px 0 2px' }}>
+            <button type="button" role="tab" aria-selected={false} data-testid="when-tab-when" onClick={() => { setTab('when'); setGridOpen(false); }} style={{ ...ghost, height: 26, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 6px 0 2px' }}>
               <MenuIcon name="back" size={12} />When
             </button>
             <span style={{ flex: 1 }} />
@@ -194,7 +190,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {quick.map(([label, ymd]) => (
             <button key={label} type="button" data-testid={`when-quick-${label.toLowerCase().replace(/ /g, '-')}`} onClick={() => pick(ymd)} style={chip(selected === ymd)}>{label}</button>
           ))}
@@ -245,29 +241,33 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
 
         {tab === 'when' && (
           <>
-            <div style={rowStyle}>
-              <span style={iconCol}><MenuIcon name="when" /></span>
-              <button type="button" data-testid="when-any-time" onClick={() => setTime('')} style={chip(!shownTime.trim())}>Any time</button>
-              <TimeField value={shownTime} onChange={setTime} testId="when-time" placeholder="--:--" onEnter={() => apply()} onEscape={onClose} style={{ width: 96 }} />
+            <div style={cardRow}>
+              <span style={cardLabel}>Time</span>
+              <div style={cardCtls}>
+                <button type="button" data-testid="when-any-time" onClick={() => setTime('')} style={cardPill(!shownTime.trim())}>Any time</button>
+                <TimeField value={shownTime} onChange={setTime} testId="when-time" placeholder="--:--" onEnter={() => apply()} onEscape={onClose} style={cardTime} />
+              </div>
             </div>
-            <div style={rowStyle}>
-              <span style={iconCol}><MenuIcon name="length" /></span>
-              <button type="button" aria-label="Shorter" data-testid="when-len-minus" onClick={() => setV((p) => ({ ...p, lengthMin: p.lengthMin && p.lengthMin > 15 ? p.lengthMin - 15 : null }))} style={stepBtn}>−</button>
-              <span data-testid="when-length" style={{ minWidth: 52, textAlign: 'center', color: v.lengthMin ? 'var(--ink)' : 'var(--ink-3)' }}>{fmtLength(v.lengthMin)}</span>
-              <button type="button" aria-label="Longer" data-testid="when-len-plus" onClick={() => setV((p) => ({ ...p, lengthMin: Math.min(480, (p.lengthMin ?? 0) + 15) }))} style={stepBtn}>+</button>
+            <div style={cardRow}>
+              <span style={cardLabel}>Length</span>
+              <span style={cardStepper()}>
+                <button type="button" aria-label="Shorter" data-testid="when-len-minus" onClick={() => setV((p) => ({ ...p, lengthMin: p.lengthMin && p.lengthMin > 15 ? p.lengthMin - 15 : null }))} style={cardStepBtn}>−</button>
+                <span data-testid="when-length" style={{ ...cardStepValue, color: v.lengthMin ? 'var(--ink)' : 'var(--ink-3)' }}>{fmtLength(v.lengthMin)}</span>
+                <button type="button" aria-label="Longer" data-testid="when-len-plus" onClick={() => setV((p) => ({ ...p, lengthMin: Math.min(480, (p.lengthMin ?? 0) + 15) }))} style={cardStepBtn}>+</button>
+              </span>
             </div>
             {/* Reminders are Advanced (owner, 2026-11-09); in Easy a reminder set
                 earlier still shows, so it can be seen and turned off. */}
             {hasTime && (!easy || value.remindMin !== null) && (
-              <div style={rowStyle}>
-                <span style={iconCol}><MenuIcon name="reminder" /></span>
+              <div style={cardRow}>
+                <span style={cardLabel}>Remind</span>
                 <AppSelect
                   value={v.remindMin === null ? 'off' : String(v.remindMin)}
                   options={REMIND}
                   onChange={(s) => setV((p) => ({ ...p, remindMin: s === 'off' ? null : Number(s) }))}
                   testId="when-remind"
                   ariaLabel="Reminder"
-                  style={{ flex: 1 }}
+                  style={{ height: 30, minWidth: 0 }}
                 />
               </div>
             )}
@@ -275,12 +275,14 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
                 earlier still shows here, so it can be seen and cleared). One row,
                 not a tab: it opens the same day picker for the deadline. */}
             {(!easy || !!value.deadline) && (
-              <div style={rowStyle}>
-                <span style={iconCol}><MenuIcon name="deadline" /></span>
-                <button type="button" role="tab" aria-selected={false} data-testid="when-tab-deadline" onClick={() => { setTab('deadline'); setGridOpen(false); }}
-                  style={{ ...chip(false), ...(v.deadline ? { color: late ? 'var(--rust)' : 'var(--ink)', borderColor: late ? 'var(--rust)' : 'var(--ink-4)' } : { color: 'var(--ink-3)' }) }}>
-                  {v.deadline ? `Deadline ${dayWord(v.deadline, today)}` : 'Add a deadline'}
-                </button>
+              <div style={cardRow}>
+                <span style={cardLabel}>Deadline</span>
+                <div style={cardCtls}>
+                  <button type="button" role="tab" aria-selected={false} data-testid="when-tab-deadline" onClick={() => { setTab('deadline'); setGridOpen(false); }}
+                    style={{ ...cardPill(false), ...(v.deadline ? { color: late ? 'var(--rust)' : 'var(--ink)', boxShadow: `inset 0 0 0 1px ${late ? 'var(--rust)' : 'var(--ink-4)'}` } : {}) }}>
+                    {v.deadline ? dayWord(v.deadline, today) : 'Add a deadline'}
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -289,14 +291,14 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
         {late && <div data-testid="when-late" style={{ color: 'var(--rust)', fontSize: 11 }}>After its deadline</div>}
 
         {mainActions.length + moreActions.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--paper-3)', paddingTop: 8 }}>
-            <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ ...cardFoot, gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
               {mainActions.map((a) => {
                 // Delete is the one icon everybody knows: it keeps the row on one line.
                 const iconOnly = a.key === 'delete';
                 return (
                   <button key={a.key} type="button" data-testid={`plan-card-${a.key}`} onClick={a.onClick} title={iconOnly ? a.label : undefined} aria-label={iconOnly ? a.label : undefined}
-                    style={{ ...actionBtn, flex: a.key === 'done' ? '1 1 0' : '0 0 auto', minWidth: 0, overflow: 'hidden', color: a.danger ? 'var(--rust)' : 'var(--ink)', ...(iconOnly ? { width: 28, padding: 0, justifyContent: 'center' } : {}) }}>
+                    style={{ ...actionBtn, flex: a.key === 'done' ? '1 1 0' : '0 0 auto', minWidth: 0, overflow: 'hidden', color: a.danger ? 'var(--rust)' : 'var(--ink)', ...(iconOnly ? { width: 30, padding: 0, justifyContent: 'center' } : {}) }}>
                     <span style={{ display: 'inline-flex', color: a.danger ? 'var(--rust)' : 'var(--ink-3)' }}><MenuIcon name={a.icon} size={13} /></span>
                     {!iconOnly && a.label}
                   </button>
@@ -304,13 +306,13 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
               })}
               {moreActions.length > 0 && (
                 <button type="button" data-testid="plan-card-more" aria-expanded={moreOpen} title="More" aria-label="More" onClick={() => setMoreOpen((o) => !o)}
-                  style={{ ...actionBtn, flex: mainActions.length === 0 ? '1 1 auto' : '0 0 auto', width: mainActions.length === 0 ? undefined : 28, padding: mainActions.length === 0 ? '4px 8px' : 0, justifyContent: 'center', color: moreOpen ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', borderColor: moreOpen ? 'var(--acid-ink, var(--acid))' : 'var(--paper-3)' }}>
+                  style={{ ...actionBtn, flex: mainActions.length === 0 ? '1 1 auto' : '0 0 auto', width: mainActions.length === 0 ? undefined : 30, padding: mainActions.length === 0 ? '0 9px' : 0, justifyContent: 'center', color: moreOpen ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', borderColor: moreOpen ? 'var(--acid-ink, var(--acid))' : 'var(--paper-3)' }}>
                   <MenuIcon name="more" size={13} />{mainActions.length === 0 && 'More'}
                 </button>
               )}
             </div>
             {moreOpen && (
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {moreActions.map((a) => (
                   <button key={a.key} type="button" data-testid={`plan-card-${a.key}`} onClick={a.onClick} style={{ ...actionBtn, flex: '1 1 auto', color: a.danger ? 'var(--rust)' : 'var(--ink)' }}>
                     <span style={{ display: 'inline-flex', color: 'var(--ink-3)' }}><MenuIcon name={a.icon} size={13} /></span>
@@ -322,12 +324,12 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--paper-3)', paddingTop: 8 }}>
+        <div style={{ ...cardFoot, flexDirection: 'row', alignItems: 'center' }}>
           {tab === 'when'
             ? <button type="button" data-testid="when-clear" onClick={() => { setV((p) => ({ ...p, day: null, time: null })); setTimeText(''); setTimeTouched(true); }} style={ghost}>No day</button>
             : <button type="button" data-testid="when-no-deadline" onClick={() => setV((p) => ({ ...p, deadline: null }))} style={ghost}>No deadline</button>}
           <button type="button" data-testid="when-done" onClick={apply} title="Save the day, time and deadline"
-            style={{ height: 28, padding: '0 14px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--btn-primary-bg, var(--acid))', color: 'var(--btn-primary-fg, #111)', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+            style={{ ...cardPrimary(true), flex: 1 }}>
             {primaryLabel ?? 'Save ↵'}
           </button>
         </div>
@@ -337,21 +339,18 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   );
 }
 
-const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, minHeight: 28 };
 const actionBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
+  display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 9px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
   border: '1px solid var(--paper-3)', background: 'transparent', fontFamily: 'var(--font-mono)', fontSize: 11.5, boxSizing: 'border-box',
 };
-const iconCol: React.CSSProperties = { width: 14, display: 'inline-flex', color: 'var(--ink-3)', flexShrink: 0 };
+// A day you pick (Today, Tmrw, Date): solid when it is the day.
 const chip = (on: boolean): React.CSSProperties => ({
-  height: 24, padding: '0 9px', borderRadius: 999, cursor: 'pointer', fontSize: 11, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap',
+  height: 28, padding: '0 10px', borderRadius: 999, cursor: 'pointer', fontSize: 11.5, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap',
   border: `1px solid ${on ? 'transparent' : 'var(--paper-3)'}`,
   background: on ? 'var(--acid)' : 'transparent', color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-2)', fontWeight: on ? 650 : 500,
 });
-const stepBtn: React.CSSProperties = {
-  width: 26, height: 26, borderRadius: 6, border: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0,
-};
 const navBtn = (off: boolean): React.CSSProperties => ({
   width: 22, height: 22, borderRadius: 5, border: 'none', background: 'transparent', color: off ? 'var(--ink-4)' : 'var(--ink-2)', cursor: off ? 'default' : 'pointer', fontSize: 14, padding: 0,
 });
-const ghost: React.CSSProperties = { height: 26, padding: '0 8px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11.5 };
+// The quiet second action in the footer ("No day"): as tall as the main button.
+const ghost: React.CSSProperties = { height: 34, padding: '0 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11.5, whiteSpace: 'nowrap' };

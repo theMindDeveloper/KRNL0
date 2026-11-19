@@ -2,7 +2,7 @@
 
 Written 2026-11-19, after the overnight pass. Everything here is on the branch `feat/unified-windows` (draft PR #257, on top of #253 and #251). The dev app from this worktree shows all of it; restart it with `npm run dev` if it is closed.
 
-Nothing is merged or released. Typecheck is clean and all 2,657 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
+Nothing is merged or released. Typecheck is clean and all 2,659 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
 
 ## The rule behind every change
 
@@ -164,6 +164,26 @@ I went through Advanced and Easy again, window by window, and fixed what stood o
 **Where:** the Calendar, WEEK, at the Station size (about 360 px wide). In a wide Calendar nothing changes.
 
 **Why this and not something else:** you chose it from three drafts (row 10 of the design board). The other two were a wider column for today, and three days instead of seven. This one moves nothing and adds nothing to press. Its cost, which the draft showed: the text is 10 px, the smallest in the app, and a long word breaks in the middle ("Physic / s").
+
+## 15. The three add cards are one card
+
+**What:** the card that adds a plan (Todo), the card that adds a plan or event (Calendar) and the card that adds a habit had three sets of sizes. They now share one layout.
+
+| | Before (Todo / Calendar / Habit) | Now, all three |
+|---|---|---|
+| Width | 300 / 330 / 330 | 330 |
+| Padding and gap between rows | 10 and 8 / 14 and 12 / 14 and 12 | 14 and 12 |
+| Name | 13.5 px / 15 px / 15 px | 15 px |
+| Close button | X / a crossed circle / a crossed circle | X |
+| Rows | icons / labels (56 px) / labels (48 px) | labels (64 px): TIME, LENGTH, GOAL, DEADLINE |
+| Control height | 24 to 34 px, mixed | 30 px (the time field was 34) |
+| Length | three separate boxes / one control | one control |
+| "Any time" | solid lime / (none) / tinted | tinted |
+| Main button | small, at the right / full width / full width | full width, 34 px ("No day" sits left of it in the plan card) |
+
+**Where:** type a name in Todo's "add a plan"; press + in the Calendar; type a name in "add a habit". The plan card that opens from "When…" changed the same way.
+
+**Why this and not something else:** you sent the three side by side and asked for the gaps and sizes to be one. I took the Calendar and Habit card as the standard because two of three already agreed, and moved the Todo card to it. The sizes live in one file, so a fourth card cannot drift. One rule came out of it: a day you pick is solid lime, an option you switch on is tinted.
 
 ## Your three answers
 

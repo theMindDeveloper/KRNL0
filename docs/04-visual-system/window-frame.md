@@ -62,7 +62,22 @@ Each window used to be built on its own. Switching views sat in four different p
 
 Brand, the canvas switcher (Advanced), "saved", the window toggles, the layout switch, Help, Settings. A toggle carries the name its window shows: Timer, Todos, Habits, Calendar, Terminal, Analytics, Clock (no abbreviations). FIT shows only in the Free layout (Station's canvas has its own fit control). Light / dark is in Settings → General. No breadcrumb.
 
-## Cards (the plan card)
+## Cards (the plan card, the Calendar card, the habit card)
+
+**One layout for every card that adds or edits one thing** (`ui/addCard.tsx`): the plan card (Todo's add card and "When…"), the Calendar's "New here" card and the habit card.
+
+| Part | Rule |
+|---|---|
+| Box | 330 px wide, 14 px padding, 12 px between rows, 12 px corner |
+| Top line | the name (15 px, bold), then the X (24 px) |
+| Row | a 64 px label in small capitals (TIME, LENGTH, GOAL, REMIND, DEADLINE), then its controls |
+| Control | 30 px tall, 8 px corner, 8 px apart: the option pill (Any time, Tick), the − value + stepper as one control, the time field, the select |
+| A day you pick | a round chip or circle, solid lime when chosen (Today, Tmrw, M T W) |
+| An option you switch on | tinted lime, never solid (Once / Repeats, Any time, Tick) |
+| Footer | a rule, 12 px, then the main button across the card, 34 px tall. A quiet second action (No day) sits to its left at the same height |
+
+A card does not set its own width, padding, gap, control height or button size.
+
 
 - **Short by default.** Day chips (Today, Tmrw, one more) and **Date**; the month opens only when Date is pressed. Then time, length; a reminder once it has a time; the deadline as one row ("Add a deadline"), which opens the same day picker.
 - **One action row, in the menus' order:** what happened (Mark done / Done on … / Not done yet), Won't do, Delete (the one icon-only button), and More for the rest (the timer, Show).

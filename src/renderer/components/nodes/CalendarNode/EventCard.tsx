@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 import { Z } from '../../ui/layers';
 import { TimeField, parseTime } from '../../ui/TimeField';
 import { MenuIcon } from '../../ui/menuIcons';
+import { CARD_W, CardClose, cardBox, cardCtls, cardDayDot, cardFoot, cardHead, cardLabel, cardPrimary, cardRow, cardSeg, cardSegBtn, cardStepBtn, cardStepValue, cardStepper, cardTime, cardTitle } from '../../ui/addCard';
 import { fmtLength } from '../../ui/WhenPopover';
 
 export interface EventDraft {
@@ -62,7 +63,7 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
   const label = submitLabel ?? (d.mode === 'once' ? 'Add plan' : d.days.length ? 'Add event' : 'Pick a day');
   const submit = () => { if (valid && time) onSubmit({ ...d, name: d.name.trim(), time }); };
 
-  const W = 330;
+  const W = CARD_W;
   const H = 330;
   const left = Math.max(8, Math.min(x, window.innerWidth - W - 8));
   const top = Math.max(8, Math.min(y, window.innerHeight - H - 8));
@@ -79,13 +80,11 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
         aria-label={allowOnce ? 'New here' : 'Edit event'}
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed', left, top, width: W, zIndex: Z.popover, boxSizing: 'border-box', padding: 14, borderRadius: 12,
-          background: 'var(--paper)', border: '1px solid var(--paper-3)', boxShadow: '0 18px 44px rgba(0,0,0,0.5)',
-          display: 'flex', flexDirection: 'column', gap: 12, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)',
+          ...cardBox, position: 'fixed', left, top, zIndex: Z.popover,
         }}
       >
         {/* The name is the title, like the habit card's. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={cardHead}>
           <input
             autoFocus
             data-testid="event-name"
@@ -94,11 +93,9 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
             value={d.name}
             onChange={(e) => setD((p) => ({ ...p, name: e.target.value }))}
             onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-            style={{ flex: 1, minWidth: 0, height: 28, border: 'none', borderBottom: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', padding: '0 2px', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, outline: 'none' }}
+            style={{ ...cardTitle, height: 28, border: 'none', borderBottom: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', padding: 0, fontFamily: 'inherit', outline: 'none' }}
           />
-          <button type="button" aria-label="Close" onClick={onClose} style={{ border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', padding: 6, margin: -4, display: 'inline-flex' }}>
-            <MenuIcon name="drop" size={12} />
-          </button>
+          <CardClose onClick={onClose} />
         </div>
 
         {allowOnce && (
@@ -119,8 +116,7 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
                 const on = d.days.includes(i + 1);
                 return (
                   <button key={i} type="button" aria-pressed={on} data-testid={`event-day-${i + 1}`} aria-label={NAMES[i]} title={NAMES[i]} onClick={() => toggleDay(i + 1)}
-                    style={{ width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 11.5, fontWeight: on ? 700 : 500, border: 'none',
-                      boxShadow: on ? 'none' : 'inset 0 0 0 1px var(--paper-3)', background: on ? 'var(--acid)' : 'transparent', color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)' }}>
+                    style={cardDayDot(on)}>
                     {l}
                   </button>
                 );
@@ -135,8 +131,8 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
 
         <div style={rowGrid}>
           <span style={rowLabel}>Time</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <TimeField value={timeText} onChange={setTimeText} testId="event-time" minuteStep={15} onEnter={submit} onEscape={onClose} style={{ width: 96 }} />
+          <div style={cardCtls}>
+            <TimeField value={timeText} onChange={setTimeText} testId="event-time" minuteStep={15} onEnter={submit} onEscape={onClose} style={cardTime} />
             <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>{time ? `to ${end}` : ''}</span>
           </div>
         </div>
@@ -144,17 +140,15 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
           <span style={rowLabel}>Length</span>
           <span style={stepper}>
             <button type="button" aria-label="Shorter" onClick={() => setD((p) => ({ ...p, lengthMin: Math.max(15, p.lengthMin - 15) }))} style={stepBtn}>−</button>
-            <span data-testid="event-length" style={{ minWidth: 48, textAlign: 'center', fontSize: 12.5, fontWeight: 650 }}>{fmtLength(d.lengthMin)}</span>
+            <span data-testid="event-length" style={cardStepValue}>{fmtLength(d.lengthMin)}</span>
             <button type="button" aria-label="Longer" onClick={() => setD((p) => ({ ...p, lengthMin: Math.min(16 * 60, p.lengthMin + 15) }))} style={stepBtn}>+</button>
           </span>
         </div>
 
-        <div style={{ borderTop: '1px solid var(--paper-3)', paddingTop: 11, marginTop: 'auto' }}>
+        <div style={{ ...cardFoot, marginTop: 'auto' }}>
           <button type="button" data-testid="event-submit" disabled={!valid} onClick={submit}
             title={summary ? `${label} · ${summary}` : undefined}
-            style={{ width: '100%', height: 34, padding: '0 12px', borderRadius: 8, border: 'none', cursor: valid ? 'pointer' : 'default',
-              background: valid ? 'var(--btn-primary-bg, var(--acid))' : 'var(--paper-3)', color: valid ? 'var(--btn-primary-fg, #111)' : 'var(--ink-4)',
-              fontFamily: 'inherit', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            style={{ ...cardPrimary(valid), width: '100%' }}>
             {label}{summary && valid ? <span style={{ fontWeight: 500, opacity: 0.75 }}> · {summary}</span> : null} ↵
           </button>
         </div>
@@ -164,19 +158,10 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
   );
 }
 
-const segWrap: React.CSSProperties = { display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'var(--paper-2)', border: '1px solid var(--paper-3)' };
-const segBtn = (on: boolean): React.CSSProperties => ({
-  flex: 1, height: 26, borderRadius: 6, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-  fontFamily: 'var(--font-mono)', fontSize: 11.5, whiteSpace: 'nowrap', fontWeight: on ? 650 : 500,
-  background: on ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent',
-  color: on ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
-});
-const rowGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: '56px 1fr', alignItems: 'center', gap: 8, minHeight: 30 };
-const rowLabel: React.CSSProperties = { fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' };
-const stepper: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', height: 30, borderRadius: 8, boxSizing: 'border-box', overflow: 'hidden', width: 'fit-content',
-  boxShadow: 'inset 0 0 0 1px var(--paper-3)',
-};
-const stepBtn: React.CSSProperties = {
-  width: 28, height: 30, border: 'none', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0, fontFamily: 'var(--font-mono)',
-};
+// One layout for every add card (ui/addCard.tsx).
+const segWrap = cardSeg;
+const segBtn = cardSegBtn;
+const rowGrid = cardRow;
+const rowLabel = cardLabel;
+const stepper = cardStepper();
+const stepBtn = cardStepBtn;

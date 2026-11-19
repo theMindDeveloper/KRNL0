@@ -149,3 +149,26 @@ describe('The bars around the windows (window-frame.md, top bar and status bar)'
     expect(read('AmbientRadio/index.tsx')).toContain('const TUCK_PX = 0;');
   });
 });
+
+describe('One layout for the cards that add something (window-frame.md, cards)', () => {
+  const root = join(process.cwd(), 'src/renderer/components');
+  const cards = ['ui/WhenPopover.tsx', 'nodes/CalendarNode/EventCard.tsx', 'nodes/HabitNode/HabitAddAsk.tsx'].map((f) => readFileSync(join(root, f), 'utf8'));
+  it('the plan card, the Calendar card and the habit card share one box, width and footer', () => {
+    for (const c of cards) {
+      expect(c).toContain('...cardBox, position:');
+      expect(c).toContain('const W = CARD_W;');
+      expect(c).toContain('cardFoot');
+      expect(c).toContain('cardPrimary(');
+      expect(c).toContain('<CardClose ');
+    }
+  });
+  it('rows are a label and controls of one height; no card keeps its own sizes', () => {
+    for (const c of cards) {
+      expect(c).toMatch(/cardRow\b/);
+      expect(c).toMatch(/cardLabel\b/);
+      expect(c).toContain('style={cardTime}');
+      expect(c).not.toContain("padding: 10, borderRadius: 12");
+      expect(c).not.toContain('<MenuIcon name="drop" size={12} />');
+    }
+  });
+});

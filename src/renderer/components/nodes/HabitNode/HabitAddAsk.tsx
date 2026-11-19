@@ -13,6 +13,7 @@ import type { HabitSchedule, IsoDow } from './types';
 import { Z } from '../../ui/layers';
 import { TimeField, parseTime } from '../../ui/TimeField';
 import { MenuIcon } from '../../ui/menuIcons';
+import { CARD_W, CardClose, cardBox, cardCtls, cardDayDot, cardFoot, cardHead, cardLabel, cardPill, cardPrimary, cardRow, cardSeg, cardSegBtn, cardStepBtn, cardStepper, cardTime, cardTitle } from '../../ui/addCard';
 
 export interface AddAnswer {
   kind: 'habit' | 'routine';
@@ -125,7 +126,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
     const m = ref.current?.offsetHeight ?? 0;
     if (m && Math.abs(m - h) > 1) setH(m);
   });
-  const W = 330;
+  const W = CARD_W;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const left = Math.max(8, Math.min(anchor.right - W, vw - W - 8));
@@ -148,8 +149,7 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
         const on = d.days.includes(dow);
         return (
           <button key={dow} type="button" title={NAMES[dow - 1]} aria-label={NAMES[dow - 1]} aria-pressed={on} data-testid={`habit-ask-day-${dow}`} onClick={() => toggleDay(dow)}
-            style={{ width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 11.5, fontWeight: on ? 700 : 500, border: 'none',
-              boxShadow: on ? 'none' : 'inset 0 0 0 1px var(--paper-3)', background: on ? 'var(--acid)' : 'transparent', color: on ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)' }}>
+            style={cardDayDot(on)}>
             {LETTERS[dow - 1]}
           </button>
         );
@@ -173,25 +173,25 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
     </div>
   );
   const timeCtl = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={cardCtls}>
       <button type="button" data-testid="habit-ask-any" onClick={() => set({ time: '' })} style={pill(!d.time.trim())}>Any time</button>
-      <TimeField value={d.time} onChange={(t) => set({ time: t })} placeholder="--:--" testId="habit-ask-time" style={{ width: 96 }} />
+      <TimeField value={d.time} onChange={(t) => set({ time: t })} placeholder="--:--" testId="habit-ask-time" style={cardTime} />
     </div>
   );
   const amountUnit = d.amount?.unit ?? '';
   const goalCtl = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={cardCtls}>
       <button type="button" data-testid="habit-ask-amount-off" onClick={() => set({ amount: null })} style={pill(!d.amount)}>Tick</button>
       {d.amount ? (
         <span style={stepper(true)}>
           <button type="button" aria-label="Fewer" onClick={() => set({ amount: { target: Math.max(2, (d.amount?.target ?? 2) - 1), unit: amountUnit } })} style={stepBtn}>−</button>
           <input data-habit-card="" data-testid="habit-ask-amount-n" inputMode="numeric" aria-label="How many a day" value={d.amount.target || ''}
             onChange={(e) => { const n = Number(e.target.value.replace(/\D/g, '').slice(0, 3)); set({ amount: { target: n, unit: amountUnit } }); }}
-            style={{ width: 26, height: 28, border: 'none', background: 'transparent', color: 'var(--ink)', textAlign: 'center', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 650, outline: 'none', padding: 0 }} />
+            style={{ width: 26, height: 30, border: 'none', background: 'transparent', color: 'var(--ink)', textAlign: 'center', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 650, outline: 'none', padding: 0 }} />
           <button type="button" aria-label="More" onClick={() => set({ amount: { target: Math.min(999, (d.amount?.target ?? 1) + 1), unit: amountUnit } })} style={stepBtn}>+</button>
           <input data-habit-card="" data-testid="habit-ask-amount-unit" aria-label="Unit" placeholder="glasses" maxLength={16} value={amountUnit}
             onChange={(e) => set({ amount: { target: d.amount?.target ?? 0, unit: e.target.value } })}
-            style={{ width: 70, height: 28, border: 'none', borderLeft: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 12, outline: 'none', padding: '0 8px', boxSizing: 'border-box' }} />
+            style={{ width: 70, height: 30, border: 'none', borderLeft: '1px solid var(--paper-3)', background: 'transparent', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 12, outline: 'none', padding: '0 8px', boxSizing: 'border-box' }} />
         </span>
       ) : (
         <button type="button" data-testid="habit-ask-amount-open" onClick={() => set({ amount: { target: 8, unit: '' } })} title="Count something each day: 8 glasses, 20 pages"
@@ -232,16 +232,12 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       style={{
-        position: 'fixed', left, top, width: W, zIndex: Z.popover, boxSizing: 'border-box',
-        maxHeight: vh - 16, overflowY: 'auto', padding: 14, borderRadius: 12,
-        background: 'var(--paper)', color: 'var(--ink)', border: '1px solid var(--paper-3)',
-        boxShadow: '0 18px 44px rgba(0,0,0,0.5)', fontFamily: 'var(--font-mono)', fontSize: 12,
-        display: 'flex', flexDirection: 'column', gap: 12,
+        ...cardBox, position: 'fixed', left, top, zIndex: Z.popover, maxHeight: vh - 16, overflowY: 'auto',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-        <button type="button" aria-label="Cancel" onClick={onCancel} style={{ border: 'none', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', padding: 2, display: 'inline-flex' }}><MenuIcon name="drop" size={12} /></button>
+      <div style={cardHead}>
+        <span style={{ ...cardTitle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        <CardClose onClick={onCancel} label="Cancel" />
       </div>
 
       {body}
@@ -263,18 +259,14 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, borderTop: '1px solid var(--paper-3)', paddingTop: 11 }}>
+      <div style={cardFoot}>
         <button
           type="button"
           data-testid="habit-ask-add"
           disabled={!answer}
           onClick={add}
           title={answer ? `${saveLabel ?? 'Add'} · ${cardSummary(d)}` : undefined}
-          style={{
-            height: 34, width: '100%', borderRadius: 8, border: 'none', cursor: answer ? 'pointer' : 'default', padding: '0 12px',
-            background: answer ? 'var(--btn-primary-bg)' : 'var(--paper-3)', color: answer ? 'var(--btn-primary-fg)' : 'var(--ink-4)',
-            fontFamily: 'inherit', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}
+          style={{ ...cardPrimary(!!answer), width: '100%' }}
         >
           {!answer
             ? (d.mode === 'days' && d.days.length === 0 ? 'Pick a day' : 'Check the time or amount')
@@ -301,26 +293,11 @@ export function HabitAddAsk({ name, anchor, onAdd, onCancel, taken, archivedMatc
   );
 }
 
-const segWrap: React.CSSProperties = { display: 'flex', gap: 2, padding: 2, borderRadius: 8, background: 'var(--paper-2)', border: '1px solid var(--paper-3)' };
-const segBtn = (on: boolean, small: boolean): React.CSSProperties => ({
-  flex: 1, height: small ? 22 : 26, borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: small ? 11 : 11.5, whiteSpace: 'nowrap', padding: '0 4px',
-  fontWeight: on ? 650 : 500,
-  background: on ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent',
-  color: on ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
-});
-const pill = (on: boolean): React.CSSProperties => ({
-  height: 30, padding: '0 10px', borderRadius: 8, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'nowrap', boxSizing: 'border-box', border: 'none',
-  boxShadow: on ? 'inset 0 0 0 1px color-mix(in srgb, var(--acid) 40%, transparent)' : 'inset 0 0 0 1px var(--paper-3)',
-  background: on ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
-  color: on ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', fontWeight: on ? 650 : 500,
-});
-const stepper = (on: boolean): React.CSSProperties => ({
-  display: 'inline-flex', alignItems: 'center', height: 30, borderRadius: 8, boxSizing: 'border-box', overflow: 'hidden', border: 'none',
-  boxShadow: on ? 'inset 0 0 0 1px color-mix(in srgb, var(--acid) 40%, transparent)' : 'inset 0 0 0 1px var(--paper-3)',
-  background: on ? 'color-mix(in srgb, var(--acid) 7%, transparent)' : 'transparent',
-});
-const stepBtn: React.CSSProperties = {
-  width: 26, height: 28, border: 'none', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0, fontFamily: 'var(--font-mono)',
-};
-const rowGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: '48px 1fr', alignItems: 'center', gap: 8, minHeight: 30 };
-const rowLabel: React.CSSProperties = { fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' };
+// One layout for every add card (ui/addCard.tsx).
+const segWrap = cardSeg;
+const segBtn = (on: boolean, _small: boolean) => cardSegBtn(on);
+const pill = cardPill;
+const stepper = cardStepper;
+const stepBtn = cardStepBtn;
+const rowGrid = cardRow;
+const rowLabel = cardLabel;

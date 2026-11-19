@@ -2894,3 +2894,17 @@ Typecheck clean; all tests pass. Checked as screenshots in Advanced and Easy; no
 - No new command: it is how a block is drawn, not an action.
 
 Typecheck clean; all tests pass. Checked as screenshots at 1457 × 945 and 1920 × 1080; not yet used by the owner.
+
+## [2026-11-19] — One layout for the three add cards
+
+**Type:** Feature (UI unification)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ui/addCard.tsx` (new), `ui/WhenPopover.tsx`, `CalendarNode/EventCard.tsx`, `HabitNode/HabitAddAsk.tsx`, tests (`windowFrame.test.ts`), docs (`window-frame.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Add cards:** the plan card (Todo's add card and "When…"), the Calendar's "New here" card and the habit card share one layout from `ui/addCard.tsx`: 330 px wide, 14 px padding, 12 px between rows, a 15 px name with an X, rows of a 64 px label and 30 px controls, a full-width 34 px main button.
+- **Plan card:** rows are labelled (TIME, LENGTH, REMIND, DEADLINE) instead of icons; length is one − value + control; "Any time" is tinted, not solid; the card is 330 px wide (it was 300).
+- **Calendar and habit cards:** the close button is an X (it was a crossed circle, which the menus use for "Won't do"); the time field is 30 px tall like the controls beside it.
+- No behaviour, command or test id changed.
+
+Typecheck clean; all tests pass. Checked in the preview at 800 × 600; not yet used by the owner.
