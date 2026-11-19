@@ -113,3 +113,19 @@ describe('canvasContents (canvases F9)', () => {
     expect(out['c3']).toBe('empty');
   });
 });
+
+describe("Won't do takes the card off the board (task-node F21)", () => {
+  const now = new Date('2026-11-18T08:00').getTime();
+  it('a dropped plan leaves at once, under every policy', () => {
+    const board = { nodes: [todo([item('quiz', { droppedAt: '2026-11-18T07:00:00.000Z' })]), task('quiz')], edges: [] } as never;
+    for (const p of ['overnight', 'hour', 'keep'] as const) expect(finishedTaskIds(board, p, now).has('quiz')).toBe(true);
+  });
+  it('a dropped plan never holds its chain on the board', () => {
+    const board = {
+      nodes: [todo([item('a', { done: true }), item('b', { droppedAt: '2026-11-17T09:00:00.000Z' })]), task('a', { done: true, completedAt: '2026-11-16T10:00:00.000Z' }), task('b')],
+      edges: [edge('a', 'b')],
+    } as never;
+    expect(waitingOnChain(board, 'overnight', now).size).toBe(0);
+    expect(finishedTaskIds(board, 'overnight', now).has('a')).toBe(true);
+  });
+});

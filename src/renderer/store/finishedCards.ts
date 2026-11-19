@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 import type { Board } from '../../shared/types';
+import { droppedTaskIds } from '../../shared/droppedPlans';
 
 export const FINISHED_POLICIES = ['overnight', 'hour', 'keep'] as const;
 export type FinishedPolicy = (typeof FINISHED_POLICIES)[number];
@@ -75,10 +76,13 @@ export function finishedTaskIds(board: Pick<Board, 'nodes' | 'edges'> | null | u
   const out = new Set<string>();
   if (!board) return out;
   // task-node F22 — an archived done card leaves now, whatever its chain says.
+  // F21 — so does a plan marked Won't do: it is closed, not open (Bring back
+  // in the Todo or Ctrl+Z puts it back).
+  const dropped = droppedTaskIds(board.nodes);
   for (const n of board.nodes) {
     if (n.kind !== 'todo.task') continue;
     const s = n.state as Loose;
-    if (s['done'] === true && typeof s['archivedAt'] === 'string') out.add(n.id);
+    if (dropped.has(n.id) || (s['done'] === true && typeof s['archivedAt'] === 'string')) out.add(n.id);
   }
   if (policy === 'keep') return out;
   for (const g of finishedGroups(board)) {
@@ -108,11 +112,14 @@ function finishedGroups(board: Pick<Board, 'nodes' | 'edges'>): FinishedGroup[] 
   }
   for (const e of board.edges ?? []) join(e.from.nodeId, e.to.nodeId);
 
+  // A Won't-do plan is closed: it never holds its chain on the board.
+  const dropped = droppedTaskIds(board.nodes);
   const groups = new Map<string, FinishedGroup>();
   for (const t of tasks) {
     const s = t.state as Loose;
     const g = groups.get(find(t.id)) ?? { allDone: true, lastMs: 0, members: [], open: [] };
     g.members.push(t.id);
+    if (dropped.has(t.id)) { groups.set(find(t.id), g); continue; }
     if (s['done'] !== true) { g.allDone = false; g.open.push(t.id); }
     else {
       const at = typeof s['completedAt'] === 'string' ? Date.parse(s['completedAt']) : NaN;

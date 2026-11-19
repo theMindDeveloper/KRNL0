@@ -124,7 +124,8 @@ describe('F9 — TodoNode row right-click context menu', () => {
     expect(labels.some((l) => l.startsWith('When…'))).toBe(true);
     expect(labels.some((l) => l.startsWith('Deadline…'))).toBe(true);
     expect(labels).toContain('Rename');
-    expect(labels).toContain("Won't do");
+    // It carries a hint now ("off the board, not missed"), like When… does.
+    expect(labels.some((l) => l.startsWith("Won't do"))).toBe(true);
     expect(labels).toContain('Delete');
   });
 

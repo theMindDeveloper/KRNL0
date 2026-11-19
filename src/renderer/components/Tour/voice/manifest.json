@@ -377,8 +377,8 @@
       "calendar"
     ]
   },
-  "ad8ce022": {
-    "text": "Double-click empty hours, or press this plus, to add a plan right on the Calendar. \"Repeating\", next to it, adds a class or a shift that comes back every week.",
+  "b67e0d17": {
+    "text": "Double-click empty hours, or press this plus, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.",
     "tours": [
       "calendar"
     ]
@@ -479,8 +479,8 @@
       "routines"
     ]
   },
-  "066b32d3": {
-    "text": "Press \"Repeating\" in the Calendar's header, or double-click empty hours and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
+  "4d4ae2b3": {
+    "text": "Press the plus in the Calendar's header, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
     "tours": [
       "routines"
     ]
@@ -527,8 +527,8 @@
       "on-track"
     ]
   },
-  "ac7c48a1": {
-    "text": "Not doing something any more? \"Won't do\" takes it off your list and the Calendar: not done, and not missed. \"Undo\", in the notice, brings it back.",
+  "6d358943": {
+    "text": "Not doing something any more? \"Won't do\" takes it off your list, the Calendar and the board: not done, and not missed. Unlike Delete, the app remembers you chose to skip it. \"Undo\", in the notice, brings it back.",
     "tours": [
       "on-track"
     ]
@@ -561,6 +561,72 @@
     "text": "Want a nudge? Right-click a row, choose \"When\", give it a time, and set a reminder. A notification comes before it starts, even with the window closed!",
     "tours": [
       "on-track"
+    ]
+  },
+  "2f66295a": {
+    "text": "Plans change. Some you did, but forgot to tick, and some you won't do at all. Here's how to tell the app what really happened, so your days stay true.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "bbb00d06": {
+    "text": "This plan's time has passed, and it was never ticked. Right-click its card, or its row in the To-do list, and pick one. \"Done on\", if you did it: it counts on that day, and the card leaves the board. Or \"Won't do\", if you skipped it: it leaves the board and the Calendar, and it isn't counted as missed.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "2ea9e4b5": {
+    "text": "The Calendar has the same two. Click a block whose time has passed, and choose \"Done on\", or \"Won't do\", on its card.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "90f641de": {
+    "text": "Now a plan for today. Tick it, right on its card.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "5629fc68": {
+    "text": "A done card stays on the board until tomorrow morning, so you can see your day. Want it gone now? Press \"Archive\". It leaves the board and the done list, and Analytics keeps it.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "7c47bc0f": {
+    "text": "Away for a day or more? \"Welcome back\" opens with the plans you missed. Tick what you did, and it counts on its own day. Then move the rest, or choose \"Won't do\". Close moves nothing.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "e8d8cd42": {
+    "text": "That's how your days stay true. Done on its day, won't do, and archive. Every tour is in my menu.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "0df33288": {
+    "text": "When done cards leave is up to you. Settings, then Finished cards: overnight, after an hour, or keep them.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "f6d9e5ae": {
+    "text": "Plans in a chain leave the board together, once all of them are done. Until then, a done card says \"waits on chain\". Hover it to see which plan is holding it, or archive it.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "6087a3f3": {
+    "text": "On the Calendar, a plan in a chain says \"after\", and the one before it. It starts when that one ends.",
+    "tours": [
+      "plans-change"
+    ]
+  },
+  "1a6e56ce": {
+    "text": "One more thing. Every canvas shows the same plans, calendar, habits and timer. Notes, images and drawings belong to one canvas. Open this to see what's on each.",
+    "tours": [
+      "plans-change"
     ]
   },
   "d77a617b": {
@@ -771,90 +837,6 @@
     "text": "\"Claude code\" starts Claude Code in the terminal, ready to work on your board. It runs without asking permission for each step.",
     "tours": [
       "terminal"
-    ]
-  },
-  "b67e0d17": {
-    "text": "Double-click empty hours, or press this plus, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.",
-    "tours": [
-      "calendar"
-    ]
-  },
-  "4d4ae2b3": {
-    "text": "Press the plus in the Calendar's header, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
-    "tours": [
-      "routines"
-    ]
-  },
-  "2f66295a": {
-    "text": "Plans change. Some you did, but forgot to tick, and some you won't do at all. Here's how to tell the app what really happened, so your days stay true.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "ba0f0e22": {
-    "text": "This plan's time has passed, and it was never ticked. Right-click its card. Did it? \"Done on\" counts it on the day it was planned. Skipped it? Choose \"Won't do\". Pick one.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "2d289bc0": {
-    "text": "\"Done on\" counts it on its own day, so its card can leave the board right away. It was finished then. \"Won't do\" takes it off your list and the Calendar: not done, and not missed. Its notice has \"Undo\".",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "2ea9e4b5": {
-    "text": "The Calendar has the same two. Click a block whose time has passed, and choose \"Done on\", or \"Won't do\", on its card.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "90f641de": {
-    "text": "Now a plan for today. Tick it, right on its card.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "5629fc68": {
-    "text": "A done card stays on the board until tomorrow morning, so you can see your day. Want it gone now? Press \"Archive\". It leaves the board and the done list, and Analytics keeps it.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "7c47bc0f": {
-    "text": "Away for a day or more? \"Welcome back\" opens with the plans you missed. Tick what you did, and it counts on its own day. Then move the rest, or choose \"Won't do\". Close moves nothing.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "e8d8cd42": {
-    "text": "That's how your days stay true. Done on its day, won't do, and archive. Every tour is in my menu.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "0df33288": {
-    "text": "When done cards leave is up to you. Settings, then Finished cards: overnight, after an hour, or keep them.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "f6d9e5ae": {
-    "text": "Plans in a chain leave the board together, once all of them are done. Until then, a done card says \"waits on chain\". Hover it to see which plan is holding it, or archive it.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "6087a3f3": {
-    "text": "On the Calendar, a plan in a chain says \"after\", and the one before it. It starts when that one ends.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "1a6e56ce": {
-    "text": "One more thing. Every canvas shows the same plans, calendar, habits and timer. Notes, images and drawings belong to one canvas. Open this to see what's on each.",
-    "tours": [
-      "plans-change"
     ]
   }
 }

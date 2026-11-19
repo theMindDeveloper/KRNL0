@@ -27,8 +27,8 @@ describe('When plans change — steps', () => {
   it('Easy gets the missed plan, the Calendar, tick, archive, Welcome back; Advanced adds finished cards, chains and canvases', () => {
     const easy = stepsFor(tour, 'easy');
     const adv = stepsFor(tour, 'advanced');
-    expect(easy).toHaveLength(8);
-    expect(adv).toHaveLength(12);
+    expect(easy).toHaveLength(7);
+    expect(adv).toHaveLength(11);
     expect(easy.some((s) => s.target?.includes('settings-finished') || s.target?.includes('canvas-switcher'))).toBe(false);
     expect(adv.some((s) => s.target?.includes('settings-finished'))).toBe(true);
     expect(adv.some((s) => s.target?.includes('topbar-canvas-switcher'))).toBe(true);

@@ -16,7 +16,7 @@ import { DoneCard } from './DoneCard';
 import { CardIcon, CardMetaRow, CardMeter, cardFrameStyle, fmtDayAnyTime, fmtDur, fmtWhen } from './CardParts';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
-import { archiveDoneTask, doneLabel, markDoneAsPlanned, plannedEndMs, wontDoTask } from '../../../store/planActions';
+import { archiveDoneTask, bringBackTask, doneLabel, markDoneAsPlanned, plannedEndMs, wontDoTask } from '../../../store/planActions';
 import { toneVarForTask } from '../../../utils/taskColor';
 
 // TaskNode — child task card spawned when a todo item is added.
@@ -92,6 +92,13 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     const todo = s.board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
     const items = (todo?.state as { items?: Array<{ taskNodeId: string | null; onDay?: string }> } | undefined)?.items;
     return items?.find((i) => i.taskNodeId === taskId)?.onDay ?? null;
+  });
+  // task-node F21 — marked Won't do (its Todo row is dropped). The card is off
+  // the board then; it only shows with "Show finished cards" on.
+  const dropped = useBoardStore((s) => {
+    const todo = s.board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+    const items = (todo?.state as { items?: Array<{ taskNodeId: string | null; droppedAt?: string }> } | undefined)?.items;
+    return items?.some((i) => i.taskNodeId === taskId && i.droppedAt !== undefined) ?? false;
   });
 
   // engagement.md F1–F2 — the done moment: ticking turns the card into the
@@ -362,11 +369,13 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     // task-node F21/F22 — what really happened, above Delete. A plan whose
     // block is over counts on that day ("Done on Mon 16"); the checkbox
     // itself always means "done now".
-    ...(state.done
-      ? [{ label: 'Archive', icon: <MenuIcon name="archive" />, hint: 'off the board', divider: true, onSelect: () => archiveDoneTask(taskId) }]
-      : [{ label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, divider: true, onSelect: () => { void markDoneAsPlanned(taskId); } }]),
-    ...(!state.done && state.todoItemId !== null
-      ? [{ label: "Won't do", icon: <MenuIcon name="drop" />, hint: 'skip, keep it', onSelect: () => { wontDoTask(taskId); } }]
+    ...(dropped && state.todoItemId !== null
+      ? [{ label: 'Bring back', icon: <MenuIcon name="undo" />, hint: "undo Won't do", divider: true, onSelect: () => { void bringBackTask(taskId); } }]
+      : state.done
+        ? [{ label: 'Archive', icon: <MenuIcon name="archive" />, hint: 'off the board', divider: true, onSelect: () => archiveDoneTask(taskId) }]
+        : [{ label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, divider: true, onSelect: () => { void markDoneAsPlanned(taskId); } }]),
+    ...(!state.done && !dropped && state.todoItemId !== null
+      ? [{ label: "Won't do", icon: <MenuIcon name="drop" />, hint: 'off the board, not missed', onSelect: () => { wontDoTask(taskId); } }]
       : []),
     {
       label: 'Delete',

@@ -128,6 +128,12 @@ export function wontDoTask(taskId: string): boolean {
   return true;
 }
 
+/** Undo Won't do from the card ("Show finished cards" on): the row is open again. */
+export async function bringBackTask(taskId: string): Promise<void> {
+  const row = todoRowOf(taskId);
+  if (row) await command(row.todoId, 'todo.undrop', { id: row.itemId });
+}
+
 /** Take a done card off the board and out of Done today now (Analytics keeps it). */
 export function archiveDoneTask(taskId: string): void {
   const ts = taskState(taskId);

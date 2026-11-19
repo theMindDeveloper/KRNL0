@@ -30,7 +30,7 @@ import { MenuIcon } from '../../ui/menuIcons';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { scheduleTaskAt, setTaskReminder, showTask, unscheduleTask } from '../../../store/scheduleActions';
-import { wontDoItem } from '../../../store/planActions';
+import { doneLabel, markDoneAsPlanned, plannedEndMs, wontDoItem } from '../../../store/planActions';
 import { parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
 import { effectiveDraft, type PlanDraft, type PlanOverrides } from './PlanAddCard';
 
@@ -513,6 +513,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     const tagLabel = item.tag !== undefined ? tagDisplay(tagLibrary, item.tag).label : undefined;
     // The eye: its card on the canvas and its place on the Calendar, at once.
     const taskId = item.taskNodeId;
+    const missedEnd = taskId ? plannedEndMs(taskId) : null;
     const show: ContextMenuItem[] = taskId ? [
       { label: 'Show', icon: <MenuIcon name="show" />, hint: w.day ? 'card + Calendar' : 'card', divider: true, onSelect: () => { void showTask(taskId); } },
     ] : [];
@@ -526,10 +527,14 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         { label: 'Tag…', icon: <MenuIcon name="tag" />, ...(tagLabel ? { hint: tagLabel } : {}), ...(hasTaskNode ? {} : { divider: true }), onSelect: () => setTagPicker({ x: at.x, y: at.y, itemId }) },
       ]),
       { ...rename, ...(easy ? { divider: true } : {}) },
+      // task-node F21 — the same choices as its card: a plan whose time has
+      // passed can be ticked for that day (the checkbox means "done now").
+      ...(missedEnd !== null && taskId ? [{ label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, divider: true, onSelect: () => { void markDoneAsPlanned(taskId); } }] : []),
       {
         label: "Won't do",
         icon: <MenuIcon name="drop" />,
-        divider: true,
+        hint: 'off the board, not missed',
+        divider: missedEnd === null,
         // Off the Calendar too: a dropped plan is not "missed"; one Ctrl+Z,
         // and the notice's UNDO puts its time and links back (planActions).
         onSelect: () => wontDoItem(node.id, itemId),

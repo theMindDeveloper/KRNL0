@@ -2780,3 +2780,18 @@ Advanced adds Settings → Finished cards, **waits on chain**, the Calendar's **
 While checking every line against the app, one claim turned out to be wrong: there is no "Todo → Archive" to look in. An archived card also leaves **Done today**, and Analytics keeps it. The tour, the button's tooltip and task-node F22 now say that.
 
 **Voice:** 12 clips recorded with `scripts/gen-tour-voice.ts plans-change` (about 1,700 characters, 1.9 MB). `tourVoice.test.ts` passes for Easy, Observe and Pomo.
+
+## [2026-11-19] — Won't do takes the card off the board; Done on in the Todo row menu
+
+**Type:** Bug Fix (UX), found by the owner while running the new tour
+**Branch:** `feat/ux-review-picks` (PR #253)
+**Files changed:** `store/finishedCards.ts`, `store/planActions.ts` (`bringBackTask`), `TaskNode/index.tsx`, `TodoNode/index.tsx`, `Tour/tours.ts`, `Tour/voice/*`, `docs/06-requirements/task-node.md` F21, tests (`uxReviewPicks.test.ts`, `tourPlansChange.test.ts`, `TodoNode.new.scenarios.test.ts`).
+
+**Summary:** The owner chose Won't do on a card and the card stayed on the board, looking open, with Won't do still in its menu. They could not tell Won't do from Delete or Archive.
+
+- **Won't do now takes the card off the board at once**, under every Finished cards setting. A Won't-do plan also no longer holds its chain on the board.
+- **The card menu never offers Won't do twice.** With "Show finished cards" on, a Won't-do card offers **Bring back** instead.
+- **The Todo row menu has "Done on …" too**, for a plan whose time has passed. The tour told the owner to look for it and the row menu did not have it.
+- **The tour says what each choice does in the step where you choose.** The separate "what happened" step is gone (Easy 7 steps, Advanced 11). "Staying on track" now says how Won't do differs from Delete. 2 clips re-recorded; 5 clips no step uses were removed.
+
+The three, in one line each: **Won't do** = skipped on purpose, kept as "won't do", not missed. **Archive** = a done card off the board now. **Delete** = erased.
