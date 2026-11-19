@@ -312,14 +312,12 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
       >
         {/* Header — .term-head */}
         <div
-          className="term-head krnl-node-header"
+          // window-frame.md — the standard header size; the terminal keeps its own colours.
+          className="term-head krnl-node-header kw-head"
           style={{
             background: 'var(--term-bg-2)',
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
             borderBottom: '1px solid var(--k-term-border, #2a241c)',
+            textTransform: 'none',
           }}
         >
           {/* Traffic lights — .lights */}

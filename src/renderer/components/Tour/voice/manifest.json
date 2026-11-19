@@ -377,8 +377,8 @@
       "calendar"
     ]
   },
-  "b67e0d17": {
-    "text": "Double-click empty hours, or press this plus, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.",
+  "5c32bed4": {
+    "text": "Double-click empty hours, or click \"add a plan\" at the bottom, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.",
     "tours": [
       "calendar"
     ]
@@ -479,8 +479,8 @@
       "routines"
     ]
   },
-  "4d4ae2b3": {
-    "text": "Press the plus in the Calendar's header, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
+  "3d3df6f8": {
+    "text": "Click \"add a plan\" at the bottom of the Calendar, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
     "tours": [
       "routines"
     ]

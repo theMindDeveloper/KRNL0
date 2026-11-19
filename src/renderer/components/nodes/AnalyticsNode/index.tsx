@@ -175,28 +175,16 @@ const rootStyle: React.CSSProperties = {
   color: 'var(--k-an-ink-1, #eef1f4)',
 };
 
+// window-frame.md — size, spacing and type come from .kw-head; only the
+// Analytics colours are set here.
 const titlebarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  padding: '10px 14px',
   background: 'linear-gradient(180deg, var(--k-an-bg-3, #1f2226) 0%, var(--k-an-bg-2, #16181a) 100%)',
   borderBottom: '1px solid var(--k-an-line, #0a0c0e)',
   boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
   color: 'var(--k-an-ink-2, #c8cdd3)',
-  flexShrink: 0,
 };
 
-const dotStyle: React.CSSProperties = {
-  width: 8,
-  height: 8,
-  borderRadius: '50%',
-  background: 'var(--acid, #c9f158)',
-};
+const dotStyle: React.CSSProperties = { background: 'var(--acid, #c9f158)' };
 
 const summaryChipStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
@@ -583,8 +571,8 @@ export function AnalyticsNode({
       {/* Titlebar — the shared header class, so every frame style's header
           skin (Macintosh title bar, Submarine module tag, …) reaches it as it
           does the other mother windows. */}
-      <div className="krnl-node-header an-head" style={titlebarStyle}>
-        <span style={dotStyle} aria-hidden />
+      <div className="krnl-node-header an-head kw-head" style={titlebarStyle}>
+        <span className="kw-dot" style={dotStyle} aria-hidden />
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
         <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
         {/* The page you are on (the toolbar is icons only) — "3 sources" told a new user nothing. */}
@@ -610,7 +598,8 @@ export function AnalyticsNode({
           aria-label={settingsOpen ? 'Close settings' : 'Open settings'}
           onClick={(e) => { e.stopPropagation(); onCommand('analytics.setSettingsOpen', { open: !settingsOpen }); }}
           onMouseDown={(e) => e.stopPropagation()}
-          style={gearBtnStyle(settingsOpen)}
+          className="kw-btn"
+          aria-expanded={settingsOpen}
           title={settingsOpen ? 'Done curating' : 'Pin or hide cards'}
         >
           {settingsOpen ? <SettingsIcon name="check" size={12} /> : <SettingsIcon name="settings" size={12} />}

@@ -2795,3 +2795,29 @@ While checking every line against the app, one claim turned out to be wrong: the
 - **The tour says what each choice does in the step where you choose.** The separate "what happened" step is gone (Easy 7 steps, Advanced 11). "Staying on track" now says how Won't do differs from Delete. 2 clips re-recorded; 5 clips no step uses were removed.
 
 The three, in one line each: **Won't do** = skipped on purpose, kept as "won't do", not missed. **Archive** = a done card off the board now. **Delete** = erased.
+
+## [2026-11-19] — One frame for every window: the same header, time row and footer
+
+**Type:** Feature (UI consistency)
+**Branch:** `feat/unified-windows` (builds on `feat/ux-review-picks`, PR #253)
+**Files changed:**
+- **New:** `src/renderer/styles/window-frame.css`, `docs/04-visual-system/window-frame.md`, `tests/unit/renderer/windowFrame.test.ts`
+- **Windows:** `PomoNode/index.tsx`, `PomoNode/PomoTimeLinks.tsx`, `TodoNode/index.tsx`, `CalendarNode/index.tsx`, `CalendarNode/WeekView.tsx`, `ClockNode/index.tsx`, `HabitNode/index.tsx`, `AnalyticsNode/index.tsx`, `TerminalNode/index.tsx`
+- **Other:** `index.tsx` (stylesheet), `Tour/tours.ts` and two voice clips (the Calendar's add row), `dev/previewBridge.ts` (`?mode=easy` for render checks)
+
+**Summary:** The owner asked for the existing windows to be made consistent: the top and the bottom of each window looked and worked differently. (A separate "Line" layout was tried first and rejected the same day: a third mode added to the load. Its branch `feat/line-layout` is kept, its PR #255 is closed.)
+
+Every window now uses one frame:
+- **Header, 36px.** Dot, name, context on the left; the view switch, then buttons, on the right.
+- **Time row, 32px,** only where the window moves through time.
+- **Footer, 44px,** only where there is something to do: the add field or the main button.
+
+What moved:
+- **Calendar:** DAY / WEEK / MONTH / YEAR went from tabs at the bottom to the header. The **+** left the time row; "add a plan" is now its bottom row, like the Todo's.
+- **Clock:** the two loose buttons (WEEK, BIG CLOCK) became one switch: DAY / BIG CLOCK / WEEK.
+- **Timer:** START and the other controls sit in the footer at the standard height; "log past time" is a button beside START, not a link under it.
+- **Habits, Todo, Analytics, Terminal:** same header size and spacing; Habits' and Todo's add rows are the standard footer.
+
+All test ids and commands are unchanged; this is placement and size only. The rules are written in `docs/04-visual-system/window-frame.md`, and `windowFrame.test.ts` fails if a window builds its own header or footer again.
+
+**Not converted yet:** the Analytics page row and range presets, the Calendar's Month and Year arrows, the Clock's AM / PM switch, and popups and cards. Checked as screenshots in Advanced and Easy on the demo board; not yet used by the owner.

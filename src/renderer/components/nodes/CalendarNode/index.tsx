@@ -64,23 +64,26 @@ export function CalendarNode({
       width={MOTHER_WIDTH}
       position={node.position}
     >
-      {/* Header */}
-      <div className="krnl-node-header"
-        style={{
-          padding: '12px 16px 10px',
-          borderBottom: '1px solid var(--paper-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          color: 'var(--ink-2)',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <span>Calendar</span>
-        <span style={{ color: 'var(--ink-3)' }}>{config.view}</span>
+      {/* window-frame.md — the standard header: name, then the views. */}
+      <div className="krnl-node-header kw-head">
+        <span className="kw-dot" style={{ background: 'var(--cyan)' }} />
+        <span className="kw-title">Calendar</span>
+        <span className="kw-sp" />
+        <span className="kw-views nodrag" role="tablist" aria-label="Calendar view" data-testid="calendar-view-switch">
+          {(['day', 'week', 'month', 'year'] as const).map((view) => (
+            <button
+              key={view}
+              type="button"
+              role="tab"
+              aria-selected={config.view === view}
+              data-testid={`calendar-view-${view}`}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => onCommand('calendar.setView', { view })}
+            >
+              {view}
+            </button>
+          ))}
+        </span>
       </div>
 
       {/* View placeholder body */}
@@ -88,38 +91,6 @@ export function CalendarNode({
         {renderBody()}
       </div>
 
-      {/* View toggle buttons (stub — wired to calendar.setView) */}
-      <div
-        style={{
-          display: 'flex',
-          borderTop: '1px solid var(--paper-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-        }}
-      >
-        {(['day', 'week', 'month', 'year'] as const).map((view) => (
-          <button
-            key={view}
-            type="button"
-            onClick={() => onCommand('calendar.setView', { view })}
-            style={{
-              flex: 1,
-              padding: '6px 0',
-              background: config.view === view ? 'var(--paper-2)' : 'transparent',
-              border: 'none',
-              borderRight: view !== 'year' ? '1px solid var(--paper-3)' : 'none',
-              color: config.view === view ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-            }}
-          >
-            {view}
-          </button>
-        ))}
-      </div>
     </MotherFrame>
   );
 }

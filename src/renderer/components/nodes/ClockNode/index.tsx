@@ -388,57 +388,42 @@ export function ClockNode({
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
-        <div className="krnl-node-header"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-2)' }}>
-            <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: isToday ? 'var(--cyan)' : 'var(--ink-4)', boxShadow: isToday ? '0 0 0 2px color-mix(in srgb, var(--cyan) 25%, transparent)' : 'none' }} />
-            {isToday ? 'Today · Schedule' : 'Day · Schedule'}
-          </span>
-          <span style={{ display: 'flex', gap: 6 }}>
-          <button
-            type="button"
-            data-testid="clock-week-toggle"
-            aria-pressed={weekView}
-            title={weekView ? 'Back to the day' : 'Last 7 days at a glance'}
-            onClick={(e) => { e.stopPropagation(); onCommand('clock.setWeekView', {}); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              background: weekView ? 'var(--acid)' : 'transparent',
-              color: weekView ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
-              border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-            }}
-          >
-            {weekView ? <><SettingsIcon name="clock" size={11} /> DAY</> : <><SettingsIcon name="dial" size={11} /> WEEK</>}
-          </button>
-          <button
-            type="button"
-            data-testid="clock-dial-only"
-            aria-pressed={dialOnly}
-            hidden={weekView}
-            title={dialOnly ? 'Show schedule' : 'Big clock — dial only'}
-            onClick={(e) => { e.stopPropagation(); onCommand('clock.setDialOnly', {}); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              background: dialOnly ? 'var(--acid)' : 'transparent',
-              color: dialOnly ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
-              border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
-            }}
-          >
-            {dialOnly ? <><SettingsIcon name="menu" size={11} /> SCHEDULE</> : <><SettingsIcon name="expand" size={11} /> BIG CLOCK</>}
-          </button>
+        {/* window-frame.md — the standard header: name, then one view switch. */}
+        <div className="krnl-node-header kw-head" style={{ margin: '-10px -14px 0' }}>
+          <span aria-hidden className="kw-dot" style={{ background: isToday ? 'var(--cyan)' : 'var(--ink-4)', boxShadow: isToday ? '0 0 0 2px color-mix(in srgb, var(--cyan) 25%, transparent)' : 'none' }} />
+          <span className="kw-title">{isToday ? 'Today · Schedule' : 'Day · Schedule'}</span>
+          <span className="kw-sp" />
+          <span className="kw-views nodrag" role="group" aria-label="Clock view" data-testid="clock-view-switch">
+            <button
+              type="button"
+              data-testid="clock-view-day"
+              aria-pressed={!weekView && !dialOnly}
+              title="The day, with its schedule"
+              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); if (dialOnly) onCommand('clock.setDialOnly', { on: false }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              DAY
+            </button>
+            <button
+              type="button"
+              data-testid="clock-dial-only"
+              aria-pressed={dialOnly && !weekView}
+              title="Big clock — dial only"
+              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); onCommand('clock.setDialOnly', { on: true }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              BIG CLOCK
+            </button>
+            <button
+              type="button"
+              data-testid="clock-week-toggle"
+              aria-pressed={weekView}
+              title="Last 7 days at a glance"
+              onClick={(e) => { e.stopPropagation(); onCommand('clock.setWeekView', { on: true }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              WEEK
+            </button>
           </span>
         </div>
         {/* #207 — Week view replaces the day view; the day view stays mounted
@@ -457,23 +442,15 @@ export function ClockNode({
             and snap back to today. Disabled when already on today.
             Buttons share a single `clock-day-btn` class so hover/focus
             polish lives in tokens.css (rather than 5 inline copies). */}
+        {/* window-frame.md — the standard time row. */}
         <div
           data-testid="clock-day-bar"
-          style={{
-            display: dialOnly ? 'none' : 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            padding: '2px 0',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.04em',
-            userSelect: 'none',
-          }}
+          className="kw-range"
+          style={{ display: dialOnly ? 'none' : 'flex', justifyContent: 'center', margin: '-10px -14px 0', userSelect: 'none' }}
         >
           <button
             type="button"
-            className="clock-day-btn"
+            className="kw-btn"
             data-testid="clock-day-prev"
             onClick={() => onCommand('clock.advanceDay', { delta: -1 })}
             title="Previous day"
@@ -486,7 +463,7 @@ export function ClockNode({
               (commandDispatch.ts). Two date pickers competing on one screen
               was the wrong UX — the calendar IS the picker. */}
           <span
-            className="clock-day-chip"
+            className="kw-range__label"
             data-state={isToday ? 'today' : 'other'}
             data-testid="clock-day-label"
             title="Click a day on the calendar to change"
@@ -499,7 +476,7 @@ export function ClockNode({
           </span>
           <button
             type="button"
-            className="clock-day-btn clock-day-today"
+            className="kw-btn clock-day-today"
             data-testid="clock-day-today"
             data-state={isToday ? 'today' : 'other'}
             onClick={() => onCommand('clock.goToday', {})}
@@ -511,7 +488,7 @@ export function ClockNode({
           {/* #9 — snap to NOW: today + the 12-hour half that contains this hour. */}
           <button
             type="button"
-            className="clock-day-btn"
+            className="kw-btn"
             data-testid="clock-day-now"
             onClick={() => onCommand('clock.goNow', {})}
             title="Jump to now (today + current 12-hour half)"
@@ -520,7 +497,7 @@ export function ClockNode({
           </button>
           <button
             type="button"
-            className="clock-day-btn"
+            className="kw-btn"
             data-testid="clock-day-next"
             onClick={() => onCommand('clock.advanceDay', { delta: 1 })}
             title="Next day"

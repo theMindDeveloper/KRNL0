@@ -851,23 +851,11 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
       <div style={{ overflow: 'hidden', borderRadius: 6, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
-        <div className="krnl-node-header"
-          style={{
-            padding: '7px 10px 6px',
-            borderBottom: '1px solid var(--paper-3)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span data-testid="todo-header">
-            <span style={{ color: 'var(--cyan)' }}><LineGlyph name="dot" size={10} /></span>
-            {` Todos (${undoneCount})`}
+        {/* window-frame.md — the standard header row. */}
+        <div className="krnl-node-header kw-head">
+          <span data-testid="todo-header" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span className="kw-dot" style={{ color: 'var(--cyan)', background: 'var(--cyan)' }} />
+            <span className="kw-title">{`Todos (${undoneCount})`}</span>
             {/* PR8 — overdue count badge in rust. Only visible when at least
                 one undone item's scheduled-end has passed. */}
             {overdueCount > 0 && (
@@ -978,20 +966,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         })()}
 
         {/* F4: add-task row — "add task" placeholder swaps to input on click, ↵ always visible */}
-        <div
-          className="todo-add"
-          ref={addRowRef}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 9,
-            padding: '8px 14px',
-            fontSize: 12,
-            color: 'var(--ink-4)',
-            fontFamily: 'var(--font-mono)',
-            borderTop: '1px dashed var(--paper-3)',
-          }}
-        >
+        {/* window-frame.md — the standard footer row. */}
+        <div className="todo-add kw-foot" ref={addRowRef}>
           {inputFocused ? (
             <input
               ref={inputRef}
@@ -1039,8 +1015,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           ) : (
             <span
               data-testid="add-task-placeholder"
+              className="kw-add"
               onClick={() => setInputFocused(true)}
-              style={{ flex: 1, cursor: 'text' }}
             >
               add a plan
             </span>
@@ -1048,16 +1024,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           {/* F4b: ↵ hint always visible */}
           <span
             data-testid="enter-hint"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              color: 'var(--ink-4)',
-              background: 'var(--paper-2)',
-              border: '1px solid var(--paper-3)',
-              padding: '1px 4px',
-              borderRadius: 3,
-              flexShrink: 0,
-            }}
+            className="kw-kbd"
           >
             ↵
           </span>

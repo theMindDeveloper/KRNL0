@@ -2313,27 +2313,9 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
       }}
     >
       {/* Sub-header: [←] Week of {Month D} [→] — parts give way to its width (cal-subhead in CSS). */}
-      <div
-        className="cal-subhead"
-        style={{
-          gap: 6,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '6px 10px',
-          borderBottom: '1px solid var(--paper-3)',
-          flexShrink: 0,
-        }}
-      >
-        <button
-          type="button"
-          data-testid="week-prev"
-          onClick={handlePrev}
-          style={navBtnStyle}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          aria-label="Previous"
-        >
+      {/* window-frame.md — the standard time row. */}
+      <div className="cal-subhead kw-range">
+        <button type="button" className="kw-btn" data-testid="week-prev" onClick={handlePrev} aria-label="Previous">
           <CalIcon name="prev" size={13} />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, minWidth: 0, flex: 1 }}>
@@ -2387,24 +2369,6 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             ))}
           </div>}
 
-          {/* Decision 40 — add something without knowing the right-click: a plan or a
-              repeating event (the card's Once / Repeats switch). The only add
-              button in the header (owner, 2026-11-09: one +, no Repeating). */}
-          <button
-            type="button"
-            data-testid="calendar-new"
-            title="Add a plan or a repeating event (or double-click empty hours)"
-            aria-label="Add to the Calendar"
-            onClick={(e) => {
-              const now = new Date();
-              const day = weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!;
-              openNewAt(day, Math.min(23 * 60, (now.getHours() + 1) * 60), e.clientX - 120, e.clientY + 14);
-            }}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 45%, var(--paper-3))', background: 'color-mix(in srgb, var(--acid) 12%, transparent)', color: 'var(--ink)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
-          >
-            <MenuIcon name="plus" size={12} />
-          </button>
-
           {/* Decision 40 — every repeating event, ended ones too: their home now
               that the Habits window lists only habits. */}
           <button
@@ -2413,7 +2377,8 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             title="Repeating events: list, edit, end, delete, or add one"
             aria-label="Repeating events"
             onClick={(e) => setEventsOpen({ x: e.clientX, y: e.clientY })}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 20, borderRadius: 6, border: '1px solid var(--paper-3)', background: eventsOpen ? 'var(--paper-2)' : 'transparent', color: 'var(--ink-2)', cursor: 'pointer', flexShrink: 0, padding: 0 }}
+            className="kw-btn"
+            aria-expanded={!!eventsOpen}
           >
             <MenuIcon name="list" size={12} />
           </button>
@@ -2424,18 +2389,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             data-testid="week-today"
             onClick={setToday}
             title="Jump to this week"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.02em',
-              color: 'var(--ink-2)',
-              background: 'var(--paper-2)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 3,
-              padding: '2px 7px',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
+            className="kw-btn"
           >
             Today
           </button>
@@ -2482,15 +2436,7 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
             </button>
           </div>}
         </div>
-        <button
-          type="button"
-          data-testid="week-next"
-          onClick={handleNext}
-          style={navBtnStyle}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          aria-label="Next"
-        >
+        <button type="button" className="kw-btn" data-testid="week-next" onClick={handleNext} aria-label="Next">
           <CalIcon name="next" size={13} />
         </button>
       </div>
@@ -2893,6 +2839,27 @@ export function WeekView({ state, config, onCommand, singleDay = false }: WeekVi
         </div>
       </div>
 
+
+      {/* window-frame.md — the standard footer: the one thing you add here. Opens
+          the same card as a double-click on empty hours (a plan, or Repeats). */}
+      <div className="kw-foot">
+        <button
+          type="button"
+          className="kw-add"
+          data-testid="calendar-new"
+          title="Add a plan or a repeating event (or double-click empty hours)"
+          aria-label="Add to the Calendar"
+          onClick={(e) => {
+            const now = new Date();
+            const day = weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!;
+            const r = e.currentTarget.getBoundingClientRect();
+            openNewAt(day, Math.min(23 * 60, (now.getHours() + 1) * 60), r.left, r.top - 8);
+          }}
+        >
+          add a plan
+        </button>
+        <span className="kw-kbd" aria-hidden>↵</span>
+      </div>
 
       {/* F28 — while a plan from this calendar is dragged: drop it here to
           take it off the calendar (it goes back to Todo). */}

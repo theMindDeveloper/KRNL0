@@ -245,6 +245,8 @@ export function installPreviewBridge(): void {
     const pomo = ((board as Json)['nodes'] as Json[]).find((n) => n['kind'] === 'pomo');
     if (pomo) pomo['config'] = { ...(pomo['config'] as Json), face };
   }
+  // `?mode=easy` — show the board in Easy mode (render checks).
+  if (new URLSearchParams(location.search).get('mode') === 'easy') (board as Json)['uiMode'] = 'easy';
   const noop = async () => {};
   const bridge = {
     boardLoad: async () => board,

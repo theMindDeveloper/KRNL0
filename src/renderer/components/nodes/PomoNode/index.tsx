@@ -356,27 +356,6 @@ export function PomoNode({
     <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
       {/* vapor-rise and pomo-blink keyframes are globally defined in tokens.css (PR1/PR4) */}
       <style>{`
-        .pomo-gear-btn {
-          background: transparent;
-          border: 1px solid var(--paper-3);
-          color: var(--ink-3);
-          width: 18px;
-          height: 18px;
-          border-radius: 4px;
-          cursor: pointer;
-          display: grid;
-          place-items: center;
-          padding: 0;
-          line-height: 1;
-        }
-        .pomo-gear-btn:hover:not(:disabled) {
-          color: var(--acid);
-          border-color: var(--acid);
-        }
-        .pomo-gear-btn:disabled {
-          opacity: 0.35;
-          cursor: not-allowed;
-        }
         .pomo-settings-row {
           display: flex;
           justify-content: space-between;
@@ -395,50 +374,32 @@ export function PomoNode({
       `}</style>
 
       {/* Header — title + bullet + gear (A.1: gear is last flex child = right side) */}
-      <div className="krnl-node-header"
-        style={{
-          padding: '7px 12px 6px',
-          borderBottom: '1px solid var(--paper-2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        <span style={{
-          width: 6, height: 6, borderRadius: '50%',
+      {/* window-frame.md — the standard header: name, context, then views and buttons. */}
+      <div className="krnl-node-header kw-head">
+        <span className="kw-dot" style={{
           background: state.status === 'running'
             ? (isTaskMode ? 'var(--acid)' : 'var(--rust)')
             : 'var(--ink-4)',
         }} />
         <span
           data-testid="pomo-header-label"
-          style={{
-            color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-2)',
-            fontWeight: 500,
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
+          className="kw-title"
+          style={isTaskMode ? { color: 'var(--acid-ink, var(--acid))' } : undefined}
         >
           {headerLeft}
         </span>
         {/* The session code gives way first: one line, never wrapped. */}
-        <span style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{headerRight}</span>
-        {/* A.1 — spacer pushes gear to the right */}
-        <span style={{ flex: 1 }} />
+        <span className="kw-ctx">{headerRight}</span>
+        <span className="kw-sp" />
         {/* Span log — every recorded span, to find and delete misclicks. */}
         <button
           type="button"
-          className="pomo-gear-btn"
+          className="pomo-gear-btn kw-btn"
           data-testid="pomo-log-toggle"
           aria-pressed={logOpen}
           title={logOpen ? 'Back to the timer' : 'Recorded spans — see and delete them'}
           onClick={(e) => { e.stopPropagation(); setGearOpen(false); setLogOpen((o) => !o); }}
           onMouseDown={(e) => e.stopPropagation()}
-          style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid-ink, var(--acid))', borderColor: 'var(--acid-ink, var(--acid))' } : {}) }}
         >
           {logOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="menu" size={12} />}
         </button>
@@ -448,7 +409,7 @@ export function PomoNode({
           role="group"
           aria-label="Pomo mode"
           // Never shrinks: the title on the left gives way instead.
-          style={{ display: 'flex', border: '1px solid var(--paper-3)', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}
+          className="kw-views"
           onMouseDown={(e) => e.stopPropagation()}
         >
           {(['pomodoro', 'observe'] as const).map((m) => {
@@ -466,20 +427,6 @@ export function PomoNode({
                     ? 'Observe — Start, Break, Stop. No session length or pips; tag what you did when a span ends.'
                     : 'Pomodoro — sessions, breaks, pips'}
                 onClick={(e) => { e.stopPropagation(); if (!active) onCommand('pomo.setConfig', { config: { mode: m } }); }}
-                style={{
-                  padding: '2px 7px',
-                  flexShrink: 0,
-                  // rust-deep: the paper-coloured label stays readable in light mode.
-                  background: active ? 'var(--rust-deep, var(--rust))' : 'transparent',
-                  color: active ? 'var(--paper)' : 'var(--ink-3)',
-                  border: 'none',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.01em',
-                  whiteSpace: 'nowrap',
-                  cursor: gearDisabled ? 'not-allowed' : 'pointer',
-                  opacity: gearDisabled && !active ? 0.4 : 1,
-                }}
               >
                 {m === 'pomodoro' ? 'POMO' : 'OBSERVE'}
               </button>
@@ -490,8 +437,9 @@ export function PomoNode({
             Observe (and Easy) has no session settings, so no gear there. */}
         {!observe && <button
           type="button"
-          className="pomo-gear-btn"
+          className="pomo-gear-btn kw-btn"
           data-testid="pomo-gear"
+          aria-expanded={gearOpen}
           aria-label={gearOpen ? 'Close settings' : 'Open settings'}
           title={gearDisabled ? 'Stop session to edit settings' : undefined}
           disabled={gearDisabled}
@@ -501,7 +449,6 @@ export function PomoNode({
             else openGear();
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          style={{ fontSize: 11 }}
         >
           {gearOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="settings" size={12} />}
         </button>}
@@ -884,6 +831,8 @@ export function PomoNode({
 
           {/* Observe mode: Start → (Break ⇄ Back to work) → Stop. Work and
               breaks are both recorded spans; there is no pause. */}
+          {/* window-frame.md — the standard footer row: the main button(s). */}
+          <div className={`kw-foot pomo-foot${away ? ' pomo-foot--tall' : ''}`} style={{ margin: inStation ? 'auto -14px -12px' : 'auto -18px -16px' }}>
           {away ? (
             <div
               data-testid="pomo-away"
@@ -1039,6 +988,7 @@ export function PomoNode({
           )}
           {/* #207 — fix recorded time where it happens: stop at the real time, or add forgotten time. */}
           {compact < 1 && <PomoTimeLinks state={state} />}
+          </div>
 
         </div>
       )}

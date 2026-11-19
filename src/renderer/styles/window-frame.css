@@ -1,0 +1,148 @@
+/* The window frame (docs/04-visual-system/window-frame.md).
+   Every window (Timer, Todo, Calendar, Clock, Habits, Analytics, Terminal)
+   uses these rows, so the same job is in the same place at the same size:
+
+     .kw-head    36px  name · context ········ views · buttons (menu last)
+     .kw-range   32px  ‹ where in time ›  Today          (only if it moves in time)
+     …body…
+     .kw-foot    44px  the one thing you do here: the add field or the main button
+
+   A window builds nothing of its own for these rows. */
+
+.kw-head {
+  height: 36px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--paper-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  min-width: 0;
+}
+.kw-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-4); flex-shrink: 0; display: inline-block; }
+.kw-title { color: var(--ink-2); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.kw-ctx { color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.kw-sp { flex: 1; min-width: 0; }
+
+/* Views: one segmented control, always the same size. */
+.kw-views { display: inline-flex; height: 22px; box-sizing: border-box; border: 1px solid var(--paper-3); border-radius: 5px; overflow: hidden; flex-shrink: 0; }
+.kw-views > button {
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.kw-views > button + button { border-left: 1px solid var(--paper-3); }
+.kw-views > button:hover { color: var(--ink); }
+.kw-views > button[aria-pressed='true'],
+.kw-views > button[aria-selected='true'] { background: color-mix(in srgb, var(--acid) 18%, transparent); color: var(--acid-ink, var(--acid)); font-weight: 650; }
+.kw-views > button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Buttons in a header or a time row: one size. */
+.kw-btn {
+  height: 22px;
+  min-width: 22px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border: 1px solid var(--paper-3);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.kw-btn:hover { color: var(--ink); border-color: var(--ink-4); }
+.kw-btn[aria-pressed='true'],
+.kw-btn[aria-expanded='true'] { color: var(--acid-ink, var(--acid)); border-color: var(--acid-ink, var(--acid)); }
+.kw-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Where in time: ‹ label › Today, centred. */
+.kw-range {
+  height: 32px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--paper-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  min-width: 0;
+}
+.kw-range__label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--ink-2); }
+
+/* The bottom row: the one thing you do in this window. */
+.kw-foot {
+  height: 44px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-top: 1px solid var(--paper-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-4);
+  min-width: 0;
+}
+.kw-add { flex: 1; min-width: 0; cursor: text; color: var(--ink-4); background: transparent; border: 0; padding: 0; font: inherit; text-align: left; }
+.kw-kbd { font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); background: var(--paper-2); border: 1px solid var(--paper-3); padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
+.kw-action {
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--paper-3);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+.kw-action:hover { border-color: var(--ink-4); color: var(--ink); }
+.kw-action--primary { flex: 1; border: 0; background: var(--btn-primary-bg); color: var(--btn-primary-fg); font-weight: 700; box-shadow: 0 0 0 1px var(--btn-primary-ring); }
+.kw-action--primary:hover { color: var(--btn-primary-fg); }
+.kw-action--icon { width: 42px; padding: 0; flex: 0 0 42px; }
+
+/* The Timer's footer: its controls keep their own markup, at the standard size. */
+.pomo-foot > .pomo-controls { flex: 1; min-width: 0; }
+.pomo-foot .pomo-controls > button { height: 30px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+.pomo-foot--tall { height: auto; padding-top: 8px; padding-bottom: 8px; }
