@@ -69,3 +69,36 @@ describe('One size per row', () => {
     expect(css).toMatch(/\.kw-foot \{\s*height: 44px;/);
   });
 });
+
+describe('Menus: six rows at most, the rest behind More (menus.md)', () => {
+  it('a menu row can hold rarer rows, and the menu shows a way back', () => {
+    const menu = readFileSync(join(process.cwd(), 'src/renderer/components/ContextMenu/index.tsx'), 'utf8');
+    expect(menu).toContain('children?: ContextMenuItem[]');
+    expect(menu).toContain('data-testid="menu-back"');
+  });
+  it('the plan menus (Todo row, board card) and the habit and event menus use More', () => {
+    expect(src('TodoNode/index.tsx')).toMatch(/label: 'More', icon: <MenuIcon name="more" \/>, children: more/);
+    expect(src('TaskNode/index.tsx')).toMatch(/label: 'More', icon: <MenuIcon name="more" \/>, children: moreItems/);
+    expect(src('CalendarNode/WeekView.tsx')).toMatch(/label: 'More', icon: <MenuIcon name="more" \/>, children: more/);
+    expect(src('HabitNode/HabitContextMenu.tsx')).toContain('testId="habit-menu-more"');
+  });
+  it('the board card says "Rename" and "When…" like the Todo row', () => {
+    const s = src('TaskNode/index.tsx');
+    expect(s).toContain("label: 'Rename'");
+    expect(s).toContain("label: 'When…'");
+    expect(s).not.toContain("label: 'Edit text'");
+  });
+});
+
+describe('The plan card is short by default (window-frame.md, cards)', () => {
+  const card = readFileSync(join(process.cwd(), 'src/renderer/components/ui/WhenPopover.tsx'), 'utf8');
+  it('the month opens only when asked for, and the main button says Save', () => {
+    expect(card).toContain('{gridOpen && (');
+    expect(card).toContain("primaryLabel ?? 'Save ↵'");
+    expect(card).not.toContain("'Done ↵'");
+  });
+  it('its actions are what happened, Won’t do, Delete; the rest behind More', () => {
+    expect(card).toContain("const MAIN = ['done', 'wontdo', 'delete']");
+    expect(card).toContain('data-testid="plan-card-more"');
+  });
+});

@@ -335,15 +335,14 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
           const taskKind: TaskKind = ts.kind ?? 'focus';
 
           if (isAnchor) {
-            // Explicit anchor: reset cursor to scheduledFor — unless the
-            // previous task in the chain ends later, then push (#168).
-            // A done plan is history: it keeps its own slot and is never
-            // pushed, and the chain after it continues from the later of
-            // its end and the cursor.
+            // A plan with its own time keeps it: the plan before it in the
+            // chain never pushes it (Decision 30, amended 2026-11-19: chains
+            // keep the order, they do not move plans). Only a follower with
+            // no time of its own is placed by the chain, after the later of
+            // this plan's end and whatever ended before it.
             const sf = ts.scheduledFor as string;
             const prevCursor: string | null = cursor;
-            const isDone = ts.done === true;
-            const start = prevCursor !== null && !isDone ? laterISO(sf, prevCursor) : sf;
+            const start = sf;
             cursorAnchorId = unit.taskId;
 
             const { effectiveMin, cursorAdvanceMin, breakdown } = computeEffective(ts, true, cfg);
@@ -361,7 +360,7 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
             // cursorAdvanceMin: for focus = effectiveMin (includes breaks),
             // for event = plannedMin (ADR 0003 §3.7 — cursor advances by work time only).
             const after = addMinutesISO(start, cursorAdvanceMin);
-            cursor = isDone && prevCursor !== null ? laterISO(after, prevCursor) : after;
+            cursor = prevCursor !== null ? laterISO(after, prevCursor) : after;
           } else if (cursor !== null && cursorAnchorId !== null) {
             // Derived: emit at current cursor.
             const { effectiveMin, cursorAdvanceMin, breakdown } = computeEffective(ts, false, cfg);
@@ -409,24 +408,24 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
             if (cursor === null) continue; // skip entire group (pre-first-anchor)
             groupStart = cursor;
             groupAnchorId = cursorAnchorId; // carries over from last sequential anchor
-          } else if (cursor !== null) {
-            // #168 — the group can't start before the preceding task ends.
-            groupStart = laterISO(groupStart, cursor);
           }
+          // (A group whose branches have their own times keeps them: nothing
+          // before it in the chain pushes it. Decision 30, amended 2026-11-19.)
 
           // Emit each branch.
           let maxEffectiveMin = 0;
+          let groupEnd: string | null = null;
           for (const { branch, idx } of branchesInComponent) {
             const ts = taskInfoById.get(branch.taskId)?.taskState;
             const isBranchAnchor =
               ts !== undefined &&
               typeof ts.scheduledFor === 'string' &&
               ts.scheduledFor.length > 0;
+            // A branch with its own time keeps it; one without follows the
+            // chain, so it never starts before what came before it has ended.
             const branchStart = isBranchAnchor
-              ? cursor !== null && ts!.done !== true
-                ? laterISO(ts!.scheduledFor as string, cursor)
-                : (ts!.scheduledFor as string)
-              : groupStart!;
+              ? (ts!.scheduledFor as string)
+              : cursor !== null ? laterISO(groupStart!, cursor) : groupStart!;
             const branchAnchorId = isBranchAnchor
               ? branch.taskId
               : (groupAnchorId ?? cursorAnchorId ?? branch.taskId);
@@ -459,12 +458,16 @@ function build(board: Board, cfg: PomoConfig): ScheduleResult {
               breakdown,
             });
             if (cursorAdvanceMin > maxEffectiveMin) maxEffectiveMin = cursorAdvanceMin;
+            const branchEnd = addMinutesISO(branchStart, cursorAdvanceMin);
+            groupEnd = groupEnd === null ? branchEnd : laterISO(groupEnd, branchEnd);
           }
 
           // Advance cursor by max(branch.cursorAdvanceMin) from groupStart.
           // cursorAnchorId after the group = anchor that determined groupStart.
           // (ADR 0005: if no anchored branch in group, cursorAnchorId carries over.)
-          cursor = addMinutesISO(groupStart!, maxEffectiveMin);
+          // Followers come after the later of this group's end and what ended before it.
+          const end: string = groupEnd ?? addMinutesISO(groupStart!, maxEffectiveMin);
+          cursor = cursor !== null ? laterISO(end, cursor) : end;
           if (groupAnchorId !== null) cursorAnchorId = groupAnchorId;
         }
       }

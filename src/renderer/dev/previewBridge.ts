@@ -245,6 +245,18 @@ export function installPreviewBridge(): void {
     const pomo = ((board as Json)['nodes'] as Json[]).find((n) => n['kind'] === 'pomo');
     if (pomo) pomo['config'] = { ...(pomo['config'] as Json), face };
   }
+  // `?open=<css selector>` — click that element once the board is up, and
+  // `?menu=<css selector>` — right-click it (render checks of cards and menus).
+  for (const [key, type] of [['open', 'click'], ['menu', 'contextmenu']] as const) {
+    const sel = new URLSearchParams(location.search).get(key);
+    if (!sel) continue;
+    window.setTimeout(() => {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
+    }, 4500);
+  }
   // `?mode=easy` — show the board in Easy mode (render checks).
   if (new URLSearchParams(location.search).get('mode') === 'easy') (board as Json)['uiMode'] = 'easy';
   const noop = async () => {};

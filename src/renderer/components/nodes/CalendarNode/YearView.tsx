@@ -76,11 +76,12 @@ export function YearView({ state, onCommand }: Props) {
   const stepYear = (d: number) => onCommand('calendar.setAnchor', { date: `${year + d}-01-01` });
 
   return (
-    <div data-testid="calendar-year" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '8px 10px 10px', gap: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-mono)' }}>
-        <button type="button" aria-label="Previous year" onClick={() => stepYear(-1)} style={navBtn}><LineGlyph name="chevronLeft" /></button>
-        <span data-testid="calendar-year-label" style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', letterSpacing: '0.06em' }}>{year}</span>
-        <button type="button" aria-label="Next year" onClick={() => stepYear(1)} style={navBtn}><LineGlyph name="chevron" /></button>
+    <div data-testid="calendar-year" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '0 0 10px', gap: 8, overflow: 'hidden' }}>
+      {/* window-frame.md — the standard time row. */}
+      <div className="kw-range">
+        <button type="button" className="kw-btn" aria-label="Previous year" onClick={() => stepYear(-1)}><LineGlyph name="chevronLeft" /></button>
+        <span data-testid="calendar-year-label" className="kw-range__label" style={{ minWidth: 44, textAlign: 'center' }}>{year}</span>
+        <button type="button" className="kw-btn" aria-label="Next year" onClick={() => stepYear(1)}><LineGlyph name="chevron" /></button>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: 'var(--ink-4)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: 'color-mix(in srgb, var(--acid) 70%, transparent)' }} /> focus

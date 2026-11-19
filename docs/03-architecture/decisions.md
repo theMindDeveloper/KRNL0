@@ -2631,3 +2631,21 @@ Plans get a card on the board (TaskNode, CardParts: 220 × 120, name + box, kind
 
 ### Round two (2026-11-09)
 The user found the cards unclear (a bare "0" in a circle, no clear click target, an event with nothing to do, a time tile without a day) and questioned the wire dots. Picked draft A of "Habit and event cards, round two": **no wire dots** on either card (wires mean "this plan, then that one"; a habit or an event never sits in that order — old wires are not drawn but kept); the **habit** keeps its week as seven lettered squares and **today's square is the button** (tick, or "+1 · 1/2" for an amount); the **event** carries a calendar page with the **next date** it happens, its time span and rule, and two buttons — **Skip this one** (`habit.lane.skip|unskip`) and **Show** (rings its block on the Calendar; `krnl show <event>`).
+
+## Decision 44 — Chains give the order; they never move a plan that has its own time (2026-11-19)
+
+**Amends Decision 30.** Decision 30 made a plan's own time an earliest start: when the plan before it in a chain ended later, the plan was pushed. That moved plans the owner had placed (the "tasks jumped to today and tomorrow" report, and overlaps resolved by silently shifting the later plan). The owner approved: keep the order, stop the pushing.
+
+**Rule.**
+- A plan with its own time (`scheduledFor`) is placed at that time. Nothing before it in its chain changes it.
+- A plan in a chain with **no** time of its own is still placed by the chain: it starts after everything before it has ended (the later of the previous ends). The same holds for a parallel branch without its own time.
+- Two chained plans may therefore overlap on the Calendar when their own times overlap. The app shows that as it is; it does not resolve it.
+
+**Consequences.**
+- Moving or lengthening one plan never moves another plan that has a time. The Calendar's "pushed" notice no longer fires for timed plans.
+- No data change and no migration: only the derived placements differ.
+- Tests: `scheduleSelector.chainPush.test.ts`, `scheduleSelector.test.ts` (Test 15), `WeekView.pushNotice.test.tsx`, `calendar.parallelDrop.test.ts` assert the new rule.
+
+## Decision 45 — One frame for windows, one pattern for menus and cards (2026-11-19)
+
+Every window uses the shared header, time row and footer (`docs/04-visual-system/window-frame.md`); every right-click menu has six rows at most with rarer rows behind More (`docs/04-visual-system/menus.md`); the plan card is short by default and its main button says Save. A new control gets a slot in these, not a new spot. `tests/unit/renderer/windowFrame.test.ts` guards it.

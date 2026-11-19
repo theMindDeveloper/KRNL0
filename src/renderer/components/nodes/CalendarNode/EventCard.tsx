@@ -73,6 +73,7 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
       <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />
       <div
         data-testid="event-card"
+        className="kw-card"
         data-owns-keys="true"
         role="dialog"
         aria-label={allowOnce ? 'New here' : 'Edit event'}

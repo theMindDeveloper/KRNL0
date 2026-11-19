@@ -1062,6 +1062,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             actions={[
               ...(!easy && it.taskNodeId ? [{ key: 'timer', label: pomoConfig.mode === 'observe' ? 'Track it now' : 'Focus on it', icon: (pomoConfig.mode === 'observe' ? 'observe' : 'play') as 'observe' | 'play', onClick: () => { onCommand('todo.startPomoForItem', { itemId: it.id }); setWhenPick(null); } }] : []),
               { key: 'done', label: it.done ? 'Not done yet' : 'Mark done', icon: (it.done ? 'undo' : 'check') as 'undo' | 'check', onClick: () => { onCommand('todo.toggle', { id: it.id }); setWhenPick(null); } },
+              ...(!it.done ? [{ key: 'wontdo', label: "Won't do", icon: 'drop' as const, onClick: () => { wontDoItem(node.id, it.id); setWhenPick(null); } }] : []),
               ...(it.taskNodeId ? [{ key: 'show', label: 'Show', icon: 'show' as const, onClick: () => { const t = it.taskNodeId!; setWhenPick(null); void showTask(t); } }] : []),
               { key: 'delete', label: 'Delete', icon: 'delete' as const, danger: true, onClick: () => { removeItem(it.id); setWhenPick(null); } },
             ]}

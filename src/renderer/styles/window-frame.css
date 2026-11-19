@@ -158,3 +158,16 @@
   .todo-win .todo-tag { padding: 1px 4px !important; border-color: transparent !important; background: transparent !important; }
   .todo-win [data-testid="todo-item-tracked"] { display: none !important; }
 }
+
+/* Cards (the plan card): they arrive from where they were opened, and every
+   button answers the press at once. No travel with reduced motion. */
+.kw-card { transform-origin: top left; animation: kw-card-in 140ms cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes kw-card-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+.kw-card button { transition: transform 90ms ease-out, border-color 120ms ease-out, color 120ms ease-out; }
+.kw-card button:active:not(:disabled) { transform: scale(0.97); }
+.kw-card button:focus-visible { outline: 2px solid var(--acid-ink, var(--acid)); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) {
+  .kw-card { animation: none; }
+  .kw-card button { transition: none; }
+  .kw-card button:active:not(:disabled) { transform: none; }
+}

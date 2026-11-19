@@ -35,7 +35,10 @@ The same from a Todo row, a board card and a Calendar block's card.
 | Archive | hint "keeps history" |
 | Delete | |
 
+## The repeating-event menu
+
+Skip this one (or Undo skip) · Move this one… (or Back to its usual time) · Edit event… · More (Remind me…, and Move when it was moved) · End after this day · Delete event.
+
 ## Not converted yet
 
-- A repeating event's menu on the Calendar (8 rows).
 - The menu on empty Calendar hours and on a recorded span.

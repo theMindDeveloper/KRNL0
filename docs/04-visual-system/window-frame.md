@@ -53,8 +53,6 @@ Each window used to be built on its own. Switching views sat in four different p
 ## Not converted yet
 
 - The Analytics page row (icons) is still its own row.
-- The Calendar's Month and Year views keep their own month/year arrows.
-- Popups and cards (the plan card, the event card) have their own layout; a standard for cards is a separate step.
 
 ## Rows inside a window
 
@@ -66,3 +64,12 @@ Each window used to be built on its own. Switching views sat in four different p
 ## The top bar
 
 Brand, the canvas switcher (Advanced), "saved", the window toggles, the layout switch, Help, Settings. FIT shows only in the Free layout (Station's canvas has its own fit control). Light / dark is in Settings → General. No breadcrumb.
+
+## Cards (the plan card)
+
+- **Short by default.** Day chips (Today, Tmrw, one more) and **Date**; the month opens only when Date is pressed. Then time, length; a reminder once it has a time; the deadline as one row ("Add a deadline"), which opens the same day picker.
+- **One action row, in the menus' order:** what happened (Mark done / Done on … / Not done yet), Won't do, Delete (the one icon-only button), and More for the rest (the timer, Show).
+- **The main button says Save** (Add when adding). "Done" only ever means the plan is done.
+- **The close button is an X.** No icon is used for two meanings.
+- **Feedback at once.** Every button answers the press (a 3% squeeze); the card arrives from where it was opened in 140 ms; neither moves with reduced motion.
+- The same card opens from the Todo row, the Calendar block and the board card's "When…".

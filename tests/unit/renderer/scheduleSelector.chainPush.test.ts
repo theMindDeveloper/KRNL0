@@ -59,7 +59,7 @@ describe('#168 — chain stays sequential when task 1 changes', () => {
     expect(placements.get('t2')?.startISO).toBe('2026-11-02T10:30');
   });
 
-  it('an anchored successor that would overlap is pushed to the predecessor end', () => {
+  it('a plan with its own time keeps it, even when the one before it runs into it (chains keep the order, they do not move plans)', () => {
     seq = 0;
     const b = board(
       [
@@ -70,9 +70,10 @@ describe('#168 — chain stays sequential when task 1 changes', () => {
       [edge('t1', 't2'), edge('t2', 't3')],
     );
     const { placements } = selectSchedule(b);
-    expect(placements.get('t2')?.startISO).toBe('2026-11-02T10:00');
-    expect(placements.get('t2')?.endISO).toBe('2026-11-02T10:30');
-    expect(placements.get('t3')?.startISO).toBe('2026-11-02T10:30');
+    expect(placements.get('t2')?.startISO).toBe('2026-11-02T09:30');
+    expect(placements.get('t2')?.endISO).toBe('2026-11-02T10:00');
+    // t3 has no time of its own: it follows, after everything before it has ended.
+    expect(placements.get('t3')?.startISO).toBe('2026-11-02T10:00');
   });
 
   it('an anchored successor placed after the predecessor keeps its own time (gap allowed)', () => {
@@ -84,7 +85,7 @@ describe('#168 — chain stays sequential when task 1 changes', () => {
     expect(selectSchedule(b).placements.get('t2')?.startISO).toBe('2026-11-02T13:00');
   });
 
-  it('an anchored parallel branch is pushed past the preceding task too', () => {
+  it('a parallel branch with its own time keeps it; one without follows the task before', () => {
     seq = 0;
     const b = board(
       [
@@ -95,7 +96,7 @@ describe('#168 — chain stays sequential when task 1 changes', () => {
       [edge('a', 'x'), edge('a', 'y')],
     );
     const { placements } = selectSchedule(b);
-    expect(placements.get('x')?.startISO).toBe('2026-11-02T10:00');
+    expect(placements.get('x')?.startISO).toBe('2026-11-02T09:15');
     expect(placements.get('y')?.startISO).toBe('2026-11-02T10:00');
   });
 });

@@ -218,7 +218,8 @@ const toolbarStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
-  padding: '10px 14px 0',
+  // window-frame.md — the same 12px side edge as the header above it.
+  padding: '8px 12px 0',
   flexShrink: 0,
   flexWrap: 'wrap',
 };

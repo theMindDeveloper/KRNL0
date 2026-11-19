@@ -870,14 +870,24 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       occ.skipped
         ? { label: 'Undo skip', icon: <MenuIcon name="undo" />, hint: dayHint, onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }
         : { label: 'Skip this one', icon: <MenuIcon name="skip" />, hint: dayHint, onSelect: () => { void habitMotherCommand('routine.skip', { id: h.id, date: occ.date }); } },
-      ...(occ.skipped ? [] : [{ label: 'Move this one…', icon: <MenuIcon name="move" />, onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(s0), x, y }) }]),
-      ...(occ.moved ? [{ label: 'Back to its usual time', icon: <MenuIcon name="undo" />, onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }] : []),
+      // menus.md — six rows at most: this one (skip, move or back), the event
+      // (edit), More, then the two ways out. The reminder and the less likely
+      // of move / back sit behind More.
+      ...(occ.skipped ? [] : occ.moved
+        ? [{ label: 'Back to its usual time', icon: <MenuIcon name="undo" />, onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }]
+        : [{ label: 'Move this one…', icon: <MenuIcon name="move" />, onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(s0), x, y }) }]),
       {
         label: 'Edit event…', icon: <MenuIcon name="rename" />,
         onSelect: () => setEventCard({ x, y, day: occ.date, allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days, time: h.schedule?.timeOfDay ?? hmOf(s0), lengthMin: h.schedule?.durationMin ?? 60 } }),
       },
       // Reminders are Advanced (owner, 2026-11-09); a reminder set earlier still shows in Easy, to turn it off.
-      ...(easy && h.remindMin === undefined ? [] : [{ label: 'Remind me…', icon: <MenuIcon name="reminder" />, hint: h.remindMin === undefined ? 'Off' : h.remindMin === 0 ? 'at start' : `${h.remindMin} min`, onSelect: () => setEventRemind({ id: h.id, x, y, value: h.remindMin ?? null }) }]),
+      ...((): ContextMenuItem[] => {
+        const more: ContextMenuItem[] = [
+          ...(!occ.skipped && occ.moved ? [{ label: 'Move this one…', icon: <MenuIcon name="move" />, onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(s0), x, y }) }] : []),
+          ...(easy && h.remindMin === undefined ? [] : [{ label: 'Remind me…', icon: <MenuIcon name="reminder" />, hint: h.remindMin === undefined ? 'Off' : h.remindMin === 0 ? 'at start' : `${h.remindMin} min`, onSelect: () => setEventRemind({ id: h.id, x, y, value: h.remindMin ?? null }) }]),
+        ];
+        return more.length > 0 ? [{ label: 'More', icon: <MenuIcon name="more" />, children: more, onSelect: () => {} }] : [];
+      })(),
       { label: 'End after this day', icon: <MenuIcon name="end" />, hint: 'keeps past', divider: true, onSelect: () => { void habitMotherCommand('routine.end', { id: h.id, date: occ.date }); } },
       { label: 'Delete event', icon: <MenuIcon name="delete" />, danger: true, onSelect: () => { void deleteRoutine(h.id); } },
     ];

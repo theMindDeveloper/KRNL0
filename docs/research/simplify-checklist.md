@@ -11,7 +11,7 @@ Status words: **Done**, **Partly**, **Open**, **Needs your decision** (it remove
 | One header for every window: name left, view switch and buttons right, 36px | Done |
 | One time row: ‹ date › Today, 32px | Done (Calendar week/day, Clock) |
 | One footer: the add field or the main button, 44px | Done (Timer, Todo, Habits, Calendar) |
-| Calendar's Month and Year views: their own arrows | Open |
+| Calendar's Month and Year views use the same time row | Done |
 | Analytics: its own row of 11 page icons | Open |
 
 Standard: `docs/04-visual-system/window-frame.md`. A test fails if a window builds its own header or footer again.
@@ -24,14 +24,14 @@ Standard: `docs/04-visual-system/window-frame.md`. A test fails if a window buil
 | Adding always in the footer (the Calendar's + moved; "log past time" is a button beside START) | Done |
 | One size per kind of button (22px in headers, 30px in footers) | Done |
 | The Calendar's top is two rows like every window: its layer switches, the events list and the zoom are one menu in the header; the day view has no extra day-name row | Done |
-| Popups and cards (the plan card, the event card) follow one layout | Open |
+| The plan card: short by default, one action row, Save instead of a second Done; the event card shares its feedback | Done |
 
 ## 3. "Too much on screen; information overload"
 
 | What | Status |
 |---|---|
 | Todo rows: one line each in a narrow window (name, when, length; tag as a dot) | Done |
-| Top bar: breadcrumb, FIT (in Station) and the DARK button removed | Done |
+| Top bar: breadcrumb, FIT (in Station) and the DARK button removed; the window toggles are the quietest control (lit icon when shown, no underline bars) | Done |
 | Clock: AM / PM folded into the time row (one row less) | Done |
 | Analytics: 11 pages, range buttons, and a second date control inside pages | Open |
 | Clock: week dots, the "free" box and the list under the dial | Open |
@@ -44,8 +44,8 @@ Standard: `docs/04-visual-system/window-frame.md`. A test fails if a window buil
 |---|---|
 | Six rows at most; the rest behind **More** | Done (plan row, plan card, habit) |
 | Same order and same words in every plan menu ("Rename", "When…", "Mark done") | Done |
-| Repeating-event menu on the Calendar (8 rows) | Open |
-| Menus on empty Calendar hours and on a recorded span | Open |
+| Repeating-event menu on the Calendar: six rows, More | Done |
+| Menus on empty Calendar hours and on a recorded span | Already short (two or three rows); unchanged |
 
 Standard: `docs/04-visual-system/menus.md`.
 
@@ -55,8 +55,8 @@ My answer, feature by feature. None of these is changed yet: each one hides or r
 
 | # | Feature | Problem | Proposal | Status |
 |---|---|---|---|---|
-| 5.1 | Chains that push later plans | Caused the "tasks moved to today and tomorrow" bug; hard to predict | Keep the order (the wire), stop the automatic pushing | Needs your decision |
-| 5.2 | Several canvases | They share all plans, so a "new canvas" looks like a copy | One canvas by default; more only in Advanced | Needs your decision |
+| 5.1 | Chains that push later plans | Caused the "tasks moved to today and tomorrow" bug; hard to predict | Keep the order (the wire), stop the automatic pushing | **Done** (you said yes; Decision 44) |
+| 5.2 | Several canvases | They share all plans, so a "new canvas" looks like a copy | One canvas by default; more only in Advanced | **Already so**: Easy has one canvas and no switcher (easy-mode D24). I was wrong to list it as open |
 | 5.3 | Finished-cards setting (overnight / 1 hour / keep) | A setting for something the app can decide | One rule: gone the next morning; Archive stays in the menu | Needs your decision |
 | 5.4 | Three names for one timer (Record / Pomo / Observe) | Three words to learn for one window | One name; Pomodoro sessions are an option inside it | Needs your decision |
 | 5.5 | A board card for every plan | The same plan is in the Todo, on the Calendar, on the Clock and on the board | A plan gets a board card only when you ask for one | Needs your decision |
@@ -89,7 +89,7 @@ The daily loop is three things: **record** what you do (Observe: study, gaming, 
 |---|---|
 | The rules are written down (frame, rows, top bar, menus) so a new control gets a slot, not a new spot | Done |
 | A test guards the frame | Done |
-| A test guards the menu length and order | Open |
+| A test guards the menus and the plan card | Done |
 
 ## What was tried and dropped
 

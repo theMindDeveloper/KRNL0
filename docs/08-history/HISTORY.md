@@ -2838,3 +2838,17 @@ All test ids and commands are unchanged; this is placement and size only. The ru
 - **Analytics:** its range buttons use the shared switch.
 
 Eight tutorial lines changed with the menus and were re-recorded. The owner's message is split point by point, with what is done and what is open, in `docs/research/simplify-checklist.md`. Checked as screenshots at 1457 × 945 in Advanced and Easy on the demo board; not yet used by the owner.
+
+## [2026-11-19] — A shorter plan card, quieter window toggles, chains stop pushing
+
+**Type:** Feature (UI simplification) + behaviour change (chains)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ui/WhenPopover.tsx`, `TodoNode/index.tsx`, `TaskNode/index.tsx`, `CalendarNode/WeekView.tsx`, `MonthView.tsx`, `YearView.tsx`, `EventCard.tsx`, `AnalyticsNode/index.tsx`, `styles/window-frame.css`, `styles/chassis.css`, `store/scheduleSelector.ts`, `dev/previewBridge.ts`, docs (`window-frame.md`, `menus.md`, Decisions 44 and 45, `simplify-checklist.md`, `ui-simplification-summary.md`), tests.
+
+**Summary:**
+- **Plan card:** about half as tall. The month grid opens only when **Date** is pressed; the When / Deadline tab bar is one "Add a deadline" row; four action buttons in a grid became one row (what happened, Won't do, Delete, More); the main button says **Save** (it said "Done", next to "Not done yet"); the close button is an X (it used the Won't-do icon). The Todo's card now also offers Won't do, like the Calendar's.
+- **Top bar window toggles:** a shown window has a lit icon and readable text, a hidden one is dim. The bright underline bars are gone.
+- **Chains (Decision 44, approved by the owner):** a plan with its own time keeps it; the plan before it in a chain never pushes it. A follower with no time still comes after what precedes it.
+- **Calendar Month and Year views:** the standard time row. **Repeating-event menu:** six rows, More. **Guard tests** for menus and the plan card.
+
+Canvases were already one-per-board in Easy (D24); nothing to change. The timer's names and the two remaining cuts (finished-cards setting, a board card for every plan) wait for the owner. Checked as screenshots at 1457 × 945; not yet used by the owner.

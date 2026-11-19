@@ -549,7 +549,7 @@ describe('Test 14 — Anchored branch in parallel group (ADR 0005 §4)', () => {
 // ── Test 15 — Backwards-in-time anchor renders as written ────────────────────
 
 describe('Test 15 — Backwards-in-time anchor (ADR 0005 §"Backwards-in-time anchors")', () => {
-  it('A@14:00, B derives@14:25, C@08:00 — C is pushed after B (#168), no reorder', () => {
+  it('A@14:00, B derives@14:25, C@08:00 — C keeps its own time (Decision 30, amended), no reorder', () => {
     _taskSeq = 0;
     const todoId = 'todo-out-of-order';
     const a = makeTaskNode('a', todoId, 25, { scheduledFor: '2026-05-20T14:00' });
@@ -564,9 +564,9 @@ describe('Test 15 — Backwards-in-time anchor (ADR 0005 §"Backwards-in-time an
     expect(placements.size).toBe(3);
     expect(placements.get('a')?.startISO).toBe('2026-05-20T14:00');
     expect(placements.get('b')?.startISO).toBe('2026-05-20T14:25');
-    // #168: an anchor can't start before its predecessor ends, so C@08:00 is
-    // pushed to B's end. It stays an anchor (its own scheduledFor is kept).
-    expect(placements.get('c')?.startISO).toBe('2026-05-20T14:50');
+    // A plan with its own time keeps it: the chain gives the order of the
+    // followers, it never moves a plan the user placed.
+    expect(placements.get('c')?.startISO).toBe('2026-05-20T08:00');
     expect(placements.get('c')?.isAnchor).toBe(true);
   });
 });

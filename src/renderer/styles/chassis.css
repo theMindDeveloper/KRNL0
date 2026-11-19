@@ -3741,9 +3741,23 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 [data-testid="topbar-panel-toggles"] .krnl-panel-toggle:hover {
   color: var(--ink) !important;
 }
+/* window-frame.md, top bar — which windows are shown is changed rarely, so it
+   is the quietest control in the bar: a shown window has a lit icon and
+   readable text, a hidden one is dim. No underline bars. */
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  letter-spacing: 0.06em !important;
+  padding: 4px 7px !important;
+  color: var(--ink-4) !important;
+}
 [data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] {
-  color: var(--ink) !important;
-  box-shadow: inset 0 -2px 0 var(--acid-ink, var(--acid)) !important;
+  color: var(--ink-2) !important;
+}
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle[aria-pressed="true"] svg {
+  color: var(--acid-ink, var(--acid));
+}
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle:focus-visible {
+  outline: 2px solid var(--acid-ink, var(--acid));
+  outline-offset: 1px;
 }
 /* Mac keeps its Chicago-style face; everything else stays mono. */
 [data-dock="macintosh"] [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {

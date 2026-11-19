@@ -320,45 +320,13 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
         userSelect: 'none',
       }}
     >
-      {/* Month navigation header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '6px 10px',
-          borderBottom: '1px solid var(--paper-3)',
-        }}
-      >
-        <button
-          type="button"
-          onClick={handlePrev}
-          data-testid="month-prev"
-          style={navBtnStyle}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-        >
+      {/* window-frame.md — the standard time row. */}
+      <div className="kw-range" style={{ justifyContent: 'center' }}>
+        <button type="button" className="kw-btn" onClick={handlePrev} data-testid="month-prev" aria-label="Previous month">
           <LineGlyph name="chevronLeft" size={13} />
         </button>
-        <span
-          data-testid="month-label"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-1)',
-            letterSpacing: '0.08em',
-          }}
-        >
-          {monthLabel}
-        </span>
-        <button
-          type="button"
-          onClick={handleNext}
-          data-testid="month-next"
-          style={navBtnStyle}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-        >
+        <span data-testid="month-label" className="kw-range__label" style={{ minWidth: 110, textAlign: 'center' }}>{monthLabel}</span>
+        <button type="button" className="kw-btn" onClick={handleNext} data-testid="month-next" aria-label="Next month">
           <LineGlyph name="chevron" size={13} />
         </button>
       </div>
