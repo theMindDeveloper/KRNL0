@@ -42,23 +42,20 @@ Each window used to be built on its own. Switching views sat in four different p
 
 | Window | Header | Time row | Footer |
 |---|---|---|---|
-| Timer | name, session code; POMO / OBSERVE switch (Advanced); recorded spans, settings | — | START / BREAK / STOP, and "log past time" when idle |
+| Timer | name ("Timer" in every mode; "· break" while on a break); recorded spans; SESSIONS / STOPWATCH switch (Advanced); settings | — | START / BREAK / STOP, and "log past time" when idle |
 | Todo | name with the open count, overdue count | — | add a plan |
 | Calendar | name; DAY / WEEK / MONTH / YEAR; one menu (what it shows besides plans, repeating events, zoom) | ‹ week or day › Today; in the day view also the day's recorded total and the hour arrows | add a plan (day and week views) |
-| Clock | name; DAY / BIG CLOCK / WEEK | ‹ day › Today, Now, AM / PM | — |
+| Clock | name ("Clock"); DAY / BIG CLOCK / WEEK | ‹ day › Today, Now, AM / PM | — (under the dial: only the day's list) |
 | Habits | name with the week; WEEK / MONTH / YEAR; settings | — | add a habit |
-| Analytics | name, page; totals; settings | (its own page row: not converted yet); the range uses the shared switch | — |
+| Analytics | name; totals; settings | ‹ page name › (the name opens the list of pages), then the range switch | — |
 | Terminal | traffic lights, label, live badge | — | — |
-
-## Not converted yet
-
-- The Analytics page row (icons) is still its own row.
 
 ## Rows inside a window
 
 - **A list row is one line** in a narrow window: the name, when, how long. The tag shrinks to its dot and the tracked time steps aside (tooltip, plan card). The full row shows in a wide window.
 - **No unlabelled switches.** A group of icon-only toggles goes into the window's menu as named rows (the Calendar's layers).
-- **No repeated rows.** A row that says what another row already says is not drawn (the Calendar's day view has no day-name row: the time row names the day).
+- **No repeated rows.** A row that says what another row already says is not drawn (the Calendar's day view has no day-name row: the time row names the day; the Clock has no week rings or "now" box under the dial: the WEEK view and the list say it; the Timer has one progress row, the session dots).
+- **One name per window.** The header says what the top-bar toggle says: Timer, Todo, Habits, Calendar, Analytics, Clock. A window is not renamed by its mode.
 - **In a narrow window the name gives way first**; the view switch and buttons stay whole.
 
 ## The top bar

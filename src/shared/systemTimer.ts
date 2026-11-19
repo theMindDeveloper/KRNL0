@@ -39,13 +39,13 @@ export function systemTimerView(snap: PocketSnapshot | null, nowMs: number): Sys
 
   if (status === 'break') {
     return {
-      live: true, observe, time: `break ${formatElapsed(clock.breakElapsedMs)}`, label: observe ? 'Observe · break' : 'Break',
+      live: true, observe, time: `break ${formatElapsed(clock.breakElapsedMs)}`, label: 'Break',
       progress: null, barMode: 'none', badge: 'break', controls,
     };
   }
   if (observe) {
     return {
-      live: true, observe, time: `${formatElapsed(clock.liveWorkMs)} ↑`, label: 'Observe · working',
+      live: true, observe, time: `${formatElapsed(clock.liveWorkMs)} ↑`, label: 'Recording',
       progress: null, barMode: 'none', badge: 'observe', controls,
     };
   }

@@ -11,7 +11,7 @@ import { POCKET_LOOKS, POCKET_LOOK_LABEL, isPocketLook, type PocketLook } from '
 const LOOK_HINT: Record<PocketLook, string> = {
   dial: 'Round, with the Clock’s ticks. Hover for buttons.',
   capsule: 'A slim pill. Hover for the details.',
-  box: 'The Pomo window itself, with your timer face.',
+  box: 'The Timer window itself, with your timer face.',
 };
 
 function read(v: unknown): { enabled: boolean; look: PocketLook } | null {
@@ -52,7 +52,7 @@ export function PocketSection() {
     <div data-testid="settings-pocket" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ flex: 1, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>
-          Show the Pomo over other apps while KRNL0 is minimised
+          Show the Timer over other apps while KRNL0 is minimised
         </span>
         <Switch checked={state.enabled} onChange={flip} testId="settings-pocket-switch" title="Floating timer" />
       </div>

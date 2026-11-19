@@ -11,6 +11,12 @@
       "first-day"
     ]
   },
+  "84152039": {
+    "text": "The timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
+    "tours": [
+      "welcome"
+    ]
+  },
   "987e0212": {
     "text": "First, add something you'll do today. Click \"add a plan\" and type it. A small card shows its day, its time and how long it takes. Pick any of them if you like, then press Enter to add it.",
     "tours": [
@@ -41,8 +47,8 @@
       "first-day"
     ]
   },
-  "0fa0c54c": {
-    "text": "When you start working, press \"Start\". The Record timer records what you really do.",
+  "a7da04b7": {
+    "text": "When you start working, press \"Start\". The timer records what you really do.",
     "tours": [
       "first-day"
     ]
@@ -113,18 +119,6 @@
       "first-day"
     ]
   },
-  "ce6da46b": {
-    "text": "When you start working, press \"Start\". The Observe timer records what you really do.",
-    "tours": [
-      "first-day"
-    ]
-  },
-  "646720e0": {
-    "text": "When you start working, press \"Start\". The Pomo timer records what you really do.",
-    "tours": [
-      "first-day"
-    ]
-  },
   "9f70f100": {
     "text": "Need a pause? Press the break button, the cup next to Pause. Your work so far is saved, and the break is timed on its own.",
     "tours": [
@@ -139,12 +133,6 @@
   },
   "c530f81c": {
     "text": "Hi, I'm your guide! This app is one board, with a window for each part of your day. Press Next or Enter to go on, and Escape to stop at any time.",
-    "tours": [
-      "welcome"
-    ]
-  },
-  "181e0d3a": {
-    "text": "The Record timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
     "tours": [
       "welcome"
     ]
@@ -191,12 +179,6 @@
       "welcome"
     ]
   },
-  "34eadddd": {
-    "text": "The Observe timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
-    "tours": [
-      "welcome"
-    ]
-  },
   "f3cbae1e": {
     "text": "To-do is your list of plans. Each one can have a when, a day and a time or just a day. It can have a deadline, and it shows the time you really spent on it.",
     "tours": [
@@ -221,14 +203,8 @@
       "welcome"
     ]
   },
-  "6078c892": {
-    "text": "The Pomo timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
-    "tours": [
-      "welcome"
-    ]
-  },
-  "d8eb7f10": {
-    "text": "The Record timer records what you really do. Let's record a short session together. It only takes a few seconds!",
+  "ead21b11": {
+    "text": "The timer records what you really do. Let's record a short session together. It only takes a few seconds!",
     "tours": [
       "pomo"
     ]
@@ -275,20 +251,8 @@
       "pomo"
     ]
   },
-  "6554e9bd": {
-    "text": "The Observe timer records what you really do. Let's record a short session together. It only takes a few seconds!",
-    "tours": [
-      "pomo"
-    ]
-  },
   "e386ecb3": {
     "text": "Here you say what you're doing. Pick a task, or a category like Code, and the time counts toward it.",
-    "tours": [
-      "pomo"
-    ]
-  },
-  "090409e8": {
-    "text": "The Pomo timer records what you really do. Let's record a short session together. It only takes a few seconds!",
     "tours": [
       "pomo"
     ]
@@ -635,8 +599,8 @@
       "analytics"
     ]
   },
-  "4382c907": {
-    "text": "Each icon is a page: summary, activity, hours, and more. The name shows next to them.",
+  "0d326b4e": {
+    "text": "Analytics has pages: summary, activity, hours, and more. Press the name for the list, or step with the arrows.",
     "tours": [
       "analytics"
     ]
@@ -659,8 +623,8 @@
       "analytics"
     ]
   },
-  "3cb42f0a": {
-    "text": "Each icon is a page: summary, activity, hours, time per task, and more. The name shows next to them.",
+  "37fcb5b5": {
+    "text": "Analytics has pages: summary, activity, hours, time per task, and more. Press the name for the list, or step with the arrows.",
     "tours": [
       "analytics"
     ]
@@ -695,14 +659,14 @@
       "modes"
     ]
   },
-  "b1c10680": {
-    "text": "In Easy, the timer is called Record: a plain stopwatch, with Start, Break and Stop. Nothing to set up, nothing to name.",
+  "5141b16c": {
+    "text": "In Easy, the Timer is a plain stopwatch, with Start, Break and Stop. Nothing to set up, nothing to name.",
     "tours": [
       "modes"
     ]
   },
-  "ce46fa79": {
-    "text": "I've switched to Advanced, and this switch appeared! Pomo gives you classic twenty-five minute sessions with breaks. Observe keeps the stopwatch.",
+  "d2e721c7": {
+    "text": "I've switched to Advanced, and this switch appeared! \"Sessions\" gives you classic twenty-five minute rounds with breaks. \"Stopwatch\" runs until you stop.",
     "tours": [
       "modes"
     ]

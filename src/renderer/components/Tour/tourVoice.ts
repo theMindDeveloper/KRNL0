@@ -7,7 +7,9 @@
 /** The timer's name as its window shows it: Record (Easy), Pomo (Advanced,
  *  Pomodoro sessions) or Observe (Advanced, the stopwatch). */
 export function timerName(mode: 'easy' | 'advanced', timer: 'stopwatch' | 'pomo' = 'pomo'): string {
-  return mode === 'easy' ? 'Record' : timer === 'stopwatch' ? 'Observe' : 'Pomo';
+  // One name in every mode (window-frame.md); the arguments stay for callers.
+  void mode; void timer;
+  return 'Timer';
 }
 
 /** `{mode}` and `{pomo}` in a tour's words, title or badge, for this user. */

@@ -70,7 +70,7 @@ function renderWindows(v: SystemTimerView): void {
   if (key === lastKey) return;
   lastKey = key;
   if (v.badge === 'break') win.setOverlayIcon(glyph('break', [217, 165, 90]), 'On a break');
-  else if (v.badge === 'observe') win.setOverlayIcon(glyph('dot', [238, 132, 102]), 'Observe · recording');
+  else if (v.badge === 'observe') win.setOverlayIcon(glyph('dot', [238, 132, 102]), 'Recording');
   else win.setOverlayIcon(null, '');
   const buttons: ThumbarButton[] = v.controls.map((c) => ({
     tooltip: c.label,

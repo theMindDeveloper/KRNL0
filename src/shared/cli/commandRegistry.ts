@@ -118,7 +118,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'add', usage: 'pomo add --start HH:MM --end HH:MM [--task <ref>] [--text "what"]', summary: 'Record time you did not record (HH:MM = today, or YYYY-MM-DDTHH:MM)' },
       { name: 'delete-segment', usage: 'pomo delete-segment <segmentId>', summary: 'Delete a recorded focus/break span (Calendar/Clock right-click → Delete segment)' },
       { name: 'status', usage: 'pomo status', summary: 'Show current pomo status' },
-      { name: 'label', usage: 'pomo label "<what you are doing>" [--tag <id>]', summary: 'Name what the running timer records (Observe); "" clears it' },
+      { name: 'label', usage: 'pomo label "<what you are doing>" [--tag <id>]', summary: 'Name what the running timer records (Stopwatch); "" clears it' },
       { name: 'config', usage: 'pomo config [--mode observe|pomodoro] [--session N] [--short N] [--long N] [--every N] [--face auto|minimal|ascii|lcd|blocks|vapor|vu|outline|mac] [--count-stopped on|off]', summary: 'Timer settings: --mode observe (a stopwatch) or pomodoro (sessions and breaks); count-stopped: does Stop record the session so far' },
     ],
   },
@@ -351,14 +351,14 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
   },
   {
     group: 'mini',
-    summary: 'The floating timer: the Pomo node over other apps while KRNL0 is minimised',
+    summary: 'The floating timer: the Timer over other apps while KRNL0 is minimised',
     subcommands: [
       { name: 'status', usage: 'mini status [--json]', summary: 'On or off, showing or hidden, collapsed, and whether a session runs (default)' },
       { name: 'show', usage: 'mini show', summary: 'Show it now, even with KRNL0 open, while a session runs' },
       { name: 'hide', usage: 'mini hide', summary: 'Hide it until KRNL0 is minimised again' },
       { name: 'on', usage: 'mini on', summary: 'Turn the floating timer on' },
       { name: 'off', usage: 'mini off', summary: 'Turn the floating timer off' },
-      { name: 'look', usage: 'mini look [dial|capsule|box]', summary: 'How it looks: a round dial (default), a capsule, or the Pomo node as a box'},
+      { name: 'look', usage: 'mini look [dial|capsule|box]', summary: 'How it looks: a round dial (default), a capsule, or the Timer window as a box'},
     ],
   },
   {

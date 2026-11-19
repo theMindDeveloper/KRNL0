@@ -12,7 +12,7 @@ import type { PomoState } from '../PomoNode/types';
 import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
-import { dayProgress, progressRatio, weekProgress } from '../../../store/dayProgress';
+import { dayProgress, progressRatio } from '../../../store/dayProgress';
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { dueOnDay } from '../../../../shared/dueOn';
@@ -351,19 +351,12 @@ export function ClockNode({
   const trackInnerEdge = REALITY_R - REALITY_SW / 2;
   const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
 
-  const activeProgress = activeIdx >= 0
-    ? (nowFloat - tasks[activeIdx]!.start) / (tasks[activeIdx]!.end - tasks[activeIdx]!.start)
-    : 0;
-  const activeColor = activeIdx >= 0 ? tasks[activeIdx]!.colorVar : 'var(--ink-3)';
-
   // Station mode: the bottom-right Clock panel is much taller than the canvas-
   // mode fixed mother (540px) — scale the dial up so it fills the space
   // instead of leaving a strip of empty card around a tiny 244px square.
   const inStation = useContext(MotherFrameStationContext);
-  // engagement.md F18 — the outer ring closes as the day's planned blocks are
-  // ticked; under the dial, one small ring per day of this week.
+  // engagement.md F18 — the outer ring closes as the day's planned blocks are ticked.
   const dayDone = useMemo(() => dayProgress(board0, selectedDate), [board0, selectedDate]);
-  const weekMarks = useMemo(() => weekProgress(board0, todayLocalYMD()), [board0]);
   const ringR = trackOuterEdge + 6;
   const ringC = 2 * Math.PI * ringR;
 
@@ -391,7 +384,7 @@ export function ClockNode({
         {/* window-frame.md — the standard header: name, then one view switch. */}
         <div className="krnl-node-header kw-head" style={{ margin: '-10px -14px 0' }}>
           <span aria-hidden className="kw-dot" style={{ background: isToday ? 'var(--cyan)' : 'var(--ink-4)', boxShadow: isToday ? '0 0 0 2px color-mix(in srgb, var(--cyan) 25%, transparent)' : 'none' }} />
-          <span className="kw-title">{isToday ? 'Today · Schedule' : 'Day · Schedule'}</span>
+          <span className="kw-title">Clock</span>
           <span className="kw-sp" />
           <span className="kw-views nodrag" role="group" aria-label="Clock view" data-testid="clock-view-switch">
             <button
@@ -976,143 +969,9 @@ export function ClockNode({
               paints behind the hour/minute/second hands. */}
         </div>
 
-        {/* engagement.md F18 — this week, one ring per day (planned blocks done). */}
-        <div
-          data-testid="clock-week-marks"
-          style={{ display: dialOnly ? 'none' : 'flex', justifyContent: 'center', gap: 6, width: '100%' }}
-        >
-          {weekMarks.map((d) => {
-            const isToday = d.date === today;
-            const ratio = progressRatio(d);
-            const full = d.planned > 0 && d.done === d.planned;
-            const dow = new Date(`${d.date}T00:00:00`).toLocaleDateString('en', { weekday: 'narrow' });
-            return (
-              <button
-                key={d.date}
-                type="button"
-                data-testid={`clock-week-mark-${d.date}`}
-                title={d.planned > 0 ? `${d.done} of ${d.planned} planned done` : 'nothing planned'}
-                onClick={() => onCommand('clock.setSelectedDate', { date: d.date })}
-                style={{ all: 'unset', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 24 }}
-              >
-                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-                  {isToday && <circle cx="10" cy="10" r="9.3" fill="none" stroke="var(--ink-3)" strokeWidth="0.8" />}
-                  <circle cx="10" cy="10" r="7" fill="none" stroke="var(--paper-3)" strokeWidth="2.4" strokeDasharray={d.planned > 0 ? undefined : '1.6 2'} />
-                  {ratio > 0 && (
-                    <circle cx="10" cy="10" r="7" fill="none" stroke="var(--acid)" strokeWidth="2.4" strokeLinecap="round"
-                      strokeDasharray={`${(ratio * 2 * Math.PI * 7).toFixed(2)} 44`} transform="rotate(-90 10 10)" />
-                  )}
-                  {full && <path d="M6.6 10.2l2.2 2.2 4.4-4.6" fill="none" stroke="var(--acid-ink, var(--acid))" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />}
-                </svg>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: isToday ? 'var(--ink)' : 'var(--ink-3)', textTransform: 'uppercase' }}>{dow}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Now-playing strip */}
-        <div
-          style={{
-            display: dialOnly ? 'none' : 'flex',
-            alignItems: 'center',
-            gap: 8,
-            width: '100%',
-            padding: '8px 10px',
-            background: 'var(--paper-2)',
-            border: '1px solid var(--paper-3)',
-            borderRadius: 5,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            position: 'relative',
-            overflow: 'hidden',
-            boxSizing: 'border-box',
-            color: activeColor,
-          }}
-        >
-          {/* Progress fill */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(90deg, currentColor 0%, currentColor 100%)',
-              opacity: 0.1,
-              pointerEvents: 'none',
-              transformOrigin: '0 50%',
-              transform: `scaleX(${activeProgress})`,
-            }}
-          />
-          {activeIdx >= 0 ? (
-            <>
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  background: activeColor,
-                  boxShadow: `0 0 8px ${activeColor}`,
-                  display: 'inline-block',
-                }}
-              />
-              <span
-                style={{
-                  color: 'var(--ink)',
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  fontSize: 11,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  maxWidth: 130,
-                }}
-              >
-                {tasks[activeIdx]!.name}
-              </span>
-              <span
-                style={{
-                  marginLeft: 'auto',
-                  color: 'var(--ink-3)',
-                  fontSize: 11,
-                  letterSpacing: '0.04em',
-                  flexShrink: 0,
-                }}
-              >
-                {fmtTime(tasks[activeIdx]!.start)} → {fmtTime(tasks[activeIdx]!.end)}
-              </span>
-            </>
-          ) : (
-            <>
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  background: 'var(--ink-3)',
-                  display: 'inline-block',
-                }}
-              />
-              <span
-                style={{
-                  color: 'var(--ink-3)',
-                  textTransform: 'none',
-                  fontWeight: 400,
-                  fontSize: 11,
-                }}
-              >
-                {isToday
-                  ? `free · ${fmtTime(nowFloat)}`
-                  : `viewing ${selectedDateObj.toLocaleDateString(undefined, {
-                      weekday: 'long',
-                      month: 'short',
-                      day: 'numeric',
-                    })}`}
-              </span>
-            </>
-          )}
-        </div>
-
+        {/* window-frame.md, no repeated rows — the week's rings and the "now" box
+            that sat here are gone: the WEEK view shows the week, and the list
+            below marks the plan that is running. */}
         {/* Task list — pages of whole rows, never a scrollbar. */}
         <PagedView
           testId="clock-task-pages"

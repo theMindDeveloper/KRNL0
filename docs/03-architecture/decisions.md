@@ -2649,3 +2649,11 @@ The user found the cards unclear (a bare "0" in a circle, no clear click target,
 ## Decision 45 — One frame for windows, one pattern for menus and cards (2026-11-19)
 
 Every window uses the shared header, time row and footer (`docs/04-visual-system/window-frame.md`); every right-click menu has six rows at most with rarer rows behind More (`docs/04-visual-system/menus.md`); the plan card is short by default and its main button says Save. A new control gets a slot in these, not a new spot. `tests/unit/renderer/windowFrame.test.ts` guards it.
+
+## Decision 46 — One name per window: the Timer (2026-11-19)
+
+The timer window had five names (RECORD, TIME LOG, POMO, DEEP WORK · POMO.025, POMO / OBSERVE). It is now **Timer** everywhere a person reads it: the top bar, the window header, the floating timer, Settings, the tutorials, the status bar. Its two ways of working are **Sessions** (timed rounds with breaks) and **Stopwatch** (runs until you stop). A window's header says what its top-bar toggle says, and a mode never renames a window.
+
+- Words only. The node kind (`pomo`), the config values (`mode: 'pomodoro' | 'observe'`), the commands (`krnl pomo …`) and every test id are unchanged, so no board migration and no CLI change.
+- The Clock's header says "Clock" for the same reason (it said "Today · Schedule").
+- Guard: `tests/unit/renderer/windowFrame.test.ts`.

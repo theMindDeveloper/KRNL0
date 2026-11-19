@@ -102,3 +102,31 @@ describe('The plan card is short by default (window-frame.md, cards)', () => {
     expect(card).toContain('data-testid="plan-card-more"');
   });
 });
+
+describe('One name per window; no second summary rows (window-frame.md)', () => {
+  it('the Timer is called Timer in every mode; its modes are Sessions and Stopwatch', () => {
+    const s = src('PomoNode/index.tsx');
+    expect(s).toContain(": 'TIMER';");
+    expect(s).not.toContain("'TIME LOG'");
+    expect(s).not.toContain('DEEP WORK');
+    expect(s).toContain("m === 'pomodoro' ? 'SESSIONS' : 'STOPWATCH'");
+    const bar = readFileSync(join(process.cwd(), 'src/renderer/components/Station/StationToolbar.tsx'), 'utf8');
+    expect(bar).not.toMatch(/'(Record|Pomo)'/);
+  });
+  it('the Timer shows one progress row (the session dots), not two counters', () => {
+    expect(src('PomoNode/index.tsx')).not.toContain('CycleCounter');
+  });
+  it('Analytics: pages are a named list in the time row, not a row of icons', () => {
+    expect(src('AnalyticsNode/index.tsx')).toContain('<div className="kw-range" style={toolbarStyle}>');
+    const nav = src('AnalyticsNode/PageNav.tsx');
+    expect(nav).toContain('testId="analytics-page"');
+    expect(nav).toContain('data-testid="analytics-page-prev"');
+    expect(nav).not.toContain('data-testid={`analytics-page-${p.id}`}');
+  });
+  it('Clock: named Clock; no week rings and no "now" box under the dial', () => {
+    const s = src('ClockNode/index.tsx');
+    expect(s).toContain('<span className="kw-title">Clock</span>');
+    expect(s).not.toContain('data-testid="clock-week-marks"');
+    expect(s).not.toContain('`free · ');
+  });
+});

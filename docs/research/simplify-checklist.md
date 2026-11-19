@@ -12,7 +12,7 @@ Status words: **Done**, **Partly**, **Open**, **Needs your decision** (it remove
 | One time row: ‹ date › Today, 32px | Done (Calendar week/day, Clock) |
 | One footer: the add field or the main button, 44px | Done (Timer, Todo, Habits, Calendar) |
 | Calendar's Month and Year views use the same time row | Done |
-| Analytics: its own row of 11 page icons | Open |
+| Analytics: its row of page icons is the standard time row: ‹ page name › (the name opens a list), then the range | Done |
 
 Standard: `docs/04-visual-system/window-frame.md`. A test fails if a window builds its own header or footer again.
 
@@ -33,9 +33,9 @@ Standard: `docs/04-visual-system/window-frame.md`. A test fails if a window buil
 | Todo rows: one line each in a narrow window (name, when, length; tag as a dot) | Done |
 | Top bar: breadcrumb, FIT (in Station) and the DARK button removed; the window toggles are the quietest control (lit icon when shown, no underline bars) | Done |
 | Clock: AM / PM folded into the time row (one row less) | Done |
-| Analytics: 11 pages, range buttons, and a second date control inside pages | Open |
-| Clock: week dots, the "free" box and the list under the dial | Open |
-| Timer in Advanced: the task picker, session dots and stats all at once | Open |
+| Analytics: the ten page icons are one named list; the page name is shown once; the streak chip left the header | Done |
+| Clock: the week dots and the "free" box are gone (the WEEK view and the list say it); the window is named Clock | Done |
+| Timer in Advanced: one progress row (the session dots; today's rounds are in its tooltip); the header no longer repeats the session length | Done |
 | The board: a card for every plan, drawn again beside the Todo and the Calendar | Needs your decision (5.5) |
 
 ## 4. "Right-click menus"
@@ -58,7 +58,7 @@ My answer, feature by feature. None of these is changed yet: each one hides or r
 | 5.1 | Chains that push later plans | Caused the "tasks moved to today and tomorrow" bug; hard to predict | Keep the order (the wire), stop the automatic pushing | **Done** (you said yes; Decision 44) |
 | 5.2 | Several canvases | They share all plans, so a "new canvas" looks like a copy | One canvas by default; more only in Advanced | **Already so**: Easy has one canvas and no switcher (easy-mode D24). I was wrong to list it as open |
 | 5.3 | Finished-cards setting (overnight / 1 hour / keep) | A setting for something the app can decide | One rule: gone the next morning; Archive stays in the menu | Needs your decision |
-| 5.4 | Three names for one timer (Record / Pomo / Observe) | Three words to learn for one window | One name; Pomodoro sessions are an option inside it | Needs your decision |
+| 5.4 | Three names for one timer (Record / Pomo / Observe) | Three words to learn for one window | One name, **Timer**; its two ways of working are **Sessions** and **Stopwatch** | **Done** (you asked what I meant; this is it, and it is a rename only: one commit to undo) |
 | 5.5 | A board card for every plan | The same plan is in the Todo, on the Calendar, on the Clock and on the board | A plan gets a board card only when you ask for one | Needs your decision |
 | 5.6 | Deadline next to When | Two dates per plan | Kept, but behind More (done) | Done |
 | 5.7 | Tags | Extra work per plan | Kept; the row shows a dot, the name is one hover away (done) | Done |

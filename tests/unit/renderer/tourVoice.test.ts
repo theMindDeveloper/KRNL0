@@ -18,19 +18,19 @@ describe('spoken text', () => {
   });
 });
 
-describe('The timer is named as its window shows it', () => {
-  it('Record in Easy, Observe with the stopwatch, Pomo with sessions', () => {
-    expect(timerName('easy', 'stopwatch')).toBe('Record');
-    expect(timerName('advanced', 'stopwatch')).toBe('Observe');
-    expect(timerName('advanced', 'pomo')).toBe('Pomo');
-    expect(spokenText('x', 'advanced', 'The {pomo} timer.', 'stopwatch')).toBe('The Observe timer.');
-    expect(fillTour('{pomo} — your timer', 'easy', 'stopwatch')).toBe('Record — your timer');
+describe('The timer has one name in every mode (window-frame.md)', () => {
+  it('Timer in Easy, with the stopwatch and with sessions', () => {
+    expect(timerName('easy', 'stopwatch')).toBe('Timer');
+    expect(timerName('advanced', 'stopwatch')).toBe('Timer');
+    expect(timerName('advanced', 'pomo')).toBe('Timer');
+    expect(spokenText('x', 'advanced', 'The {pomo} runs.', 'stopwatch')).toBe('The Timer runs.');
+    expect(fillTour('{pomo} — record what you do', 'easy', 'stopwatch')).toBe('Timer — record what you do');
   });
-  it('menus show the tour title for the board: Easy, Observe, Pomo', () => {
+  it('menus show the same tour title for every board', () => {
     const board = (uiMode: string, mode: string) => ({ uiMode, nodes: [{ kind: 'pomo', isMother: true, config: { mode } }] });
-    expect(tourTitleOn('{pomo} — your timer', board('easy', 'pomodoro'))).toBe('Record — your timer');
-    expect(tourTitleOn('{pomo} — your timer', board('advanced', 'observe'))).toBe('Observe — your timer');
-    expect(tourTitleOn('{pomo} — your timer', board('advanced', 'pomodoro'))).toBe('Pomo — your timer');
+    for (const b of [board('easy', 'pomodoro'), board('advanced', 'observe'), board('advanced', 'pomodoro')]) {
+      expect(tourTitleOn('{pomo} — record what you do', b)).toBe('Timer — record what you do');
+    }
   });
 });
 

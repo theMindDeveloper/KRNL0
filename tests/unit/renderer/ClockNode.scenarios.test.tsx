@@ -305,13 +305,17 @@ describe('Header', () => {
     expect(screen.getByTestId('clock-dial-only').textContent).toMatch(/BIG CLOCK/);
   });
 
-  it('shows "Today · Schedule" title', () => {
+  it('is named Clock, like its toggle in the top bar (window-frame.md)', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
-    // The title text may be split across spans; look for the combined text.
-    const el = document.body.textContent ?? '';
-    expect(el.toLowerCase()).toContain('today');
-    expect(el.toLowerCase()).toContain('schedule');
+    expect(document.querySelector('.kw-title')?.textContent).toBe('Clock');
+  });
+
+  it('draws no second summary under the dial: no week rings, no "now" box', () => {
+    seedBoard([]);
+    renderClockNode(makeClockState());
+    expect(screen.queryByTestId('clock-week-marks')).toBeNull();
+    expect(document.body.textContent ?? '').not.toMatch(/free ·/);
   });
 });
 

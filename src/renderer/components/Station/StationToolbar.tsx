@@ -27,7 +27,7 @@ interface MotherEntry {
 
 // Order matches the layout: top-row mothers left → right, then bottom-row.
 const MOTHER_ORDER: MotherEntry[] = [
-  { kind: 'pomo',     label: 'Pomo' },
+  { kind: 'pomo',     label: 'Timer' },
   { kind: 'todo',     label: 'Todo' },
   { kind: 'habit',    label: 'Habit' },
   { kind: 'calendar', label: 'Cal' },
@@ -242,7 +242,7 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           <ToolbarBtn
             key={m.kind}
             active={active}
-            label={easy && m.kind === 'pomo' ? 'Record' : m.label}
+            label={m.label}
             onClick={() => toggleMother(m.kind)}
           >
             <Glyph kind={m.kind} active={active} />

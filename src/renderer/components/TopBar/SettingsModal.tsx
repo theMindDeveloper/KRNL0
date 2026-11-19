@@ -23,7 +23,7 @@ export type SettingsSection = 'general' | 'timer' | 'sounds' | 'finished' | 'cel
 
 const SECTIONS: ReadonlyArray<{ id: SettingsSection; icon: SettingsIconName; label: string; title: string; blurb: string }> = [
   { id: 'general', icon: 'general', label: 'General', title: 'General', blurb: 'How KRNL0 looks, and how much of it you see.' },
-  { id: 'timer', icon: 'timer', label: 'Floating timer', title: 'Floating timer', blurb: 'Keep the Pomo in sight while you work in other apps.' },
+  { id: 'timer', icon: 'timer', label: 'Floating timer', title: 'Floating timer', blurb: 'Keep the Timer in sight while you work in other apps.' },
   { id: 'sounds', icon: 'sound', label: 'Sounds', title: 'Sounds', blurb: 'Small sounds that confirm what you just did.' },
   { id: 'finished', icon: 'finished', label: 'Finished cards', title: 'Finished cards', blurb: 'Done tasks clear off the board so today stays in focus.' },
   { id: 'celebrations', icon: 'celebrations', label: 'Celebrations', title: 'Celebrations', blurb: 'A card to keep or share when you hit a milestone.' },

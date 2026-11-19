@@ -26,7 +26,7 @@ import { HoldButton } from '../../ui/HoldButton';
 import { PagedView } from '../../ui/PagedView';
 import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
-import { EASY_HIDDEN_PAGES, PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
+import { EASY_HIDDEN_PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
 import { useEasyMode } from '../../../store/uiMode';
 import { PageNav } from './PageNav';
 import { AnalyticsSettings } from './AnalyticsSettings';
@@ -215,13 +215,9 @@ const gearBtnStyle = (active: boolean): React.CSSProperties => ({
 });
 
 const toolbarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  // window-frame.md — the same 12px side edge as the header above it.
-  padding: '8px 12px 0',
-  flexShrink: 0,
-  flexWrap: 'wrap',
+  // The frame's time row, in the Analytics' own colours.
+  borderBottom: '1px solid var(--k-an-line-2, #2a2e33)',
+  color: 'var(--k-an-ink-2, #c8cdd3)',
 };
 
 const tabPill = (active: boolean): React.CSSProperties => ({
@@ -575,9 +571,6 @@ export function AnalyticsNode({
       <div className="krnl-node-header an-head kw-head" style={titlebarStyle}>
         <span className="kw-dot" style={dotStyle} aria-hidden />
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
-        <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
-        {/* The page you are on (the toolbar is icons only) — "3 sources" told a new user nothing. */}
-        <span data-testid="analytics-page-name" title={`${sources.length} data sources`} style={{ color: 'var(--k-an-ink-2b, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{PAGES.find((pg) => pg.id === currentPage)?.label ?? 'Summary'}</span>
         <div style={{ flex: 1 }} />
         <span className="an-chip an-chip--done" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>done </span>
@@ -587,12 +580,6 @@ export function AnalyticsNode({
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>focus </span>
           <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin}m</span>
         </span>
-        {streaks.longestHabitStreak > 0 && (
-          <span className="an-chip an-chip--streak" style={summaryChipStyle} title="Longest habit streak in this range">
-            <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>streak </span>
-            <span style={{ color: 'var(--acid-ink, var(--acid, #c9f158))', fontWeight: 600 }}>{streaks.longestHabitStreak}d</span>
-          </span>
-        )}
         <button
           type="button"
           data-testid="analytics-gear"
@@ -607,10 +594,9 @@ export function AnalyticsNode({
         </button>
       </div>
 
-      {/* Page icons + range chips — one compact row; the rest is charts. */}
-      <div style={toolbarStyle}>
+      {/* window-frame.md — the time row: which page (earlier, its name, later), then the range. */}
+      <div className="kw-range" style={toolbarStyle}>
         <PageNav current={currentPage} pages={pages} onPick={(id) => setJumpTo(pageSelector(id))} />
-        <div style={{ flex: 1 }} />
         {/* window-frame.md — the range is the same switch every window uses. */}
         <div className="kw-views" role="group" aria-label="Range">
           {RANGE_PRESETS.map((days) => (
@@ -817,7 +803,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
         cardId: 'estimates.perTask' as const,
         render: () => card('estimates.perTask', 'Estimate vs actual · per task', 2, 250, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Legend items={[{ label: 'Planned (estimate)', color: COLOR_PLANNED }, { label: 'Tracked (pomo, tagged)', color: COLOR_TRACKED }]} />
+            <Legend items={[{ label: 'Planned (estimate)', color: COLOR_PLANNED }, { label: 'Recorded on the task', color: COLOR_TRACKED }]} />
             <EstimateBars tasks={est.tasks} width={chartWidth(size.width, 480)} {...(size.height > 0 ? { height: size.height - 30 } : {})} />
           </div>
         )),
@@ -832,7 +818,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
         cardId: 'estimates.daily' as const,
         render: () => card('estimates.daily', 'Planned vs worked · per day', 3, 200, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Legend items={[{ label: 'Planned on calendar', color: COLOR_PLANNED }, { label: 'Worked (pomo)', color: COLOR_TRACKED }]} />
+            <Legend items={[{ label: 'Planned on calendar', color: COLOR_PLANNED }, { label: 'Recorded', color: COLOR_TRACKED }]} />
             <DailyPlanActual days={est.days} width={chartWidth(size.width, 640)} height={chartHeight(size.height - 20, 170)} />
           </div>
         )),

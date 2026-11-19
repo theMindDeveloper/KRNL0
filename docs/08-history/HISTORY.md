@@ -2852,3 +2852,18 @@ Eight tutorial lines changed with the menus and were re-recorded. The owner's me
 - **Calendar Month and Year views:** the standard time row. **Repeating-event menu:** six rows, More. **Guard tests** for menus and the plan card.
 
 Canvases were already one-per-board in Easy (D24); nothing to change. The timer's names and the two remaining cuts (finished-cards setting, a board card for every plan) wait for the owner. Checked as screenshots at 1457 × 945; not yet used by the owner.
+
+## [2026-11-19] — One name for the Timer; Analytics, Clock and Timer show less
+
+**Type:** Feature (UI simplification)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `PomoNode/index.tsx`, `Station/StationToolbar.tsx`, `StatusBar/index.tsx`, `pocket/PocketApp.tsx`, `pocket/CapsuleView.tsx`, `TopBar/PocketSection.tsx`, `TopBar/SettingsModal.tsx`, `shared/systemTimer.ts`, `shared/cli/commandRegistry.ts`, `main/taskbar.ts`, `analytics/sources/pomoSource.ts`, `AnalyticsNode/index.tsx`, `AnalyticsNode/PageNav.tsx`, `AnalyticsNode/TimeLogHeatmap.tsx`, `ClockNode/index.tsx`, `Tour/tours.ts`, `Tour/tourVoice.ts`, tour voice clips, tests (`windowFrame.test.ts`, `ClockNode.scenarios.test.tsx`, `tourVoice.test.ts`), docs (`window-frame.md`, Decision 46, `simplify-checklist.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Timer (Decision 46):** one name in every mode and place (it was RECORD, TIME LOG, POMO, DEEP WORK · POMO.025). The Advanced switch reads SESSIONS / STOPWATCH (it read POMO / OBSERVE). Words only: commands, config values and test ids are unchanged.
+- **Timer body:** one progress row (the session dots); the separate "cycles today" counter is gone, its numbers are in the dots' tooltip. The header no longer repeats the session length.
+- **Analytics:** the row of ten unlabelled page icons is the standard time row: ‹ page name ›, where the name opens the list of pages, then the range switch. The page name is shown once; the streak chip left the header. Two chart legends say "Recorded" instead of "pomo".
+- **Clock:** named "Clock" (it said "Today · Schedule"). The week rings and the "now / free" box under the dial are gone: the WEEK view shows the week and the list marks the running plan. The dial gets the room.
+- **Tutorials:** the lines that named these things are reworded and re-recorded; the Analytics tour now opens a page from the list.
+
+Typecheck clean; all tests pass. Checked as screenshots at 1457 × 945 and 1920 × 1080 in Advanced and Easy on the demo board; not yet used by the owner.
