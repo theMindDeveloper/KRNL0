@@ -11,6 +11,7 @@ import { applyPrefsPatch, parseAppState, updateKind, type AppStateFile, type Lau
 import type { Json } from '../shared/sync/types';
 import type { SyncEngine } from '../shared/sync/engine';
 import type { SyncDevice, SyncInfo } from '../shared/sync/port';
+import { readServerUpdate, type ServerUpdateResult } from '../shared/sync/serverUpdate';
 import { newAssetId, type BoardMeta, type WebHost } from './sync/host';
 import type { WebTransport } from './sync/transport';
 import type { WebSyncStore } from './sync/store';
@@ -80,6 +81,18 @@ export function unsentChanges(host: WebHost, store: WebSyncStore): number {
 
 export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: () => void } {
   const { host, engine } = d;
+  const serverWrite = async (method: 'POST' | 'PUT', path: string, body: Record<string, unknown>): Promise<ServerUpdateResult> => {
+    try {
+      const r = await d.transport.serverCall(method, path, body);
+      const err = r.body.error as { message?: unknown; update?: unknown } | undefined;
+      const update = readServerUpdate(r.body.update ?? err?.update);
+      if (r.status === 200 || r.status === 202) return { ok: true, message: null, update };
+      if (r.status === 404) return { ok: false, message: 'This server version can not update itself yet. Run the command shown on the server once.', update };
+      return { ok: false, message: typeof err?.message === 'string' ? err.message : `The server answered ${r.status}.`, update };
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e), update: null };
+    }
+  };
 
   // Launch (Decision 38) as the desktop computes it, once per page load.
   let appState = readAppState();
@@ -348,6 +361,16 @@ export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: 
     syncStatus: async () => info(),
     onSyncStatus: (cb) => { statusListeners.add(cb); return () => { statusListeners.delete(cb); }; },
     syncRetry: async () => { await engine.syncNow(); return { ok: true, info: info() }; },
+    // server-updates F1–F6: the server this page came from.
+    syncServer: async (check?: boolean) => {
+      try {
+        let r = check ? await d.transport.serverCall('POST', '/api/v1/server/update/check', {}) : await d.transport.serverCall('GET', '/api/v1/server');
+        if (check && r.status === 404) r = await d.transport.serverCall('GET', '/api/v1/server');
+        return r.status === 200 ? readServerUpdate(r.body.update) : null;
+      } catch { return null; }
+    },
+    syncServerUpdate: async (password: string, code?: string): Promise<ServerUpdateResult> => serverWrite('POST', '/api/v1/server/update', { password, ...(code ? { code } : {}) }),
+    syncServerAuto: async (on: boolean, password: string, code?: string): Promise<ServerUpdateResult> => serverWrite('PUT', '/api/v1/server/update/auto', { on, password, ...(code ? { code } : {}) }),
     syncDevices: async (): Promise<SyncDevice[]> => {
       try {
         const r = await fetch('/api/v1/devices', { credentials: 'same-origin', cache: 'no-store' });

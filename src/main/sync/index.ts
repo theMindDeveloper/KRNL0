@@ -52,6 +52,10 @@ export function initSync(deps: {
   ipcMain.handle('sync:disconnect', async () => ({ ok: true, info: await s.disconnect() }));
   ipcMain.handle('sync:retry', async () => ({ ok: true, info: await s.retry() }));
   ipcMain.handle('sync:devices', async () => s.devices());
+  // server-updates F1–F6: the server's update state, one click, night updates.
+  ipcMain.handle('sync:server', async (_e, check: unknown) => s.serverUpdate(check === true));
+  ipcMain.handle('sync:server-update', async (_e, password: unknown, code: unknown) => s.startServerUpdate(String(password ?? ''), typeof code === 'string' && code ? code : undefined));
+  ipcMain.handle('sync:server-auto', async (_e, on: unknown, password: unknown, code: unknown) => s.setServerAuto(on === true, String(password ?? ''), typeof code === 'string' && code ? code : undefined));
 
   s.start();
   app.on('before-quit', () => s.stop());

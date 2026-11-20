@@ -86,6 +86,18 @@ export class WebTransport implements SyncTransport {
     return { status: res.status, res, json: () => res.json().catch(() => ({})) as Promise<Record<string, unknown>> };
   }
 
+  /**
+   * Server update routes (server-updates F1–F6). Unlike sync calls, a 401 here is a
+   * wrong password, not an ended session, so statuses come back as they are.
+   */
+  async serverCall(method: 'GET' | 'POST' | 'PUT', path: string, json?: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+    const headers: Record<string, string> = { ...(this.opts.headers ?? {}) };
+    if (method !== 'GET') { headers['X-KRNL0-CSRF'] = this.csrf; headers['Content-Type'] = 'application/json'; }
+    const res = await this.f(this.origin + path, { method, headers, body: json === undefined ? null : JSON.stringify(json), credentials: 'same-origin', cache: 'no-store' });
+    const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+    return { status: res.status, body };
+  }
+
   async listDocs(): Promise<DocListing[]> {
     const r = await this.call('GET', '/api/v1/docs');
     const docs = ((await r.json()).docs as Array<{ name: string; rev: number; deleted?: boolean }>) ?? [];
