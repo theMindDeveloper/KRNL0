@@ -21,13 +21,15 @@ import artBoard from '../../assets/launch/plate-board.webp';
 import artBoards from '../../assets/launch/plate-boards.webp';
 import artWindows from '../../assets/launch/plate-windows.webp';
 import artCards from '../../assets/launch/plate-cards.webp';
+import artSync from '../../assets/launch/plate-sync.webp';
+import artPhone from '../../assets/launch/plate-phone.webp';
 import { startTour } from '../Tour/TourHost';
 import { tourById } from '../Tour/tours';
 import { useEasyMode } from '../../store/uiMode';
 
 const ART: Record<WhatsNewArt, string> = {
   mini: artMini, menubar: artMenubar, feedback: artFeedback, streak: artStreak, sessions: artSessions, guide: artGuide, board: artBoard,
-  boards: artBoards, windows: artWindows, cards: artCards,
+  boards: artBoards, windows: artWindows, cards: artCards, sync: artSync, phone: artPhone,
 };
 
 function runAction(item: WhatsNewItem): void {
