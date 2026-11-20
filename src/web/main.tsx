@@ -7,6 +7,10 @@
 
 import { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+// React Flow's own styles first, the app's theme after (the desktop's order:
+// there App, and with it the canvas, is imported before the theme). The other
+// way round, React Flow's defaults win: a white map, white controls.
+import '@xyflow/react/dist/style.css';
 import '../renderer/styles/tokens.css';
 import '../renderer/styles/reactflow-theme.css';
 import '../renderer/styles/chassis.css';

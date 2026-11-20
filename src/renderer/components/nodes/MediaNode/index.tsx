@@ -12,6 +12,7 @@ import type { NodeProps } from '../types';
 import { useBoardStore } from '../../../store/boardStore';
 import { MEDIA_SIZE, mediaUrl, type MediaConfig, type MediaState } from './types';
 import { LineGlyph } from '../../ui/LineGlyph';
+import { useAssetUrl } from '../../../utils/assetUrl';
 
 const ReactPlayer = lazy(() => import('react-player/lazy'));
 
@@ -39,10 +40,13 @@ function fmtBytes(n?: number): string {
 
 export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, MediaConfig>) {
   const s = node.state as MediaState;
-  const url = mediaUrl(s);
+  const isUrl = s.media === 'embed' || s.media === 'link';
+  // A stored file loads from the desktop's asset protocol, or on the web from
+  // this browser's copy (null while it loads; missing when it never arrived).
+  const file = useAssetUrl(isUrl ? null : s.src, (id) => mediaUrl({ media: s.media, src: id }));
+  const url = isUrl ? mediaUrl(s) : file.url ?? '';
   const k = KIND[s.media];
   const min = s.media === 'file' ? { w: 220, h: 96 } : s.media === 'audio' ? { w: 280, h: 104 } : { w: 240, h: 160 };
-  const isUrl = s.media === 'embed' || s.media === 'link';
   // The card takes the content's shape: embeds start 16:9, files report theirs.
   const fit = (aspect: number) => onCommand('media.setAspect', { aspect });
   useEffect(() => {
@@ -80,7 +84,7 @@ export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, M
             Aa
           </button>
         )}
-        {(isUrl || s.media === 'pdf' || s.media === 'file') && (
+        {(isUrl || s.media === 'pdf' || s.media === 'file') && url !== '' && (
           <a className="nodrag" href={url} target="_blank" rel="noreferrer" download={s.media === 'file' ? s.title : undefined} title={s.media === 'file' ? 'Download' : 'Open'} style={{ ...chipBtn, display: 'grid', placeItems: 'center', textDecoration: 'none' }}>
             <Svg size={12}>{s.media === 'file' ? <><path d="M12 4v11M7 10l5 5 5-5" /><path d="M5 20h14" /></> : <><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>}</Svg>
           </a>
@@ -89,11 +93,18 @@ export function MediaNode({ node, selected, onCommand }: NodeProps<MediaState, M
 
       {/* Body */}
       <div className="nodrag nowheel" style={{ flex: 1, minHeight: 0, position: 'relative', margin: '0 6px 6px', borderRadius: 10, overflow: 'hidden', background: s.media === 'video' || s.media === 'embed' ? '#000' : 'var(--paper-2)' }}>
-        {s.media === 'pdf' && <PdfView url={url} page={s.page ?? 1} onPage={(page) => onCommand('media.setPage', { page })} onAspect={fit} />}
-        {s.media === 'audio' && <AudioPlayer url={url} tone={k.tone} />}
+        {!isUrl && !file.url && (
+          <Centered>
+            {file.missing
+              ? <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', padding: 16, lineHeight: 1.45 }}>This file has not reached this device yet.</span>
+              : <Spinner />}
+          </Centered>
+        )}
+        {url !== '' && s.media === 'pdf' && <PdfView url={url} page={s.page ?? 1} onPage={(page) => onCommand('media.setPage', { page })} onAspect={fit} />}
+        {url !== '' && s.media === 'audio' && <AudioPlayer url={url} tone={k.tone} />}
         {s.media === 'file' && <FileCard name={s.title} size={s.size} tone={k.tone} />}
         {s.media === 'link' && <WebPreview url={url} />}
-        {(s.media === 'video' || s.media === 'embed') && <VideoPlayer url={url} onAspect={fit} />}
+        {url !== '' && (s.media === 'video' || s.media === 'embed') && <VideoPlayer url={url} onAspect={fit} />}
       </div>
 
       <NodeResizeControl
@@ -121,7 +132,7 @@ const chipBtn: React.CSSProperties = {
 
 function VideoPlayer({ url, onAspect }: { url: string; onAspect: (a: number) => void }) {
   const [error, setError] = useState(false);
-  const isFile = url.startsWith('krnl-asset://');
+  const isFile = url.startsWith('krnl-asset://') || url.startsWith('blob:');
   if (error) {
     return (
       <Centered>
