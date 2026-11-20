@@ -179,6 +179,19 @@ export function deleteTaskCascade(
   return { board, removedCount: allDescendants.size, pomoCancelled };
 }
 
+// ── doneAtISO ─────────────────────────────────────────────────────────────
+// "I did it then": a tick may say when the task was really done, so a late
+// tick lands on the right day in analytics. Accepts a local "YYYY-MM-DDTHH:MM"
+// or a full ISO string. Returns null when absent, unreadable or in the future
+// (a task can't be done later than now) — the caller then uses now.
+
+export function doneAtISO(raw: unknown, nowMs: number): string | null {
+  if (typeof raw !== 'string' || raw.trim() === '') return null;
+  const ms = Date.parse(raw.trim());
+  if (!Number.isFinite(ms) || ms > nowMs) return null;
+  return new Date(ms).toISOString();
+}
+
 // ── stampCompletedAt ──────────────────────────────────────────────────────
 // Issue #134 — applied at every task.toggle call site (renderer, sys CLI,
 // taskToggleMirror) so analytics buckets can date completions.

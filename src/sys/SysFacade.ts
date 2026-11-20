@@ -864,7 +864,7 @@ export class SysFacade {
         case 'list':    return task.taskList(ctx, command.todoId, command.json);
         case 'add':     return task.taskAdd(ctx, command.todoId, command.text, command.durationMin);
         case 'edit':    return task.taskEdit(ctx, command.id, command.text);
-        case 'toggle':  return task.taskToggle(ctx, command.id);
+        case 'toggle':  return task.taskToggle(ctx, command.id, command.at);
         case 'delete':  return task.taskDelete(ctx, command.id);
         case 'pomo':    return task.taskStartPomo(ctx, command.id);
         case 'subtask':    return task.taskSubtask(ctx, command.parentId, command.text);

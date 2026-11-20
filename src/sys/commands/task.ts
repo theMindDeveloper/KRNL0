@@ -27,6 +27,7 @@ import {
   deleteTaskCascade,
   renumberSiblings as sharedRenumberSiblings,
   taskToggleMirror,
+  doneAtISO,
   renameTask,
 } from '../../shared/dispatch/task';
 import type { BoardShape as SharedBoardShape } from '../../shared/dispatch/types';
@@ -279,8 +280,14 @@ export async function taskEdit(
 export async function taskToggle(
   ctx: TaskCtx,
   taskId: string | undefined,
+  at?: string,
 ): Promise<SysResult> {
   if (!taskId) return { ok: false, message: 'task toggle requires a <id>' };
+  // --at: when it was really done ("I did it then"). Never in the future.
+  const doneAt = at !== undefined ? doneAtISO(at, Date.now()) : null;
+  if (at !== undefined && doneAt === null) {
+    return { ok: false, message: `task toggle --at: "${at}" is not a past date/time (use YYYY-MM-DDTHH:MM)` };
+  }
   const board = loadBoard(ctx);
   const taskNode = findTaskNode(board, taskId);
   if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
@@ -288,7 +295,7 @@ export async function taskToggle(
 
   // Shared with the renderer: toggles, stamps completedAt, mirrors to the
   // TodoItem and records/clears the completion ledger (#169).
-  const env = { uuid: () => randomUUID(), now: () => new Date().toISOString() };
+  const env = { uuid: () => randomUUID(), now: () => doneAt ?? new Date().toISOString() };
   const result = taskToggleMirror(board, taskId, env);
   if (!result) return { ok: false, message: noTaskMessage(taskId) };
   const nextState = { done: result.done };

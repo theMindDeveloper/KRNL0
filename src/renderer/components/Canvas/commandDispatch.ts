@@ -53,6 +53,7 @@ import {
   deleteTaskCascade,
   collectDescendants,
   stampCompletedAt,
+  doneAtISO,
   completionTagFor,
   renameTask,
 } from '../../../shared/dispatch/task';
@@ -1694,10 +1695,13 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
     if (node.kind === 'todo.task' && command === 'task.toggle' && result.state !== undefined) {
       const prevTask = node.state as TaskState;
       // Issue #134 — stamp completedAt at the call site (pure fsmTaskToggle has no clock).
-      const nextTask = stampCompletedAt(prevTask, result.state as TaskState, {
+      // `at` — "I did it then" (Welcome back "Did it", `krnl task toggle --at`).
+      const doneAt = doneAtISO(args['at'], Date.now());
+      const toggleEnv = {
         uuid: () => crypto.randomUUID(),
-        now: () => new Date().toISOString(),
-      });
+        now: () => doneAt ?? new Date().toISOString(),
+      };
+      const nextTask = stampCompletedAt(prevTask, result.state as TaskState, toggleEnv);
       updateNode(nodeId, { state: nextTask });
       if (prevTask.done !== nextTask.done) {
         emit('task.completed', `task ${shortId(nodeId)} ${nextTask.done ? 'completed' : 'reopened'}`, {
@@ -1715,7 +1719,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
           const todoState = todoNode.state as TodoState;
           const item = todoState.items.find((i) => i.id === prevTask.todoItemId);
           if (item && item.done !== nextTask.done) {
-            const newTodoState = todoToggle(todoState, { id: prevTask.todoItemId });
+            const newTodoState = todoToggle(todoState, { id: prevTask.todoItemId }, toggleEnv);
             updateNode(todoNode.id, { state: newTodoState });
           }
         }

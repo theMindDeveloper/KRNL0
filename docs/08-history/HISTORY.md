@@ -2724,3 +2724,15 @@ The first-day voice clips no longer match the corrected words: the clip check is
 **Branch:** `docs/v0.11.3-published`
 **Files changed:** this file; the v0.11.3 GitHub release; the website (theminddeveloper.github.io, fallback version 0.11.3).
 **Summary:** Tag `v0.11.3` built by CI run 42706418592 (draft with `KRNL0-Setup-0.11.3.exe`, `.blockmap`, `latest.yml` at 0.11.3), checked and published on the owner's go-ahead. It is Latest; 0.11.1+ installs update to it by themselves. The website reads the version from the newest release on every visit (its HTML fallback now says 0.11.3).
+
+## [2026-11-18] — UX review: Welcome back no longer moves done work; done plans stay put
+
+**Type:** Bug Fix + UX
+**Branch:** `fix/ux-review-welcome-back`
+**Files changed:** `src/renderer/store/scheduleSelector.ts`, `src/shared/dispatch/task.ts` (`doneAtISO`), `src/renderer/components/Canvas/commandDispatch.ts`, `src/renderer/components/Launch/WelcomeBack.tsx`, `src/sys/{parser.ts,SysFacade.ts,commands/task.ts}`, `src/shared/cli/commandRegistry.ts`, `docs/06-requirements/launch-experience.md` (F14b), `docs/03-architecture/decisions.md` (Decision 30 amendment), `docs/research/ux-review-2026-11-18.md` (new), tests (selector, CLI, dialog).
+**Summary:** The owner used the 0.11.3 install for a week and found tasks they had done last week drawn on today and tomorrow. Their time log showed why. The Welcome back dialog's main button, "Bring all N to today", moved four plans to today in 7 ms. The user had pressed it to close the dialog, and those plans were done but not ticked. The FILMHACK chain then pushed its finished parts into the next day. Fixes:
+- the main button is now "Keep as is" and moves nothing
+- each row has **Did it**, which ticks the task where it was planned and dates the completion to the end of its block (CLI: `krnl task toggle <id> --at <time>`), and **Won't do**
+- a done anchor is never pushed by its chain
+
+The full user-journey review, with proposals for canvases, archive and chains, is in `docs/research/ux-review-2026-11-18.md`. Typecheck is at 0 errors. 2,609 tests pass. The one failure, `routines.test.ts`, depends on the date and also fails on the unchanged branch. Not yet walked in the real window: the owner checks it.
