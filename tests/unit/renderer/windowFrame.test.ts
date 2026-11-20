@@ -368,3 +368,28 @@ describe('Visual bugs fixed (owner list, 2026-11-20)', () => {
     expect(read('renderer/components/TopBar/index.tsx')).toContain('window.krnl.titleBarColors(bg, ink)');
   });
 });
+
+describe('The Timer clock, the layout switch and a flat Analytics header (owner, 2026-11-20)', () => {
+  const root = join(process.cwd(), 'src/renderer');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('the time is set in the reading font, grows with the window, and its colon is two drawn dots centred on the digits', () => {
+    const d = read('components/nodes/PomoNode/ObserveDash.tsx');
+    expect(d).toContain("fontSize: 'clamp(64px, 24cqw, 168px)', fontWeight: 500");
+    expect(d).toContain("alignItems: 'center', fontFamily: 'var(--font-read)'");
+    expect(d).toContain('data-testid="pomo-colon" role="presentation"');
+  });
+  it('Fit sits before the Station / Free switch, so the switch never moves when Fit appears', () => {
+    const bar = read('components/TopBar/index.tsx');
+    expect(bar.indexOf('testId="topbar-fit"')).toBeGreaterThan(0);
+    expect(bar.indexOf('testId="topbar-fit"')).toBeLessThan(bar.indexOf('<LayoutModeToggle />'));
+  });
+  it('the switch is a track with a raised thumb', () => {
+    expect(read('styles/window-frame.css')).toContain('[data-testid="layout-mode-toggle"] > button[aria-pressed="true"] {');
+    expect(read('components/ui/LayoutModeToggle.tsx')).toContain('aria-pressed={active}');
+  });
+  it('the Analytics header is flat: no gradient, no shadow', () => {
+    const a = read('components/nodes/AnalyticsNode/index.tsx');
+    expect(a).toContain('The same flat header as every window: no gradient, no shadow');
+    expect(a).not.toContain('inset 0 -1px 0 rgba(255,255,255,0.03)');
+  });
+});

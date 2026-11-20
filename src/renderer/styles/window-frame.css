@@ -260,10 +260,22 @@
   font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
 }
 [data-testid="topbar"] .krnl-topbar-btn:hover { background: var(--paper-3) !important; color: var(--ink) !important; }
-[data-testid="layout-mode-toggle"] { height: 28px; box-sizing: border-box; padding: 2px; border: 0 !important; border-radius: 8px !important; background: var(--paper-2); overflow: visible !important; }
+/* Station / Free: a two-way switch you can see is a switch. A darker track holds
+   both words; the chosen one is a raised thumb in the bar's own colour. (It was
+   two bare words with a grey box behind one of them.) */
+[data-testid="layout-mode-toggle"] {
+  height: 28px; box-sizing: border-box; padding: 2px; gap: 2px; border: 0 !important; border-radius: 8px !important;
+  background: color-mix(in srgb, var(--ink) 9%, transparent); overflow: visible !important;
+}
 [data-testid="layout-mode-toggle"] > button {
-  height: 24px; min-height: 0; padding: 0 10px !important; border-left: 0 !important; border-radius: 6px;
+  height: 24px; min-height: 0; min-width: 62px; padding: 0 12px !important; border: 0 !important; border-radius: 6px;
+  background: transparent !important; color: var(--ink-3) !important;
   font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
+}
+[data-testid="layout-mode-toggle"] > button:hover { color: var(--ink) !important; }
+[data-testid="layout-mode-toggle"] > button[aria-pressed="true"] {
+  background: var(--node-bg) !important; color: var(--ink) !important; font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
 }
 [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
   font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;

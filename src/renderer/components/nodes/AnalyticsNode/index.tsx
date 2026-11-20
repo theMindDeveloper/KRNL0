@@ -163,7 +163,8 @@ const CARDS_BY_VIEW: Record<AnalyticsView, readonly AnalyticsCardId[]> = {
 const rootStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
-  background: 'linear-gradient(180deg, var(--k-an-bg-2, #16181a) 0%, var(--k-an-bg, #0e1012) 100%)',
+  // Flat, like every other window: its own top-to-bottom gradient read as a shadow under the header.
+  background: 'transparent',
   // The window frame around it draws the border and the corner (a second
   // border with its own, larger radius left a bright crescent in each corner).
   border: 'none',
@@ -179,11 +180,10 @@ const rootStyle: React.CSSProperties = {
 
 // window-frame.md — size, spacing and type come from .kw-head; only the
 // Analytics colours are set here.
+// The same flat header as every window: no gradient, no shadow (window-frame.md).
 const titlebarStyle: React.CSSProperties = {
-  background: 'linear-gradient(180deg, var(--k-an-bg-3, #1f2226) 0%, var(--k-an-bg-2, #16181a) 100%)',
-  borderBottom: '1px solid var(--k-an-line, #0a0c0e)',
-  boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
-  color: 'var(--k-an-ink-2, #c8cdd3)',
+  background: 'transparent',
+  boxShadow: 'none',
 };
 
 const dotStyle: React.CSSProperties = { background: 'var(--acid, #c9f158)' };

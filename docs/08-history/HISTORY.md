@@ -3010,3 +3010,16 @@ Typecheck clean; all tests pass. Storage and commands tested (unit tests and an 
 - **Window buttons (minimise, maximise, close):** they take the top bar's colours when the theme or style changes (they stayed dark with lime symbols in a light theme).
 
 Typecheck clean; all tests pass. Checked as screenshots in light and dark; the window-button colours can only be seen in the real window.
+
+## [2026-11-20] — Timer clock font and size, the layout switch, a flat Analytics header
+
+**Type:** Bug Fix + Feature (UI)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `PomoNode/ObserveDash.tsx`, `TopBar/index.tsx`, `ui/LayoutModeToggle.tsx`, `styles/window-frame.css`, `AnalyticsNode/index.tsx`, tests (`windowFrame.test.ts`)
+
+**Summary:**
+- **Timer clock:** the time is set in the reading font at weight 500 (chosen from twelve faces: plain zeros, equal-width digits), grows with the window (about a quarter of its width, 64 to 168 px), and its colon is two drawn dots centred on the digits (a typed colon sat low).
+- **Station / Free:** a track with a raised thumb. **Fit** sits before the switch, so the switch no longer shifts when Fit appears in the Free layout.
+- **Analytics:** the header and the window body are flat (its own gradient read as a shadow under the header).
+
+Typecheck clean; all tests pass. Checked as screenshots in light and dark at three window sizes.

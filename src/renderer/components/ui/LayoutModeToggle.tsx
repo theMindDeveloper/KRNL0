@@ -84,6 +84,7 @@ function PillSegment({ label, active, testId, onClick, borderLeft }: PillSegment
     <button
       type="button"
       data-testid={testId}
+      aria-pressed={active}
       onClick={onClick}
       style={{
         background: active ? 'var(--paper-3)' : 'transparent',

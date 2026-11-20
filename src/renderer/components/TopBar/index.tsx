@@ -238,11 +238,12 @@ export function TopBar() {
 
       {/* Right: action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <LayoutModeToggle />
-        {/* window-frame.md, top bar — FIT only where it does something (the
-            Free layout; Station's small canvas has its own fit control). The
+        {/* window-frame.md, top bar — Fit only where it does something (the Free
+            layout; Station's small canvas has its own fit control). It sits
+            before the switch, so the switch never moves when it appears. The
             light / dark switch lives in Settings → General. */}
         {!stationShown && <TopBarButton label="Fit" title="Fit everything in view" onClick={handleFit} testId="topbar-fit" />}
+        <LayoutModeToggle />
         <HelpMenu />
         <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
       </div>
