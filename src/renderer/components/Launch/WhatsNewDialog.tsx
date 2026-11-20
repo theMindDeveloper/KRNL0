@@ -18,10 +18,16 @@ import artStreak from '../../assets/launch/plate-streak.webp';
 import artSessions from '../../assets/launch/plate-sessions.webp';
 import artGuide from '../../assets/launch/plate-guide.webp';
 import artBoard from '../../assets/launch/plate-board.webp';
+import artBoards from '../../assets/launch/plate-boards.webp';
+import artWindows from '../../assets/launch/plate-windows.webp';
+import artCards from '../../assets/launch/plate-cards.webp';
 import { startTour } from '../Tour/TourHost';
+import { tourById } from '../Tour/tours';
+import { useEasyMode } from '../../store/uiMode';
 
 const ART: Record<WhatsNewArt, string> = {
   mini: artMini, menubar: artMenubar, feedback: artFeedback, streak: artStreak, sessions: artSessions, guide: artGuide, board: artBoard,
+  boards: artBoards, windows: artWindows, cards: artCards,
 };
 
 function runAction(item: WhatsNewItem): void {
@@ -36,13 +42,14 @@ function runAction(item: WhatsNewItem): void {
     if (pomo) focusNode(pomo.id);
   }
   if (item.action === 'settings') window.dispatchEvent(new CustomEvent('krnl:open-settings'));
-  if (item.action === 'tour') window.setTimeout(() => startTour('first-day'), 200);
+  if (item.action === 'tour') window.setTimeout(() => startTour(item.tour ?? 'first-day'), 200);
 }
 
 export function WhatsNewDialog() {
   const release = useLaunchStore((s) => s.whatsNew);
   const info = useLaunchStore((s) => s.info);
   const [step, setStep] = useState(0);
+  const easy = useEasyMode();
 
   useEffect(() => { setStep(0); }, [release]);
   useEffect(() => {
@@ -90,7 +97,8 @@ export function WhatsNewDialog() {
             <button type="button" className="ln-link" onClick={() => { void window.krnl?.appOpenExternal?.(RELEASES_URL); }}>full release notes</button>
             <span style={{ flex: 1 }} />
             <button type="button" className="ln-btn" onClick={() => closeWhatsNew()} data-testid="whatsnew-later">Later</button>
-            {item.action !== 'none' && (
+            {/* A tour that only exists in Advanced is not offered in Easy. */}
+            {item.action !== 'none' && !(item.action === 'tour' && easy && tourById(item.tour ?? 'first-day')?.onlyIn === 'advanced') && (
               <button type="button" className="ln-btn ln-btn--line" onClick={() => runAction(item)} data-testid="whatsnew-show">Show me</button>
             )}
             <button

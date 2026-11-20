@@ -7,7 +7,7 @@
 
 import { minorOf } from './appState';
 
-export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board';
+export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards';
 /** What "Show me" does for a highlight. */
 export type WhatsNewAction = 'pomo' | 'feedback' | 'settings' | 'tour' | 'none';
 
@@ -22,6 +22,8 @@ export interface WhatsNewItem {
   body: string;
   art: WhatsNewArt;
   action: WhatsNewAction;
+  /** With action 'tour': which tour "Show me" starts (default: the first-day tour). */
+  tour?: string;
 }
 
 export interface WhatsNewRelease {
@@ -38,6 +40,55 @@ export interface WhatsNewRelease {
 }
 
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    minor: '0.12',
+    date: 'Nov 2026',
+    summary: 'Separate boards, one look for every window, plan cards you can read',
+    items: [
+      {
+        label: 'One board per project',
+        kicker: 'New · Separate boards',
+        caption: 'Each board has its own todos, habits, calendar, timer history and analytics.',
+        title: 'One board\nper project.',
+        body: 'Make a board for uni, one for work, one for home. Each has its own todos, habits, calendar, timer history and analytics. Your old canvases became boards by themselves; nothing was deleted.',
+        art: 'boards',
+        action: 'tour',
+        tour: 'boards',
+      },
+      {
+        label: 'One look for every window',
+        kicker: 'Redesigned · Every window',
+        caption: 'The same header, the same view switch, the same buttons.',
+        title: 'The same place,\nin every window.',
+        body: 'Every window now has the same header, the same view switch and the same buttons, in normal letters you can read. The Timer got one calm face and a clock of its own. Two styles to choose from, Paper and Pro, in Settings.',
+        art: 'windows',
+        action: 'settings',
+      },
+      {
+        label: 'Plan cards you can read',
+        kicker: 'Redesigned · Cards',
+        caption: 'A plan, a habit, an event and logged time use one kind of card.',
+        title: 'A day, a time,\na deadline. One card.',
+        body: 'Adding a plan, a habit or an event uses one kind of card: a short list you read from top to bottom. Pick the day with one press, add a time or a deadline if it has one. Click away and it is kept.',
+        art: 'cards',
+        action: 'none',
+      },
+    ],
+    more: [
+      'Two styles, Paper and Pro, chosen in Settings. The style picker left the board.',
+      'Two volumes in Settings › Sounds: app sounds and the AI voice, each with its own slider.',
+      'One timer at a time across boards. If it is still running in another board, a note in the top bar takes you back to it.',
+      'Reminders reach you from every board, with the board’s name.',
+      'Narrow windows keep their full name; the views get tighter instead of running over the edge.',
+      'The Calendar week wraps long names, and the Year view fills its window.',
+      'The Timer has one face, a clock font of its own, and its settings as a list.',
+      'Connectors only on task cards. Notes, images and frames have none.',
+      'A plan card keeps your change when you click elsewhere.',
+      'A voiced tutorial for boards (the orb’s menu, Advanced). All older tours match the new look.',
+      'Safer storage: a board switch that fails is undone, and every board gets a safety copy before an update.',
+      'Commands: krnl board list / new / switch / rename / delete, and krnl sound voice.',
+    ],
+  },
   {
     minor: '0.11',
     date: 'Nov 2026',

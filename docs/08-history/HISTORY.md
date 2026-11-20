@@ -3118,3 +3118,16 @@ Typecheck clean; all tests pass.
 - The board menu stays open while the guide's own card is pressed, so a tour step can point inside it.
 
 Typecheck clean; all tests pass. Run once in the preview, step by step, with real presses.
+
+## [2026-11-20] — Release notes for 0.12 written in (approved by the owner)
+
+**Type:** Docs + Feature (launch experience)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `shared/whatsnew.ts`, `Launch/WhatsNewDialog.tsx`, `assets/launch/plate-boards.webp`, `plate-windows.webp`, `plate-cards.webp`, `docs/releases/v0.12.0.md`, `CHANGELOG.md`, tests
+
+**Summary:**
+- **What's new for 0.12:** three slides (One board per project; The same place, in every window; A day, a time, a deadline. One card.), each with its picture, and twelve smaller changes. Drafted on the design board (row 15) and approved by the owner on 2026-11-20.
+- "Show me" on the first slide starts the boards tutorial; it is not offered in Easy, where that tutorial does not exist.
+- The release page and the changelog entry are written. **Not done here:** the version bump, the tag and the publish. They belong to the release PR and wait for the owner's OK.
+
+Typecheck clean; all tests pass.

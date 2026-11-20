@@ -5,6 +5,26 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — unreleased
+
+### Added
+- **Separate boards:** each board has its own todos, habits, calendar, timer history, analytics, notes and drawings. Existing canvases become boards by themselves, with a copy of the board from before. One timer at a time across boards; reminders from every board. `krnl board list | new | switch | rename | delete`.
+- **The window standard:** one header, one time row, one footer and one view switch for every window; the Timer with one face and its own clock font; the cards for a plan, a habit, an event and logged time as one design.
+- **Two styles** (Paper, Pro) in Settings; **two volumes** (app sounds, AI voice) in Settings › Sounds, and `krnl sound voice <0-100>`.
+- A voiced **Separate boards** tutorial (`krnl tour start boards`).
+
+### Changed
+- Connectors are drawn on task cards only.
+- Narrow windows keep their full name; the views get tighter.
+- The Calendar week wraps long names; the Year view fills its window.
+- A plan card keeps the change when you click elsewhere.
+- Switching boards shows no start-up screen and plays no greeting.
+
+### Fixed
+- A failed board switch is undone completely and waits out a short file lock; every board gets a safety copy before an update; a lost list of boards is rebuilt from disk.
+- "One timer at a time" holds for every way to start a timer.
+- The first tutorial's "plan it" step in a narrow Calendar; tutorial wording matches the new buttons.
+
 ## [0.11.3] — 2026-11-09
 
 ### Fixed (full audit, 2026-11-09)
