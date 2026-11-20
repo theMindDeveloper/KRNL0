@@ -10,6 +10,7 @@
 // Started from the Orb ("Tutorials") or `krnl tour start <id>`.
 
 import type { Board } from '../../../shared/types';
+import { IS_WEB } from '../../platform';
 
 /** Examples a tour can add to an empty board (store/tourExamples.ts). */
 export type ExampleKind = 'plan' | 'recorded' | 'habit' | 'event' | 'missed';
@@ -81,6 +82,8 @@ export interface Tour {
   steps: TourStep[];
   /** A tour about something only one mode has (the Terminal: Advanced). */
   onlyIn?: 'easy' | 'advanced';
+  /** About the desktop app only (the Terminal, the AI orb): not listed on the web (Decision 51). */
+  desktopOnly?: boolean;
   /** What it shows that a new board doesn't have yet: added as examples
    *  when missing, removed when the tour ends (tourExamples.ts). */
   examples?: ExampleKind[];
@@ -88,14 +91,14 @@ export interface Tour {
 
 /** The tours listed in a mode (menus); `krnl tour start` can still run any. */
 export function toursIn(mode: 'easy' | 'advanced'): Tour[] {
-  return TOURS.filter((t) => !t.onlyIn || t.onlyIn === mode)
+  return TOURS.filter((t) => (!t.onlyIn || t.onlyIn === mode) && !(IS_WEB && t.desktopOnly))
     .map((t) => (mode === 'easy' && t.summaryEasy ? { ...t, summary: t.summaryEasy } : t));
 }
 
 /** The steps a user in `mode` sees (drops steps for the other mode, and for
  *  the other way the timer works). */
 export function stepsFor(tour: Tour, mode: 'easy' | 'advanced', timer: 'stopwatch' | 'pomo' = 'stopwatch'): TourStep[] {
-  return tour.steps.filter((s) => (!s.onlyIn || s.onlyIn === mode) && (!s.timer || s.timer === timer));
+  return tour.steps.filter((s) => (!s.onlyIn || s.onlyIn === mode) && (!s.timer || s.timer === timer) && !(IS_WEB && needsDesktop(s)));
 }
 
 // ── board predicates ───────────────────────────────────────────────────────
@@ -455,6 +458,7 @@ export const TOURS: readonly Tour[] = [
   {
     id: 'terminal',
     onlyIn: 'advanced',
+    desktopOnly: true,
     title: 'Terminal & AI',
     summary: 'The krnl commands and Claude Code',
     steps: [
@@ -464,6 +468,12 @@ export const TOURS: readonly Tour[] = [
     ],
   },
 ];
+
+/** A step about the Terminal or the AI orb, which only the desktop app has. */
+function needsDesktop(s: TourStep): boolean {
+  const t = s.target ?? '';
+  return s.node === 'mother-term' || t === TERM || t === ORB || t.includes('orb-') || JSON.stringify(s.waitFor ?? null).includes(ORB);
+}
 
 export function tourById(id: string): Tour | undefined {
   return TOURS.find((t) => t.id === id);
