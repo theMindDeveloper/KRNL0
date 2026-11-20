@@ -173,11 +173,7 @@ export function CanvasSwitcher() {
               </div>
             );
           })}
-          {/* canvases F9 — said, not discovered: what every canvas shares. */}
-          <div data-testid="canvas-shared-note" style={{ margin: '6px 2px 2px', padding: '8px 9px', borderRadius: 6, background: 'var(--paper-2)', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10.5, lineHeight: 1.45 }}>
-            <span><span style={{ color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>On every canvas</span><br /><span style={{ color: 'var(--ink)' }}>plans, calendar, habits, timer</span></span>
-            <span><span style={{ color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Only on this one</span><br /><span style={{ color: 'var(--ink)' }}>notes, images, drawings</span></span>
-          </div>
+          {/* The note that listed what is shared and what is not is gone (owner, 2026-11-20); it is in the button's tooltip. */}
           <div style={{ borderTop: '1px solid var(--paper-3)', margin: '3px 2px' }} />
           {adding ? (
             <div style={{ display: 'flex', gap: 4, padding: 3 }}>

@@ -2971,3 +2971,11 @@ Typecheck clean; all tests pass. Checked as full-size screenshots of the whole a
 - **Log time:** the "Fill a gap" chips are removed; the overlap message is one tinted line with a filled button.
 
 Typecheck clean; all tests pass. Checked as screenshots (Settings, the plan card with the deadline open, the habit card); not yet used by the owner.
+
+## [2026-11-20] — Canvas menu: the explanatory note is removed
+
+**Type:** Chore (UI)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `TopBar/CanvasSwitcher.tsx`
+
+**Summary:** the "On every canvas / Only on this one" note under the canvas list is removed at the owner's request. What is shared is still said in the switcher's tooltip. Behaviour is unchanged: canvases still share plans, calendar, habits and the timer.
