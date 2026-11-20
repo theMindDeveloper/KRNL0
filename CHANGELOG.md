@@ -5,7 +5,7 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.13.0] — unreleased
+## [0.13.0] — 2026-11-20
 
 ### Added
 - **Sync through your own KRNL0 server** (Decision 51): boards, the board list, the time log, pictures and files, near real time, offline-safe, with the app's own three-way merge. Pairing checks the server's fingerprint and pins its certificate; the device key is kept in the OS keychain. `krnl sync status | connect | pair | disconnect | retry`.
