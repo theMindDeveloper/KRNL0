@@ -381,6 +381,7 @@ export class SysFacade {
         case 'pair': return syncCmd.syncPair(sync, command.password, command.code);
         case 'disconnect': return syncCmd.syncDisconnect(sync);
         case 'retry': return syncCmd.syncRetry(sync);
+        case 'server': return syncCmd.syncServer(sync, command.json);
       }
     }
 
