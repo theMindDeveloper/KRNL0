@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0e0d0b" />
+    <title>KRNL0</title>
+    <!-- No inline script (the server's CSP is script-src 'self'); fonts are bundled. -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #0e0d0b; }
+      #web-boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
+        font: 800 44px/1 'JetBrains Mono', ui-monospace, monospace; letter-spacing: -.035em; color: #f4efe2; }
+      #web-boot i { display: inline-block; width: 20px; height: 34px; border: 5px solid #c9f158; border-radius: 999px; margin-left: 2px; }
+      @media (prefers-reduced-motion: no-preference) { #web-boot i { animation: webBootPulse 1.2s ease-in-out infinite; } }
+      @keyframes webBootPulse { 50% { opacity: .35; } }
+    </style>
+  </head>
+  <body>
+    <div id="web-boot" role="status" aria-label="Opening KRNL0">KRNL<i aria-hidden="true"></i></div>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

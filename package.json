@@ -13,6 +13,7 @@
     "dev:shared": "electron-vite dev",
     "seed:preview": "vite-node scripts/seed-observe-preview.ts",
     "build": "electron-vite build",
+    "build:web": "vite build --config vite.web.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
     "reset": "node scripts/reset-board.mjs",
@@ -25,7 +26,11 @@
     "sys": "bin/sys.js"
   },
   "dependencies": {
+    "@fontsource/azeret-mono": "^5.3.0",
     "@fontsource/caveat": "^5.1.0",
+    "@fontsource/geist": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/pixelify-sans": "^5.3.0",
     "@fontsource/stardos-stencil": "^5.3.0",
     "@fontsource/vt323": "^5.3.0",

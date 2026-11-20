@@ -1,0 +1,293 @@
+// window.krnl for the web app (Decision 51): the same calls the desktop window
+// makes over IPC, answered from this browser's copy (WebHost) and synced by
+// the shared engine. No terminal, no assistant, no board CLI, no updater here
+// (server-sync.md: the website never runs code on the server).
+
+import { mergeBoards } from '../shared/boardMerge';
+import { migrateBoard, seedBoard } from '../shared/boardMigrate';
+import { docName } from '../shared/sync/shape';
+import { stampEntry, TimeLogInputSchema, type TimeLogEntry } from '../shared/timelog';
+import type { Json } from '../shared/sync/types';
+import type { SyncEngine } from '../shared/sync/engine';
+import type { SyncDevice, SyncInfo } from '../shared/sync/port';
+import { newAssetId, type BoardMeta, type WebHost } from './sync/host';
+import type { WebTransport } from './sync/transport';
+
+const isObject = (v: unknown): v is Record<string, Json> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+const MIME: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', avif: 'image/avif',
+  mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4',
+  pdf: 'application/pdf',
+};
+
+export interface WebBridgeDeps {
+  host: WebHost;
+  engine: SyncEngine;
+  transport: WebTransport;
+  appVersion: string;
+  /** Writes what is still queued for IndexedDB (before a reload). */
+  flush: () => Promise<void>;
+  reload: () => void;
+  logout: () => Promise<void>;
+  /** The server's own address, for the status sheet. */
+  origin: string;
+}
+
+/** The desktop's board lookup (persistence/boards.ts resolveBoard): id or name, exact then prefix. */
+function resolveBoard(boards: BoardMeta[], ref: string | undefined): BoardMeta | string {
+  const r = ref?.trim();
+  if (!r) return 'missing board name';
+  const exact = boards.filter((b) => b.id === r || b.name.toLowerCase() === r.toLowerCase());
+  if (exact.length === 1) return exact[0]!;
+  const loose = boards.filter((b) => b.id.startsWith(r) || b.name.toLowerCase().startsWith(r.toLowerCase()));
+  if (loose.length === 1) return loose[0]!;
+  return loose.length > 1 || exact.length > 1 ? `board "${r}" is ambiguous` : `no board "${r}"`;
+}
+
+export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: (info: SyncInfo) => void } {
+  const { host, engine } = d;
+  const boardListeners = new Set<() => void>();
+  const statusListeners = new Set<(info: unknown) => void>();
+
+  // Same guard as the desktop's board:save (ipc/handlers.ts): when sync changed
+  // the open board after the page last loaded it, a save merges both onto the
+  // board the page loaded, instead of putting the other device's edit back.
+  let pageBase: Json | null = null;
+  let stale = false;
+
+  const notifyBoard = (): void => { for (const cb of boardListeners) cb(); };
+  host.on({
+    activeChanged: () => { stale = true; notifyBoard(); },
+    activeSwitched: () => { void d.flush().then(d.reload); },
+  });
+
+  const activeId = (): string => {
+    const id = host.activeId();
+    if (!id) throw new Error('No board yet.');
+    return id;
+  };
+  const changed = (id: string): void => engine.changed(docName.board(id));
+
+  const info = (): SyncInfo => ({
+    configured: true,
+    origin: d.origin,
+    fingerprint: null,
+    deviceName: 'This browser',
+    ...engine.getStatus(),
+  });
+
+  const bridge: KrnlBridge & { notifyStatus: (info: SyncInfo) => void } = {
+    notifyStatus: (i) => { for (const cb of statusListeners) cb(i); },
+
+    // ── The board ───────────────────────────────────────────────────────
+    boardLoad: async () => {
+      const b = host.activeBoard();
+      pageBase = b === null ? null : clone(b);
+      stale = false;
+      return b;
+    },
+    boardSave: async (data: unknown) => {
+      if (!isObject(data)) return;
+      const id = activeId();
+      if (stale && pageBase) {
+        const n = (v: Json): Record<string, Json> => migrateBoard(clone(v)) as Record<string, Json>;
+        const theirs = host.activeBoard();
+        if (theirs !== null) {
+          host.saveBoard(id, mergeBoards(n(pageBase), n(data), n(theirs)) as Json);
+          pageBase = clone(data);
+          changed(id);
+          notifyBoard(); // the page reloads the merged board (its boardLoad clears `stale`)
+          return;
+        }
+      }
+      host.saveBoard(id, clone(data));
+      pageBase = clone(data);
+      changed(id);
+    },
+    boardReset: async () => {
+      const id = activeId();
+      host.saveBoard(id, migrateBoard(seedBoard()) as Json);
+      changed(id);
+      const b = host.activeBoard();
+      pageBase = b === null ? null : clone(b);
+      stale = false;
+      return b;
+    },
+    boardSaveViewport: async (viewport) => {
+      const id = host.activeId();
+      const b = id ? host.read(docName.board(id)) : null;
+      if (!id || !isObject(b)) return;
+      // The view is this browser's own (never uploaded): no sync needed.
+      host.saveBoard(id, { ...b, viewport, savedAt: new Date().toISOString() } as Json);
+    },
+    onBoardChanged: (cb) => { boardListeners.add(cb); return () => { boardListeners.delete(cb); }; },
+
+    // ── No terminal on the web ──────────────────────────────────────────
+    ptyCreate: async () => { throw new Error('The terminal is only in the desktop app.'); },
+    ptyWrite: async () => {},
+    ptyResize: async () => {},
+    ptyKill: async () => {},
+    onPtyData: () => () => {},
+    onPtyExit: () => () => {},
+
+    // ── Pictures and files ──────────────────────────────────────────────
+    assetWrite: async (ext, bytes) => {
+      const e = ext.toLowerCase().replace(/^\./, '');
+      const norm = e === 'jpeg' ? 'jpg' : e;
+      const assetId = newAssetId();
+      host.writeAsset(assetId, norm, bytes);
+      engine.assetAdded(assetId);
+      return { assetId, ext: norm };
+    },
+    assetRead: async (assetId) => {
+      let a = host.readAsset(assetId);
+      if (!a) {
+        // Not here yet (large files are fetched when first shown).
+        const got = await d.transport.getAsset(assetId).catch(() => null);
+        if (got) { host.writeAsset(assetId, got.ext, got.bytes); a = got; }
+      }
+      return a ? { bytes: a.bytes, mimeType: MIME[a.ext] ?? 'application/octet-stream' } : null;
+    },
+    assetDelete: async (assetId) => { host.deleteFile(assetId); },
+
+    // ── Boards ──────────────────────────────────────────────────────────
+    boardsList: async () => {
+      const idx = host.list();
+      if (!idx) return { activeId: '', boards: [], recording: null, notice: null };
+      return {
+        activeId: idx.activeId,
+        boards: idx.boards.map((b) => ({ ...b, active: b.id === idx.activeId, ...host.facts(b.id) })),
+        recording: null,
+        notice: null,
+      };
+    },
+    boardsCreate: async (name, copyHabits) => {
+      const idx = host.list();
+      const trimmed = name.trim();
+      if (!idx) return { ok: false, message: 'No board list yet.' };
+      if (!trimmed) return { ok: false, message: 'a board needs a name' };
+      if (idx.boards.some((b) => b.name.toLowerCase() === trimmed.toLowerCase())) return { ok: false, message: `there is already a board called "${trimmed}"` };
+      const seed = migrateBoard(seedBoard()) as Record<string, Json>;
+      const active = host.activeBoard();
+      if (isObject(active)) {
+        if (active.uiMode) seed.uiMode = active.uiMode;
+        if (active.layoutMode) seed.layoutMode = active.layoutMode;
+        if (copyHabits) {
+          const habitOf = (b: Record<string, Json>): Record<string, Json> | undefined =>
+            (b.nodes as Json[]).find((n): n is Record<string, Json> => isObject(n) && n.kind === 'habit' && n.isMother === true);
+          const from = ((habitOf(active)?.state as { habits?: Array<Record<string, Json>> } | undefined)?.habits ?? []);
+          const target = habitOf(seed);
+          if (target) {
+            target.state = {
+              ...(isObject(target.state) ? target.state : {}),
+              habits: from.filter((h) => !h.archived).map((h) => {
+                const { log: _l, counts: _c, exceptions: _e, rest: _r, pauses: _p, ...keep } = h;
+                void _l; void _c; void _e; void _r; void _p;
+                return { ...keep, id: crypto.randomUUID(), log: [], createdAt: new Date().toISOString() };
+              }),
+            };
+          }
+        }
+      }
+      const id = `board-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      host.saveBoard(id, seed as Json);
+      host.saveIndex({ ...idx, boards: [...idx.boards, { id, name: trimmed }] });
+      engine.changed('boards');
+      changed(id);
+      return { ok: true, message: `created board "${trimmed}"`, board: { id, name: trimmed } };
+    },
+    boardsRename: async (ref, name) => {
+      const idx = host.list();
+      const trimmed = name.trim();
+      if (!idx) return { ok: false, message: 'No board list yet.' };
+      if (!trimmed) return { ok: false, message: 'a board needs a name' };
+      const hit = resolveBoard(idx.boards, ref);
+      if (typeof hit === 'string') return { ok: false, message: hit };
+      if (idx.boards.some((b) => b.id !== hit.id && b.name.toLowerCase() === trimmed.toLowerCase())) return { ok: false, message: `there is already a board called "${trimmed}"` };
+      host.saveIndex({ ...idx, boards: idx.boards.map((b) => (b.id === hit.id ? { id: hit.id, name: trimmed } : b)) });
+      engine.changed('boards');
+      return { ok: true, message: `renamed to "${trimmed}"`, board: { id: hit.id, name: trimmed } };
+    },
+    boardsDelete: async (ref) => {
+      const idx = host.list();
+      if (!idx) return { ok: false, message: 'No board list yet.' };
+      const hit = resolveBoard(idx.boards, ref);
+      if (typeof hit === 'string') return { ok: false, message: hit };
+      if (hit.id === idx.activeId) return { ok: false, message: 'switch to another board first' };
+      if (idx.boards.length <= 1) return { ok: false, message: 'the last board stays' };
+      host.remove(docName.board(hit.id));
+      engine.changed('boards');
+      changed(hit.id);
+      return { ok: true, message: `deleted "${hit.name}" (kept in this browser)`, board: hit };
+    },
+    boardsSwitch: async (ref) => {
+      const idx = host.list();
+      if (!idx) return { ok: false, message: 'No board list yet.' };
+      const hit = resolveBoard(idx.boards, ref);
+      if (typeof hit === 'string') return { ok: false, message: hit };
+      if (hit.id === idx.activeId) return { ok: true, message: 'already open' };
+      host.setActive(hit.id);
+      try { sessionStorage.setItem('krnl0-board-switch', '1'); } catch { /* private window */ }
+      await d.flush();
+      d.reload();
+      return { ok: true, message: `opened "${hit.name}"` };
+    },
+    boardsAckNotice: async () => {},
+
+    // ── Clipboard ───────────────────────────────────────────────────────
+    clipboardReadText: async () => { try { return await navigator.clipboard.readText(); } catch { return ''; } },
+    clipboardWriteText: async (text) => { try { await navigator.clipboard.writeText(text); } catch { /* not allowed here */ } },
+
+    // ── Time log ────────────────────────────────────────────────────────
+    timelogAppend: async (raw) => {
+      const list = Array.isArray(raw) ? raw : [raw];
+      const id = host.activeId();
+      if (!id) return { ok: false, written: 0 };
+      const now = Date.now();
+      const stamped: TimeLogEntry[] = [];
+      for (const item of list) {
+        const parsed = TimeLogInputSchema.safeParse(item);
+        if (!parsed.success) continue;
+        try { stamped.push(stampEntry(parsed.data, now)); } catch { /* invalid entry: dropped */ }
+      }
+      if (stamped.length > 0) {
+        host.appendTimelog(id, stamped);
+        engine.timelogAppended(id, stamped as unknown as Json[]);
+      }
+      return { ok: stamped.length === list.length, written: stamped.length };
+    },
+    timelogQuery: async (fromYMD) => {
+      const id = host.activeId();
+      return id ? host.queryTimelog(id, fromYMD) : [];
+    },
+
+    // ── Links ───────────────────────────────────────────────────────────
+    appOpenExternal: async (url) => {
+      let u: URL;
+      try { u = new URL(url); } catch { return { ok: false, message: 'not a link' }; }
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false, message: 'only web links open' };
+      window.open(u.toString(), '_blank', 'noopener,noreferrer');
+      return { ok: true, message: 'opened' };
+    },
+
+    // ── Sync status (the top-bar chip) ──────────────────────────────────
+    syncStatus: async () => info(),
+    onSyncStatus: (cb) => { statusListeners.add(cb); return () => { statusListeners.delete(cb); }; },
+    syncRetry: async () => { await engine.syncNow(); return { ok: true, info: info() }; },
+    syncDevices: async (): Promise<SyncDevice[]> => {
+      try {
+        const r = await fetch('/api/v1/devices', { credentials: 'same-origin', cache: 'no-store' });
+        if (!r.ok) return [];
+        const j = (await r.json()) as { devices?: SyncDevice[] };
+        return (j.devices ?? []).map((x) => ({ id: x.id, name: x.name, platform: x.platform, lastSeenAt: x.lastSeenAt, current: false }));
+      } catch {
+        return [];
+      }
+    },
+    // On the web "disconnect" is logging out of this browser.
+    syncDisconnect: async () => { await d.logout(); return { ok: true }; },
+  };
+  return bridge;
+}
