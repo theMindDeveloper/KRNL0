@@ -16,6 +16,7 @@ A board is a separate space: its own todos, habits, calendar, timer history, ana
 | F6 | A board can be deleted from the menu after an in-menu confirm. The open board and the last board cannot be deleted. A deleted board's files are kept in `boards/.deleted/`. |
 | F7 | CLI: `board list [--json]`, `board new <name> [--copy-habits]`, `board switch <id\|name>`, `board rename <id\|name> <new name>`, `board delete <id\|name>`. `board show / summary / stats` still describe the open board. Every other `krnl` command works on the open board. |
 | F8 | **Migration, once.** A board file with several canvases becomes several boards. The first canvas keeps every plan, habit, the calendar, the recorded time and its own notes. Each other canvas becomes a board with its own notes, images, drawings and the links among them, and fresh, empty lists. The file as it was is copied to `board.json.before-boards-<date>` first. The app says so once ("Your canvases are now boards"). A board with one canvas simply becomes one board, silently. |
+| F9 | **A switch is not a start.** Opening another board never shows the start-up screen, What's new or Welcome back: the board simply appears. |
 
 ## Non-Functional Requirements
 

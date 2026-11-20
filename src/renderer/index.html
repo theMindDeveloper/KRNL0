@@ -73,7 +73,11 @@
     </div>
     <script>
       // The pocket timer loads this same page: it never shows the splash.
-      if (new URLSearchParams(location.search).get('pocket') === '1') {
+      var boardSwitch = false;
+      try { boardSwitch = sessionStorage.getItem('krnl0-board-switch') === '1'; sessionStorage.removeItem('krnl0-board-switch'); } catch (e) {}
+      if (boardSwitch) window.__krnlBoardSwitch = true;
+      // Nor does a switch to another board: that is not a start (boards.md F9).
+      if (boardSwitch || new URLSearchParams(location.search).get('pocket') === '1') {
         var s = document.getElementById('boot-splash'); if (s) s.remove();
       } else {
         var bar = document.getElementById('bs-bar');

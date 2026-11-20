@@ -100,6 +100,8 @@ interface KrnlBridge {
 
 interface Window {
   krnl?: KrnlBridge
+  /** Set by index.html when this load is a switch to another board (no start-up screen, no launch dialogs). */
+  __krnlBoardSwitch?: boolean
 }
 
 // Vite `?url` imports (e.g. the pdf.js worker) resolve to a URL string.

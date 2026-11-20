@@ -144,7 +144,8 @@ function AppInner() {
     let raf = 0;
     let unsubBoard: (() => void) | null = null;
     let unsubInfo: (() => void) | null = null;
-    const startFlow = (): void => { window.setTimeout(runLaunchFlow, 500); };
+    // A switch to another board is not a start: no What's new, no Welcome back.
+    const startFlow = (): void => { if (!window.__krnlBoardSwitch) window.setTimeout(runLaunchFlow, 500); };
     const onBoard = (): void => {
       // Two frames: the canvas has painted the board before the splash fades.
       raf = requestAnimationFrame(() => { raf = requestAnimationFrame(() => hideSplash()); });

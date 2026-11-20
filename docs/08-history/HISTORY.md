@@ -3035,3 +3035,14 @@ Typecheck clean; all tests pass. Checked as screenshots in light and dark at thr
 - **Timer clock:** a font of its own, `--font-clock` (Azeret Mono 500): monospaced like the rest of the app, with plain zeros. Chosen from 28 faces compared on the app's colours. The time is a little smaller once it shows hours, so it always fits.
 
 Typecheck clean; all tests pass. Checked as screenshots in both layouts, light and dark.
+
+## [2026-11-20] — Switching boards no longer shows the start-up screen
+
+**Type:** Bug Fix
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `main/ipc/handlers.ts`, `renderer/index.html`, `renderer/App.tsx`, `renderer/env.d.ts`, `docs/06-requirements/boards.md` (F9), tests (`windowFrame.test.ts`)
+
+**Summary:**
+- A board switch reloads the window, and every reload played the start-up screen and then the launch dialogs. The main process now marks the reload as a board switch; the page removes the start-up screen before it is painted and skips What's new / Welcome back. A real start is unchanged.
+
+Typecheck clean; all tests pass.

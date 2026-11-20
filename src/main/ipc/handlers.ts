@@ -123,8 +123,12 @@ export function switchBoardAndReload(ref: string | undefined): { ok: boolean; me
   const res = switchBoard(BOARD_DIR, ref);
   if (typeof res === 'string') { boardsSwitching = false; return { ok: false, message: res }; }
   const w = getMainWindow();
-  if (w && !w.isDestroyed()) w.webContents.reload();
-  else boardsSwitching = false;
+  if (w && !w.isDestroyed()) {
+    // A board switch is not a start: the page is told to skip the start-up
+    // screen and the launch dialogs, then reloads onto the board (boards.md F9).
+    const reload = (): void => { if (!w.isDestroyed()) w.webContents.reload(); };
+    w.webContents.executeJavaScript("try { sessionStorage.setItem('krnl0-board-switch', '1') } catch (e) {}", true).then(reload, reload);
+  } else boardsSwitching = false;
   return { ok: true, message: `switched to board "${res.name}"` };
 }
 const asBoard = (b: unknown): Record<string, unknown> | null =>
