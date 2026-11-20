@@ -880,5 +880,11 @@
     "tours": [
       "sync"
     ]
+  },
+  "5421deb9": {
+    "text": "When your server has a new version, a small dot appears on this badge. Its menu updates the server in one click, with your password: a backup first, and back by itself if anything fails. Settings, Updates, shows your server too.",
+    "tours": [
+      "sync"
+    ]
   }
 }

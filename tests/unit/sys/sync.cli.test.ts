@@ -24,6 +24,9 @@ function port(over: Partial<SyncPort> = {}): SyncPort {
     finish: vi.fn(async () => info()),
     disconnect: vi.fn(async () => info({ configured: false, state: 'off' })),
     retry: vi.fn(async () => info()),
+    serverUpdate: vi.fn(async () => null),
+    startServerUpdate: vi.fn(async () => ({ ok: false, message: null, update: null })),
+    setServerAuto: vi.fn(async () => ({ ok: false, message: null, update: null })),
     ...over,
   };
 }
@@ -62,3 +65,23 @@ describe('krnl sync (Decision 51)', () => {
     expect((await facade(port()).run(['sync', 'pair'])).ok).toBe(false);
   });
 });
+
+describe('krnl sync server (server-updates F8)', () => {
+  const u = (over: Record<string, unknown> = {}) => ({ current: '0.1.0', latest: '0.2.0', available: true, url: null, channel: 'one-click' as const, command: null, commandWindows: null, commandLinux: null, reason: null, auto: false, job: null, minApp: null, ...over });
+  it('one click: points to the app, never asks for the password here', async () => {
+    const r = await facade(port({ serverUpdate: vi.fn(async () => u()) })).run(['sync', 'server']);
+    expect(r.ok).toBe(true);
+    expect(r.message).toContain('0.2.0 is out');
+    expect(r.message).toContain('Update server');
+  });
+  it('a server that can not update itself: the command to run once', async () => {
+    const r = await facade(port({ serverUpdate: vi.fn(async () => u({ channel: 'command', command: 'curl … docker.sh | sh', commandWindows: 'irm … docker.ps1 | iex' })) })).run(['sync', 'server']);
+    expect(r.message).toContain('docker.sh')
+    expect(r.message).toContain('docker.ps1')
+  });
+  it('the server can not be reached: says so', async () => {
+    const r = await facade(port()).run(['sync', 'server']);
+    expect(r.ok).toBe(false);
+  });
+});
+

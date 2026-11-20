@@ -104,6 +104,10 @@ interface KrnlBridge {
   syncDisconnect?: (force?: boolean) => Promise<unknown>
   syncRetry?: () => Promise<unknown>
   syncDevices?: () => Promise<unknown>
+  // server-updates F1–F6 (Decision 52)
+  syncServer?: (check?: boolean) => Promise<unknown>
+  syncServerUpdate?: (password: string, code?: string) => Promise<unknown>
+  syncServerAuto?: (on: boolean, password: string, code?: string) => Promise<unknown>
   onSyncStatus?: (callback: (info: unknown) => void) => () => void
 }
 

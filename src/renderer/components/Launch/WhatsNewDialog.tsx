@@ -23,13 +23,14 @@ import artWindows from '../../assets/launch/plate-windows.webp';
 import artCards from '../../assets/launch/plate-cards.webp';
 import artSync from '../../assets/launch/plate-sync.webp';
 import artPhone from '../../assets/launch/plate-phone.webp';
+import artUpdate from '../../assets/launch/plate-update.webp';
 import { startTour } from '../Tour/TourHost';
 import { tourById } from '../Tour/tours';
 import { useEasyMode } from '../../store/uiMode';
 
 const ART: Record<WhatsNewArt, string> = {
   mini: artMini, menubar: artMenubar, feedback: artFeedback, streak: artStreak, sessions: artSessions, guide: artGuide, board: artBoard,
-  boards: artBoards, windows: artWindows, cards: artCards, sync: artSync, phone: artPhone,
+  boards: artBoards, windows: artWindows, cards: artCards, sync: artSync, phone: artPhone, update: artUpdate,
 };
 
 function runAction(item: WhatsNewItem): void {

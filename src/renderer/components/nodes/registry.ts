@@ -72,4 +72,7 @@ export const NODE_TYPES: Record<string, ComponentType<RFNodeProps<KrnlRFNode>>> 
   frame:          createNodeAdapter(FrameNode as AnyNodeComponent),
   analytics:      createNodeAdapter(AnalyticsMother as AnyNodeComponent),
   media:          createNodeAdapter(MediaNode as AnyNodeComponent),
+  // A window kind this KRNL0 does not know (made by a newer KRNL0, server-updates F9):
+  // a quiet card instead of React Flow's blank default box. Its data is kept as it is.
+  unknown:        createNodeAdapter(UnknownNode),
 };

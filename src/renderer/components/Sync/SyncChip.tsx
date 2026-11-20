@@ -9,8 +9,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Popover } from '../ui/Popover';
-import { agoText, chipLook, disconnectSync, fetchDevices, syncNow, useSyncBridge, useSyncStore } from '../../store/syncStore';
+import { agoText, chipLook, disconnectSync, fetchDevices, syncNow, useServerUpdateStore, useServerUpdateWatch, useSyncBridge, useSyncStore } from '../../store/syncStore';
 import { ConnectSheet } from './ConnectSheet';
+import { ServerUpdateRow, ServerUpdateSheet } from './ServerUpdate';
 import { IS_WEB } from '../../platform';
 import type { SyncDevice } from '../../../shared/sync/port';
 
@@ -42,9 +43,14 @@ const badgeStyle: React.CSSProperties = {
 
 export function SaveSyncBadge() {
   useSyncBridge();
+  useServerUpdateWatch();
   const info = useSyncStore((s) => s.info);
+  // server-updates F1 (draft A): a small dot on the badge, never a colour change (NF2).
+  const serverUpdate = useServerUpdateStore((s) => s.update);
+  const updatePip = !!serverUpdate?.available;
   const [open, setOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [devices, setDevices] = useState<SyncDevice[]>([]);
   const [busy, setBusy] = useState(false);
   // Web: changes the server does not have yet, found when logging out.
@@ -104,6 +110,7 @@ export function SaveSyncBadge() {
       >
         <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor' }} />
         {look.label}
+        {updatePip && <span data-testid="server-update-pip" aria-label="Server update available" style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--amber)', marginLeft: 2 }} />}
       </button>
 
       <Popover anchor={ref.current} open={open} onClose={() => setOpen(false)} minWidth={340}>
@@ -133,6 +140,7 @@ export function SaveSyncBadge() {
 
           {configured && (
             <>
+              <ServerUpdateRow onOpen={() => { setOpen(false); setUpdating(true); }} />
               {info.message && <span style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--ink-2)' }}>{info.message}</span>}
               {info.state === 'offline' && !IS_WEB && (
                 <span data-testid="sync-offline-hint" style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--ink-3)' }}>
@@ -178,6 +186,7 @@ export function SaveSyncBadge() {
       </Popover>
 
       {connecting && <ConnectSheet onClose={() => setConnecting(false)} />}
+      {updating && <ServerUpdateSheet onClose={() => setUpdating(false)} />}
     </>
   );
 }

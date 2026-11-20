@@ -19,7 +19,8 @@
     "reset": "node scripts/reset-board.mjs",
     "reset:hard": "node scripts/reset-board.mjs --hard",
     "icons": "electron scripts/generate-icons.mjs",
-    "postinstall": "electron-rebuild -f -w node-pty"
+    "postinstall": "electron-rebuild -f -w node-pty",
+    "release": "node scripts/release.mjs"
   },
   "bin": {
     "krnl": "bin/krnl.js",

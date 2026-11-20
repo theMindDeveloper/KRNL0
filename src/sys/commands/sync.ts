@@ -77,3 +77,24 @@ export async function syncRetry(port: SyncPort): Promise<SysResult> {
   const s = await port.retry();
   return syncStatus({ ...port, info: () => s }, false);
 }
+
+/**
+ * `krnl sync server` (server-updates F8): the server's version and how it updates.
+ * Updating needs the server password, so it happens in the app (saved › Update
+ * server), never in the terminal.
+ */
+export async function syncServer(port: SyncPort, json: boolean): Promise<SysResult> {
+  if (!port.info().configured) return { ok: false, message: 'Sync is off: no server to look at. Connect one: krnl sync connect <address>', data: { exitCode: 1 } };
+  const u = await port.serverUpdate(true);
+  if (!u) return { ok: false, message: "Can't reach the server right now. Try again when it is online.", data: { exitCode: 1 } };
+  if (json) return { ok: true, message: JSON.stringify(u, null, 2), data: u };
+  const lines = [
+    `server: ${u.current}${u.available && u.latest ? ` — ${u.latest} is out` : ' (newest)'}`,
+    `updates: ${u.channel === 'one-click' ? 'one click in the app: saved › Update server (asks for the server password)' : u.channel === 'command' ? 'run on the server once:' : 'from source (git)'}`,
+  ];
+  if (u.channel === 'command' && u.command) lines.push(`  ${u.command}`, ...(u.commandWindows ? [`  Windows: ${u.commandWindows}`] : []), ...(u.commandLinux ? [`  Linux without Docker: ${u.commandLinux}`] : []));
+  lines.push(`at night: ${u.auto ? 'on (04:00)' : 'off'}`);
+  if (u.job && u.job.state !== 'idle') lines.push(`last update: ${u.job.state}${u.job.to ? ` ${u.job.from ?? ''} → ${u.job.to}` : ''}${u.job.message ? ` — ${u.job.message}` : ''}`);
+  if (u.minApp) lines.push(`needs KRNL0 ${u.minApp} or newer on your computers`);
+  return { ok: true, message: lines.join('\n'), data: u };
+}

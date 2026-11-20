@@ -7,7 +7,7 @@
 
 import { minorOf } from './appState';
 
-export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone';
+export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone' | 'update';
 /** What "Show me" does for a highlight. */
 export type WhatsNewAction = 'pomo' | 'feedback' | 'settings' | 'tour' | 'none';
 
@@ -40,6 +40,30 @@ export interface WhatsNewRelease {
 }
 
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    minor: '0.14',
+    date: 'Nov 2026',
+    summary: 'Your server updates in one click, and installs with one command',
+    items: [
+      {
+        label: 'Your server, up to date in one click',
+        kicker: 'New · Server updates',
+        caption: 'When your server has a new version, the saved badge says so.',
+        title: 'Your server,\nup to date in one click.',
+        body: 'When your KRNL0 server has a new version, a small dot appears on the saved badge. Click Update server and type your password: it makes a backup, checks that the release is the real one, restarts, and goes back by itself if anything fails. Or let it update itself at night.',
+        art: 'update',
+        action: 'tour',
+        tour: 'sync',
+      },
+    ],
+    more: [
+      'Docker in one command, on Linux, Mac and Windows, with the updater included. A server started with docker run moves over with its data.',
+      'Settings › Updates shows your server: its version, how it updates, and the night switch.',
+      'The website one version behind keeps everything a newer KRNL0 added, and a window it does not know yet shows as a quiet card.',
+      'Each KRNL0 release now prepares the matching server release by itself.',
+      'Command: krnl sync server.',
+    ],
+  },
   {
     minor: '0.13',
     date: 'Nov 2026',

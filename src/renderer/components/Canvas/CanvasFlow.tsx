@@ -449,7 +449,9 @@ function getMemoizedRfNode(
   const cached = rfNodeCache.get(node.id);
   // updateNode rewrites a single node ref on change; others stay identical.
   if (cached && cached.src === node) return cached.rf;
-  const rf = toRfNode(node, ctx);
+  const made = toRfNode(node, ctx);
+  // A kind this KRNL0 does not know (a newer KRNL0 made it): the "newer KRNL0" card.
+  const rf = made.type && made.type in ALL_NODE_TYPES ? made : { ...made, type: 'unknown' };
   rfNodeCache.set(node.id, { src: node, rf });
   return rf;
 }

@@ -2709,3 +2709,14 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
 **Consequences.** Same-value conflicts resolve the way they already do for the CLI (first to the server wins, the other value one undo step away). Order comes from server revisions only, never from device clocks.
 
 **The web app (2026-11-20).** `vite.web.config.ts` builds the same renderer into `dist-web/` with `__KRNL_WEB__` set (`src/renderer/platform.ts` → `IS_WEB`); `src/web/` replaces Electron: a `window.krnl` over the browser's own copy (`WebHost`, `WebSyncStore` in IndexedDB) and `WebTransport` (fetch + WebSocket with the session cookie and CSRF token; polling when a phone blocks the socket). Board migrations moved to `src/shared/boardMigrate.ts`, so both run the same code. Phones and iPads get `components/Mobile/MobileShell`: the board's own windows (`MotherWindow`, the Station cell without its drag handle) in views, so every tap runs the desktop's commands; `MothersElsewhereContext` makes the canvas show only free cards there. Pictures load through `utils/assetUrl.ts` (`krnl-asset://` on the desktop, a `blob:` of the browser's copy on the web). Sync status lives in the top bar's own **saved** badge (owner, 2026-11-20: one indicator, not a second chip). The KRNL0 release attaches `krnl0-web-<version>.tar.gz` (+ `.sha256`); the server release pins and checks it.
+
+## Decision 52 — Server updates from the app; releases keep the server in step (2026-11-20)
+
+**Context.** The desktop app updates itself (Decision 36); the KRNL0 server did not, and a newer app beside an older server leaves phones on the older website. The owner asked for one-click server updates from the app, a one-command Docker install with an updater, a check of version edge cases, and a release workflow every agent can follow, on GitHub's free plan.
+
+**Decision.**
+1. The server reports its update state in `GET /api/v1/server` (`update`: current, latest, channel `one-click`/`command`/`none`, the job, auto, `minApp`, `protocol`). The app shows a notice where the owner picks (draft A or B on the design board) and, for `one-click`, sends `POST /api/v1/server/update` with the owner password. The server's privileged helper does the update; the app never touches the server machine (server Decision S12).
+2. An older KRNL0 must keep what it doesn't know (server-updates F9). The store and node commands already spread objects; a test over the real actions guards it. New code that rebuilds a node, state or item object from scratch breaks this rule.
+3. Every KRNL0 release starts the server's follow workflow (server Decision S13); `scripts/release.mjs` and `docs/releases/RELEASING.md` describe the whole train.
+
+**Requirements:** [server-updates.md](../06-requirements/server-updates.md).

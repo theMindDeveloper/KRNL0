@@ -10,6 +10,7 @@ import { writeFileAtomic } from '../persistence/board';
 import { SyncEngine } from '../../shared/sync/engine';
 import { PROTOCOL, type SyncStatus } from '../../shared/sync/types';
 import type { SyncDevice, SyncInfo, SyncPort } from '../../shared/sync/port';
+import { readServerUpdate, type ServerUpdate, type ServerUpdateResult } from '../../shared/sync/serverUpdate';
 import { DesktopHost } from './host';
 import { onAssetStored, onFileWritten, onTimelogAppended } from './observers';
 import { FileSyncStore } from './store';
@@ -192,6 +193,48 @@ export class SyncService implements SyncPort {
     this.config = null;
     this.emit();
     return this.info();
+  }
+
+  /** The server's update state (server-updates F1). `check` asks GitHub again (at most once a minute). */
+  async serverUpdate(check = false): Promise<ServerUpdate | null> {
+    const cfg = this.config;
+    if (!cfg) return null;
+    try {
+      const token = this.deps.secrets.open(cfg.sealedToken);
+      const r = check
+        ? await request(cfg.origin, 'POST', '/api/v1/server/update/check', { caPem: cfg.caPem, token, json: {} })
+        : await request(cfg.origin, 'GET', '/api/v1/server', { caPem: cfg.caPem, token });
+      if (r.status === 404 && check) return this.serverUpdate(false); // a 0.1.0 server has no check route
+      if (r.status !== 200) return null;
+      return readServerUpdate(json(r.body).update);
+    } catch {
+      return null;
+    }
+  }
+
+  private async serverWrite(method: string, path: string, body: Record<string, unknown>): Promise<ServerUpdateResult> {
+    const cfg = this.config;
+    if (!cfg) return { ok: false, message: 'Connect your server first.', update: null };
+    try {
+      const token = this.deps.secrets.open(cfg.sealedToken);
+      const r = await request(cfg.origin, method, path, { caPem: cfg.caPem, token, json: body });
+      const j = json(r.body);
+      const update = readServerUpdate(j.update ?? (j.error as Record<string, unknown> | undefined)?.update);
+      if (r.status === 200 || r.status === 202) return { ok: true, message: null, update };
+      if (r.status === 404) return { ok: false, message: 'This server version can not update itself yet. Run the command shown on the server once.', update };
+      const err = j.error as { message?: unknown } | undefined;
+      return { ok: false, message: typeof err?.message === 'string' ? err.message : `The server answered ${r.status}.`, update };
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e), update: null };
+    }
+  }
+
+  startServerUpdate(password: string, code?: string): Promise<ServerUpdateResult> {
+    return this.serverWrite('POST', '/api/v1/server/update', { password, ...(code ? { code } : {}) });
+  }
+
+  setServerAuto(on: boolean, password: string, code?: string): Promise<ServerUpdateResult> {
+    return this.serverWrite('PUT', '/api/v1/server/update/auto', { on, password, ...(code ? { code } : {}) });
   }
 
   async devices(): Promise<SyncDevice[]> {

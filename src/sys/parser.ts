@@ -95,6 +95,7 @@ export type SysCommand =
   | { kind: 'sync'; sub: 'connect'; address: string | undefined }
   | { kind: 'sync'; sub: 'pair'; password: string | undefined; code: string | undefined }
   | { kind: 'sync'; sub: 'disconnect' | 'retry' }
+  | { kind: 'sync'; sub: 'server'; json: boolean }
   | { kind: 'mini'; sub: 'status'; json: boolean }
   | { kind: 'mini'; sub: 'show' | 'hide' | 'on' | 'off' }
   | { kind: 'mini'; sub: 'look'; look: string | undefined }
@@ -410,7 +411,8 @@ export class SysParser {
         return { kind: 'sync', sub: 'pair', password: pw, code };
       }
       if (sub === 'disconnect' || sub === 'retry') return { kind: 'sync', sub };
-      return { kind: 'invalid', message: `Unknown subcommand: sync ${sub}. Try: sync status | connect <address> | pair --password-stdin | disconnect | retry` };
+      if (sub === 'server') return { kind: 'sync', sub: 'server', json: hasFlag(rest, 'json') };
+      return { kind: 'invalid', message: `Unknown subcommand: sync ${sub}. Try: sync status | connect <address> | pair --password-stdin | disconnect | retry | server` };
     }
 
     // Decision 37 — the floating pocket timer. Bare `mini` (or `mini --json`) = status.
