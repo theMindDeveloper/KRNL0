@@ -19,6 +19,7 @@ const info = (over: Partial<SyncInfo> = {}): SyncInfo => ({
 function port(over: Partial<SyncPort> = {}): SyncPort {
   return {
     info: () => info(),
+    devices: vi.fn(async () => []),
     begin: vi.fn(async () => ({ origin: 'https://192.168.1.20:8443', fingerprint: 'F5:50:35', serverVersion: '0.1.0', encryption: 'self-signed' })),
     finish: vi.fn(async () => info()),
     disconnect: vi.fn(async () => info({ configured: false, state: 'off' })),

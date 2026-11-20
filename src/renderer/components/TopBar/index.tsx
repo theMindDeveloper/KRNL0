@@ -21,6 +21,7 @@ import { runLookTransition } from '../../themes/transition';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
 import { BoardSwitcher } from './BoardSwitcher';
+import { SyncChip } from '../Sync/SyncChip';
 import { Z } from '../ui/layers';
 import { SettingsModal, type SettingsSection } from './SettingsModal';
 import { HelpMenu } from '../Launch/HelpMenu';
@@ -243,6 +244,7 @@ export function TopBar() {
             before the switch, so the switch never moves when it appears. The
             light / dark switch lives in Settings → General. */}
         {!stationShown && <TopBarButton label="Fit" title="Fit everything in view" onClick={handleFit} testId="topbar-fit" />}
+        <SyncChip />
         <LayoutModeToggle />
         <HelpMenu />
         <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />

@@ -9,7 +9,17 @@ export interface SyncInfo extends SyncStatus {
   deviceName: string | null;
 }
 
+export interface SyncDevice {
+  id: string;
+  name: string;
+  platform: string;
+  lastSeenAt: number;
+  current: boolean;
+}
+
 export interface SyncPort {
+  /** The devices paired with the server (the server's list). */
+  devices(): Promise<SyncDevice[]>;
   info(): SyncInfo;
   begin(address: string): Promise<{ origin: string; fingerprint: string | null; serverVersion: string; encryption: string }>;
   finish(password: string, code?: string): Promise<SyncInfo>;

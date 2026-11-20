@@ -158,6 +158,7 @@ contextBridge.exposeInMainWorld('krnl', {
   syncFinish: (password: string, code?: string): Promise<unknown> => ipcRenderer.invoke('sync:finish', password, code),
   syncDisconnect: (): Promise<unknown> => ipcRenderer.invoke('sync:disconnect'),
   syncRetry: (): Promise<unknown> => ipcRenderer.invoke('sync:retry'),
+  syncDevices: (): Promise<unknown> => ipcRenderer.invoke('sync:devices'),
   onSyncStatus: (callback: (info: unknown) => void) => {
     const listener = (_event: unknown, info: unknown) => callback(info)
     ipcRenderer.on('sync:status', listener)

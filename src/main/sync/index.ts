@@ -51,6 +51,7 @@ export function initSync(deps: {
   });
   ipcMain.handle('sync:disconnect', async () => ({ ok: true, info: await s.disconnect() }));
   ipcMain.handle('sync:retry', async () => ({ ok: true, info: await s.retry() }));
+  ipcMain.handle('sync:devices', async () => s.devices());
 
   s.start();
   app.on('before-quit', () => s.stop());

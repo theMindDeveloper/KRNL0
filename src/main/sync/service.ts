@@ -9,7 +9,7 @@ import { join } from 'path';
 import { writeFileAtomic } from '../persistence/board';
 import { SyncEngine } from '../../shared/sync/engine';
 import { PROTOCOL, type SyncStatus } from '../../shared/sync/types';
-import type { SyncInfo, SyncPort } from '../../shared/sync/port';
+import type { SyncDevice, SyncInfo, SyncPort } from '../../shared/sync/port';
 import { DesktopHost } from './host';
 import { onAssetStored, onFileWritten, onTimelogAppended } from './observers';
 import { FileSyncStore } from './store';
@@ -192,6 +192,19 @@ export class SyncService implements SyncPort {
     this.config = null;
     this.emit();
     return this.info();
+  }
+
+  async devices(): Promise<SyncDevice[]> {
+    const cfg = this.config;
+    if (!cfg) return [];
+    try {
+      const token = this.deps.secrets.open(cfg.sealedToken);
+      const r = await request(cfg.origin, 'GET', '/api/v1/devices', { caPem: cfg.caPem, token });
+      if (r.status !== 200) return [];
+      return ((json(r.body).devices as SyncDevice[] | undefined) ?? []).map((d) => ({ id: d.id, name: d.name, platform: d.platform, lastSeenAt: d.lastSeenAt, current: d.current }));
+    } catch {
+      return [];
+    }
   }
 
   async retry(): Promise<SyncInfo> {
