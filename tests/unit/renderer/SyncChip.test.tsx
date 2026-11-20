@@ -3,7 +3,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import React from 'react';
-import { SyncChip } from '../../../src/renderer/components/Sync/SyncChip';
+import { SaveSyncBadge } from '../../../src/renderer/components/Sync/SyncChip';
 import { fingerprintGroups } from '../../../src/renderer/components/Sync/ConnectSheet';
 import { agoText, chipLook, parseSyncInfo, useSyncStore } from '../../../src/renderer/store/syncStore';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
@@ -50,14 +50,14 @@ afterEach(() => { cleanup(); delete (window as unknown as { krnl?: Bridge }).krn
 
 describe('chip words (F6)', () => {
   it('names every state in plain words', () => {
-    expect(chipLook(null).label).toBe('connect server');
-    expect(chipLook(info({ configured: false, state: 'off' })).label).toBe('connect server');
-    expect(chipLook(info()).label).toBe('server · synced');
+    expect(chipLook(null).label).toBe('saved');
+    expect(chipLook(info({ configured: false, state: 'off' })).label).toBe('saved');
+    expect(chipLook(info()).label).toBe('saved · synced');
     expect(chipLook(info({ state: 'syncing' })).tone).toBe('cyan');
-    expect(chipLook(info({ state: 'offline' })).label).toBe('offline · changes kept');
-    expect(chipLook(info({ state: 'paused' })).label).toBe('sync paused · retry');
+    expect(chipLook(info({ state: 'offline' })).label).toBe('saved · offline');
+    expect(chipLook(info({ state: 'paused' })).label).toBe('sync paused');
     expect(chipLook(info({ state: 'update' })).label).toBe('update KRNL0');
-    expect(chipLook(info({ state: 'signed-out' })).label).toBe('signed out · connect again');
+    expect(chipLook(info({ state: 'signed-out' })).label).toBe('saved · signed out');
   });
 
   it('accepts only a well-formed status from IPC', () => {
@@ -80,20 +80,30 @@ describe('chip words (F6)', () => {
   });
 });
 
-describe('SyncChip', () => {
-  it('shows a quiet "connect server" chip in Easy mode too (the only way in without the terminal)', async () => {
-    setBoard('easy');
-    mount(info({ configured: false, state: 'off' }));
-    render(<SyncChip />);
-    await act(async () => {});
-    expect(screen.getByTestId('sync-chip').textContent).toContain('connect server');
+describe('the saved badge, which also tells how sync is doing', () => {
+  it('without a sync service it is the plain "saved" badge', () => {
+    render(<SaveSyncBadge />);
+    expect(screen.getByTestId('topbar-live-badge').textContent).toBe('saved');
+    expect(screen.getByTestId('topbar-live-badge').getAttribute('title')).toContain('saves itself');
   });
 
-  it('with no server, opens the Connect sheet; CONNECT waits for the fingerprint tick and a password', async () => {
-    mount(info({ configured: false, state: 'off', origin: null, fingerprint: null }));
-    render(<SyncChip />);
+  it('in Easy mode too, "saved" offers to connect a server (the only way in without the terminal)', async () => {
+    setBoard('easy');
+    mount(info({ configured: false, state: 'off' }));
+    render(<SaveSyncBadge />);
     await act(async () => {});
-    fireEvent.click(screen.getByTestId('sync-chip'));
+    expect(screen.getByTestId('topbar-live-badge').textContent).toBe('saved');
+    await act(async () => { fireEvent.click(screen.getByTestId('topbar-live-badge')); });
+    expect(screen.getByText('Saved on this computer')).toBeTruthy();
+    expect(screen.getByText('CONNECT SERVER')).toBeTruthy();
+  });
+
+  it('with no server, Connect opens the sheet; CONNECT waits for the fingerprint tick and a password', async () => {
+    mount(info({ configured: false, state: 'off', origin: null, fingerprint: null }));
+    render(<SaveSyncBadge />);
+    await act(async () => {});
+    await act(async () => { fireEvent.click(screen.getByTestId('topbar-live-badge')); });
+    fireEvent.click(screen.getByText('CONNECT SERVER'));
     expect(screen.getByTestId('sync-connect-sheet')).toBeTruthy();
 
     fireEvent.change(screen.getByPlaceholderText('192.168.1.20:8443'), { target: { value: 'home.lan:8443' } });
@@ -116,9 +126,10 @@ describe('SyncChip', () => {
   it('shows the server\'s error in the sheet and keeps it open', async () => {
     mount(info({ configured: false, state: 'off' }));
     bridge.syncBegin = vi.fn(async () => ({ ok: false, message: 'Cannot reach https://x. Is the server running?' }));
-    render(<SyncChip />);
+    render(<SaveSyncBadge />);
     await act(async () => {});
-    fireEvent.click(screen.getByTestId('sync-chip'));
+    await act(async () => { fireEvent.click(screen.getByTestId('topbar-live-badge')); });
+    fireEvent.click(screen.getByText('CONNECT SERVER'));
     fireEvent.change(screen.getByPlaceholderText('192.168.1.20:8443'), { target: { value: 'x' } });
     await act(async () => { fireEvent.click(screen.getByText('Find')); });
     expect(screen.getByRole('alert').textContent).toContain('Cannot reach');
@@ -127,11 +138,11 @@ describe('SyncChip', () => {
 
   it('when synced, opens the status with this computer marked and Sync now', async () => {
     mount(info());
-    render(<SyncChip />);
+    render(<SaveSyncBadge />);
     await act(async () => {});
-    expect(screen.getByTestId('sync-chip').textContent).toContain('server · synced');
-    await act(async () => { fireEvent.click(screen.getByTestId('sync-chip')); });
-    expect(screen.getByText('Everything is in sync')).toBeTruthy();
+    expect(screen.getByTestId('topbar-live-badge').textContent).toContain('saved · synced');
+    await act(async () => { fireEvent.click(screen.getByTestId('topbar-live-badge')); });
+    expect(screen.getByText('Everything is saved and in sync')).toBeTruthy();
     expect(screen.getByText('desk (this computer)')).toBeTruthy();
     expect(screen.getByText('laptop')).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByText('Sync now')); });

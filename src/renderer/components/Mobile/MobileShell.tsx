@@ -13,7 +13,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { useEasyMode } from '../../store/uiMode';
 import { BoardSwitcher } from '../TopBar/BoardSwitcher';
 import { SettingsModal, type Theme } from '../TopBar/SettingsModal';
-import { SyncChip } from '../Sync/SyncChip';
+import { SaveSyncBadge } from '../Sync/SyncChip';
 import { EmbeddedCanvasCell } from '../Station/EmbeddedCanvasCell';
 import { MothersElsewhereContext, setMothersElsewhere } from '../Station/useStationViewportGate';
 import { pomoClock, formatElapsed, formatRemaining, isObserve } from '../nodes/PomoNode/derive';
@@ -253,7 +253,7 @@ function Focus({ onClose }: { onClose: () => void }) {
       <header className="m-focus__head">
         <button type="button" className="m-icon-btn" aria-label="Back to today" onClick={onClose}><Icon d={BACK} /></button>
         <span className="m-cap">Focus</span>
-        <SyncChip />
+        <SaveSyncBadge />
       </header>
       <div className="m-grow"><MotherWindow kind="pomo" label="Timer" /></div>
     </div>
@@ -328,9 +328,10 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
             </div>
           )}
           <BoardSwitcher quiet={easy} />
+          {/* The app's own saved badge, on the left as in the top bar: saved and synced. */}
+          <SaveSyncBadge />
           <span className="m-spacer" />
           {ff === 'tablet' && view === 'today' && <FocusPill onOpen={() => setFocus(true)} />}
-          <SyncChip />
           {ff === 'phone' && settingsButton}
         </header>
         <main className="m-body">

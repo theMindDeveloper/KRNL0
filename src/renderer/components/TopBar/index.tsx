@@ -21,7 +21,7 @@ import { runLookTransition } from '../../themes/transition';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
 import { BoardSwitcher } from './BoardSwitcher';
-import { SyncChip } from '../Sync/SyncChip';
+import { SaveSyncBadge } from '../Sync/SyncChip';
 import { Z } from '../ui/layers';
 import { SettingsModal, type SettingsSection } from './SettingsModal';
 import { HelpMenu } from '../Launch/HelpMenu';
@@ -204,29 +204,10 @@ export function TopBar() {
         {/* Decision 49 — separate boards. In Easy the menu shows once there is more than one board. */}
         <BoardSwitcher quiet={easyMode} />
 
-        {/* Live badge */}
-        {/* New-user review 1.7: a static "live" said nothing; this says what a
-            new user wants to know — nothing to save by hand. */}
-        <span
-          data-testid="topbar-live-badge"
-          className="krnl-live-badge"
-          title="Your board saves itself as you go — there is nothing to save by hand."
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--acid-ink, var(--acid))',
-            letterSpacing: '0.04em',
-            userSelect: 'none',
-            whiteSpace: 'nowrap',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            marginRight: 10,
-          }}
-        >
-          <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor' }} />
-          saved
-        </span>
+        {/* Live badge — New-user review 1.7: says what a new user wants to know
+            (nothing to save by hand); with a KRNL0 server it also says how
+            sync is doing (Decision 51: one place, not a second chip). */}
+        <SaveSyncBadge />
       </div>
 
       {/* Centre: panel toggles (ADR 0009 F9) — in Station AND Canvas mode; a
@@ -244,7 +225,6 @@ export function TopBar() {
             before the switch, so the switch never moves when it appears. The
             light / dark switch lives in Settings → General. */}
         {!stationShown && <TopBarButton label="Fit" title="Fit everything in view" onClick={handleFit} testId="topbar-fit" />}
-        <SyncChip />
         <LayoutModeToggle />
         <HelpMenu />
         <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />

@@ -37,18 +37,18 @@ export function useSyncBridge(): void {
 
 export interface ChipLook { label: string; tone: 'acid' | 'cyan' | 'amber' | 'rust' | 'quiet' }
 
-/** The chip's words and colour for each state (server-sync.md F6). */
+/** The saved badge's words and colour for each state (server-sync.md F6). */
 export function chipLook(info: SyncInfo | null): ChipLook {
-  if (!info || !info.configured) return { label: 'connect server', tone: 'quiet' };
+  if (!info || !info.configured) return { label: 'saved', tone: 'acid' };
   switch (info.state) {
-    case 'synced': return { label: 'server · synced', tone: 'acid' };
+    case 'synced': return { label: 'saved · synced', tone: 'acid' };
     case 'syncing':
     case 'connecting': return { label: 'syncing', tone: 'cyan' };
-    case 'offline': return { label: 'offline · changes kept', tone: 'amber' };
-    case 'paused': return { label: 'sync paused · retry', tone: 'rust' };
+    case 'offline': return { label: 'saved · offline', tone: 'amber' };
+    case 'paused': return { label: 'sync paused', tone: 'rust' };
     case 'update': return { label: 'update KRNL0', tone: 'rust' };
-    case 'signed-out': return { label: 'signed out · connect again', tone: 'quiet' };
-    default: return { label: 'sync off', tone: 'quiet' };
+    case 'signed-out': return { label: 'saved · signed out', tone: 'quiet' };
+    default: return { label: 'saved', tone: 'acid' };
   }
 }
 
