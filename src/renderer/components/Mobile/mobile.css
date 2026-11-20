@@ -1,0 +1,148 @@
+/* The web app on phones and iPads (MobileShell.tsx). App tokens only, so every
+   theme and frame style applies. Spacing scale 4 / 8 / 12 / 16 / 20 / 24 / 32;
+   touch targets at least 44 px; nothing scrolls sideways; no scrollbars shown. */
+
+.m-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+}
+/* No double-tap zoom, no iOS callout on a long-press (it opens the row's menu instead). */
+.m-shell { touch-action: manipulation; -webkit-touch-callout: none; }
+.m-shell * { scrollbar-width: none; }
+.m-shell *::-webkit-scrollbar { display: none; }
+.m-shell button { font-family: inherit; }
+.m-shell button:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+.m-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.m-spacer { flex: 1 1 auto; }
+.m-grow { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.m-fill { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.m-stack { gap: 12px; }
+
+.m-icon { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.m-head {
+  flex-shrink: 0;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--paper-3);
+}
+.m-logo { width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; }
+.m-logo--rail { width: 36px; height: 36px; border-radius: 9px; margin-bottom: 14px; }
+.m-head__title { min-width: 0; margin-right: 8px; }
+.m-head__title p { margin: 2px 0 0; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-head__title h1 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-icon-btn {
+  width: 44px; height: 44px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 12px; background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.m-icon-btn:active { background: var(--paper-3); }
+.m-cap { font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+
+.m-chip {
+  height: 32px; padding: 0 12px; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px; border: 1px solid var(--paper-3); background: var(--paper-2);
+  color: var(--ink-2); font-size: 11.5px; white-space: nowrap; cursor: pointer;
+}
+.m-chip--live { color: var(--ink); border-color: var(--acid); }
+.m-num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.m-dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; background: var(--ink-3); }
+.m-dot--acid { background: var(--acid); }
+
+/* ── Body and windows ───────────────────────────────────────────────────── */
+.m-body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.m-shell--phone .m-body { padding: 12px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left)); }
+.m-shell--phone .m-body:has(> .m-scroll) { padding: 0; }
+.m-shell--tablet .m-body { padding: 20px 24px max(20px, env(safe-area-inset-bottom)); }
+
+/* A board window filling its slot (the same frame as a Station cell). */
+.m-window { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.m-window > * { flex: 1 1 auto; min-height: 0; }
+
+/* Today on a phone: one column that scrolls; each window keeps a height that
+   shows it whole (they are the desktop's windows, which fill what they get). */
+.m-scroll {
+  position: absolute; inset: 0;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 16px max(12px, env(safe-area-inset-right)) 24px max(12px, env(safe-area-inset-left));
+}
+.m-headline { display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+.m-headline h1 { margin: 0; font-size: 30px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.05; }
+.m-headline__row { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+.m-headline__row p { margin: 0; flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--ink-3); }
+.m-slot { flex-shrink: 0; display: flex; flex-direction: column; }
+.m-slot--timer { height: 300px; }
+.m-slot--habits-tab { height: 290px; }
+
+/* Calendar / Clock switch */
+.m-seg { display: inline-flex; align-self: flex-start; padding: 3px; gap: 2px; border-radius: 10px; background: var(--paper-2); border: 1px solid var(--paper-3); flex-shrink: 0; }
+.m-seg button { height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; cursor: pointer; }
+.m-seg button.on { background: var(--paper-3); color: var(--ink); }
+
+.m-canvas { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--paper-3); }
+/* A phone has no room for the map of the board; pinch and Fit do its job. */
+.m-shell--phone .m-canvas .react-flow__minimap { display: none; }
+
+/* iPad Today: Timer and Plans on the left, Calendar and Habits on the right. */
+.m-today-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 16px; }
+.m-col { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 899px) { .m-today-grid { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); } }
+
+/* ── Phone tab bar: a material layer at the bottom ──────────────────────── */
+.m-shell--phone { flex-direction: column; }
+.m-tabbar {
+  flex-shrink: 0;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--paper-2) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-top: 1px solid var(--paper-3);
+}
+.m-nav__item {
+  min-height: 52px; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: 0; background: transparent; color: var(--ink-3); cursor: pointer;
+  font-size: 10.5px; letter-spacing: 0.04em;
+}
+.m-nav__item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-nav__item.on { color: var(--acid-ink); }
+:root[data-theme='dark'] .m-nav__item.on { color: var(--acid); }
+
+/* ── iPad rail ──────────────────────────────────────────────────────────── */
+.m-rail {
+  width: 76px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: max(24px, env(safe-area-inset-top)) 0 max(20px, env(safe-area-inset-bottom)) env(safe-area-inset-left);
+  background: var(--paper-2); border-right: 1px solid var(--paper-3);
+}
+.m-rail .m-nav__item { width: 56px; min-height: 56px; border-radius: 14px; flex: 0 0 auto; }
+.m-rail .m-nav__item.on { background: var(--acid-faint); }
+
+/* ── Focus: the timer alone ─────────────────────────────────────────────── */
+.m-focus {
+  position: fixed; inset: 0; z-index: 240;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: var(--paper);
+}
+.m-focus__head { display: flex; align-items: center; gap: 8px; }
+.m-focus__head .m-cap { flex: 1 1 auto; text-align: center; }
+
+@media (prefers-reduced-transparency: reduce) {
+  .m-tabbar { background: var(--paper-2); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}

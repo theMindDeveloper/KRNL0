@@ -53,6 +53,8 @@ export function Popover({ anchor, open, onClose, minWidth, children }: Props) {
       if (ref.current?.contains(t) || anchor?.contains(t)) return;
       // A popover opened from inside this one (e.g. a TimeField's picker) is part of it.
       if (t instanceof Element && t.closest('.krnl-popover')) return;
+      // The guide's card (Next, Back): a tour step can show what this popover holds.
+      if (t instanceof Element && t.closest('[data-testid="tour-card"]')) return;
       onClose();
     };
     const onKey = (e: KeyboardEvent) => {

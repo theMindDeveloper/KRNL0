@@ -475,6 +475,20 @@ function getMemoizedRfEdge(
   return rf;
 }
 
+/** True on a touch-first device (phone, iPad): no mouse, so no middle-button pan. */
+function useCoarsePointer(): boolean {
+  const query = '(pointer: coarse)';
+  const [coarse, setCoarse] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia(query);
+    const on = (): void => setCoarse(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return coarse;
+}
+
 // ── Inner canvas (must be inside ReactFlowProvider) ───────────────────────────
 
 // Size of the canvas area the saved viewport was last framed for (see the
@@ -1424,6 +1438,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // The effective mode: below the station minimum size the window falls
   // back to the canvas, and the mothers must be drawn here (ADR 0008 § 9.5).
   const isStation = useStationViewportGate().effectiveMode === 'station';
+  const coarsePointer = useCoarsePointer();
 
   // ── Derive RF nodes from boardStore — memoized per-id ───────────────────
   // Stable RFNode identity unless the underlying KrnlNode reference changes.
@@ -1940,9 +1955,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       // Marquee selection on left-drag (empty canvas); pan with middle/right-drag.
       // Right-click on a node/edge still fires onNodeContextMenu / onEdgeContextMenu
       // because that's a press-release event, not a drag.
-      selectionOnDrag
+      // A touch screen (phone, iPad) has no middle button: one finger pans and
+      // two pinch, as in every map (Decision 51, web on phones).
+      selectionOnDrag={!coarsePointer}
       selectionMode={SelectionMode.Partial}
-      panOnDrag={[1, 2]}
+      panOnDrag={coarsePointer ? true : [1, 2]}
       multiSelectionKeyCode={['Control', 'Meta', 'Shift']}
       // Trackpad-first gestures:
       //   • Two-finger drag on a trackpad fires wheel events with deltaX/deltaY

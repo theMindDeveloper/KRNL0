@@ -7,7 +7,7 @@
 
 import { minorOf } from './appState';
 
-export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards';
+export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone';
 /** What "Show me" does for a highlight. */
 export type WhatsNewAction = 'pomo' | 'feedback' | 'settings' | 'tour' | 'none';
 
@@ -40,6 +40,40 @@ export interface WhatsNewRelease {
 }
 
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    minor: '0.13',
+    date: 'Nov 2026',
+    summary: 'Your board on every device through your own server, and on your phone',
+    items: [
+      {
+        label: 'Your board on every device',
+        kicker: 'New · Your own server',
+        caption: 'Every computer you connect keeps the same boards, plans, habits and time.',
+        title: 'Your board,\non every device.',
+        body: 'Run your own KRNL0 server at home and connect it from the saved badge in the top bar. Every computer you connect keeps the same boards, plans, habits and time. Offline too: changes wait and go when the server is back. Nothing passes through anyone else.',
+        art: 'sync',
+        action: 'tour',
+        tour: 'sync',
+      },
+      {
+        label: 'Open it on your phone',
+        kicker: 'New · In the browser',
+        caption: 'Today, the timer, calendar, habits and canvas, laid out for a phone.',
+        title: 'Open it on\nyour phone.',
+        body: 'Your server also serves KRNL0 to your phone and your iPad: Today with the timer, your plans and habits, the calendar, insights and the canvas, laid out for the screen in your hand. Hold a finger on a plan for its menu. The terminal and the AI stay in this app.',
+        art: 'phone',
+        action: 'none',
+      },
+    ],
+    more: [
+      'The saved badge in the top bar now also tells sync: saved · synced, syncing, saved · offline.',
+      'Connecting checks the server’s fingerprint, and the key stays in your system’s keychain.',
+      'Edits made on two devices at the same moment are both kept.',
+      'Pictures and files sync too.',
+      'A tutorial: Help › Tutorials › Saved and synced.',
+      'Commands: krnl sync status / connect / disconnect / retry.',
+    ],
+  },
   {
     minor: '0.12',
     date: 'Nov 2026',

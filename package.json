@@ -13,6 +13,7 @@
     "dev:shared": "electron-vite dev",
     "seed:preview": "vite-node scripts/seed-observe-preview.ts",
     "build": "electron-vite build",
+    "build:web": "vite build --config vite.web.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
     "reset": "node scripts/reset-board.mjs",
@@ -25,7 +26,11 @@
     "sys": "bin/sys.js"
   },
   "dependencies": {
+    "@fontsource/azeret-mono": "^5.3.0",
     "@fontsource/caveat": "^5.1.0",
+    "@fontsource/geist": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/pixelify-sans": "^5.3.0",
     "@fontsource/stardos-stencil": "^5.3.0",
     "@fontsource/vt323": "^5.3.0",
@@ -42,6 +47,7 @@
     "react-dom": "^18.3.0",
     "react-player": "^2.16.0",
     "react-resizable-panels": "^4.11.1",
+    "ws": "^8.23.0",
     "zod": "^3.23.0",
     "zustand": "^4.5.0"
   },
@@ -51,6 +57,7 @@
     "@types/node": "^20.12.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^4.3.0",
     "electron": "^30.0.0",
     "electron-builder": "^24.13.0",

@@ -43,3 +43,7 @@ Feature: Guided tours
     And the bottom row is the canvas, Habits, Analytics
     And the Terminal is hidden
 ```
+
+## Saved and synced (Decision 51)
+
+`sync` — Help › Tutorials, `krnl tour start sync`. Five steps: the top bar's **saved** badge (it saves itself), press it, its sheet (your server, Connect server: address, fingerprint, password), synced / offline / two devices at once, the board on the phone. Listed on the desktop and the web; the web skips every tour step about the Terminal or the AI orb and does not list "Terminal & AI". Voice: five clips recorded with `scripts/gen-tour-voice.ts sync` (703 characters, the tours' voice).

@@ -3,6 +3,7 @@
 // Check for updates opens it on Updates.
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { IS_WEB } from '../../platform';
 import { createPortal } from 'react-dom';
 import { HoldButton } from '../ui/HoldButton';
 import { CloseButton } from '../ui/CloseButton';
@@ -80,7 +81,7 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
         <nav className="st-nav" aria-label="Settings sections">
           <div className="st-nav__title"><SettingsIcon name="settings" />Settings</div>
           {/* easy-mode D25 — Finished cards (how done cards clear off the canvas) is Advanced. */}
-          {SECTIONS.filter((s) => !(easyMode && s.id === 'finished')).map((s) => (
+          {SECTIONS.filter((s) => !(easyMode && s.id === 'finished') && !(IS_WEB && (s.id === 'timer' || s.id === 'updates'))).map((s) => (
             <button
               key={s.id}
               type="button"

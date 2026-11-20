@@ -5,6 +5,16 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] — unreleased
+
+### Added
+- **Sync through your own KRNL0 server** (Decision 51): boards, the board list, the time log, pictures and files, near real time, offline-safe, with the app's own three-way merge. Pairing checks the server's fingerprint and pins its certificate; the device key is kept in the OS keychain. `krnl sync status | connect | pair | disconnect | retry`.
+- **The KRNL0 website** (served by the server after login): phone layout (Today, Calendar with Clock, Habits, Insights, Canvas, Focus), iPad layout with a side rail, the Station and Canvas in a computer's browser; long-press menus on touch screens. Built with `npm run build:web`; the release attaches `krnl0-web-<version>.tar.gz` for servers.
+- A **Saved and synced** tutorial (`krnl tour start sync`).
+
+### Changed
+- The top bar's **saved** badge also tells how sync is doing; a click shows the details or offers to connect a server.
+
 ## [0.12.0] — 2026-11-20
 
 ### Added

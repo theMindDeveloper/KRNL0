@@ -149,9 +149,53 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # The KRNL0 web app (Decision 51) for self-hosted KRNL0 servers: the
+  # krnl0-server release downloads krnl0-web-<version>.tar.gz from here (its
+  # vars.KRNL0_WEB_VERSION) and checks it against the .sha256 next to it.
+  web:
+    name: Build the web app
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # No Electron, no native modules: the web build is plain Vite.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build:web
+
+      - name: Pack krnl0-web-<version>.tar.gz
+        shell: bash
+        run: |
+          set -e
+          v="$(node -p "require('./package.json').version")"
+          mkdir -p web-out/krnl0-web-$v
+          cp -R dist-web/. web-out/krnl0-web-$v/
+          test -f web-out/krnl0-web-$v/index.html
+          tar -czf krnl0-web-$v.tar.gz -C web-out krnl0-web-$v
+          sha256sum krnl0-web-$v.tar.gz > krnl0-web-$v.tar.gz.sha256
+
+      - name: Upload the web app
+        uses: actions/upload-artifact@v4
+        with:
+          name: krnl0-web
+          path: |
+            krnl0-web-*.tar.gz
+            krnl0-web-*.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [build, web]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -190,3 +234,5 @@ jobs:
             dist-artifacts/*.exe
             dist-artifacts/*.exe.blockmap
             dist-artifacts/latest.yml
+            dist-artifacts/krnl0-web-*.tar.gz
+            dist-artifacts/krnl0-web-*.tar.gz.sha256

@@ -10,6 +10,7 @@
 // Started from the Orb ("Tutorials") or `krnl tour start <id>`.
 
 import type { Board } from '../../../shared/types';
+import { IS_WEB } from '../../platform';
 
 /** Examples a tour can add to an empty board (store/tourExamples.ts). */
 export type ExampleKind = 'plan' | 'recorded' | 'habit' | 'event' | 'missed';
@@ -81,6 +82,8 @@ export interface Tour {
   steps: TourStep[];
   /** A tour about something only one mode has (the Terminal: Advanced). */
   onlyIn?: 'easy' | 'advanced';
+  /** About the desktop app only (the Terminal, the AI orb): not listed on the web (Decision 51). */
+  desktopOnly?: boolean;
   /** What it shows that a new board doesn't have yet: added as examples
    *  when missing, removed when the tour ends (tourExamples.ts). */
   examples?: ExampleKind[];
@@ -88,14 +91,14 @@ export interface Tour {
 
 /** The tours listed in a mode (menus); `krnl tour start` can still run any. */
 export function toursIn(mode: 'easy' | 'advanced'): Tour[] {
-  return TOURS.filter((t) => !t.onlyIn || t.onlyIn === mode)
+  return TOURS.filter((t) => (!t.onlyIn || t.onlyIn === mode) && !(IS_WEB && t.desktopOnly))
     .map((t) => (mode === 'easy' && t.summaryEasy ? { ...t, summary: t.summaryEasy } : t));
 }
 
 /** The steps a user in `mode` sees (drops steps for the other mode, and for
  *  the other way the timer works). */
 export function stepsFor(tour: Tour, mode: 'easy' | 'advanced', timer: 'stopwatch' | 'pomo' = 'stopwatch'): TourStep[] {
-  return tour.steps.filter((s) => (!s.onlyIn || s.onlyIn === mode) && (!s.timer || s.timer === timer));
+  return tour.steps.filter((s) => (!s.onlyIn || s.onlyIn === mode) && (!s.timer || s.timer === timer) && !(IS_WEB && needsDesktop(s)));
 }
 
 // ── board predicates ───────────────────────────────────────────────────────
@@ -187,6 +190,9 @@ const ORB = '[aria-label^="AI assistant"]';
 const GEAR = '[data-testid="topbar-settings"]';
 const BOARDS = '[data-testid="topbar-canvas-switcher"]';
 const CARD = '[data-testid="task-node-root"]';
+// Decision 51 — the saved badge (it also tells how sync is doing) and its sheet.
+const SAVED = '[data-testid="topbar-live-badge"]';
+const SYNC_SHEET = '[data-testid="sync-status"]';
 // The names of the examples a tour adds (store/tourExamples.ts), so a step can ring that card.
 const EXAMPLE_MISSED_TEXT = 'Example: Read chapter 2';
 const EXAMPLE_PLAN_TEXT = 'Example: Read chapter 3';
@@ -452,9 +458,23 @@ export const TOURS: readonly Tour[] = [
       { say: "That's boards! One per project, or one for work and one for home. You can also ask me to make one.", target: ORB, badge: 'ASK ME', text: 'That’s boards: one per project, or one for work and one for home. You can also **ask me** to make one.' },
     ],
   },
+  // Decision 51 — your own KRNL0 server: saved here, synced, on your phone.
+  {
+    id: 'sync',
+    title: 'Saved and synced',
+    summary: 'Your board on your other computers and your phone, through your own server',
+    steps: [
+      { say: "This badge says your board is saved. It saves itself as you go, so there is nothing to save by hand.", target: SAVED, badge: 'SAVED', text: 'This badge says your board is **saved**. It saves itself as you go: nothing to save by hand.' },
+      { say: "Press the badge.", target: SAVED, badge: 'PRESS', text: 'Press the **badge**.', waitFor: { click: SAVED }, hint: 'Waiting for a press on the badge…' },
+      { say: "With a server of your own, your boards follow you: to your other computers, and to your phone's browser. On a computer without a server yet, Connect server sets it up: its address, the fingerprint the server shows, and your password, once.", target: SYNC_SHEET, badge: 'YOUR SERVER', text: 'With your own **KRNL0 server**, your boards follow you: to your **other computers** and your **phone**. Without one yet, **Connect server** sets it up: its address, the **fingerprint** the server shows, your password, once.' },
+      { say: "Connected, the badge says saved and synced. Offline, it keeps your changes here and sends them when the server is back. Edit on two devices at once, and both edits are kept.", target: SAVED, badge: 'SAVED · SYNCED', text: 'Connected, it says **saved · synced**. **Offline**, your changes are kept here and sent when the server is back. **Two devices at once**: both edits are kept.' },
+      { say: "On your phone, open your server's address and log in. Today, the timer, your calendar, habits and the canvas, laid out for the phone. The terminal and the AI stay in this app.", target: SAVED, badge: 'ON YOUR PHONE', text: 'On your phone, open your server\'s address and **log in**: Today, the timer, calendar, habits and the canvas, laid out for the phone. The **terminal and AI** stay in this app.' },
+    ],
+  },
   {
     id: 'terminal',
     onlyIn: 'advanced',
+    desktopOnly: true,
     title: 'Terminal & AI',
     summary: 'The krnl commands and Claude Code',
     steps: [
@@ -464,6 +484,12 @@ export const TOURS: readonly Tour[] = [
     ],
   },
 ];
+
+/** A step about the Terminal or the AI orb, which only the desktop app has. */
+function needsDesktop(s: TourStep): boolean {
+  const t = s.target ?? '';
+  return s.node === 'mother-term' || t === TERM || t === ORB || t.includes('orb-') || JSON.stringify(s.waitFor ?? null).includes(ORB);
+}
 
 export function tourById(id: string): Tour | undefined {
   return TOURS.find((t) => t.id === id);

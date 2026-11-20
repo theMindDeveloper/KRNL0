@@ -3,7 +3,8 @@
  *
  * State references the image by `assetId` (a 26-char ULID-shaped string).
  * Bytes live at <BOARD_DIR>/assets/<assetId>.<ext> and are served via the
- * krnl-asset:// privileged protocol (Decision 21). No base64 in board.json.
+ * krnl-asset:// privileged protocol (Decision 21); the web app shows this
+ * browser's own copy instead (utils/assetUrl.ts). No base64 in board.json.
  *
  * The node body is the image itself — no header, no caption row. The empty
  * placeholder opens a file picker on click; once an asset is set the card is
@@ -16,6 +17,7 @@ import type { NodeProps } from '../types';
 import type { ImageState, ImageConfig } from './types';
 import { ingestImageFile, imageRejectReason } from '../../Canvas/dropImage';
 import { useCornerProximity } from '../../../hooks/useCornerProximity';
+import { useAssetUrl } from '../../../utils/assetUrl';
 
 export function ImageNode({
   node,
@@ -88,7 +90,10 @@ export function ImageNode({
     onCommand('image.setSize', { width: p.width, height: p.height });
   };
 
-  const hasAsset = Boolean(assetId) && !imgFailed;
+  // Where the picture loads from: the desktop's asset protocol, or on the web
+  // this browser's copy (null while it loads).
+  const asset = useAssetUrl(assetId || null);
+  const hasAsset = Boolean(assetId) && !imgFailed && !asset.missing;
 
   // Proximity reveal for the corner resize handle — invisible until the
   // cursor is within ~48px of the bottom-right corner.
@@ -183,10 +188,17 @@ export function ImageNode({
           border: hasAsset ? 'none' : '1px dashed var(--paper-3)',
         }}
       >
-        {hasAsset ? (
+        {hasAsset && !asset.url ? (
+          <div
+            data-testid="image-node-loading"
+            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase' }}
+          >
+            loading image
+          </div>
+        ) : hasAsset && asset.url ? (
           <img
             data-testid="image-node-img"
-            src={`krnl-asset://${assetId}`}
+            src={asset.url}
             alt={state.alt ?? ''}
             onError={() => setImgFailed(true)}
             style={{

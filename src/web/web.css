@@ -1,0 +1,3 @@
+/* The web app's page: the app fills the browser window, nothing scrolls the page itself. */
+html, body, #root { height: 100%; }
+body { margin: 0; overflow: hidden; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }

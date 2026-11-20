@@ -94,6 +94,11 @@ export function useReactFlow() {
   };
 }
 
+/** The web shell waits for this before it frames the canvas. */
+export function useNodesInitialized(): boolean {
+  return true;
+}
+
 // Stub useStore for StatusBar (reads zoom from RF internal transform).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useStore<T>(selector: (state: any) => T): T {

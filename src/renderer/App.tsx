@@ -16,6 +16,9 @@ import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
 import { StationLayout } from './components/Station/StationLayout';
 import { useStationViewportGate } from './components/Station/useStationViewportGate';
 import { Orb } from './components/Orb';
+import { IS_WEB } from './platform';
+import { MobileShell } from './components/Mobile/MobileShell';
+import { useFormFactor } from './components/Mobile/useFormFactor';
 import { AmbientRadio } from './components/AmbientRadio';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
@@ -103,6 +106,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 // can safely read boardStore after board is loaded.
 function AppInner() {
   const { effectiveMode, isFallingBack } = useStationViewportGate();
+  // Web on a phone or an iPad: the mobile shell (Decision 51). Desktop app: always the Station / Canvas.
+  const formFactor = useFormFactor();
   const { fitView } = useReactFlow();
 
   // Centre the viewport on the mother row whenever the layout mode changes,
@@ -159,6 +164,20 @@ function AppInner() {
     return () => { cancelAnimationFrame(raf); unsubBoard?.(); unsubInfo?.(); window.clearTimeout(failsafe); };
   }, []);
 
+  if (formFactor !== 'desktop') {
+    return (
+      <>
+        <MobileShell ff={formFactor} />
+        <RadialChooserHost />
+        <LogTimeHost />
+        <RetagPickerHost />
+        <DayMoments />
+        <UndoNoticeBar />
+        <LaunchHost />
+      </>
+    );
+  }
+
   return (
     <div
       style={{
@@ -176,7 +195,7 @@ function AppInner() {
         {/* Orb (AI bubble) is available in both modes — tutorials and chat
             work the same. ScriptRunner gates camera moves so station mode
             doesn't yank the embedded canvas around. */}
-        <Orb />
+        {!IS_WEB && <Orb />}
         <AmbientRadio />
       </div>
       <StatusBar fallbackNotice={isFallingBack} />
@@ -187,7 +206,7 @@ function AppInner() {
       <DayMoments />
       <PlanGuide />
       <UndoNoticeBar />
-      <UpdateNoticeBar />
+      {!IS_WEB && <UpdateNoticeBar />}
       <LaunchHost />
     </div>
   );

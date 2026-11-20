@@ -2697,3 +2697,15 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
 **Decision.** Connector dots are drawn on task cards only (`rfAdapters.tsx`). Windows, habit and event cards, notes, images, frames and media have none.
 
 **Consequences.** Wires stored between other cards stay in `board.json` untouched but are no longer drawn. No migration is needed, and nothing is deleted.
+
+## Decision 51 — Sync through the owner's own KRNL0 server: revisioned documents and the app's three-way merge (2026-11-20)
+
+**Context.** The owner wants the desktop app and a website (phones included) to share boards in near real time through a self-hosted server (`theMindDeveloper/krnl0-server`), offline-safe, without conflicts or deadlocks. Requirements: `docs/06-requirements/server-sync.md`.
+
+**Decision.** The server stores each board, the board list, the time log and assets as revisioned documents and pushes change notices over a WebSocket. Clients keep the last agreed version of each document (the base) and merge base / mine / server with `boardMerge` — the same merge main already uses for the CLI and the AI terminal. The sync core lives in `src/shared/sync/` without Node or Electron imports; the desktop runs it in main next to the single write path (`board.json`), the web build runs it in the browser with IndexedDB. Per-device keys (`viewport`, `savedAt`, `layoutMode`, `layoutGeometry`, `activeCanvasId`, and `activeId` / `recording` / `notice` in `boards.json`) are never uploaded.
+
+**Not a CRDT.** A JSON↔CRDT bridge would merge next to `boardMerge` — two merge systems — and bridges lose data in exactly the places KRNL0 relies on (id-keyed lists, whole-board writes from the CLI, migrations). Full reasoning: krnl0-server Decision S11; state machine and failure table: krnl0-server `docs/architecture/sync.md`.
+
+**Consequences.** Same-value conflicts resolve the way they already do for the CLI (first to the server wins, the other value one undo step away). Order comes from server revisions only, never from device clocks.
+
+**The web app (2026-11-20).** `vite.web.config.ts` builds the same renderer into `dist-web/` with `__KRNL_WEB__` set (`src/renderer/platform.ts` → `IS_WEB`); `src/web/` replaces Electron: a `window.krnl` over the browser's own copy (`WebHost`, `WebSyncStore` in IndexedDB) and `WebTransport` (fetch + WebSocket with the session cookie and CSRF token; polling when a phone blocks the socket). Board migrations moved to `src/shared/boardMigrate.ts`, so both run the same code. Phones and iPads get `components/Mobile/MobileShell`: the board's own windows (`MotherWindow`, the Station cell without its drag handle) in views, so every tap runs the desktop's commands; `MothersElsewhereContext` makes the canvas show only free cards there. Pictures load through `utils/assetUrl.ts` (`krnl-asset://` on the desktop, a `blob:` of the browser's copy on the web). Sync status lives in the top bar's own **saved** badge (owner, 2026-11-20: one indicator, not a second chip). The KRNL0 release attaches `krnl0-web-<version>.tar.gz` (+ `.sha256`); the server release pins and checks it.

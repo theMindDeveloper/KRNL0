@@ -96,6 +96,15 @@ interface KrnlBridge {
   appPrefsSet?: (patch: unknown) => Promise<unknown>
   appBackupsOpen?: () => Promise<{ ok: boolean; message: string }>
   appOpenExternal?: (url: string) => Promise<{ ok: boolean; message: string }>
+  // Decision 51 — sync with the owner's KRNL0 server. Use renderer/store/syncStore, not these directly.
+  syncStatus?: () => Promise<unknown>
+  syncBegin?: (address: string) => Promise<unknown>
+  syncFinish?: (password: string, code?: string) => Promise<unknown>
+  /** Web: `force` logs out even with changes the server does not have yet. */
+  syncDisconnect?: (force?: boolean) => Promise<unknown>
+  syncRetry?: () => Promise<unknown>
+  syncDevices?: () => Promise<unknown>
+  onSyncStatus?: (callback: (info: unknown) => void) => () => void
 }
 
 interface Window {

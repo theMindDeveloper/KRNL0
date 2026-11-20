@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
 import { getUpdater } from '../updater';
+import { getSync } from '../sync';
 import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard, BoardCorruptError } from '../persistence/board';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
 import { ackBoardsNotice, BOARDS_DIRNAME, createBoard, deleteBoard, listBoards, readBoardsIndex, renameBoard, switchBoard } from '../persistence/boards';
@@ -323,7 +324,9 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   ipcMain.handle('sys:run', async (_event, argv: string[]) => {
     const updater = getUpdater();
     const pocket = getPocket();
+    const sync = getSync();
     const facade = new SysFacade({
+      ...(sync ? { sync } : {}),
       boardPath: BOARD_PATH,
       hasOpenRenderer,
       onBoardChanged: notifyBoardChanged,

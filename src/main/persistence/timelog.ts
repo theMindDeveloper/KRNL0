@@ -20,6 +20,7 @@ import {
   type TimeLogInput,
 } from '../../shared/timelog';
 import { isValidYMD } from '../../shared/ymd';
+import { timelogAppended } from '../sync/observers';
 
 export const TIMELOG_DIRNAME = 'timelog';
 export const BACKFILL_MARKER = '.backfilled';
@@ -85,6 +86,7 @@ export function appendTimeLogEntries(boardDir: string, entries: readonly TimeLog
     const lead = endsTorn(path) ? '\n' : '';
     appendFileSync(path, lead + list.map(serializeEntry).join('\n') + '\n', 'utf-8');
   }
+  timelogAppended(boardDir, entries); // Decision 51
 }
 
 /**

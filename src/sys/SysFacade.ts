@@ -25,6 +25,8 @@ import * as calCmd from './commands/cal';
 import * as clockCmd from './commands/clock';
 import * as updateCmd from './commands/update';
 import type { UpdaterPort } from '../shared/update';
+import type { SyncPort } from '../shared/sync/port';
+import * as syncCmd from './commands/sync';
 import { textAdd, textSet, textResize, textLook } from './commands/text';
 import { drawList, drawClear, drawDelete, drawStroke } from './commands/draw';
 import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
@@ -91,6 +93,8 @@ export interface SysFacadeDeps {
   viewSize?: () => { width: number; height: number } | null;
   /** Decision 36: the app's updater (main only; absent in tests / headless). */
   updater?: UpdaterPort;
+  /** Decision 51: sync with the owner's server (main only). */
+  sync?: SyncPort;
   /** Decision 37: the floating pocket timer (main only; absent in tests / headless). */
   pocket?: PocketPort;
   /** Decision 38: launch info and app prefs (main only; absent in tests / headless). */
@@ -141,6 +145,7 @@ export class SysFacade {
       ...(deps?.cliDispatch ? { cliDispatch: deps.cliDispatch } : {}),
       ...(deps?.viewSize ? { viewSize: deps.viewSize } : {}),
       ...(deps?.updater ? { updater: deps.updater } : {}),
+      ...(deps?.sync ? { sync: deps.sync } : {}),
       ...(deps?.pocket ? { pocket: deps.pocket } : {}),
       ...(deps?.appState ? { appState: deps.appState } : {}),
     };
@@ -363,6 +368,19 @@ export class SysFacade {
         case 'check':   return updateCmd.updateCheck(updater, command.json);
         case 'install': return updateCmd.updateInstall(updater);
         case 'open':    return updateCmd.updateOpen(updater);
+      }
+    }
+
+    // ── Sync with the owner's server (Decision 51) ──────────────────────────
+    if (command.kind === 'sync') {
+      const sync = this.deps.sync;
+      if (!sync) return { ok: false, message: 'Sync runs in the KRNL0 app — run this in its terminal.', data: { exitCode: 2 } };
+      switch (command.sub) {
+        case 'status': return syncCmd.syncStatus(sync, command.json);
+        case 'connect': return syncCmd.syncConnect(sync, command.address);
+        case 'pair': return syncCmd.syncPair(sync, command.password, command.code);
+        case 'disconnect': return syncCmd.syncDisconnect(sync);
+        case 'retry': return syncCmd.syncRetry(sync);
       }
     }
 

@@ -91,6 +91,10 @@ export type SysCommand =
   | { kind: 'info'; json: boolean }
   | { kind: 'update'; sub: 'status' | 'check'; json: boolean }
   | { kind: 'update'; sub: 'install' | 'open' }
+  | { kind: 'sync'; sub: 'status'; json: boolean }
+  | { kind: 'sync'; sub: 'connect'; address: string | undefined }
+  | { kind: 'sync'; sub: 'pair'; password: string | undefined; code: string | undefined }
+  | { kind: 'sync'; sub: 'disconnect' | 'retry' }
   | { kind: 'mini'; sub: 'status'; json: boolean }
   | { kind: 'mini'; sub: 'show' | 'hide' | 'on' | 'off' }
   | { kind: 'mini'; sub: 'look'; look: string | undefined }
@@ -392,6 +396,21 @@ export class SysParser {
       if (sub === 'status' || sub === 'check') return { kind: 'update', sub, json: hasFlag(rest, 'json') };
       if (sub === 'install' || sub === 'open') return { kind: 'update', sub };
       return { kind: 'invalid', message: `Unknown subcommand: update ${sub}. Try: update status | check | install | open` };
+    }
+
+    // Decision 51 — sync with the owner's KRNL0 server. Bare `sync` = status.
+    if (cmd === 'sync') {
+      if (sub === undefined || sub.startsWith('--')) return { kind: 'sync', sub: 'status', json: hasFlag([sub ?? '', ...rest], 'json') };
+      if (sub === 'status') return { kind: 'sync', sub: 'status', json: hasFlag(rest, 'json') };
+      if (sub === 'connect') return { kind: 'sync', sub: 'connect', address: rest.find((a) => !a.startsWith('--')) };
+      if (sub === 'pair') {
+        const pw = rest.find((a) => a.startsWith('--password='))?.slice('--password='.length);
+        const ci = rest.indexOf('--code');
+        const code = ci >= 0 ? rest[ci + 1] : rest.find((a) => a.startsWith('--code='))?.slice('--code='.length);
+        return { kind: 'sync', sub: 'pair', password: pw, code };
+      }
+      if (sub === 'disconnect' || sub === 'retry') return { kind: 'sync', sub };
+      return { kind: 'invalid', message: `Unknown subcommand: sync ${sub}. Try: sync status | connect <address> | pair --password-stdin | disconnect | retry` };
     }
 
     // Decision 37 — the floating pocket timer. Bare `mini` (or `mini --json`) = status.

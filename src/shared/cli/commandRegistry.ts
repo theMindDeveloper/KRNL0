@@ -356,6 +356,17 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     ],
   },
   {
+    group: 'sync',
+    summary: 'Sync this computer with your own KRNL0 server (same as Settings › Sync)',
+    subcommands: [
+      { name: 'status', usage: 'sync status [--json]', summary: 'Synced / syncing / offline, the server, last sync (default when no subcommand)' },
+      { name: 'connect', usage: 'sync connect <address>', summary: 'Reach a server and show its fingerprint to compare with "krnl0 fingerprint"' },
+      { name: 'pair', usage: 'sync pair --password-stdin [--code <2FA>]', summary: 'Pair this computer after the fingerprint matched (password read from stdin)' },
+      { name: 'disconnect', usage: 'sync disconnect', summary: 'Stop syncing; the boards on this computer stay' },
+      { name: 'retry', usage: 'sync retry', summary: 'Sync everything again now (after "sync paused")' },
+    ],
+  },
+  {
     group: 'mini',
     summary: 'The floating timer: the Timer over other apps while KRNL0 is minimised',
     subcommands: [
