@@ -6,7 +6,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Popover } from '../ui/Popover';
-import { useEasyMode } from '../../store/uiMode';
 import { agoText, chipLook, disconnectSync, fetchDevices, syncNow, useSyncBridge, useSyncStore } from '../../store/syncStore';
 import { ConnectSheet } from './ConnectSheet';
 import type { SyncDevice } from '../../../shared/sync/port';
@@ -26,7 +25,6 @@ const hostOf = (origin: string | null): string => {
 export function SyncChip() {
   useSyncBridge();
   const info = useSyncStore((s) => s.info);
-  const easy = useEasyMode();
   const [open, setOpen] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [devices, setDevices] = useState<SyncDevice[]>([]);
@@ -39,8 +37,8 @@ export function SyncChip() {
     if (open && configured) void fetchDevices().then(setDevices);
   }, [open, configured]);
 
-  // Easy mode keeps the bar calm: the chip appears once a server is connected.
-  if (!info || (easy && !configured)) return null;
+  // Shown in Easy mode too: it is the one way to connect a server without the terminal.
+  if (!info) return null;
 
   const onChip = (): void => {
     if (!configured || info.state === 'signed-out') setConnecting(true);

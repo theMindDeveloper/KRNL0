@@ -81,12 +81,12 @@ describe('chip words (F6)', () => {
 });
 
 describe('SyncChip', () => {
-  it('hides in Easy mode until a server is connected', async () => {
+  it('shows a quiet "connect server" chip in Easy mode too (the only way in without the terminal)', async () => {
     setBoard('easy');
     mount(info({ configured: false, state: 'off' }));
     render(<SyncChip />);
     await act(async () => {});
-    expect(screen.queryByTestId('sync-chip')).toBeNull();
+    expect(screen.getByTestId('sync-chip').textContent).toContain('connect server');
   });
 
   it('with no server, opens the Connect sheet; CONNECT waits for the fingerprint tick and a password', async () => {
