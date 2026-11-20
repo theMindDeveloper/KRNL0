@@ -2689,3 +2689,11 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
 - **CLI:** `krnl board list / new / switch / rename / delete` join `board show / summary / stats`.
 - **Canvases:** still exist inside a board (`krnl canvas …`), but the app's UI no longer offers them.
 - Requirements: `docs/06-requirements/boards.md`. Tests: `tests/unit/main/boards.test.ts`.
+
+## Decision 50 — Only task cards have connectors (2026-11-20)
+
+**Context.** Every card on the board (notes, images, frames, media) showed two connector dots, although a wire only means something between tasks ("this one comes after that one"). The dots read as clutter and invited wires that do nothing.
+
+**Decision.** Connector dots are drawn on task cards only (`rfAdapters.tsx`). Windows, habit and event cards, notes, images, frames and media have none.
+
+**Consequences.** Wires stored between other cards stay in `board.json` untouched but are no longer drawn. No migration is needed, and nothing is deleted.

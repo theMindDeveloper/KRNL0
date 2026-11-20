@@ -191,8 +191,8 @@ describe('TextNode — F6 size source-of-truth', () => {
   });
 });
 
-describe('TextNode — F8 handles are connectable', () => {
-  it('createNodeAdapter wraps TextNode with connectable Handles', () => {
+describe('TextNode — Decision 50: a note has no connectors', () => {
+  it('createNodeAdapter wraps TextNode without connector dots', () => {
     const Adapter = createNodeAdapter(TextNode);
     render(
       <Adapter
@@ -211,8 +211,8 @@ describe('TextNode — F8 handles are connectable', () => {
         }}
       />,
     );
-    expect(screen.getByTestId('rf-handle-target-left')).toBeTruthy();
-    expect(screen.getByTestId('rf-handle-source-right')).toBeTruthy();
+    expect(screen.queryByTestId('rf-handle-target-left')).toBeNull();
+    expect(screen.queryByTestId('rf-handle-source-right')).toBeNull();
   });
 });
 

@@ -14,7 +14,7 @@ import type { Board } from '../../../shared/types';
 import type { MotherNodeConfig } from '../../../shared/types/board';
 import { useBoardStore } from '../../store/boardStore';
 import { saveBoard } from '../../store/eventLog';
-import { CALENDAR_REVEAL_EVENT, focusNode } from '../../store/scheduleActions';
+import { CALENDAR_LAYOUT_EVENT, CALENDAR_REVEAL_EVENT, focusNode } from '../../store/scheduleActions';
 import { beginPractice, keepPractice, practiceActive, practiceSummary, removePractice, type PracticeSummary } from '../../store/tourPractice';
 import { addExamples, removeExamples } from '../../store/tourExamples';
 import { isStationHidden } from '../Station/stationVisibility';
@@ -282,11 +282,18 @@ function calendarToToday(): () => void {
     const send = makeCommandHandler(cal.id);
     if (own !== 'day') send('calendar.setView', { view: 'day' });
     send('calendar.setAnchor', { date: todayYMD() });
+    // The hours, not the narrow window's list: the step says "at a time later than now".
+    const layout = (pref: string): void => { window.dispatchEvent(new CustomEvent(CALENDAR_LAYOUT_EVENT, { detail: { pref } })); };
+    layout('grid');
     window.setTimeout(() => {
+      layout('grid');
       window.dispatchEvent(new CustomEvent(CALENDAR_REVEAL_EVENT, { detail: { startISO: new Date().toISOString() } }));
     }, 150);
   });
-  return () => { if (own && own !== 'day') sendTo(own); };
+  return () => {
+    window.dispatchEvent(new CustomEvent(CALENDAR_LAYOUT_EVENT, { detail: { pref: 'auto' } }));
+    if (own && own !== 'day') sendTo(own);
+  };
 }
 
 /** Does the tour ask the user to make or change things (practice)? */

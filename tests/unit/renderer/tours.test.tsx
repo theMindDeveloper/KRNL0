@@ -92,7 +92,7 @@ describe('TourHost', () => {
     // go to the "press WEEK" step
     act(() => { fireEvent.click(screen.getByTestId('tour-next')); });
     act(() => { fireEvent.click(screen.getByTestId('tour-next')); });
-    expect(screen.getByTestId('tour-text').textContent).toMatch(/WEEK/);
+    expect(screen.getByTestId('tour-text').textContent).toMatch(/Week/);
     expect(screen.queryByTestId('tour-next')).toBeNull(); // waiting, no Next
     act(() => { target.click(); vi.advanceTimersByTime(400); });
     expect(screen.getByTestId('tour-text').textContent).toMatch(/Each clock is a day/);

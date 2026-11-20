@@ -188,12 +188,11 @@ export function createNodeAdapter<S = unknown, C = unknown>(
   function NodeAdapter(props: RFNodeProps<KrnlRFNode>) {
     const { data, selected } = props;
     const { node, onCommand, onSelect, slotIndex, slotTotal } = data;
-    // Mother nodes don't connect — render zero handles. Children get
-    // interactive handles so users can wire edges between them.
-    // Analytics is a read-only dashboard — no edges, no handles.
-    // Habit and event cards neither: nothing runs "after" a habit or an
-    // event (board cards round two, Decision 42).
-    const showHandles = !node.isMother && node.kind !== 'analytics' && node.kind !== 'habit.lane';
+    // Only task cards connect (owner, 2026-11-20): a wire means "this task
+    // comes after that one". Notes, images, frames, media, habit and event
+    // cards and every window have no connector dots. Wires already stored
+    // between other cards stay in the board file; they are just not drawn.
+    const showHandles = node.kind === 'todo.task';
     return (
       <>
         {showHandles && (

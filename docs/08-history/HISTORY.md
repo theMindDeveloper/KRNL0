@@ -3092,3 +3092,17 @@ Typecheck clean; all tests pass.
 - Walked as a user in the preview: add a plan, give it a day and a deadline, tick and untick, add a habit and tick it, start and stop the timer. Each step was checked in the saved board.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-20] — Narrow windows fit their headers; tutorials match the new UI; connectors only on tasks
+
+**Type:** Bug Fix + Feature (UI)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `styles/window-frame.css`, `CalendarNode/WeekView.tsx`, `store/scheduleActions.ts`, `Tour/TourHost.tsx`, `Tour/tours.ts`, `Canvas/rfAdapters.tsx`, docs (`decisions.md` Decision 50), tests
+
+**Summary:**
+- **Narrow windows (four in a row on a laptop).** The standard header did not fit in a window of about 310 to 380 px: the Calendar's name was cut to "Cal…", its views ran over the edge, Habits showed "W.", the Clock's date was clipped. The header now gives way in a fixed order: the fact beside the name goes, the views get tighter, and in the narrowest windows a switch of four views shows first letters. The name is never shortened.
+- **First tutorial, "plan it" step.** In a narrow window the Calendar's Day view turned into its list, so the step pointed at a column that was not there. The step now always shows the hours.
+- **Tutorials checked against the new UI:** every selector, every step of all 14 tours run in Easy and Advanced. One step pointed at a label that was renamed ("Pomo mode" → "Timer mode"); the written button names now match the buttons (Start, Break, Back to work, Stop, Pause, End break, Sessions, Stopwatch). No voice line changed.
+- **Connectors only on task cards** (Decision 50).
+
+Typecheck clean; all tests pass.

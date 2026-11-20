@@ -280,3 +280,27 @@
 [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
   font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
 }
+
+/* ── Narrow windows (2026-11-20) ─────────────────────────────────────────────
+   Four windows in a row on a laptop leave each about 310 to 380 px. The header
+   then gives way in a fixed order, so nothing is cut in the middle of a word
+   and nothing runs over the edge:
+     1. the one fact beside the name goes (when the header also has views),
+     2. the views get tighter,
+     3. in the narrowest windows a switch of four views shows first letters
+        (the full word stays in the tooltip and for screen readers).
+   The name is never shortened. */
+.kw-head, .kw-range { container-type: inline-size; }
+@container (max-width: 400px) {
+  .kw-head:has(.kw-views) .kw-ctx { display: none; }
+  .kw-title { flex-shrink: 0; overflow: visible; }
+  .kw-views > button { padding: 0 6px; font-size: 12px; }
+  .kw-range__label, .kw-range > span.kw-range__label { font-size: 12.5px; }
+  .kw-range .kw-btn:not(:has(svg)) { padding: 0 6px; }
+}
+/* Only a header's own switch with four or more views needs the letters
+   (Day Week Month Year); three always fit, and ranges like 7d / 30d never shorten. */
+@container (max-width: 295px) {
+  .kw-head > .kw-views:has(> button:nth-child(4)) > button { font-size: 0; padding: 0 8px; }
+  .kw-head > .kw-views:has(> button:nth-child(4)) > button::first-letter { font-size: 12px; }
+}

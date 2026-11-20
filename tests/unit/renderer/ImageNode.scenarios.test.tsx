@@ -112,8 +112,8 @@ describe('ImageNode — F5 resize dispatches image.setSize', () => {
 // for accessibility (img.alt) but is no longer user-editable inline.
 // `imageSetAlt` command remains and is covered by the pure-command tests.
 
-describe('ImageNode — F10 handles are connectable', () => {
-  it('createNodeAdapter wraps ImageNode with connectable handles', () => {
+describe('ImageNode — Decision 50: an image has no connectors', () => {
+  it('createNodeAdapter wraps ImageNode without connector dots', () => {
     const Adapter = createNodeAdapter(ImageNode);
     render(
       <Adapter
@@ -132,8 +132,8 @@ describe('ImageNode — F10 handles are connectable', () => {
         }}
       />,
     );
-    expect(screen.getByTestId('rf-handle-target-left')).toBeTruthy();
-    expect(screen.getByTestId('rf-handle-source-right')).toBeTruthy();
+    expect(screen.queryByTestId('rf-handle-target-left')).toBeNull();
+    expect(screen.queryByTestId('rf-handle-source-right')).toBeNull();
   });
 });
 

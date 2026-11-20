@@ -42,3 +42,19 @@ describe('a plan card keeps what was changed when you click elsewhere', () => {
     expect(card).toContain('<CardClose onClick={onClose} />');
   });
 });
+
+describe('Decision 50 and the narrow-window header', () => {
+  it('only task cards draw connector dots', () => {
+    expect(read('renderer/components/Canvas/rfAdapters.tsx')).toContain("const showHandles = node.kind === 'todo.task';");
+  });
+  it('a narrow header never shortens the name, and gives way in order', () => {
+    const css = read('renderer/styles/window-frame.css');
+    expect(css).toContain('.kw-head, .kw-range { container-type: inline-size; }');
+    expect(css).toContain('.kw-head:has(.kw-views) .kw-ctx { display: none; }');
+    expect(css).toContain('.kw-title { flex-shrink: 0; overflow: visible; }');
+  });
+  it('the tour step "onto today" asks the Calendar for its hours', () => {
+    expect(read('renderer/components/Tour/TourHost.tsx')).toContain("layout('grid');");
+    expect(read('renderer/components/Tour/tours.ts')).not.toContain('Pomo mode"]');
+  });
+});
