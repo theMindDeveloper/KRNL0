@@ -7,6 +7,7 @@ import { mergeBoards } from '../shared/boardMerge';
 import { migrateBoard, seedBoard } from '../shared/boardMigrate';
 import { docName } from '../shared/sync/shape';
 import { stampEntry, TimeLogInputSchema, type TimeLogEntry } from '../shared/timelog';
+import { applyPrefsPatch, parseAppState, updateKind, type AppStateFile, type LaunchInfo } from '../shared/appState';
 import type { Json } from '../shared/sync/types';
 import type { SyncEngine } from '../shared/sync/engine';
 import type { SyncDevice, SyncInfo } from '../shared/sync/port';
@@ -35,6 +36,16 @@ export interface WebBridgeDeps {
   origin: string;
 }
 
+// The app's own per-device state (What's new seen, Celebrations, milestones,
+// last use): the desktop keeps it in app-state.json, this browser in localStorage.
+const APP_STATE_KEY = 'krnl0-app-state';
+function readAppState(): AppStateFile {
+  try { return parseAppState(JSON.parse(localStorage.getItem(APP_STATE_KEY) ?? 'null') as unknown); } catch { return parseAppState(null); }
+}
+function writeAppState(s: AppStateFile): void {
+  try { localStorage.setItem(APP_STATE_KEY, JSON.stringify(s)); } catch { /* private window: this visit only */ }
+}
+
 /** The desktop's board lookup (persistence/boards.ts resolveBoard): id or name, exact then prefix. */
 function resolveBoard(boards: BoardMeta[], ref: string | undefined): BoardMeta | string {
   const r = ref?.trim();
@@ -48,6 +59,36 @@ function resolveBoard(boards: BoardMeta[], ref: string | undefined): BoardMeta |
 
 export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: (info: SyncInfo) => void } {
   const { host, engine } = d;
+
+  // Launch (Decision 38) as the desktop computes it, once per page load.
+  let appState = readAppState();
+  const launch: LaunchInfo = (() => {
+    const now = Date.now();
+    const previous = appState.lastVersion;
+    const kind = updateKind(previous, d.appVersion);
+    const changed = kind === 'feature' || kind === 'patch' || kind === 'downgrade';
+    const lastActive = appState.lastActiveAt;
+    const info: LaunchInfo = {
+      version: d.appVersion,
+      previousVersion: changed ? previous : null,
+      kind,
+      backupFile: null,
+      backupDir: '',
+      backups: [],
+      awayMs: lastActive !== null ? Math.max(0, now - lastActive) : null,
+      awayFrom: lastActive,
+      simulated: false,
+      system: typeof navigator !== 'undefined' ? `Web · ${navigator.platform || 'browser'}` : 'Web',
+      prefs: appState,
+    };
+    appState = { ...appState, lastVersion: d.appVersion, lastActiveAt: now };
+    writeAppState(appState);
+    return info;
+  })();
+  // "Last in use" for Welcome back: whenever the page is left or shown again.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => { appState = { ...appState, lastActiveAt: Date.now() }; writeAppState(appState); });
+  }
   const boardListeners = new Set<() => void>();
   const statusListeners = new Set<(info: unknown) => void>();
 
@@ -263,10 +304,16 @@ export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: 
       return id ? host.queryTimelog(id, fromYMD) : [];
     },
 
+    // ── App state (What's new, Celebrations, milestones) ─────────────────
+    appLaunch: async () => ({ ...launch, prefs: appState }),
+    appPrefsSet: async (patch) => { appState = applyPrefsPatch(appState, patch); writeAppState(appState); return appState; },
+
     // ── Links ───────────────────────────────────────────────────────────
     appOpenExternal: async (url) => {
       let u: URL;
       try { u = new URL(url); } catch { return { ok: false, message: 'not a link' }; }
+      // Feedback by email (Help › Send feedback) opens the mail app.
+      if (u.protocol === 'mailto:') { window.location.href = u.toString(); return { ok: true, message: 'opened' }; }
       if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false, message: 'only web links open' };
       window.open(u.toString(), '_blank', 'noopener,noreferrer');
       return { ok: true, message: 'opened' };
