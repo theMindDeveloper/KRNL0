@@ -15,7 +15,7 @@
 // target's files back to <dir>. Every reader of board.json (the window, the
 // CLI, reminders, the floating timer) therefore always sees the active board.
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'fs';
 import { join } from 'path';
 import { isSharedNode } from '../../shared/canvas';
 import { readBoardText, saveBoardTo, seedBoard, writeFileAtomic } from './board';
@@ -157,6 +157,26 @@ function migrateCanvasesToBoards(dir: string): BoardsIndex {
   };
 }
 
+/**
+ * A list that had to be rebuilt (missing or unreadable) must not forget the
+ * boards parked in boards/: each folder with a board.json is listed again,
+ * under the name its board carries.
+ */
+function adoptParked(dir: string, index: BoardsIndex): BoardsIndex {
+  const root = join(dir, BOARDS_DIRNAME);
+  if (!existsSync(root)) return index;
+  const boards = [...index.boards];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === index.activeId) continue;
+    if (boards.some((b) => b.id === entry.name) || !existsSync(join(root, entry.name, BOARD_FILE))) continue;
+    const own = (readRaw(join(root, entry.name, BOARD_FILE))?.canvases as BoardMeta[] | undefined)?.[0]?.name;
+    let name = typeof own === 'string' && own.trim() ? own.trim() : `Board ${boards.length + 1}`;
+    while (boards.some((b) => b.name.toLowerCase() === name.toLowerCase())) name = `${name} (found)`;
+    boards.push({ id: entry.name, name });
+  }
+  return { ...index, boards };
+}
+
 /** The list of boards. Created on first use (with the one-time migration). */
 export function readBoardsIndex(dir: string): BoardsIndex {
   const path = indexPath(dir);
@@ -166,7 +186,7 @@ export function readBoardsIndex(dir: string): BoardsIndex {
       if (Array.isArray(parsed.boards) && parsed.boards.length > 0 && parsed.boards.some((b) => b.id === parsed.activeId)) return parsed;
     } catch { /* rebuilt below */ }
   }
-  const index = migrateCanvasesToBoards(dir);
+  const index = adoptParked(dir, migrateCanvasesToBoards(dir));
   writeIndex(dir, index);
   return index;
 }
@@ -191,6 +211,18 @@ export function listBoards(dir: string): BoardsList {
   const rec = index.recording && index.recording.boardId !== index.activeId && index.boards.some((b) => b.id === index.recording!.boardId)
     ? index.recording : null;
   return { activeId: index.activeId, boards, recording: rec, notice: index.notice ?? null };
+}
+
+/** Every board that is not open, as stored (for reminders: a plan in a parked board still reminds). */
+export function parkedBoards(dir: string): Array<BoardMeta & { board: unknown }> {
+  const index = readBoardsIndex(dir);
+  const out: Array<BoardMeta & { board: unknown }> = [];
+  for (const b of index.boards) {
+    if (b.id === index.activeId) continue;
+    const board = readRaw(join(parkedDir(dir, b.id), BOARD_FILE));
+    if (board) out.push({ ...b, board });
+  }
+  return out;
 }
 
 export function ackBoardsNotice(dir: string): void {
@@ -219,9 +251,11 @@ export function createBoard(dir: string, name: string | undefined, opts: { copyH
       target.state = {
         ...state,
         habits: from.filter((h) => !h.archived).map((h) => {
-          const { log: _l, counts: _c, exceptions: _e, ...rest } = h;
-          void _l; void _c; void _e;
-          return { ...rest, log: [] };
+          // History stays behind: ticks, counts, rest days, pauses, moved times.
+          // The habit starts today here, so no earlier day reads as missed.
+          const { log: _l, counts: _c, exceptions: _e, rest: _r, pauses: _p, ...keep } = h;
+          void _l; void _c; void _e; void _r; void _p;
+          return { ...keep, log: [], createdAt: new Date().toISOString() };
         }),
       };
     }
@@ -289,23 +323,33 @@ export function switchBoard(dir: string, ref: string | undefined): BoardMeta | s
   const target = parkedDir(dir, hit.id);
   const leaving = recordingOf(readRaw(here), index.activeId);
 
-  mkdirSync(park, { recursive: true });
-  moveInto(here, join(park, BOARD_FILE));
-  moveInto(hereLog, join(park, TIMELOG_DIRNAME));
+  // Every move is remembered, so a failure at any point (a locked file, a full
+  // disk, the list that cannot be written) is undone in reverse: the folder
+  // never ends up without its board, or with one board's files under
+  // another board's name (NF2).
+  const done: Array<[from: string, to: string]> = [];
+  const move = (from: string, to: string): void => {
+    if (!existsSync(from)) return;
+    moveInto(from, to);
+    done.push([from, to]);
+  };
   try {
-    if (existsSync(join(target, BOARD_FILE))) moveInto(join(target, BOARD_FILE), here);
+    mkdirSync(park, { recursive: true });
+    move(here, join(park, BOARD_FILE));
+    move(hereLog, join(park, TIMELOG_DIRNAME));
+    if (existsSync(join(target, BOARD_FILE))) move(join(target, BOARD_FILE), here);
     else saveBoardTo(here, seedBoard());
-    moveInto(join(target, TIMELOG_DIRNAME), hereLog);
+    move(join(target, TIMELOG_DIRNAME), hereLog);
+
+    // One timer at a time: remember where one is still running.
+    const arriving = recordingOf(readRaw(here), hit.id);
+    const recording = leaving ?? (index.recording && index.recording.boardId !== hit.id ? index.recording : null);
+    writeIndex(dir, { ...index, activeId: hit.id, recording: arriving ? null : recording });
   } catch (err) {
-    // Put the board we were leaving back, so the app still opens.
-    if (!existsSync(here)) moveInto(join(park, BOARD_FILE), here);
-    if (!existsSync(hereLog)) moveInto(join(park, TIMELOG_DIRNAME), hereLog);
+    for (const [from, to] of done.reverse()) {
+      try { moveInto(to, from); } catch { /* keep undoing the rest */ }
+    }
     return `could not switch board (${err instanceof Error ? err.message : String(err)})`;
   }
-
-  // One timer at a time: remember where one is still running.
-  const arriving = recordingOf(readRaw(here), hit.id);
-  const recording = leaving ?? (index.recording && index.recording.boardId !== hit.id ? index.recording : null);
-  writeIndex(dir, { ...index, activeId: hit.id, recording: arriving ? null : recording });
   return hit;
 }

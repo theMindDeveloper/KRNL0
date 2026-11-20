@@ -165,7 +165,7 @@ export function TaskTagPicker({ tasks, library, value, onPick, onUntag, onAddCat
 
       {done.length > 0 && !needle && (
         <button type="button" data-testid={`${testIdPrefix}-show-done`} onClick={() => setShowDone((v) => !v)}
-          style={{ ...caption, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+          style={{ ...caption, alignSelf: 'flex-start', padding: '5px 10px', background: 'var(--paper-2)', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left' }}>
           {showDone ? 'Hide done' : `Show done (${done.length})`}
         </button>
       )}

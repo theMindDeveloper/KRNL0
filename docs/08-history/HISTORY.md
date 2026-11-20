@@ -3058,3 +3058,20 @@ Typecheck clean; all tests pass.
 - **Two volumes in Settings → Sounds:** **App sounds** (the existing slider, renamed) and a new **AI voice** slider (0–100, default 60; the voice was fixed at 85). It covers the hello, the voice's replies and the tour guide; 0 is silent; moving it changes a line already being spoken. CLI: `sound voice <0-100>`.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-20] — Pre-release review of separate boards: fixes
+
+**Type:** Bug Fix
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `main/persistence/boards.ts`, `main/ipc/handlers.ts`, `main/reminders.ts`, `Canvas/commandDispatch.ts`, `sys/commands/pomo.ts`, `PomoNode/DoingPicker.tsx`, `ui/TaskTagPicker.tsx`, `styles/launch.css`, docs (`boards.md` F10, F11), tests (`boards.test.ts`)
+
+**Summary:**
+- **A failed switch is undone completely.** A file that could not be moved (locked, disk full) or a list that could not be written used to be able to leave the folder without its board, and the save guard stayed on, dropping every later save without a word. Every move is now undone in reverse and the guard is always released.
+- **A lost list of boards finds the parked boards again** from the folders on disk, instead of listing only the open one.
+- **One timer at a time, every way to start:** the rule was only checked on three buttons. It is now checked where every start goes through (a task, the calendar, a shortcut) and in `krnl pomo start`.
+- **Reminders from every board:** a plan in a board that is not open now reminds, and the notification names the board.
+- **Copied habits start today:** rest days, pauses and the old start date no longer come along, so no earlier day reads as missed.
+- **The floating timer follows a board switch.**
+- **No underlined links:** "Show done" in the two task pickers and the small actions in the launch dialogs are quiet filled buttons.
+
+Typecheck clean; all tests pass.

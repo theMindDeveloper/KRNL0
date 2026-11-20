@@ -58,7 +58,24 @@ const cliEnv = (): PomoEnv => ({
   uuid: () => crypto.randomUUID(),
 });
 
+/** The board another timer is running in, if any (one timer at a time, boards.md F4). */
+function timerElsewhere(): string | null {
+  try {
+    const dir = (getBoardIo() as { BOARD_DIR?: unknown }).BOARD_DIR;
+    if (typeof dir !== 'string' || !dir) return null;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { listBoards } = require('../../main/persistence/boards') as typeof import('../../main/persistence/boards');
+    const list = listBoards(dir);
+    if (!list.recording) return null;
+    return list.boards.find((b) => b.id === list.recording!.boardId)?.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function pomoStart(label?: string, minutes?: number): SysResult {
+  const elsewhere = timerElsewhere();
+  if (elsewhere) return { ok: false, message: `a timer is already running in the board "${elsewhere}" — stop it there first (krnl board switch "${elsewhere}")` };
   let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
   getBoardIo().mutateBoard((board) => {
     const node = findPomoNode(board);

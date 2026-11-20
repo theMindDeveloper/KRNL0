@@ -1,4 +1,4 @@
-import { app, ipcMain, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, clipboard } from 'electron';
 import { getMainWindow } from '../mainWindow';
 import { getPocket } from '../pocket';
 import { appStatePort } from '../appState';
@@ -119,9 +119,19 @@ let boardsSwitching = false;
 
 /** Swap to another board and reload the window (boards.md F3). Also used by `krnl board switch`. */
 export function switchBoardAndReload(ref: string | undefined): { ok: boolean; message: string } {
+  let activeBeforeSwitch = '';
+  try { activeBeforeSwitch = readBoardsIndex(BOARD_DIR).activeId; } catch { /* the switch reports it */ }
   boardsSwitching = true;
-  const res = switchBoard(BOARD_DIR, ref);
+  let res: ReturnType<typeof switchBoard>;
+  try {
+    res = switchBoard(BOARD_DIR, ref);
+  } catch (err) {
+    // Never leave the guard on: it would silently drop every save from then on.
+    res = `could not switch board (${err instanceof Error ? err.message : String(err)})`;
+  }
   if (typeof res === 'string') { boardsSwitching = false; return { ok: false, message: res }; }
+  // Already on that board: nothing moved, so nothing to reload.
+  if (res.id === activeBeforeSwitch) { boardsSwitching = false; return { ok: true, message: `already on board "${res.name}"` }; }
   const w = getMainWindow();
   if (w && !w.isDestroyed()) {
     // A board switch is not a start: the page is told to skip the start-up
@@ -178,15 +188,24 @@ function hasOpenRenderer(): boolean {
 }
 
 export function registerHandlers(rpcServer?: RpcServer): void {
-  ipcMain.handle('board:load', async () => {
+  ipcMain.handle('board:load', async (event) => {
     // The list of boards exists before the first load (this is also where
     // canvases become boards, once).
     try { readBoardsIndex(BOARD_DIR); } catch (err) { console.warn('[boards] index not ready:', err instanceof Error ? err.message : err); }
+    const afterSwitch = boardsSwitching;
     boardsSwitching = false;
     const board = loadBoard();
     rendererRev.sync();
     rendererBase = asBoard(board);
     awaitingReload = false;
+    // The window is now on another board: the floating timer follows it.
+    if (afterSwitch) {
+      try {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed() && w.webContents !== event?.sender) w.webContents.send('board:changed');
+        }
+      } catch { /* no other window */ }
+    }
     return board;
   });
 

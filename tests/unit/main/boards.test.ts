@@ -244,3 +244,74 @@ describe('F8 — canvases become boards, once', () => {
     expect(now.nodes.map((n) => n.id)).toContain('note-r1');
   });
 });
+
+describe('NF2 — a switch that fails changes nothing', () => {
+  it('a failure before anything moved leaves the open board where it is', () => {
+    write(seeded());
+    createBoard(dir, 'Uni');
+    // The open board cannot be parked: a file sits where its folder must go.
+    mkdirSync(join(dir, 'boards'), { recursive: true });
+    writeFileSync(join(dir, 'boards', 'canvas-main'), 'in the way');
+    const res = switchBoard(dir, 'Uni');
+    expect(typeof res).toBe('string');
+    expect(readBoardsIndex(dir).activeId).toBe('canvas-main');
+    expect(read().nodes.map((n) => n.id)).toContain('note-main');
+  });
+
+  it('after a switch the list and the files always agree on which board is open', () => {
+    write(seeded());
+    mkdirSync(join(dir, 'timelog'), { recursive: true });
+    writeFileSync(join(dir, 'timelog', '2026-11.jsonl'), 'main log');
+    const uni = (createBoard(dir, 'Uni') as { id: string }).id;
+    mkdirSync(join(dir, 'boards', uni, 'timelog'), { recursive: true });
+    writeFileSync(join(dir, 'boards', uni, 'timelog', '2026-11.jsonl'), 'uni log');
+    const res = switchBoard(dir, 'Uni');
+    // Whatever the platform allowed, the folder is consistent: the list and
+    // the files agree on which board is open.
+    const open = readBoardsIndex(dir).activeId;
+    const log = readFileSync(join(dir, 'timelog', '2026-11.jsonl'), 'utf8');
+    if (typeof res === 'string') {
+      expect(open).toBe('canvas-main');
+      expect(log).toBe('main log');
+      expect(read().nodes.map((n) => n.id)).toContain('note-main');
+    } else {
+      expect(open).toBe(uni);
+      expect(log).toBe('uni log');
+      expect(readFileSync(join(dir, 'boards', 'canvas-main', 'timelog', '2026-11.jsonl'), 'utf8')).toBe('main log');
+    }
+  });
+});
+
+describe('a lost list of boards finds the parked boards again', () => {
+  it('rebuilds the list from the folders in boards/', () => {
+    write(seeded());
+    const uni = (createBoard(dir, 'Uni') as { id: string }).id;
+    rmSync(join(dir, 'boards.json'));
+    const rebuilt = readBoardsIndex(dir);
+    expect(rebuilt.activeId).toBe('canvas-main');
+    expect(rebuilt.boards.map((b) => b.id).sort()).toEqual(['canvas-main', uni].sort());
+    // The parked board can still be opened, and the deleted bin is not a board.
+    mkdirSync(join(dir, 'boards', '.deleted', 'old'), { recursive: true });
+    writeFileSync(join(dir, 'boards', '.deleted', 'old', 'board.json'), '{}');
+    rmSync(join(dir, 'boards.json'));
+    expect(readBoardsIndex(dir).boards).toHaveLength(2);
+    expect(typeof switchBoard(dir, uni)).toBe('object');
+  });
+});
+
+describe('F2 — copied habits start today', () => {
+  it('rest days, pauses and the old start date stay behind', () => {
+    const main = seeded();
+    (mother(main, 'habit').state as Record<string, unknown>).habits = [
+      { id: 'h1', name: 'Run', createdAt: '2025-01-01T08:00:00.000Z', log: ['2026-11-01'], rest: ['2026-10-01'], pauses: [{ from: '2026-09-01', to: '2026-09-07' }], perWeek: 3 },
+    ];
+    write(main);
+    const id = (createBoard(dir, 'Uni', { copyHabits: true }) as { id: string }).id;
+    const h = (mother(read(join(dir, 'boards', id, 'board.json')), 'habit').state as { habits: Array<Record<string, unknown>> }).habits[0]!;
+    expect(h.log).toEqual([]);
+    expect(h.rest).toBeUndefined();
+    expect(h.pauses).toBeUndefined();
+    expect(h.perWeek).toBe(3);
+    expect(String(h.createdAt).slice(0, 4)).not.toBe('2025');
+  });
+});

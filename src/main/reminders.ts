@@ -3,7 +3,8 @@
 // Runs while KRNL0 runs, window open or closed to the tray.
 
 import { Notification } from 'electron';
-import { readBoardFile } from './boardIo';
+import { BOARD_DIR, readBoardFile } from './boardIo';
+import { parkedBoards } from './persistence/boards';
 import { getMainWindow } from './mainWindow';
 import { dueReminders } from '../shared/reminders';
 import type { Board } from '../shared/types';
@@ -25,7 +26,18 @@ export function startReminders(): void {
     // Unreadable right now (locked, or broken and kept aside): try again next
     // tick without moving the window, so no reminder is skipped.
     try { board = readBoardFile() as unknown as Board | null; } catch { return; }
-    for (const r of dueReminders(board, lastMs, now)) {
+    const due = dueReminders(board, lastMs, now);
+    // A plan in a board that is not open reminds too, and says which board (boards.md F10).
+    try {
+      for (const other of parkedBoards(BOARD_DIR)) {
+        try {
+          for (const r of dueReminders(other.board as Board, lastMs, now)) {
+            due.push({ ...r, key: `${other.id}:${r.key}`, body: r.body ? `${r.body} · in your board "${other.name}"` : `In your board "${other.name}"` });
+          }
+        } catch { /* a board stored by an older version: it reminds once it has been opened */ }
+      }
+    } catch { /* the list of boards is unreadable right now: the open board still reminds */ }
+    for (const r of due) {
       if (shown.has(r.key)) continue;
       shown.add(r.key);
       if (!Notification.isSupported()) continue;

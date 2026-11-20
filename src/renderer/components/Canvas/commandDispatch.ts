@@ -27,6 +27,7 @@
 
 import { detachIfPushed } from '../../store/chainSchedule';
 import { useBoardStore, pushHistory } from '../../store/boardStore';
+import { blockedByOtherBoard } from '../../store/boardsInfo';
 import { emit, saveBoard } from '../../store/eventLog';
 import { commandCanSound, momentFromChange, soundSnapshot } from '../../sfx/soundMoments';
 import { uiSounds } from '../../sfx/uiSounds';
@@ -273,6 +274,9 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         observeMode ? pomoDropBlips(s as unknown as PomoState, next) : next;
       switch (command) {
         case 'pomo.start': {
+          // One timer at a time across boards (boards.md F4): every way to start
+          // (the button, a task, the calendar, a shortcut, the CLI) ends here.
+          if ((s['status'] === 'idle' || s['status'] === 'done') && blockedByOtherBoard()) return null;
           // A fresh start runs at the pomo's own session length (time-model
           // F3/F12), so a Session change in the gear takes effect on the next
           // START. Observe mode has no session length.
@@ -751,7 +755,7 @@ function tagPomo(taskNodeId: string | null, opts: { start: boolean }): void {
     taskId: taskNodeId,
     label: taskNode ? (taskNode.state as TaskState).text : '',
   });
-  if (opts.start && (next.status === 'idle' || next.status === 'done')) {
+  if (opts.start && (next.status === 'idle' || next.status === 'done') && !blockedByOtherBoard()) {
     const cfg = (pomoNode.config as PomoConfig | null) ?? defaultPomoConfig();
     // Observe / Easy mode has no session length: a 25-min threshold would
     // flag an ordinary span as a completed pomodoro.
