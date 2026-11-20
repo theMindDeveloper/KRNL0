@@ -244,9 +244,9 @@ export function HabitNode({
   );
 
   const titleByView: Record<HabitView, string> = {
-    week: `HABITS — WEEK ${weekNum}`,
-    month: `HABITS — ${MONTH_LABELS[now.getMonth()]}`,
-    year: `HABITS — ${now.getFullYear()}`,
+    week: `Week ${weekNum}`,
+    month: `${MONTH_LABELS[now.getMonth()]}`,
+    year: `${now.getFullYear()}`,
   };
 
   const menuHabit = menu ? visibleHabits.find((h) => h.id === menu.habitId) ?? null : null;
@@ -301,34 +301,18 @@ export function HabitNode({
     >
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* Header */}
-        <div className="krnl-node-header"
-          style={{
-            padding: '7px 10px 6px 16px',
-            borderBottom: '1px solid var(--paper-3)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <span style={{ color: 'var(--rust)', display: 'inline-flex' }}><LineGlyph name="dot" size={10} /></span>
-          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {titleByView[view]}
-          </span>
+        {/* window-frame.md — the standard header: name, then views, then the menu. */}
+        <div className="krnl-node-header kw-head">
+          <span className="kw-dot" style={{ background: 'var(--rust)' }} />
+          {/* window-frame.md — the name, then one fact. */}
+          <span className="kw-title">Habits</span>
+          <span className="kw-ctx" data-testid="habit-header-context" style={{ flex: 1 }}>{titleByView[view]}</span>
           {/* Week · Month · Year right here, not inside Settings. */}
-          <span role="tablist" aria-label="Habit view" data-testid="habit-view-switch" className="nodrag"
-            style={{ display: 'inline-flex', gap: 2, padding: 2, borderRadius: 6, border: '1px solid var(--paper-3)', textTransform: 'none', flexShrink: 0 }}>
+          <span role="tablist" aria-label="Habit view" data-testid="habit-view-switch" className="nodrag kw-views">
             {HABIT_VIEWS.map((v) => (
               <button key={v} type="button" role="tab" aria-selected={view === v} data-testid={`habit-view-${v}`}
                 onMouseDown={(e) => e.stopPropagation()}
-                onClick={() => onCommand('habit.setView', { view: v })}
-                style={{ height: 20, padding: '0 7px', border: 'none', borderRadius: 4, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em',
-                  background: view === v ? 'color-mix(in srgb, var(--acid) 18%, transparent)' : 'transparent',
-                  color: view === v ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', fontWeight: view === v ? 650 : 500 }}>
+                onClick={() => onCommand('habit.setView', { view: v })}>
                 {v === 'week' ? 'Week' : v === 'month' ? 'Month' : 'Year'}
               </button>
             ))}
@@ -339,17 +323,7 @@ export function HabitNode({
             aria-expanded={settingsOpen}
             data-habit-gear
             onClick={() => setSettingsOpen((v) => !v)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: settingsOpen ? 'var(--ink-2)' : 'var(--ink-3)',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 13,
-              lineHeight: 1,
-              padding: '2px 4px',
-              borderRadius: 3,
-            }}
+            className="kw-btn"
           >
             <SettingsIcon name="settings" size={12} />
           </button>
@@ -435,18 +409,9 @@ export function HabitNode({
         {/* Add row — pinned to the bottom of the window, same look as the
             Todo's "add task" row (UI rule: the add row of a list is always its
             last row, dashed top rule, mono text, ↵ hint). */}
-        <div
-          className="habit-add"
-          style={{
-            flexShrink: 0,
-            padding: '8px 14px',
-            borderTop: '1px dashed var(--paper-3)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            color: 'var(--ink-4)',
-          }}
-        >
-            <div ref={addRowRef} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+        {/* window-frame.md — the standard footer row. */}
+        <div className="habit-add kw-foot">
+            <div ref={addRowRef} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
             <input
               type="text"
               placeholder="add a habit"
@@ -491,15 +456,7 @@ export function HabitNode({
                 minWidth: 0,
               }}
             />
-            <span
-              aria-hidden
-              style={{
-                fontSize: 11, color: 'var(--ink-4)', background: 'var(--paper-2)',
-                border: '1px solid var(--paper-3)', padding: '1px 4px', borderRadius: 3, flexShrink: 0,
-              }}
-            >
-              ↵
-            </span>
+            <span aria-hidden className="kw-kbd">↵</span>
             </div>
             {ask && newName.trim() && (
               <HabitAddAsk simple={easy} name={newName.trim()} anchor={ask} onAdd={addAnswered} onCancel={() => { setAsk(null); setNewName(''); }} taken={takenNames}

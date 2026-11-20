@@ -172,8 +172,8 @@ export function PocketApp() {
   const controls = pomoControls({ observe, status: state.status, promptDone, config });
   const onBreak = state.status === 'break';
   const isTaskMode = !snap.easy && state.activeTaskId !== null;
-  const title = isTaskMode ? `ON · ${truncate(state.label || 'task', 18)}` : observe ? 'TIME LOG' : 'DEEP WORK';
-  const titleRight = observe ? (onBreak ? '· BREAK' : '') : isTaskMode ? '' : `· POMO.${String(clock.sessionMin).padStart(3, '0')}`;
+  const title = isTaskMode ? `ON · ${truncate(state.label || 'task', 18)}` : 'TIMER';
+  const titleRight = observe ? (onBreak ? '· BREAK' : '') : isTaskMode ? '' : `· ${clock.sessionMin} MIN`;
   const dot = onBreak ? 'var(--cyan, #22d3ee)' : state.status === 'paused' ? 'var(--ink-3)' : observe ? 'var(--rust)' : 'var(--acid)';
 
   // Pomodoro face text: idle shows the session, a break counts up, otherwise what's left.
@@ -209,7 +209,7 @@ export function PocketApp() {
       <header style={{ ...DRAG, height: 32, display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 0 12px', borderBottom: '1px solid var(--paper-3)' }}>
         <span style={{ width: 6, height: 6, borderRadius: 999, background: dot, flexShrink: 0 }} />
         <span style={{ ...label, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title} {titleRight}</span>
-        <span style={{ marginLeft: 'auto', ...modeChip(observe) }}>{observe ? 'OBSERVE' : 'POMO'}</span>
+        <span style={{ marginLeft: 'auto', ...modeChip(observe) }}>{observe ? 'STOPWATCH' : 'SESSIONS'}</span>
         <IconButton title="Collapse to one line" onClick={() => collapse(true)}><path d="M5 12h14" /></IconButton>
         <IconButton title="Open KRNL0" onClick={open}><path d="M14 4h6v6M20 4l-8 8" /><path d="M18 14v5H5V6h5" /></IconButton>
       </header>

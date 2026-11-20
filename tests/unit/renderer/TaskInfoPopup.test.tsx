@@ -32,8 +32,8 @@ describe('TaskInfoPopup', () => {
     const pop = screen.getByTestId('task-info-popup');
     expect(pop.textContent).toContain('Fix bug');
     expect(pop.textContent).toContain('Code');
-    expect(pop.textContent).toContain('plan 1h 30m');
-    expect(pop.textContent).toContain('tracked 50m');
+    expect(pop.textContent).toContain('Planned 1h 30m');
+    expect(pop.textContent).toContain('Recorded 50m');
   });
 
   it('renders nothing for a non-task id', () => {

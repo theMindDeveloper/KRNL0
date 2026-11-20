@@ -35,6 +35,13 @@ import {
 import type { Node } from '../../../src/shared/types/node';
 import type { TodoState, TodoConfig } from '../../../src/renderer/components/nodes/TodoNode/types';
 
+// menus.md — rare items sit behind "More": open it before looking for one.
+const openMore = (): void => {
+  const m = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'More');
+  if (m) fireEvent.click(m);
+};
+
+
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const T1 = '2026-05-10T10:00:00.000Z';
@@ -120,13 +127,19 @@ describe('F9 — TodoNode row right-click context menu', () => {
     const rowEl = textEl.closest('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
     const labels = Array.from(document.querySelectorAll('button')).map((b) => b.textContent ?? '');
-    // Decision 40 — grouped, with icons: When… Deadline… Rename … Won't do, Delete.
+    // menus.md — the plan menu: Mark done, When…, Rename, More, Won't do, Delete.
+    expect(labels).toContain('Mark done');
     expect(labels.some((l) => l.startsWith('When…'))).toBe(true);
-    expect(labels.some((l) => l.startsWith('Deadline…'))).toBe(true);
     expect(labels).toContain('Rename');
-    // It carries a hint now ("off the board, not missed"), like When… does.
+    expect(labels).toContain('More');
+    // Deadline… is one of the rare items behind More.
+    expect(labels.some((l) => l.startsWith('Deadline…'))).toBe(false);
+    openMore();
+    expect(Array.from(document.querySelectorAll('button')).some((b) => (b.textContent ?? '').startsWith('Deadline…'))).toBe(true);
+    fireEvent.click(screen.getByTestId('menu-back'));
     expect(labels.some((l) => l.startsWith("Won't do"))).toBe(true);
     expect(labels).toContain('Delete');
+    expect(labels.filter((l) => l !== '' && l !== '+' && l !== '↵').length).toBeLessThanOrEqual(8);
   });
 
   it('F9 — the timer item is not offered when the item has no linked taskNodeId', () => {
@@ -136,6 +149,7 @@ describe('F9 — TodoNode row right-click context menu', () => {
     renderTodoNode(s);
     const rowEl = document.querySelector('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
+    openMore();
     const startPomoBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => (b.textContent ?? '').startsWith('Focus on it'),
     );
@@ -149,6 +163,7 @@ describe('F9 — TodoNode row right-click context menu', () => {
     renderTodoNode(s);
     const rowEl = document.querySelector('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
+    openMore();
     const startPomoBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => (b.textContent ?? '').startsWith('Focus on it'),
     )!;
@@ -163,6 +178,7 @@ describe('F9 — TodoNode row right-click context menu', () => {
     renderTodoNode(s, onCommand);
     const rowEl = document.querySelector('.todo-item') as HTMLElement;
     fireEvent.contextMenu(rowEl);
+    openMore();
     const startPomoBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => (b.textContent ?? '').startsWith('Focus on it'),
     )!;

@@ -1,6 +1,7 @@
-// Compact page switcher for the Analytics toolbar: one icon button per page
-// (line icons, 16px), the active one filled. Hover shows the page name; the
-// current page's name is printed next to the icons.
+// The Analytics page switcher: one icon button per page (line icons, 16px),
+// the active one filled. Hover shows the page name; the current page's name is
+// printed next to the icons. (It was a named list for a day, 2026-11-19; the
+// owner preferred the icons, so they are back.)
 
 import { PAGES, type AnalyticsPage, type PageId } from './guide';
 
@@ -42,14 +43,14 @@ export function PageNav({ current, onPick, pages = PAGES }: { current: PageId; o
             onClick={(e) => { e.stopPropagation(); onPick(p.id); }}
             onMouseDown={(e) => e.stopPropagation()}
             style={{
-              width: 28, height: 28, flexShrink: 0, display: 'grid', placeItems: 'center', padding: 0,
-              borderRadius: 8, border: 'none', cursor: 'pointer',
+              width: 24, height: 24, flexShrink: 0, display: 'grid', placeItems: 'center', padding: 0,
+              borderRadius: 6, border: 'none', cursor: 'pointer',
               background: on ? 'var(--acid, #c9f158)' : 'transparent',
               color: on ? 'var(--k-an-on-accent, #0e1012)' : 'var(--k-an-ink-3, #9aa1a8)',
               transition: 'background 120ms, color 120ms',
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               {ICONS[p.id]}
             </svg>
           </button>
@@ -57,7 +58,7 @@ export function PageNav({ current, onPick, pages = PAGES }: { current: PageId; o
       })}
       <span
         data-testid="analytics-page-label"
-        style={{ marginLeft: 8, fontFamily: 'var(--font-sans)', fontSize: 12.5, fontWeight: 600, color: 'var(--k-an-ink, #f4f6f8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}
+        style={{ marginLeft: 6, fontFamily: 'var(--font-read)', fontSize: 12.5, fontWeight: 600, letterSpacing: 0, color: 'var(--k-an-ink, #f4f6f8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}
       >
         {label}
       </span>

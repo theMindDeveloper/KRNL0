@@ -47,7 +47,7 @@ export function CapsuleView({ m, hover }: { m: PocketModel; hover: boolean }) {
           {m.observe ? (
             <>
               <div style={{ display: 'flex' }}>
-                <span style={{ ...labelStyle, color: RUST }}><span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor', display: 'inline-block', marginRight: 6, verticalAlign: '0.1em' }} />Time log</span>
+                <span style={{ ...labelStyle, color: RUST }}><span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor', display: 'inline-block', marginRight: 6, verticalAlign: '0.1em' }} />Timer</span>
                 <span style={{ ...labelStyle, marginLeft: 'auto', color: m.onBreak ? INK3 : ACID }}><span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor', display: 'inline-block', marginRight: 6, verticalAlign: '0.1em' }} />{m.onBreak ? 'break' : 'working'}</span>
               </div>
               <div className="pk-dash"><ObserveDash state={state} liveMs={m.onBreak ? m.clock.breakElapsedMs : m.clock.liveWorkMs} library={m.snap.library} nowMs={m.now} plain={m.snap.easy} /></div>

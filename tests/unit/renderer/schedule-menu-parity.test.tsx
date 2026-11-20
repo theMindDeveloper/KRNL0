@@ -8,7 +8,7 @@
  * Also covers the pomo highlights: background bands that never take pointer
  * events (so drops still reach the hour cells).
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { WeekView } from '../../../src/renderer/components/nodes/CalendarNode/WeekView';
@@ -23,6 +23,13 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const d0 = new Date();
 const TODAY = `${d0.getFullYear()}-${pad(d0.getMonth() + 1)}-${pad(d0.getDate())}`;
 
+// The seeded span is 10:00–10:25 today: pin the clock to the afternoon, so the
+// test does not fail when it runs before 10:25 (recorded time is never in the future).
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(`${TODAY}T15:00:00`));
+});
+afterEach(() => { vi.useRealTimers(); });
 afterEach(() => {
   cleanup();
   useBoardStore.setState({ board: null });

@@ -282,6 +282,10 @@
   position: relative; z-index: 1; font-family: var(--font-mono); font-size: 11px; font-weight: 700;
   line-height: 14px; color: var(--ink); letter-spacing: 0; pointer-events: none; white-space: nowrap;
 }
+/* F31 — a narrow block alone in its column: the name, wrapped down the block. */
+.cal-wrap { font-family: var(--font-mono); font-size: 10px; line-height: 11px; letter-spacing: -0.06em; color: var(--ink); overflow: hidden; overflow-wrap: anywhere; white-space: normal; flex-shrink: 0; pointer-events: none; position: relative; z-index: 1; }
+.cal-block[data-plan-state="missed"] .cal-wrap { color: color-mix(in srgb, var(--rust) 70%, var(--ink)); }
+.cal-block[data-plan-state="done"] .cal-wrap { color: var(--ink-2); }
 .cal-letter--stack { writing-mode: horizontal-tb; width: 1ch; white-space: normal; word-break: break-all; line-height: 11px; text-align: center; }
 .cal-block[data-plan-state="missed"] .cal-letter { color: color-mix(in srgb, var(--rust) 70%, var(--ink)); }
 .cal-block[data-plan-state="done"] .cal-letter { color: var(--ink-2); }

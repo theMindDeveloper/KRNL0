@@ -12,7 +12,7 @@ import type { PomoState } from '../PomoNode/types';
 import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
-import { dayProgress, progressRatio, weekProgress } from '../../../store/dayProgress';
+import { dayProgress, progressRatio } from '../../../store/dayProgress';
 import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { dueOnDay } from '../../../../shared/dueOn';
@@ -351,19 +351,12 @@ export function ClockNode({
   const trackInnerEdge = REALITY_R - REALITY_SW / 2;
   const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
 
-  const activeProgress = activeIdx >= 0
-    ? (nowFloat - tasks[activeIdx]!.start) / (tasks[activeIdx]!.end - tasks[activeIdx]!.start)
-    : 0;
-  const activeColor = activeIdx >= 0 ? tasks[activeIdx]!.colorVar : 'var(--ink-3)';
-
   // Station mode: the bottom-right Clock panel is much taller than the canvas-
   // mode fixed mother (540px) — scale the dial up so it fills the space
   // instead of leaving a strip of empty card around a tiny 244px square.
   const inStation = useContext(MotherFrameStationContext);
-  // engagement.md F18 — the outer ring closes as the day's planned blocks are
-  // ticked; under the dial, one small ring per day of this week.
+  // engagement.md F18 — the outer ring closes as the day's planned blocks are ticked.
   const dayDone = useMemo(() => dayProgress(board0, selectedDate), [board0, selectedDate]);
-  const weekMarks = useMemo(() => weekProgress(board0, todayLocalYMD()), [board0]);
   const ringR = trackOuterEdge + 6;
   const ringC = 2 * Math.PI * ringR;
 
@@ -388,57 +381,42 @@ export function ClockNode({
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
-        <div className="krnl-node-header"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ink-2)' }}>
-            <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: isToday ? 'var(--cyan)' : 'var(--ink-4)', boxShadow: isToday ? '0 0 0 2px color-mix(in srgb, var(--cyan) 25%, transparent)' : 'none' }} />
-            {isToday ? 'Today · Schedule' : 'Day · Schedule'}
-          </span>
-          <span style={{ display: 'flex', gap: 6 }}>
-          <button
-            type="button"
-            data-testid="clock-week-toggle"
-            aria-pressed={weekView}
-            title={weekView ? 'Back to the day' : 'Last 7 days at a glance'}
-            onClick={(e) => { e.stopPropagation(); onCommand('clock.setWeekView', {}); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              background: weekView ? 'var(--acid)' : 'transparent',
-              color: weekView ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
-              border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-            }}
-          >
-            {weekView ? <><SettingsIcon name="clock" size={11} /> DAY</> : <><SettingsIcon name="dial" size={11} /> WEEK</>}
-          </button>
-          <button
-            type="button"
-            data-testid="clock-dial-only"
-            aria-pressed={dialOnly}
-            hidden={weekView}
-            title={dialOnly ? 'Show schedule' : 'Big clock — dial only'}
-            onClick={(e) => { e.stopPropagation(); onCommand('clock.setDialOnly', {}); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              background: dialOnly ? 'var(--acid)' : 'transparent',
-              color: dialOnly ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
-              border: '1px solid var(--paper-3)', borderRadius: 4, padding: '2px 7px',
-              fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
-            }}
-          >
-            {dialOnly ? <><SettingsIcon name="menu" size={11} /> SCHEDULE</> : <><SettingsIcon name="expand" size={11} /> BIG CLOCK</>}
-          </button>
+        {/* window-frame.md — the standard header: name, then one view switch. */}
+        <div className="krnl-node-header kw-head" style={{ margin: '-10px -14px 0' }}>
+          <span aria-hidden className="kw-dot" style={{ background: isToday ? 'var(--cyan)' : 'var(--ink-4)', boxShadow: isToday ? '0 0 0 2px color-mix(in srgb, var(--cyan) 25%, transparent)' : 'none' }} />
+          <span className="kw-title">Clock</span>
+          <span className="kw-sp" />
+          <span className="kw-views nodrag" role="group" aria-label="Clock view" data-testid="clock-view-switch">
+            <button
+              type="button"
+              data-testid="clock-view-day"
+              aria-pressed={!weekView && !dialOnly}
+              title="The day, with its schedule"
+              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); if (dialOnly) onCommand('clock.setDialOnly', { on: false }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              DAY
+            </button>
+            <button
+              type="button"
+              data-testid="clock-dial-only"
+              aria-pressed={dialOnly && !weekView}
+              title="Big clock — dial only"
+              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); onCommand('clock.setDialOnly', { on: true }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              BIG CLOCK
+            </button>
+            <button
+              type="button"
+              data-testid="clock-week-toggle"
+              aria-pressed={weekView}
+              title="Last 7 days at a glance"
+              onClick={(e) => { e.stopPropagation(); onCommand('clock.setWeekView', { on: true }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              WEEK
+            </button>
           </span>
         </div>
         {/* #207 — Week view replaces the day view; the day view stays mounted
@@ -457,23 +435,15 @@ export function ClockNode({
             and snap back to today. Disabled when already on today.
             Buttons share a single `clock-day-btn` class so hover/focus
             polish lives in tokens.css (rather than 5 inline copies). */}
+        {/* window-frame.md — the standard time row. */}
         <div
           data-testid="clock-day-bar"
-          style={{
-            display: dialOnly ? 'none' : 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            padding: '2px 0',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.04em',
-            userSelect: 'none',
-          }}
+          className="kw-range"
+          style={{ display: dialOnly ? 'none' : 'flex', justifyContent: 'center', margin: '-10px -14px 0', userSelect: 'none' }}
         >
           <button
             type="button"
-            className="clock-day-btn"
+            className="kw-btn"
             data-testid="clock-day-prev"
             onClick={() => onCommand('clock.advanceDay', { delta: -1 })}
             title="Previous day"
@@ -486,7 +456,7 @@ export function ClockNode({
               (commandDispatch.ts). Two date pickers competing on one screen
               was the wrong UX — the calendar IS the picker. */}
           <span
-            className="clock-day-chip"
+            className="kw-range__label"
             data-state={isToday ? 'today' : 'other'}
             data-testid="clock-day-label"
             title="Click a day on the calendar to change"
@@ -499,111 +469,32 @@ export function ClockNode({
           </span>
           <button
             type="button"
-            className="clock-day-btn clock-day-today"
+            className="kw-btn clock-day-today"
             data-testid="clock-day-today"
             data-state={isToday ? 'today' : 'other'}
-            onClick={() => onCommand('clock.goToday', {})}
-            disabled={isToday}
-            title="Jump back to today"
+            // One button: today, and the half of the day that holds this hour
+            // (it was two, Today and Now).
+            onClick={() => onCommand('clock.goNow', {})}
+            disabled={isToday && viewWindow === (new Date().getHours() < 12 ? 0 : 1)}
+            title="Back to today, now"
           >
             Today
           </button>
-          {/* #9 — snap to NOW: today + the 12-hour half that contains this hour. */}
           <button
             type="button"
-            className="clock-day-btn"
-            data-testid="clock-day-now"
-            onClick={() => onCommand('clock.goNow', {})}
-            title="Jump to now (today + current 12-hour half)"
-          >
-            Now
-          </button>
-          <button
-            type="button"
-            className="clock-day-btn"
+            className="kw-btn"
             data-testid="clock-day-next"
             onClick={() => onCommand('clock.advanceDay', { delta: 1 })}
             title="Next day"
             aria-label="Next day"
           ><LineGlyph name="chevron" /></button>
+          {/* window-frame.md — the dial's half of the day, in the time row (was a row of its own). */}
+          <span className="kw-views" role="group" aria-label="Half of the day" style={{ marginLeft: 6 }}>
+            <button type="button" data-testid="clock-window-am" aria-pressed={viewWindow === 0} title="Midnight to noon" onClick={() => onCommand('clock.setViewWindow', { window: 0 })}>AM</button>
+            <button type="button" data-testid="clock-window-pm" aria-pressed={viewWindow === 1} title="Noon to midnight" onClick={() => onCommand('clock.setViewWindow', { window: 1 })}>PM</button>
+          </span>
         </div>
 
-        {/* 12-hour window toggle bar — prominent, above the clock face.
-            Shows which half-day the arcs reflect and lets users swap. */}
-        <div
-          data-testid="clock-window-bar"
-          style={{
-            display: dialOnly ? 'none' : 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            padding: '4px 0 2px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            userSelect: 'none',
-          }}
-        >
-          <button
-            type="button"
-            data-testid="clock-window-am"
-            onClick={() => onCommand('clock.setViewWindow', { window: 0 })}
-            style={{
-              padding: '3px 10px',
-              background: viewWindow === 0 ? 'var(--rust-deep, var(--rust))' : 'transparent',
-              color: viewWindow === 0 ? 'var(--paper)' : 'var(--ink-3)',
-              border: `1px solid ${viewWindow === 0 ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: 'inherit',
-              fontWeight: viewWindow === 0 ? 700 : 400,
-            }}
-          >
-            AM · 0–12
-          </button>
-          <button
-            type="button"
-            data-testid="clock-window-swap"
-            onClick={() => onCommand('clock.setViewWindow', { window: viewWindow === 0 ? 1 : 0 })}
-            title="Show next 12 hours"
-            style={{
-              padding: '3px 8px',
-              background: 'transparent',
-              color: 'var(--ink-2)',
-              border: '1px solid var(--paper-3)',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 12,
-              lineHeight: 1,
-            }}
-          >
-            ⇆
-          </button>
-          <button
-            type="button"
-            data-testid="clock-window-pm"
-            onClick={() => onCommand('clock.setViewWindow', { window: 1 })}
-            style={{
-              padding: '3px 10px',
-              // rust-deep: the paper-coloured label reads on it in both themes.
-              background: viewWindow === 1 ? 'var(--rust-deep, var(--rust))' : 'transparent',
-              color: viewWindow === 1 ? 'var(--paper)' : 'var(--ink-3)',
-              border: `1px solid ${viewWindow === 1 ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: 'inherit',
-              fontWeight: viewWindow === 1 ? 700 : 400,
-            }}
-          >
-            PM · 12–24
-          </button>
-        </div>
 
         {/* Clock face — container wider than SVG viewBox so outward-growing
             train tracks don't clip on the parent div edge. Station mode:
@@ -1070,143 +961,9 @@ export function ClockNode({
               paints behind the hour/minute/second hands. */}
         </div>
 
-        {/* engagement.md F18 — this week, one ring per day (planned blocks done). */}
-        <div
-          data-testid="clock-week-marks"
-          style={{ display: dialOnly ? 'none' : 'flex', justifyContent: 'center', gap: 6, width: '100%' }}
-        >
-          {weekMarks.map((d) => {
-            const isToday = d.date === today;
-            const ratio = progressRatio(d);
-            const full = d.planned > 0 && d.done === d.planned;
-            const dow = new Date(`${d.date}T00:00:00`).toLocaleDateString('en', { weekday: 'narrow' });
-            return (
-              <button
-                key={d.date}
-                type="button"
-                data-testid={`clock-week-mark-${d.date}`}
-                title={d.planned > 0 ? `${d.done} of ${d.planned} planned done` : 'nothing planned'}
-                onClick={() => onCommand('clock.setSelectedDate', { date: d.date })}
-                style={{ all: 'unset', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 24 }}
-              >
-                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-                  {isToday && <circle cx="10" cy="10" r="9.3" fill="none" stroke="var(--ink-3)" strokeWidth="0.8" />}
-                  <circle cx="10" cy="10" r="7" fill="none" stroke="var(--paper-3)" strokeWidth="2.4" strokeDasharray={d.planned > 0 ? undefined : '1.6 2'} />
-                  {ratio > 0 && (
-                    <circle cx="10" cy="10" r="7" fill="none" stroke="var(--acid)" strokeWidth="2.4" strokeLinecap="round"
-                      strokeDasharray={`${(ratio * 2 * Math.PI * 7).toFixed(2)} 44`} transform="rotate(-90 10 10)" />
-                  )}
-                  {full && <path d="M6.6 10.2l2.2 2.2 4.4-4.6" fill="none" stroke="var(--acid-ink, var(--acid))" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />}
-                </svg>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: isToday ? 'var(--ink)' : 'var(--ink-3)', textTransform: 'uppercase' }}>{dow}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Now-playing strip */}
-        <div
-          style={{
-            display: dialOnly ? 'none' : 'flex',
-            alignItems: 'center',
-            gap: 8,
-            width: '100%',
-            padding: '8px 10px',
-            background: 'var(--paper-2)',
-            border: '1px solid var(--paper-3)',
-            borderRadius: 5,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            position: 'relative',
-            overflow: 'hidden',
-            boxSizing: 'border-box',
-            color: activeColor,
-          }}
-        >
-          {/* Progress fill */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(90deg, currentColor 0%, currentColor 100%)',
-              opacity: 0.1,
-              pointerEvents: 'none',
-              transformOrigin: '0 50%',
-              transform: `scaleX(${activeProgress})`,
-            }}
-          />
-          {activeIdx >= 0 ? (
-            <>
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  background: activeColor,
-                  boxShadow: `0 0 8px ${activeColor}`,
-                  display: 'inline-block',
-                }}
-              />
-              <span
-                style={{
-                  color: 'var(--ink)',
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  fontSize: 11,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  maxWidth: 130,
-                }}
-              >
-                {tasks[activeIdx]!.name}
-              </span>
-              <span
-                style={{
-                  marginLeft: 'auto',
-                  color: 'var(--ink-3)',
-                  fontSize: 11,
-                  letterSpacing: '0.04em',
-                  flexShrink: 0,
-                }}
-              >
-                {fmtTime(tasks[activeIdx]!.start)} → {fmtTime(tasks[activeIdx]!.end)}
-              </span>
-            </>
-          ) : (
-            <>
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  background: 'var(--ink-3)',
-                  display: 'inline-block',
-                }}
-              />
-              <span
-                style={{
-                  color: 'var(--ink-3)',
-                  textTransform: 'none',
-                  fontWeight: 400,
-                  fontSize: 11,
-                }}
-              >
-                {isToday
-                  ? `free · ${fmtTime(nowFloat)}`
-                  : `viewing ${selectedDateObj.toLocaleDateString(undefined, {
-                      weekday: 'long',
-                      month: 'short',
-                      day: 'numeric',
-                    })}`}
-              </span>
-            </>
-          )}
-        </div>
-
+        {/* window-frame.md, no repeated rows — the week's rings and the "now" box
+            that sat here are gone: the WEEK view shows the week, and the list
+            below marks the plan that is running. */}
         {/* Task list — pages of whole rows, never a scrollbar. */}
         <PagedView
           testId="clock-task-pages"

@@ -2795,3 +2795,187 @@ While checking every line against the app, one claim turned out to be wrong: the
 - **The tour says what each choice does in the step where you choose.** The separate "what happened" step is gone (Easy 7 steps, Advanced 11). "Staying on track" now says how Won't do differs from Delete. 2 clips re-recorded; 5 clips no step uses were removed.
 
 The three, in one line each: **Won't do** = skipped on purpose, kept as "won't do", not missed. **Archive** = a done card off the board now. **Delete** = erased.
+
+## [2026-11-19] — One frame for every window: the same header, time row and footer
+
+**Type:** Feature (UI consistency)
+**Branch:** `feat/unified-windows` (builds on `feat/ux-review-picks`, PR #253)
+**Files changed:**
+- **New:** `src/renderer/styles/window-frame.css`, `docs/04-visual-system/window-frame.md`, `tests/unit/renderer/windowFrame.test.ts`
+- **Windows:** `PomoNode/index.tsx`, `PomoNode/PomoTimeLinks.tsx`, `TodoNode/index.tsx`, `CalendarNode/index.tsx`, `CalendarNode/WeekView.tsx`, `ClockNode/index.tsx`, `HabitNode/index.tsx`, `AnalyticsNode/index.tsx`, `TerminalNode/index.tsx`
+- **Other:** `index.tsx` (stylesheet), `Tour/tours.ts` and two voice clips (the Calendar's add row), `dev/previewBridge.ts` (`?mode=easy` for render checks)
+
+**Summary:** The owner asked for the existing windows to be made consistent: the top and the bottom of each window looked and worked differently. (A separate "Line" layout was tried first and rejected the same day: a third mode added to the load. Its branch `feat/line-layout` is kept, its PR #255 is closed.)
+
+Every window now uses one frame:
+- **Header, 36px.** Dot, name, context on the left; the view switch, then buttons, on the right.
+- **Time row, 32px,** only where the window moves through time.
+- **Footer, 44px,** only where there is something to do: the add field or the main button.
+
+What moved:
+- **Calendar:** DAY / WEEK / MONTH / YEAR went from tabs at the bottom to the header. The **+** left the time row; "add a plan" is now its bottom row, like the Todo's.
+- **Clock:** the two loose buttons (WEEK, BIG CLOCK) became one switch: DAY / BIG CLOCK / WEEK.
+- **Timer:** START and the other controls sit in the footer at the standard height; "log past time" is a button beside START, not a link under it.
+- **Habits, Todo, Analytics, Terminal:** same header size and spacing; Habits' and Todo's add rows are the standard footer.
+
+All test ids and commands are unchanged; this is placement and size only. The rules are written in `docs/04-visual-system/window-frame.md`, and `windowFrame.test.ts` fails if a window builds its own header or footer again.
+
+**Not converted yet:** the Analytics page row and range presets, the Calendar's Month and Year arrows, the Clock's AM / PM switch, and popups and cards. Checked as screenshots in Advanced and Easy on the demo board; not yet used by the owner.
+
+## [2026-11-19] — Simpler menus, one-line Todo rows, a shorter top bar
+
+**Type:** Feature (UI simplification)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ContextMenu/index.tsx` (a row can hold rarer rows behind it), `ui/menuIcons.tsx`, `TodoNode/index.tsx`, `TaskNode/index.tsx`, `HabitNode/HabitContextMenu.tsx`, `CalendarNode/WeekView.tsx`, `ClockNode/index.tsx`, `AnalyticsNode/index.tsx`, `TopBar/index.tsx`, `styles/window-frame.css`, `Tour/tours.ts` + 6 voice clips, `docs/04-visual-system/menus.md` (new), `window-frame.md`, `docs/research/simplify-checklist.md` (new), tests.
+
+**Summary:** The owner said the first pass was only "kind of better": menus were long and each one different, Todo rows wrapped onto two lines, the top bar was crowded, and the Calendar had unlabelled icon switches.
+
+- **Menus:** six rows at most, the same order and words everywhere (what happened, When…, Rename, More, then Won't do / Archive and Delete). The Todo row menu went from 8 rows to 6, the card menu from 9 to 6, the habit menu from 9 to 6. Rarer rows sit behind **More**. The card menu now says "Rename" and "When…" like the Todo row, and "When…" opens the same plan card.
+- **Todo rows:** one line each in a narrow window (name, when, length). The tag shrinks to its dot and the tracked time steps aside.
+- **Top bar:** the breadcrumb and the DARK button are gone (light / dark is in Settings); FIT shows only in the Free layout.
+- **Calendar:** its top went from four rows to two. The three unlabelled layer switches, the events list and the zoom are one menu button in the header; the time row is just ‹ date › Today; the day view no longer draws a second row with the day's name.
+- **Clock:** AM / PM moved into the time row, one row less.
+- **Analytics:** its range buttons use the shared switch.
+
+Eight tutorial lines changed with the menus and were re-recorded. The owner's message is split point by point, with what is done and what is open, in `docs/research/simplify-checklist.md`. Checked as screenshots at 1457 × 945 in Advanced and Easy on the demo board; not yet used by the owner.
+
+## [2026-11-19] — A shorter plan card, quieter window toggles, chains stop pushing
+
+**Type:** Feature (UI simplification) + behaviour change (chains)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ui/WhenPopover.tsx`, `TodoNode/index.tsx`, `TaskNode/index.tsx`, `CalendarNode/WeekView.tsx`, `MonthView.tsx`, `YearView.tsx`, `EventCard.tsx`, `AnalyticsNode/index.tsx`, `styles/window-frame.css`, `styles/chassis.css`, `store/scheduleSelector.ts`, `dev/previewBridge.ts`, docs (`window-frame.md`, `menus.md`, Decisions 44 and 45, `simplify-checklist.md`, `ui-simplification-summary.md`), tests.
+
+**Summary:**
+- **Plan card:** about half as tall. The month grid opens only when **Date** is pressed; the When / Deadline tab bar is one "Add a deadline" row; four action buttons in a grid became one row (what happened, Won't do, Delete, More); the main button says **Save** (it said "Done", next to "Not done yet"); the close button is an X (it used the Won't-do icon). The Todo's card now also offers Won't do, like the Calendar's.
+- **Top bar window toggles:** a shown window has a lit icon and readable text, a hidden one is dim. The bright underline bars are gone.
+- **Chains (Decision 44, approved by the owner):** a plan with its own time keeps it; the plan before it in a chain never pushes it. A follower with no time still comes after what precedes it.
+- **Calendar Month and Year views:** the standard time row. **Repeating-event menu:** six rows, More. **Guard tests** for menus and the plan card.
+
+Canvases were already one-per-board in Easy (D24); nothing to change. The timer's names and the two remaining cuts (finished-cards setting, a board card for every plan) wait for the owner. Checked as screenshots at 1457 × 945; not yet used by the owner.
+
+## [2026-11-19] — One name for the Timer; Analytics, Clock and Timer show less
+
+**Type:** Feature (UI simplification)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `PomoNode/index.tsx`, `Station/StationToolbar.tsx`, `StatusBar/index.tsx`, `pocket/PocketApp.tsx`, `pocket/CapsuleView.tsx`, `TopBar/PocketSection.tsx`, `TopBar/SettingsModal.tsx`, `shared/systemTimer.ts`, `shared/cli/commandRegistry.ts`, `main/taskbar.ts`, `analytics/sources/pomoSource.ts`, `AnalyticsNode/index.tsx`, `AnalyticsNode/PageNav.tsx`, `AnalyticsNode/TimeLogHeatmap.tsx`, `ClockNode/index.tsx`, `Tour/tours.ts`, `Tour/tourVoice.ts`, tour voice clips, tests (`windowFrame.test.ts`, `ClockNode.scenarios.test.tsx`, `tourVoice.test.ts`), docs (`window-frame.md`, Decision 46, `simplify-checklist.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Timer (Decision 46):** one name in every mode and place (it was RECORD, TIME LOG, POMO, DEEP WORK · POMO.025). The Advanced switch reads SESSIONS / STOPWATCH (it read POMO / OBSERVE). Words only: commands, config values and test ids are unchanged.
+- **Timer body:** one progress row (the session dots); the separate "cycles today" counter is gone, its numbers are in the dots' tooltip. The header no longer repeats the session length.
+- **Analytics:** the row of ten unlabelled page icons is the standard time row: ‹ page name ›, where the name opens the list of pages, then the range switch. The page name is shown once; the streak chip left the header. Two chart legends say "Recorded" instead of "pomo".
+- **Clock:** named "Clock" (it said "Today · Schedule"). The week rings and the "now / free" box under the dial are gone: the WEEK view shows the week and the list marks the running plan. The dial gets the room.
+- **Tutorials:** the lines that named these things are reworded and re-recorded; the Analytics tour now opens a page from the list.
+
+Typecheck clean; all tests pass. Checked as screenshots at 1457 × 945 and 1920 × 1080 in Advanced and Easy on the demo board; not yet used by the owner.
+
+## [2026-11-19] — Names in the top bar, a quieter status bar in Easy, the radio tab
+
+**Type:** Feature (UI simplification) + Bug Fix (the tucked radio covered the Calendar)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `Station/StationToolbar.tsx`, `StatusBar/index.tsx`, `AmbientRadio/index.tsx`, `ClockNode/index.tsx`, `AnalyticsNode/index.tsx`, `analytics/summary.ts`, tests (`windowFrame.test.ts`, `ambientRadio.resize.test.tsx`), docs (`window-frame.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Top bar:** the toggles read Todos, Habits, Calendar, Terminal (they read TODO, HABIT, CAL, TERM), the names their windows show.
+- **Ambient radio:** tucked at an edge it shows only its tab. 14px of its body, with clipped text, sat on top of the Calendar's last column and menu button.
+- **Status bar in Easy:** the Timer's state in a word, the day, the version. Workspace, Claude, nodes, edges and zoom stay in Advanced.
+- **Clock:** Today also returns to the current half of the day; the Now button is gone.
+- **Analytics:** the header writes focus as hours and minutes; the summary says "sessions".
+
+Typecheck clean; all tests pass. Checked as screenshots in Advanced and Easy; not yet used by the owner.
+
+## [2026-11-19] — Calendar week: a narrow block shows its name, wrapped
+
+**Type:** Feature (UI, owner pick A of three drafts)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `CalendarNode/WeekView.tsx`, `styles/reactflow-theme.css`, tests (`WeekView.clash.test.tsx`), docs (`calendar-clock-visuals.md` F31, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Calendar, week view at Station width (F31):** a plan alone in a day column too narrow for a one-line name shows its name in 10 px type, wrapped down the block in whole lines (words first). It showed only its first character. Plans that clash keep their letters (F28); a wide Calendar is unchanged.
+- No new command: it is how a block is drawn, not an action.
+
+Typecheck clean; all tests pass. Checked as screenshots at 1457 × 945 and 1920 × 1080; not yet used by the owner.
+
+## [2026-11-19] — One layout for the three add cards
+
+**Type:** Feature (UI unification)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ui/addCard.tsx` (new), `ui/WhenPopover.tsx`, `CalendarNode/EventCard.tsx`, `HabitNode/HabitAddAsk.tsx`, tests (`windowFrame.test.ts`), docs (`window-frame.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Add cards:** the plan card (Todo's add card and "When…"), the Calendar's "New here" card and the habit card share one layout from `ui/addCard.tsx`: 330 px wide, 14 px padding, 12 px between rows, a 15 px name with an X, rows of a 64 px label and 30 px controls, a full-width 34 px main button.
+- **Plan card:** rows are labelled (TIME, LENGTH, REMIND, DEADLINE) instead of icons; length is one − value + control; "Any time" is tinted, not solid; the card is 330 px wide (it was 300).
+- **Calendar and habit cards:** the close button is an X (it was a crossed circle, which the menus use for "Won't do"); the time field is 30 px tall like the controls beside it.
+- No behaviour, command or test id changed.
+
+Typecheck clean; all tests pass. Checked in the preview at 800 × 600; not yet used by the owner.
+
+## [2026-11-20] — Cards redesigned as a list you read; the Timer is a clock first
+
+**Type:** Feature (UI redesign, owner picks A and A of the drafts; Decision 47)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ui/addCard.tsx`, `ui/WhenPopover.tsx`, `CalendarNode/EventCard.tsx`, `HabitNode/HabitAddAsk.tsx`, `ui/SpanEditor.tsx`, `ui/LogTimeDial.tsx`, `PomoNode/ObserveDash.tsx`, `PomoNode/PlannedNowChip.tsx`, `PomoNode/DoingPicker.tsx`, `PomoNode/FaceFit.tsx`, `PomoNode/index.tsx`, `styles/tokens.css`, `styles/window-frame.css`, tests (`windowFrame.test.ts`, `schedule-menu-parity.test.tsx`), docs (`window-frame.md`, `design-tokens.md`, Decision 47, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Cards (plan, Calendar, habit, Log time):** a name, one filled block with a line per setting (name left, value right), one main button. No outlined boxes; labels are sentence-case words, not small capitals.
+- **Reading font:** new token `--font-read` (Geist) for words on these surfaces; times and numbers keep the code font.
+- **Plan card:** the day is one line (Today, Tomorrow, one more, Date); pressing the chosen day clears it; "Tmrw" is written "Tomorrow".
+- **Timer:** the stopwatch face is the time (large, centred), its state in words and today as one line; the three total tiles are gone. A plan due now is one card with **Start on it**; the picker line shows after "pick something else". The face is centred in the window in both modes.
+- **Test fix:** `schedule-menu-parity.test.tsx` seeded a span at 10:00 "today" against the real clock and failed before 10:25; the clock is now pinned.
+- No behaviour, command or test id changed.
+
+Typecheck clean; all tests pass. Checked as full-size screenshots of each card and the Timer; not yet used by the owner.
+
+## [2026-11-20] — Alignment and unification pass; the Analytics icon row is back
+
+**Type:** Bug Fix (alignment, clipping) + Feature (UI unification)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `styles/window-frame.css`, `PomoNode/index.tsx`, `PomoNode/DoingPicker.tsx`, `CalendarNode/YearView.tsx`, `CalendarNode/EventCard.tsx`, `AnalyticsNode/PageNav.tsx`, `AnalyticsNode/index.tsx`, `ui/TaskInfoPopup.tsx`, `ui/TaskTimeline.tsx`, `ui/SpanEditor.tsx`, `ui/addCard.tsx`, `Tour/tours.ts`, tour voice clips, tests (`windowFrame.test.ts`, `calendar.yearLayout.test.ts`, `TaskInfoPopup.test.tsx`), docs (`window-frame.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Header controls:** one height. The 24 px click-floor rule made some segments taller than their 22 px switch (Clock DAY / BIG CLOCK, AM / PM, Timer modes, Analytics range), so the chosen segment sat off and the Clock's date sat above its buttons. The Clock's Today is the standard button.
+- **Timer:** the body fills the window in the Free layout, so START is at the bottom edge (it left an empty half below it).
+- **Calendar Year:** the layout never rounds a cell up past the room (January was cut off at Station size); empty days are visible; standard time row with Today; a legend line.
+- **Cards:** a range reads "15:30 – 17:30"; unchosen days have a soft fill.
+- **Plan popup and task picker:** the card design (reading font, sentence case, filled buttons).
+- **Analytics:** the page icon row is restored (owner preferred it to the named list), with the page name beside it; the header totals are plain words. Tutorial lines and their recorded clips are back to the icon wording; nothing new was recorded.
+- No behaviour or command changed.
+
+Typecheck clean; all tests pass. Checked as full-size screenshots; the plan popup was not captured; not yet used by the owner.
+
+## [2026-11-20] — The window standard (header, time row, footer) and Timer A
+
+**Type:** Feature (UI redesign, owner picks; Decision 48)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `styles/window-frame.css`, `MotherFrame/index.tsx`, `TodoNode/index.tsx`, `HabitNode/index.tsx`, `PomoNode/index.tsx`, `PomoNode/ObserveDash.tsx`, `PomoNode/PlannedNowChip.tsx`, `PomoNode/DoingPicker.tsx`, `PomoNode/FaceFit.tsx`, `PomoNode/PomoTimeLinks.tsx`, `PomoNode/display.ts`, `themes/manifests.ts`, `dev/previewBridge.ts`, tests (`windowFrame.test.ts`, `PomoNode.scenarios.test.ts`, `TodoNode.scenarios.test.ts`, `TodoNode.doneArchive.ui.test.tsx`, `themeEngine.test.tsx`), docs (`window-frame.md`, Decision 48, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Window standard:** header 40 px, time row 36 px, footer 48 px for every window; names and labels in the reading font and normal letters; one filled view switch with the chosen view lifted; borderless icon buttons; filled footer buttons; one font for add fields. Todos and Habits show the name, then the fact (18 · 3 overdue, Week 47).
+- **Free layout:** the "01 · spine · 05" badge over a window's header is no longer drawn.
+- **Timer A:** one clock for Sessions and Stopwatch; the state (Recording, Break, Paused) in the header, never under the time, and the time never dims; one rounded button for what you are on (session dots beside it in Sessions); a plan due now is that same button, not a card; today as one line. Settings are a list with a stepper per line. Button words are in normal letters (Start session, Pause, Stop, …).
+- **Default face:** the Pro frame style no longer names Blocks, so the standard clock is the default; other faces stay selectable.
+- No behaviour, command or test id changed.
+
+Typecheck clean; all tests pass. Checked as full-size screenshots of the whole app and of the Timer in five states; not yet used by the owner.
+
+## [2026-11-20] — Two styles in Settings, one Timer clock, deadline opens in place
+
+**Type:** Feature (UI simplification, owner requests)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ChassisLayer/dockRegistry.tsx`, `ChassisLayer/useDockStyle.ts`, `Dock/index.tsx`, `TopBar/SettingsModal.tsx`, `PomoNode/index.tsx`, `PomoNode/ObserveDash.tsx`, `ui/WhenPopover.tsx`, `HabitNode/HabitAddAsk.tsx`, `ui/SpanEditor.tsx`, tests (`windowFrame.test.ts`, `HabitNode.addField.test.tsx`), docs (`window-frame.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Styles:** only Paper and Pro are offered, in Settings → General → Appearance. The style button on the canvas tool panel is removed. The other six styles stay in the code, unoffered; a saved one opens as Pro.
+- **Timer:** one clock; the face picker is removed from its settings. The colon blinks while recording.
+- **Plan card:** the deadline opens in place under its line (quick days, None, the month); there is no second pane.
+- **Habit card:** the helper sentence and the underlined "Put it on the Calendar" link are removed.
+- **Log time:** the "Fill a gap" chips are removed; the overlap message is one tinted line with a filled button.
+
+Typecheck clean; all tests pass. Checked as screenshots (Settings, the plan card with the deadline open, the habit card); not yet used by the owner.
+
+## [2026-11-20] — Canvas menu: the explanatory note is removed
+
+**Type:** Chore (UI)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `TopBar/CanvasSwitcher.tsx`
+
+**Summary:** the "On every canvas / Only on this one" note under the canvas list is removed at the owner's request. What is shared is still said in the switcher's tooltip. Behaviour is unchanged: canvases still share plans, calendar, habits and the timer.

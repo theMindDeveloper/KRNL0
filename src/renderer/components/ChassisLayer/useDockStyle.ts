@@ -17,19 +17,20 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import { DOCK_STYLES, DEFAULT_DOCK_STYLE, type DockStyle } from './dockRegistry';
+import { DOCK_STYLES, DEFAULT_DOCK_STYLE, VISIBLE_DOCK_STYLES, type DockStyle } from './dockRegistry';
 import { applyFrameTheme, currentMode } from '../../themes/applyFrameTheme';
 import { runLookTransition } from '../../themes/transition';
 
 export type { DockStyle } from './dockRegistry';
-export { DOCK_STYLES } from './dockRegistry';
+export { DOCK_STYLES, VISIBLE_DOCK_STYLES } from './dockRegistry';
 
 const STORAGE_KEY = 'krnl0-dock-style';
 
 function readStored(): DockStyle {
   if (typeof localStorage === 'undefined') return DEFAULT_DOCK_STYLE;
   const v = localStorage.getItem(STORAGE_KEY);
-  return DOCK_STYLES.includes(v as DockStyle) ? (v as DockStyle) : DEFAULT_DOCK_STYLE;
+  // A style that is no longer offered (Synthesizer, Macintosh, …) opens as Pro.
+  return VISIBLE_DOCK_STYLES.includes(v as DockStyle) ? (v as DockStyle) : DEFAULT_DOCK_STYLE;
 }
 
 function apply(style: DockStyle) {

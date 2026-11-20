@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 import type { PomoState } from './types';
 import { useBoardStore } from '../../../store/boardStore';
 import { plannedTaskAt } from '../../../store/plannedNow';
+import { toneVarForTask } from '../../../utils/taskColor';
+import { LineGlyph } from '../../ui/LineGlyph';
 
 export function PlannedNowChip({ state, easy, onCommand }: {
   state: PomoState;
@@ -32,39 +34,30 @@ export function PlannedNowChip({ state, easy, onCommand }: {
     <div
       data-testid="pomo-planned-now"
       className="nodrag"
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '5px 8px',
-        border: '1px dashed var(--paper-3)', borderRadius: 6, fontFamily: 'var(--font-mono)', fontSize: 11,
-        color: 'var(--ink-2)', minWidth: 0,
-      }}
+      style={{ alignSelf: 'center', maxWidth: '100%', minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 2, height: 36, padding: '0 4px 0 4px', borderRadius: 999, background: 'var(--paper-2)', fontFamily: 'var(--font-read)' }}
     >
-      <span style={{ color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: 11, flexShrink: 0 }}>Planned now</span>
-      <span title={planned.text} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)' }}>
-        {planned.text}
-      </span>
       <button
         type="button"
         data-testid="pomo-planned-accept"
         onClick={() => (running
           ? onCommand('pomo.tag', { taskId: planned.id })
           : onCommand('pomo.start', { activeTaskId: planned.id, label: planned.text }))}
-        style={{
-          flexShrink: 0, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em',
-          textTransform: 'uppercase', padding: '3px 7px', borderRadius: 4,
-          border: '1px solid var(--ink)', background: 'var(--ink)', color: 'var(--paper)',
-        }}
-        title={running ? `Count this session toward "${planned.text}"` : `Start a session on "${planned.text}"`}
+        style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 8, height: 28, padding: '0 10px', borderRadius: 999, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5 }}
+        title={running ? `Count this session toward "${planned.text}"` : `Start on "${planned.text}"`}
       >
-        {running ? 'Track it' : 'Start on it'}
+        <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(planned.id) }} />
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{planned.text}</span>
+        <span style={{ flexShrink: 0, fontSize: 12.5, color: 'var(--ink-3)' }}>{running ? 'count it for this' : 'planned now'}</span>
       </button>
       <button
         type="button"
-        aria-label="Hide suggestion"
+        aria-label="Not this: pick something else"
+        title="Not this: pick something else"
         data-testid="pomo-planned-dismiss"
         onClick={() => setDismissed(planned.id)}
-        style={{ flexShrink: 0, cursor: 'pointer', background: 'none', border: 'none', color: 'var(--ink-4)', fontSize: 12, padding: 0, lineHeight: 1 }}
+        style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 999, cursor: 'pointer', background: 'transparent', border: 'none', color: 'var(--ink-3)', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
       >
-        ×
+        <LineGlyph name="close" size={11} />
       </button>
     </div>
   );

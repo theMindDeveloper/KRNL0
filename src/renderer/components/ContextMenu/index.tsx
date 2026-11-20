@@ -22,6 +22,9 @@ export interface ContextMenuItem {
   divider?: boolean;
   /** Quiet text at the right: the current value ("Sun 16:05") or a key. */
   hint?: string;
+  /** menus.md — the rare things: choosing this row shows these instead, with a
+   *  way back. One level only. */
+  children?: ContextMenuItem[];
 }
 
 export interface ContextMenuProps {
@@ -35,6 +38,9 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   // Keep the menu fully on screen: flip it left / up when it would overflow.
   const [pos, setPos] = useState({ left: x, top: y });
+  // "More" opened: its items are shown in place of the menu's own.
+  const [sub, setSub] = useState<{ label: string; items: ContextMenuItem[] } | null>(null);
+  const shown = sub ? sub.items : items;
   useLayoutEffect(() => {
     const el = menuRef.current;
     const w = el?.offsetWidth ?? 0;
@@ -43,7 +49,7 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
       left: w && x + w > window.innerWidth - 4 ? Math.max(4, x - w) : x,
       top: h && y + h > window.innerHeight - 4 ? Math.max(4, window.innerHeight - h - 4) : y,
     });
-  }, [x, y, items.length]);
+  }, [x, y, items.length, sub]);
 
   useEffect(() => {
     // Capture-phase listeners fire before any target's bubbling handlers.
@@ -65,7 +71,7 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
     };
   }, [onDismiss]);
 
-  const hasIcons = items.some((it) => !!it.icon);
+  const hasIcons = shown.some((it) => !!it.icon);
   const menu = (
     <div
       ref={menuRef}
@@ -85,7 +91,18 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
         userSelect: 'none',
       }}
     >
-      {items.map((item, i) => item.header ? (
+      {sub && (
+        <button
+          type="button"
+          data-testid="menu-back"
+          onClick={() => setSub(null)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: '1px solid var(--paper-3)', marginBottom: 3, padding: '5px 14px 6px 10px', cursor: 'pointer', color: 'var(--ink-3)', fontFamily: 'inherit', fontSize: 11, letterSpacing: '0.04em' }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 6l-6 6 6 6" /></svg>
+          {sub.label}
+        </button>
+      )}
+      {shown.map((item, i) => item.header ? (
         <div
           key={i}
           role="presentation"
@@ -111,10 +128,10 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
             type="button"
             disabled={item.disabled}
             onClick={() => {
-              if (!item.disabled) {
-                item.onSelect();
-                onDismiss();
-              }
+              if (item.disabled) return;
+              if (item.children) { setSub({ label: item.label, items: item.children }); return; }
+              item.onSelect();
+              onDismiss();
             }}
             style={{
               display: 'flex',
@@ -152,6 +169,7 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
             )}
             <span style={{ flex: 1 }}>{item.label}</span>
             {item.hint && <span style={{ marginLeft: 16, fontSize: 11, color: 'var(--ink-3)' }}>{item.hint}</span>}
+            {item.children && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ marginLeft: 12, color: 'var(--ink-3)' }}><path d="M9 6l6 6-6 6" /></svg>}
           </button>
         </Fragment>
       ))}

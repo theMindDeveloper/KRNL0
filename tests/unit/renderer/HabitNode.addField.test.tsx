@@ -53,7 +53,8 @@ describe('habit add field', () => {
     fireEvent.change(input, { target: { value: 'Class' } });
     expect(screen.queryByTestId('habit-ask-yes')).toBeNull();
     expect(screen.queryByTestId('habit-ask-no')).toBeNull();
-    expect(screen.getByTestId('habit-ask-calendar').textContent).toContain('Calendar');
+    // The card has no underlined link under its button any more (owner, 2026-11-20).
+    expect(screen.queryByTestId('habit-ask-calendar')).toBeNull();
   });
 });
 

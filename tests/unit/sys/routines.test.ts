@@ -48,7 +48,8 @@ describe('model', () => {
     expect(routineOccurrence(moved, '2026-11-04')).toMatchObject({ startMin: 810, endMin: 930, moved: true });
     const ended = routineEnd(state(h), { id: 'r1', date: '2026-11-04' }).habits[0]!;
     expect(routineOccurrence(ended, '2026-11-09')).toBeNull();
-    expect(routineOccurrence(routineRestart(state(ended), { id: 'r1' }).habits[0]!, '2026-11-09')).not.toBeNull();
+    // Restarted on a fixed day (the default is the real today, which made this test fail once that day passed).
+    expect(routineOccurrence(routineRestart(state(ended), { id: 'r1', today: '2026-11-05' }).habits[0]!, '2026-11-09')).not.toBeNull();
   });
 
   it('a night shift (Fri 22:00 for 8 h) shows Friday 22:00–24:00 and Saturday 00:00–06:00; skipping Friday skips both', () => {

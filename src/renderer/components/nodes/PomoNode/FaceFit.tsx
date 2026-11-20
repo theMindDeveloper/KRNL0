@@ -24,7 +24,7 @@ export function compactLevelFor(h: number): 0 | 1 | 2 | 3 {
   return h >= 330 ? 0 : h >= 295 ? 1 : h >= 262 ? 2 : 3;
 }
 
-export function FaceFit({ children }: { children: ReactNode; compact?: ReactNode }) {
+export function FaceFit({ children, grow = true }: { children: ReactNode; compact?: ReactNode; /** False: take only the face's own height, so the face and what follows it sit together in the middle. */ grow?: boolean }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -75,7 +75,7 @@ export function FaceFit({ children }: { children: ReactNode; compact?: ReactNode
       data-scale={scale}
       data-labels={labelsOff ? 'off' : undefined}
       // Takes what's left after the controls; never forces the window taller.
-      style={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}
+      style={{ flex: grow ? '1 1 auto' : '0 1 auto', minHeight: 0, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}
     >
       <div
         ref={inner}
@@ -85,7 +85,8 @@ export function FaceFit({ children }: { children: ReactNode; compact?: ReactNode
           // face keeps its proportions across the whole window.
           width: `${100 / scale}%`,
           flexShrink: 0,
-          alignSelf: 'flex-start',
+          // With room to spare the face sits in the middle of it (window-frame.md, Timer).
+          alignSelf: scale >= 1 ? 'center' : 'flex-start',
           transform: scale < 1 ? `scale(${scale})` : undefined,
           transformOrigin: 'top center',
           // Labels inside the face are drawn at 11 px / scale, so after the

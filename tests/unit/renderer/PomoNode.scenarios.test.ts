@@ -182,20 +182,20 @@ describe('Feature: PomoNode vapor timer', () => {
 
   // ── Scenario: F5 — Button label reflects status ────────────────────────────
   describe('Scenario: F5 — Button label reflects status', () => {
-    it('When status is idle, Then primaryButtonLabel returns START', () => {
-      expect(primaryButtonLabel('idle')).toBe('START');
+    it('When status is idle, Then primaryButtonLabel returns Start session', () => {
+      expect(primaryButtonLabel('idle')).toBe('Start session');
     });
 
-    it('When status is running, Then primaryButtonLabel returns PAUSE', () => {
-      expect(primaryButtonLabel('running')).toBe('PAUSE');
+    it('When status is running, Then primaryButtonLabel returns Pause', () => {
+      expect(primaryButtonLabel('running')).toBe('Pause');
     });
 
-    it('When status is done, Then primaryButtonLabel returns START', () => {
-      expect(primaryButtonLabel('done')).toBe('START');
+    it('When status is done, Then primaryButtonLabel returns Start session', () => {
+      expect(primaryButtonLabel('done')).toBe('Start session');
     });
 
-    it('When status is break, Then primaryButtonLabel returns END BREAK', () => {
-      expect(primaryButtonLabel('break')).toBe('END BREAK');
+    it('When status is break, Then primaryButtonLabel returns End break', () => {
+      expect(primaryButtonLabel('break')).toBe('End break');
     });
   });
 

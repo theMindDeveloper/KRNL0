@@ -11,6 +11,12 @@
       "first-day"
     ]
   },
+  "84152039": {
+    "text": "The timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
+    "tours": [
+      "welcome"
+    ]
+  },
   "987e0212": {
     "text": "First, add something you'll do today. Click \"add a plan\" and type it. A small card shows its day, its time and how long it takes. Pick any of them if you like, then press Enter to add it.",
     "tours": [
@@ -41,8 +47,8 @@
       "first-day"
     ]
   },
-  "0fa0c54c": {
-    "text": "When you start working, press \"Start\". The Record timer records what you really do.",
+  "a7da04b7": {
+    "text": "When you start working, press \"Start\". The timer records what you really do.",
     "tours": [
       "first-day"
     ]
@@ -113,18 +119,6 @@
       "first-day"
     ]
   },
-  "ce6da46b": {
-    "text": "When you start working, press \"Start\". The Observe timer records what you really do.",
-    "tours": [
-      "first-day"
-    ]
-  },
-  "646720e0": {
-    "text": "When you start working, press \"Start\". The Pomo timer records what you really do.",
-    "tours": [
-      "first-day"
-    ]
-  },
   "9f70f100": {
     "text": "Need a pause? Press the break button, the cup next to Pause. Your work so far is saved, and the break is timed on its own.",
     "tours": [
@@ -139,12 +133,6 @@
   },
   "c530f81c": {
     "text": "Hi, I'm your guide! This app is one board, with a window for each part of your day. Press Next or Enter to go on, and Escape to stop at any time.",
-    "tours": [
-      "welcome"
-    ]
-  },
-  "181e0d3a": {
-    "text": "The Record timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
     "tours": [
       "welcome"
     ]
@@ -191,12 +179,6 @@
       "welcome"
     ]
   },
-  "34eadddd": {
-    "text": "The Observe timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
-    "tours": [
-      "welcome"
-    ]
-  },
   "f3cbae1e": {
     "text": "To-do is your list of plans. Each one can have a when, a day and a time or just a day. It can have a deadline, and it shows the time you really spent on it.",
     "tours": [
@@ -221,14 +203,8 @@
       "welcome"
     ]
   },
-  "6078c892": {
-    "text": "The Pomo timer records what you actually do. Start it when you begin, and stop it when you finish. Only recorded time counts as time spent.",
-    "tours": [
-      "welcome"
-    ]
-  },
-  "d8eb7f10": {
-    "text": "The Record timer records what you really do. Let's record a short session together. It only takes a few seconds!",
+  "ead21b11": {
+    "text": "The timer records what you really do. Let's record a short session together. It only takes a few seconds!",
     "tours": [
       "pomo"
     ]
@@ -275,20 +251,8 @@
       "pomo"
     ]
   },
-  "6554e9bd": {
-    "text": "The Observe timer records what you really do. Let's record a short session together. It only takes a few seconds!",
-    "tours": [
-      "pomo"
-    ]
-  },
   "e386ecb3": {
     "text": "Here you say what you're doing. Pick a task, or a category like Code, and the time counts toward it.",
-    "tours": [
-      "pomo"
-    ]
-  },
-  "090409e8": {
-    "text": "The Pomo timer records what you really do. Let's record a short session together. It only takes a few seconds!",
     "tours": [
       "pomo"
     ]
@@ -377,8 +341,8 @@
       "calendar"
     ]
   },
-  "b67e0d17": {
-    "text": "Double-click empty hours, or press this plus, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.",
+  "5c32bed4": {
+    "text": "Double-click empty hours, or click \"add a plan\" at the bottom, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.",
     "tours": [
       "calendar"
     ]
@@ -461,8 +425,8 @@
       "habits"
     ]
   },
-  "f90c0527": {
-    "text": "Right-click a habit. \"Days and time\" changes when it happens, and \"Rest today\" keeps your streak on a sick day. Below, you can rename, recolour or archive it.",
+  "8a7a1acf": {
+    "text": "Right-click a habit. \"Days and time\" changes when it happens, and \"Rest today\" keeps your streak on a sick day. Below, you can rename or archive it. Its colour and icon are under \"More\".",
     "tours": [
       "habits"
     ]
@@ -479,8 +443,8 @@
       "routines"
     ]
   },
-  "4d4ae2b3": {
-    "text": "Press the plus in the Calendar's header, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
+  "3d3df6f8": {
+    "text": "Click \"add a plan\" at the bottom of the Calendar, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
     "tours": [
       "routines"
     ]
@@ -491,8 +455,8 @@
       "routines"
     ]
   },
-  "41f9383f": {
-    "text": "On the Calendar it's a hatched band, every week, with your plans on top. The list button in the header shows all your repeating events.",
+  "ff37aeb3": {
+    "text": "On the Calendar it's a hatched band, every week, with your plans on top. The menu button in the Calendar's header lists all your repeating events.",
     "tours": [
       "routines"
     ]
@@ -509,8 +473,8 @@
       "routines"
     ]
   },
-  "742755de": {
-    "text": "On the Calendar it's a hatched band, every week, with your plans on top. The \"Events\" switch hides them, and the list button in the header shows them all.",
+  "ebab56ac": {
+    "text": "On the Calendar it's a hatched band, every week, with your plans on top. The menu button in the Calendar's header hides them, and lists them all.",
     "tours": [
       "routines"
     ]
@@ -551,8 +515,8 @@
       "on-track"
     ]
   },
-  "e747b2bd": {
-    "text": "When you do something and when it must be done can differ. Right-click a To-do row and choose \"Deadline\". The row shows a flag, the Calendar a dashed flag on that day, and the Clock lists it.",
+  "d1e8f0c4": {
+    "text": "When you do something and when it must be done can differ. Right-click a To-do row, choose \"More\", then \"Deadline\". The row shows a flag, the Calendar a dashed flag on that day, and the Clock lists it.",
     "tours": [
       "on-track"
     ]
@@ -695,14 +659,14 @@
       "modes"
     ]
   },
-  "b1c10680": {
-    "text": "In Easy, the timer is called Record: a plain stopwatch, with Start, Break and Stop. Nothing to set up, nothing to name.",
+  "5141b16c": {
+    "text": "In Easy, the Timer is a plain stopwatch, with Start, Break and Stop. Nothing to set up, nothing to name.",
     "tours": [
       "modes"
     ]
   },
-  "ce46fa79": {
-    "text": "I've switched to Advanced, and this switch appeared! Pomo gives you classic twenty-five minute sessions with breaks. Observe keeps the stopwatch.",
+  "d2e721c7": {
+    "text": "I've switched to Advanced, and this switch appeared! \"Sessions\" gives you classic twenty-five minute rounds with breaks. \"Stopwatch\" runs until you stop.",
     "tours": [
       "modes"
     ]
@@ -713,8 +677,8 @@
       "modes"
     ]
   },
-  "7183378d": {
-    "text": "Tasks get tags, like Code or Study. And right-click a plan for \"Focus on it\".",
+  "d40baebb": {
+    "text": "Tasks get tags, like Code or Study. And right-click a plan, then \"More\", for \"Focus on it\".",
     "tours": [
       "modes"
     ]
@@ -779,8 +743,8 @@
       "board"
     ]
   },
-  "bd671219": {
-    "text": "Right-click a plan's card and choose \"Show\". It lights up here and on the Calendar, so you always find it. Plans with a day have it.",
+  "11a2b53c": {
+    "text": "Right-click a plan's card, choose \"More\", then \"Show\". It lights up here and on the Calendar, so you always find it. Plans with a day have it.",
     "tours": [
       "board"
     ]

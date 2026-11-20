@@ -4,7 +4,10 @@ import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
 import type { TaskConfig, TaskState } from './types';
 import { defaultTaskConfig } from './types';
-import { ContextMenu } from '../../ContextMenu';
+import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
+import { WhenPopover } from '../../ui/WhenPopover';
+import { applyPlanWhen, planWhenOf } from '../../../store/scheduleActions';
+import { todayYMD } from '../../../../shared/ymd';
 import { MenuIcon } from '../../ui/menuIcons';
 import { useEasyMode } from '../../../store/uiMode';
 import { useBoardStore } from '../../../store/boardStore';
@@ -301,6 +304,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
 
   // ── context menu ───────────────────────────────────────────────────────────
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  // menus.md — "When…" opens the same plan card as the Todo row and the Calendar block.
+  const [whenAt, setWhenAt] = useState<{ x: number; y: number } | null>(null);
   const { getNodes } = useReactFlow();
 
   const handleContextMenu = (e: MouseEvent) => {
@@ -322,21 +327,19 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
   const onCalendar = ctxMenu !== null
     && (!!state.scheduledFor || selectSchedule(useBoardStore.getState().board).placements.has(taskId));
 
-  const ctxItems = [
-    {
-      label: 'Edit text',
-      onSelect: startEdit,
-    },
-    {
-      label: 'Edit time',
-      onSelect: startEtaEdit,
-      disabled: state.done,
-    },
+  // menus.md — the plan menu, the same from its Todo row, its card and its
+  // Calendar block: what happened, when, its name, More, then Won't do and
+  // Delete. Everything used less often sits behind More.
+  const plan = ctxMenu !== null || whenAt !== null ? planWhenOf({ taskId }) : null;
+  const moreItems: ContextMenuItem[] = [
+    { label: 'Length…', icon: <MenuIcon name="length" />, onSelect: startEtaEdit, disabled: state.done },
+    { label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note', icon: <MenuIcon name="note" />, onSelect: startNoteEdit },
     // easy-mode D21 — making chains is Advanced; existing chains keep working.
     ...(easy ? [] : [{
       // ADR 0004 §2 — sequential successor: same chain level as source,
       // single task.next edge.
       label: 'Add next task',
+      icon: <MenuIcon name="plus" />,
       onSelect: () => {
         setInlineMode('next');
         setInlineName('');
@@ -349,6 +352,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     {
       // ADR 0004 §2 — UI label only; internal mode 'sibling' retained.
       label: 'Add parallel task',
+      icon: <MenuIcon name="plus" />,
       onSelect: () => {
         setInlineMode('sibling');
         setInlineName('');
@@ -358,29 +362,42 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
       },
       disabled: state.done,
     }]),
-    {
-      label: state.note && state.note.length > 0 ? 'Edit note' : 'Add note',
-      onSelect: startNoteEdit,
-    },
     // The eye: this card and its place on the Calendar, at once.
     ...(onCalendar || onDay
       ? [{ label: 'Show', icon: <MenuIcon name="show" />, hint: 'card + Calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTask(taskId)); } }]
       : []),
-    // task-node F21/F22 — what really happened, above Delete. A plan whose
-    // block is over counts on that day ("Done on Mon 16"); the checkbox
-    // itself always means "done now".
-    ...(dropped && state.todoItemId !== null
-      ? [{ label: 'Bring back', icon: <MenuIcon name="undo" />, hint: "undo Won't do", divider: true, onSelect: () => { void bringBackTask(taskId); } }]
+    ...(state.done ? [{ label: 'Archive', icon: <MenuIcon name="archive" />, hint: 'off the board', onSelect: () => archiveDoneTask(taskId) }] : []),
+  ];
+  const whenCard = whenAt !== null && plan ? (
+    <WhenPopover
+      x={whenAt.x}
+      y={whenAt.y}
+      today={todayYMD()}
+      value={plan.value}
+      title={{ text: plan.text, tone: toneVarForTask(taskId) }}
+      onApply={(next) => { void applyPlanWhen(plan, next); setWhenAt(null); }}
+      onClose={() => setWhenAt(null)}
+    />
+  ) : null;
+  const ctxItems: ContextMenuItem[] = [
+    // What happened. A plan whose block is over counts on that day ("Done on
+    // Mon 16"); the checkbox itself always means "done now".
+    dropped && state.todoItemId !== null
+      ? { label: 'Bring back', icon: <MenuIcon name="undo" />, hint: "undo Won't do", onSelect: () => { void bringBackTask(taskId); } }
       : state.done
-        ? [{ label: 'Archive', icon: <MenuIcon name="archive" />, hint: 'off the board', divider: true, onSelect: () => archiveDoneTask(taskId) }]
-        : [{ label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, divider: true, onSelect: () => { void markDoneAsPlanned(taskId); } }]),
+        ? { label: 'Not done yet', icon: <MenuIcon name="undo" />, onSelect: () => onCommand('task.toggle') }
+        : { label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, onSelect: () => { void markDoneAsPlanned(taskId); } },
+    ...(plan ? [{ label: 'When…', icon: <MenuIcon name="when" />, onSelect: () => setWhenAt(ctxMenu ? { x: ctxMenu.x, y: ctxMenu.y } : { x: 200, y: 200 }) }] : []),
+    { label: 'Rename', icon: <MenuIcon name="rename" />, onSelect: startEdit },
+    { label: 'More', icon: <MenuIcon name="more" />, children: moreItems, onSelect: () => {} },
     ...(!state.done && !dropped && state.todoItemId !== null
-      ? [{ label: "Won't do", icon: <MenuIcon name="drop" />, hint: 'off the board, not missed', onSelect: () => { wontDoTask(taskId); } }]
+      ? [{ label: "Won't do", icon: <MenuIcon name="drop" />, hint: 'not missed', divider: true, onSelect: () => { wontDoTask(taskId); } }]
       : []),
     {
       label: 'Delete',
+      icon: <MenuIcon name="delete" />,
       danger: true,
-      divider: true,
+      ...(!state.done && !dropped && state.todoItemId !== null ? {} : { divider: true }),
       onSelect: () => undoable(`Deleted "${state.text || 'task'}"`, () => onCommand('task.delete')),
     },
   ];
@@ -409,6 +426,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
         {ctxMenu !== null && (
           <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxItems} onDismiss={() => setCtxMenu(null)} />
         )}
+        {whenCard}
       </DoneCard>
     );
   }
@@ -677,6 +695,7 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
           onDismiss={() => setCtxMenu(null)}
         />
       )}
+      {whenCard}
     </div>
   );
 }

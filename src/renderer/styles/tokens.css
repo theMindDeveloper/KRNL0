@@ -109,6 +109,8 @@
   --font-mono:  'JetBrains Mono', ui-monospace, monospace;
   --font-sans:  'JetBrains Mono', 'Geist', ui-monospace, ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Instrument Serif', Georgia, serif;
+  /* Words you read (cards, the Timer's lines): a reading face. Times and numbers stay in --font-mono. */
+  --font-read:  'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* Contrast lock.
    * Theme-invariant near-black for text that sits ON a bright accent

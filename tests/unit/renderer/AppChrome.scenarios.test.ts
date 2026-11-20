@@ -94,13 +94,6 @@ describe('F1 — Topbar left content', () => {
     expect(screen.getByTestId('topbar-brand').textContent).toContain('KRNL0');
   });
 
-  it('renders breadcrumb text "~/krnl0 / canvas /"', () => {
-    renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-breadcrumb').textContent).toBe(
-      '~/krnl0 / canvas /'
-    );
-  });
-
   it('renders badge text "saved" with a dot (no glyph) and says the board saves itself', () => {
     renderWithWrapper(React.createElement(TopBar));
     expect(screen.getByTestId('topbar-live-badge').textContent).toBe('saved');
@@ -116,9 +109,9 @@ describe('F2 — Topbar right buttons present', () => {
     expect(screen.getByTestId('topbar-fit').textContent).toBe('FIT');
   });
 
-  it('renders a theme toggle button', () => {
+  it('has no theme button: light / dark is in Settings (window-frame.md, top bar)', () => {
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-theme-toggle')).toBeTruthy();
+    expect(screen.queryByTestId('topbar-theme-toggle')).toBeNull();
   });
 });
 
@@ -248,34 +241,12 @@ describe('F6 — Theme toggle persists to localStorage', () => {
     localStorage.removeItem('krnl0-theme');
   });
 
-  it('toggles data-theme from dark to light and writes to localStorage', () => {
+  it('Settings → General switches the theme and writes it to localStorage', () => {
     renderWithWrapper(React.createElement(TopBar));
-    const toggleBtn = screen.getByTestId('topbar-theme-toggle');
-
-    // Initial state: dark, button shows ☾ DARK
-    expect(toggleBtn.textContent).toContain('DARK');
-
-    fireEvent.click(toggleBtn);
-
-    // After toggle: light
+    fireEvent.click(screen.getByTestId('topbar-settings'));
+    fireEvent.click(screen.getByTestId('settings-theme-light'));
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     expect(localStorage.getItem('krnl0-theme')).toBe('light');
-    expect(toggleBtn.textContent).toContain('LIGHT');
-  });
-
-  it('button label shows a moon icon and DARK when theme is dark', () => {
-    localStorage.setItem('krnl0-theme', 'dark');
-    renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('DARK');
-    expect(screen.getByTestId('topbar-theme-toggle').querySelector('svg')).not.toBeNull();
-  });
-
-  it('button label shows a sun icon and LIGHT when theme is light', () => {
-    localStorage.setItem('krnl0-theme', 'light');
-    document.documentElement.setAttribute('data-theme', 'light');
-    renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-theme-toggle').textContent).toContain('LIGHT');
-    expect(screen.getByTestId('topbar-theme-toggle').querySelector('svg')).not.toBeNull();
   });
 });
 

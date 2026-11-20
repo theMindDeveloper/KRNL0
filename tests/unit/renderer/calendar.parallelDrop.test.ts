@@ -57,7 +57,8 @@ describe('parallel drop rewires the chain', () => {
     seq = 0;
     const nodes = [at('t1', '2026-11-02T21:00', 45), at('t2', '2026-11-02T21:00', 30), task('t3', 15)];
     const before = selectSchedule(board(nodes, [edge('t1', 't2'), edge('t2', 't3')]));
-    expect(before.placements.get('t2')?.startISO).toBe('2026-11-02T21:45');
+    // A plan with its own time keeps it (Decision 30, amended 2026-11-19): t2 is not pushed.
+    expect(before.placements.get('t2')?.startISO).toBe('2026-11-02T21:00');
 
     const edges = parallelizeChainEdges([edge('t1', 't2'), edge('t2', 't3')], 't2', 't1', true, mk);
     const { placements } = selectSchedule(board(nodes, edges));

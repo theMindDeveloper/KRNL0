@@ -128,7 +128,7 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
       {!fold ? (
         <div style={{ color: ink3, padding: 8 }}>Loading…</div>
       ) : rows.length === 0 ? (
-        <div style={{ color: ink3, padding: '16px 0' }}>Nothing recorded this {span}. Start a session on the Pomo, or log past time from the Calendar.</div>
+        <div style={{ color: ink3, padding: '16px 0' }}>Nothing recorded this {span}. Start the Timer, or log past time from the Calendar.</div>
       ) : (
         <div role="table" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div role="row" style={{ display: 'flex', alignItems: 'center', height: 16, color: ink3, fontSize: 11 }}>

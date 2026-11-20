@@ -9,6 +9,7 @@ import {
 import './styles/tokens.css';
 import './styles/reactflow-theme.css';
 import './styles/chassis.css';
+import './styles/window-frame.css';
 import './styles/launch.css';
 import '@xterm/xterm/css/xterm.css';
 import { installDockThemes } from './styles/dock-themes';

@@ -7,7 +7,7 @@
  *   F8  — opacity 0.4 on done card
  *   F9  — body click fires task.startPomo (drag-safe; no-op when done)
  *   F10 — right-click opens ContextMenu with 3 items
- *   F11 — inline edit via context menu "Edit text" and double-click
+ *   F11 — inline edit via context menu "Rename" and double-click
  *   F12 — "Add subtask" shows inline input, Enter fires task.addSubtask
  *   F13 — "Delete" fires task.delete; danger styling on Delete item
  */
@@ -21,6 +21,13 @@ afterEach(() => cleanup());
 import { TaskNode } from '../../../src/renderer/components/nodes/TaskNode';
 import type { Node } from '../../../src/shared/types/node';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
+
+// menus.md — rare items sit behind "More": open it before looking for one.
+const openMore = (): void => {
+  const m = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'More');
+  if (m) fireEvent.click(m);
+};
+
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -144,17 +151,21 @@ describe('F10 — Right-click context menu', () => {
     const menuItems = document.querySelectorAll('button[type="button"]');
     // Should have at least 3 menu buttons in addition to the task-check and task-pomo-btn
     const labels = Array.from(menuItems).map((b) => b.textContent);
-    expect(labels).toContain('Edit text');
-    expect(labels).toContain('Add next task');
-    expect(labels).toContain('Add parallel task');
+    expect(labels).toContain('Rename');
+    expect(labels).toContain('More');
+    // Rare items (Add next task, Add parallel task, Add note…) are behind More.
+    openMore();
+    const moreLabels = Array.from(document.querySelectorAll('button')).map((b) => b.textContent ?? '');
+    expect(moreLabels).toContain('Add next task');
+    expect(moreLabels).toContain('Add parallel task');
     expect(labels).toContain('Delete');
   });
 
-  it('context menu has "Edit text" item', () => {
+  it('context menu has "Rename" item', () => {
     renderTaskNode(makeTaskState());
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
     const editBtn = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Edit text',
+      (b) => b.textContent === 'Rename',
     );
     expect(editBtn).toBeDefined();
   });
@@ -162,6 +173,7 @@ describe('F10 — Right-click context menu', () => {
   it('context menu has "Add next task" item (disabled when done)', () => {
     renderTaskNode(makeTaskState({ done: true }));
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
+    openMore();
     const addSubBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => b.textContent === 'Add next task',
     );
@@ -172,6 +184,7 @@ describe('F10 — Right-click context menu', () => {
   it('context menu has "Add next task" item (enabled when not done)', () => {
     renderTaskNode(makeTaskState({ done: false }));
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
+    openMore();
     const addSubBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => b.textContent === 'Add next task',
     );
@@ -194,25 +207,25 @@ describe('F10 — Right-click context menu', () => {
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
     // Menu should be open
     expect(
-      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Edit text'),
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Rename'),
     ).toBeDefined();
     // Press ESC
     fireEvent.keyDown(document, { key: 'Escape' });
     // Menu should be dismissed
     expect(
-      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Edit text'),
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Rename'),
     ).toBeUndefined();
   });
 });
 
-// ── F11 — Inline edit via "Edit text" context menu item ──────────────────────
+// ── F11 — Inline edit via "Rename" context menu item ──────────────────────
 
 describe('F11 — Inline edit', () => {
-  it('clicking "Edit text" opens the inline editor prefilled with current text', () => {
+  it('clicking "Rename" opens the inline editor prefilled with current text', () => {
     renderTaskNode(makeTaskState({ text: 'current text' }));
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
     const editBtn = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Edit text',
+      (b) => b.textContent === 'Rename',
     )!;
     fireEvent.click(editBtn);
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
@@ -225,7 +238,7 @@ describe('F11 — Inline edit', () => {
     renderTaskNode(makeTaskState({ text: 'old text' }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
     const editBtn = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Edit text',
+      (b) => b.textContent === 'Rename',
     )!;
     fireEvent.click(editBtn);
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
@@ -239,7 +252,7 @@ describe('F11 — Inline edit', () => {
     renderTaskNode(makeTaskState({ text: 'unchanged' }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
     const editBtn = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Edit text',
+      (b) => b.textContent === 'Rename',
     )!;
     fireEvent.click(editBtn);
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
@@ -271,6 +284,7 @@ describe('F12 — Add next task inline input', () => {
   it('clicking "Add next task" shows a next task name input field', () => {
     renderTaskNode(makeTaskState({ done: false }));
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
+    openMore();
     const addBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => b.textContent === 'Add next task',
     )!;
@@ -283,6 +297,7 @@ describe('F12 — Add next task inline input', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
+    openMore();
     const addBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => b.textContent === 'Add next task',
     )!;
@@ -303,6 +318,7 @@ describe('F12 — Add next task inline input', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
+    openMore();
     fireEvent.click(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Add next task')!);
     const nameInput = document.querySelector('input[placeholder="next task name…"]') as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: 'later' } });
@@ -316,6 +332,7 @@ describe('F12 — Add next task inline input', () => {
     const onCommand = vi.fn();
     renderTaskNode(makeTaskState({ done: false }), onCommand);
     fireEvent.contextMenu(screen.getByTestId('task-node-root'));
+    openMore();
     const addBtn = Array.from(document.querySelectorAll('button')).find(
       (b) => b.textContent === 'Add next task',
     )!;

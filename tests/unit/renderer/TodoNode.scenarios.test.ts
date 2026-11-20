@@ -282,21 +282,22 @@ describe('TodoNode Gherkin scenarios (Issue #39)', () => {
 
   // ── F7 — Header count is reactive ────────────────────────────────────────
   describe('F7 — Header count is reactive', () => {
-    it('header reads "Todos (3)" when 3 items are undone', () => {
+    it('header reads "Todos" and 3 when 3 items are undone', () => {
       let s = defaultTodoState();
       s = todoAdd(s, { text: 'a' }, envAt(T1, 'id-a'));
       s = todoAdd(s, { text: 'b' }, envAt(T2, 'id-b'));
       s = todoAdd(s, { text: 'c' }, envAt(T3, 'id-c'));
       renderTodoNode(s);
       const header = screen.getByTestId('todo-header');
-      expect(header.textContent).toContain('Todos (3)');
+      expect(header.textContent).toContain('Todos');
+      expect(header.querySelector('[data-testid="todo-open-count"]')?.textContent).toBe('3');
     });
 
     it('header reflects the undone count (done items excluded from count)', () => {
       const state = makeBackground(); // 2 undone, 1 done
       renderTodoNode(state);
       const header = screen.getByTestId('todo-header');
-      expect(header.textContent).toContain('Todos (2)');
+      expect(header.querySelector('[data-testid="todo-open-count"]')?.textContent).toBe('2');
     });
   });
 

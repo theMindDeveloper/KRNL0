@@ -29,7 +29,8 @@ import { decodeTargets, encodeTargets, spanTaskTargets, startOfLocalDayMs } from
 import { DoingPicker, type DoingChoice } from './DoingPicker';
 import { SpanLog } from './SpanLog';
 import { useEasyMode } from '../../../store/uiMode';
-import { ObserveDash } from './ObserveDash';
+import { ObserveDash, TimerClock } from './ObserveDash';
+import { CardGroup, cardLabel, cardRow, cardStepBtn, cardStepper } from '../../ui/addCard';
 import { useAwayGap } from './useAwayGap';
 import { Switch } from '../../ui/Switch';
 import { calcRemainingPct, primaryButtonLabel, primaryTooltip, pipState } from './display';
@@ -64,7 +65,7 @@ export function PomoNode({
   // MotherFrameStationContext is true so the timer + pips + cycle counter +
   // controls all fit without spilling past the panel's overflow:hidden edge.
   const inStation = useContext(MotherFrameStationContext);
-  const bodyPadding = inStation ? '10px 14px 12px' : '18px 18px 16px';
+  const bodyPadding = inStation ? '12px 14px 12px' : '20px 20px 16px';
   // A short station slot sheds secondary rows before the face shrinks, so the
   // time and START always show: 1 = no "log past time", 2 = no cycles strip,
   // 3 = no session dots. Set from the slot's height only (no feedback loop).
@@ -83,7 +84,7 @@ export function PomoNode({
     measure();
     return () => ro.disconnect();
   }, [inStation, bodyEl]);
-  const bodyGap = inStation ? 8 : 14;
+  const bodyGap = inStation ? 10 : 16;
 
   // Gear panel local UI state (Decision 22 F9).
   const [gearOpen, setGearOpen] = useState(false);
@@ -176,7 +177,7 @@ export function PomoNode({
   // falls on the local date today. A full cycle = `longBreakEvery` sessions
   // (e.g. 4 default), so `cyclesToday = floor(sessionsToday / longBreakEvery)`.
   // Distinct from the per-task pip counter (which is per-task progress).
-  const { cyclesToday, sessionsToday, progressToNext } = todayCycles(state.history, config.longBreakEvery, Date.now());
+  const { cyclesToday, sessionsToday } = todayCycles(state.history, config.longBreakEvery, Date.now());
 
   // Issue #166 — observer-model controls (dispatch the new verbs).
   const handlePrimary = () => {
@@ -235,39 +236,42 @@ export function PomoNode({
 
   const buttonLabel = primaryButtonLabel(state.status);
 
+  // window-frame.md — footer buttons: 34 px, filled, the reading font, normal letters.
   const ghostBtnStyle: React.CSSProperties = {
     flex: 1,
-    padding: '10px 8px',
-    background: 'transparent',
+    minWidth: 0,
+    height: 34,
+    padding: '0 12px',
+    background: 'var(--paper-2)',
     color: 'var(--ink-2)',
-    border: '1px solid var(--paper-3)',
-    borderRadius: 5,
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
+    border: 'none',
+    borderRadius: 9,
+    fontFamily: 'var(--font-read)',
+    fontSize: 13,
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
     cursor: 'pointer',
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
   };
   const primaryBtnStyle: React.CSSProperties = {
     flex: 1,
-    padding: '10px 8px',
+    minWidth: 0,
+    height: 34,
+    padding: '0 12px',
     background: 'var(--btn-primary-bg)',
     color: 'var(--btn-primary-fg)',
     border: 'none',
-    borderRadius: 5,
-    fontFamily: 'var(--font-mono)',
-    fontSize: 11,
-    fontWeight: 700,
+    borderRadius: 9,
+    fontFamily: 'var(--font-read)',
+    fontSize: 13.5,
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
     cursor: 'pointer',
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    boxShadow: '0 0 0 1px var(--btn-primary-ring)',
   };
   const iconBtnStyle: React.CSSProperties = {
     ...ghostBtnStyle,
     flex: '0 0 42px',
     padding: 0,
-    height: 38,
+    height: 34,
     display: 'grid',
     placeItems: 'center',
   };
@@ -277,11 +281,11 @@ export function PomoNode({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 38,
+    height: 34,
     padding: '0 12px',
   };
   const stopTitle = config.countStopped === false
-    ? 'Stop — end and discard this session (change in Pomo settings)'
+    ? 'Stop — end and discard this session (change in the Timer settings)'
     : 'Stop — end and record this session';
 
   // F1 — liquid fill height tracks remaining time
@@ -313,13 +317,16 @@ export function PomoNode({
   const themeIsDark = frameMode === 'dark';
   const defaultFace: TimerFace = frameManifest.components.pomo.face ?? (themeIsDark ? 'vapor' : 'blocks');
   const activeFace: TimerFace = config.face ?? defaultFace;
+  // window-frame.md, Timer A — one face for both modes, unless a face was chosen
+  // (in settings, or by the frame style).
+  // Only the standard clock is drawn (owner, 2026-11-20: "leave just the
+  // standard"). A face saved earlier or named by a frame style is ignored.
+  const oneFace = !observe;
 
-  const headerLeft = isTaskMode
-    ? `ON · ${truncate(state.label || 'task', 18)}`
-    : observe ? 'TIME LOG' : 'DEEP WORK';
-  const headerRight = observe
-    ? (state.status === 'break' ? '· BREAK' : '')
-    : isTaskMode ? '· TAGGED' : `· POMO.${String(sessionMin).padStart(3, '0')}`;
+  // window-frame.md — one name for the window in every mode and state.
+  const headerLeft = 'Timer';
+  const headerRight = state.status === 'running' ? 'Recording' : state.status === 'break' ? 'Break' : state.status === 'paused' ? 'Paused' : '';
+  const headerTone = state.status === 'running' ? 'var(--acid-ink, var(--acid))' : 'var(--ink-2)';
 
   // A.2 — gear disabled while session is in-flight (running, paused, break)
   const gearDisabled = state.status !== 'idle' && state.status !== 'done';
@@ -355,100 +362,30 @@ export function PomoNode({
   return (
     <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
       {/* vapor-rise and pomo-blink keyframes are globally defined in tokens.css (PR1/PR4) */}
-      <style>{`
-        .pomo-gear-btn {
-          background: transparent;
-          border: 1px solid var(--paper-3);
-          color: var(--ink-3);
-          width: 18px;
-          height: 18px;
-          border-radius: 4px;
-          cursor: pointer;
-          display: grid;
-          place-items: center;
-          padding: 0;
-          line-height: 1;
-        }
-        .pomo-gear-btn:hover:not(:disabled) {
-          color: var(--acid);
-          border-color: var(--acid);
-        }
-        .pomo-gear-btn:disabled {
-          opacity: 0.35;
-          cursor: not-allowed;
-        }
-        .pomo-settings-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          padding: 6px 0;
-        }
-        .pomo-settings-label {
-          font-family: var(--font-mono);
-          font-size: 10.5px;
-          color: var(--ink-2);
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-
-      `}</style>
 
       {/* Header — title + bullet + gear (A.1: gear is last flex child = right side) */}
-      <div className="krnl-node-header"
-        style={{
-          padding: '7px 12px 6px',
-          borderBottom: '1px solid var(--paper-2)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        <span style={{
-          width: 6, height: 6, borderRadius: '50%',
-          background: state.status === 'running'
-            ? (isTaskMode ? 'var(--acid)' : 'var(--rust)')
-            : 'var(--ink-4)',
+      {/* window-frame.md — the standard header: name, context, then views and buttons. */}
+      <div className="krnl-node-header kw-head">
+        <span className="kw-dot" style={{
+          background: state.status === 'running' ? 'var(--acid)' : state.status === 'break' || state.status === 'paused' ? 'var(--rust)' : 'var(--ink-4)',
+          boxShadow: state.status === 'running' ? '0 0 0 3px color-mix(in srgb, var(--acid) 22%, transparent)' : 'none',
         }} />
         <span
           data-testid="pomo-header-label"
-          style={{
-            color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-2)',
-            fontWeight: 500,
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
+          className="kw-title"
         >
           {headerLeft}
         </span>
         {/* The session code gives way first: one line, never wrapped. */}
-        <span style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{headerRight}</span>
-        {/* A.1 — spacer pushes gear to the right */}
-        <span style={{ flex: 1 }} />
-        {/* Span log — every recorded span, to find and delete misclicks. */}
-        <button
-          type="button"
-          className="pomo-gear-btn"
-          data-testid="pomo-log-toggle"
-          aria-pressed={logOpen}
-          title={logOpen ? 'Back to the timer' : 'Recorded spans — see and delete them'}
-          onClick={(e) => { e.stopPropagation(); setGearOpen(false); setLogOpen((o) => !o); }}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{ fontSize: 11, width: 'auto', padding: '0 5px', ...(logOpen ? { color: 'var(--acid-ink, var(--acid))', borderColor: 'var(--acid-ink, var(--acid))' } : {}) }}
-        >
-          {logOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="menu" size={12} />}
-        </button>
+        <span className="kw-ctx" data-testid="pomo-observe-status" role="status" style={{ color: headerTone, fontWeight: 500, flexShrink: 0 }}>{headerRight}</span>
+        <span className="kw-sp" />
         {/* Mode switch — Pomodoro rhythm, or just observe where the time goes.
             Locked while a span is in flight, like the gear. Hidden in Easy mode. */}
         {!easy && <div
           role="group"
-          aria-label="Pomo mode"
+          aria-label="Timer mode"
           // Never shrinks: the title on the left gives way instead.
-          style={{ display: 'flex', border: '1px solid var(--paper-3)', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}
+          className="kw-views"
           onMouseDown={(e) => e.stopPropagation()}
         >
           {(['pomodoro', 'observe'] as const).map((m) => {
@@ -463,35 +400,34 @@ export function PomoNode({
                 title={gearDisabled
                   ? 'Stop the current span to switch mode'
                   : m === 'observe'
-                    ? 'Observe — Start, Break, Stop. No session length or pips; tag what you did when a span ends.'
-                    : 'Pomodoro — sessions, breaks, pips'}
+                    ? 'Stopwatch — Start, Break, Stop. It runs until you stop; say what it was when a span ends.'
+                    : 'Sessions — timed rounds with breaks (Pomodoro)'}
                 onClick={(e) => { e.stopPropagation(); if (!active) onCommand('pomo.setConfig', { config: { mode: m } }); }}
-                style={{
-                  padding: '2px 7px',
-                  flexShrink: 0,
-                  // rust-deep: the paper-coloured label stays readable in light mode.
-                  background: active ? 'var(--rust-deep, var(--rust))' : 'transparent',
-                  color: active ? 'var(--paper)' : 'var(--ink-3)',
-                  border: 'none',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.01em',
-                  whiteSpace: 'nowrap',
-                  cursor: gearDisabled ? 'not-allowed' : 'pointer',
-                  opacity: gearDisabled && !active ? 0.4 : 1,
-                }}
               >
-                {m === 'pomodoro' ? 'POMO' : 'OBSERVE'}
+                {m === 'pomodoro' ? 'Sessions' : 'Stopwatch'}
               </button>
             );
           })}
         </div>}
+        {/* Span log — every recorded span, to find and delete misclicks. */}
+        <button
+          type="button"
+          className="pomo-gear-btn kw-btn"
+          data-testid="pomo-log-toggle"
+          aria-pressed={logOpen}
+          title={logOpen ? 'Back to the timer' : 'Recorded spans — see and delete them'}
+          onClick={(e) => { e.stopPropagation(); setGearOpen(false); setLogOpen((o) => !o); }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {logOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="menu" size={12} />}
+        </button>
         {/* A.2 — Decision 22 F9 — Gear icon, disabled while session in-flight.
             Observe (and Easy) has no session settings, so no gear there. */}
         {!observe && <button
           type="button"
-          className="pomo-gear-btn"
+          className="pomo-gear-btn kw-btn"
           data-testid="pomo-gear"
+          aria-expanded={gearOpen}
           aria-label={gearOpen ? 'Close settings' : 'Open settings'}
           title={gearDisabled ? 'Stop session to edit settings' : undefined}
           disabled={gearDisabled}
@@ -501,7 +437,6 @@ export function PomoNode({
             else openGear();
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          style={{ fontSize: 11 }}
         >
           {gearOpen ? <SettingsIcon name="close" size={12} /> : <SettingsIcon name="settings" size={12} />}
         </button>}
@@ -511,149 +446,57 @@ export function PomoNode({
       {gearOpen && !observe ? (
         <div
           data-testid="pomo-settings-panel"
-          style={{
-            padding: '14px 16px 16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            minHeight: 240,
-          }}
+          style={{ flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-read)', fontSize: 13.5 }}
         >
-          <div style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            paddingBottom: 8,
-            borderBottom: '1px dashed var(--paper-3)',
-          }}>
-            settings
+          <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: inStation ? '12px 14px' : '20px 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <CardGroup>
+              {([
+                ['sessionMin', 'Session', 'min'],
+                ['shortBreakMin', 'Short break', 'min'],
+                ['longBreakMin', 'Long break', 'min'],
+                ['longBreakEvery', 'Long break after', 'sessions'],
+              ] as Array<[Exclude<keyof PomoConfig, 'face'>, string, string]>).map(([key, label, unit]) => {
+                const val = draftConfig[key] as number;
+                const max = key === 'longBreakEvery' ? 12 : 120;
+                const set = (n: number) => updateDraft(key)(Math.max(1, Math.min(max, Math.round(n) || 1)));
+                return (
+                  <div key={key} className="pomo-settings-row" style={cardRow}>
+                    <span className="pomo-settings-label" style={cardLabel}>{label}</span>
+                    <span style={cardStepper()} onMouseDown={(e) => e.stopPropagation()}>
+                      <button type="button" aria-label={`Less: ${label}`} data-testid={`pomo-settings-${key}-dec`} style={cardStepBtn} onClick={(e) => { e.stopPropagation(); set(val - 1); }}>−</button>
+                      <span style={{ display: 'inline-flex', alignItems: 'baseline', justifyContent: 'center', gap: 4, minWidth: 84, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                        <input
+                          data-testid={`pomo-settings-${key}`}
+                          aria-label={label}
+                          inputMode="numeric"
+                          value={Number.isFinite(val) ? val : ''}
+                          onChange={(e) => set(Number(e.target.value.replace(/\D/g, '').slice(0, 3)))}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          style={{ width: `${String(val).length + 0.5}ch`, minWidth: '1.5ch', border: 'none', background: 'transparent', color: 'var(--ink)', textAlign: 'right', fontFamily: 'inherit', fontSize: 13, fontWeight: 500, outline: 'none', padding: 0 }}
+                        />
+                        <span style={{ color: 'var(--ink-3)' }}>{unit}</span>
+                      </span>
+                      <button type="button" aria-label={`More: ${label}`} data-testid={`pomo-settings-${key}-inc`} style={cardStepBtn} onClick={(e) => { e.stopPropagation(); set(val + 1); }}>+</button>
+                    </span>
+                  </div>
+                );
+              })}
+              {/* Does Stop record the session so far? (one Stop button either way) */}
+              <div className="pomo-settings-row" style={cardRow}>
+                <span className="pomo-settings-label" style={cardLabel} title="On: Stop records the work so far. Off: Stop discards the session.">Count a session you stop early</span>
+                <Switch
+                  checked={config.countStopped !== false}
+                  testId="pomo-settings-countStopped"
+                  onChange={(on) => onCommand('pomo.setConfig', { config: { countStopped: on } })}
+                />
+              </div>
+            </CardGroup>
+
           </div>
-
-          {!observe && ([
-            ['sessionMin', 'Session (min)'],
-            ['shortBreakMin', 'Short break (min)'],
-            ['longBreakMin', 'Long break (min)'],
-            ['longBreakEvery', 'Long break every'],
-          ] as Array<[Exclude<keyof PomoConfig, 'face'>, string]>).map(([key, label]) => (
-            <div key={key} className="pomo-settings-row">
-              <span className="pomo-settings-label">{label}</span>
-              <NumberStepper
-                value={draftConfig[key] as number}
-                onChange={updateDraft(key)}
-                min={1}
-                max={key === 'longBreakEvery' ? 12 : 120}
-                testId={`pomo-settings-${key}`}
-              />
-            </div>
-          ))}
-
-          {/* Does Stop record the session so far? (one Stop button either way) */}
-          {!observe && <div className="pomo-settings-row">
-            <span className="pomo-settings-label" title="On: Stop records the work so far. Off: Stop discards the session.">Count stopped sessions</span>
-            <Switch
-              checked={config.countStopped !== false}
-              testId="pomo-settings-countStopped"
-              onChange={(on) => onCommand('pomo.setConfig', { config: { countStopped: on } })}
-            />
-          </div>}
-
-          {!observe && (<>
-          {/* PR4 — face picker: 5 segmented buttons, one per variant */}
-          <div
-            className="pomo-settings-row"
-            style={{ marginTop: 8, borderTop: '1px dashed var(--paper-3)', paddingTop: 10 }}
-          >
-            <span className="pomo-settings-label">Timer face</span>
-          </div>
-          <div
-            data-testid="pomo-face-picker"
-            style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {(['auto', ...TIMER_FACES] as const).map((face) => {
-              // 'auto' = no saved face: the frame style picks (ADR 0009 F7).
-              const isActive = face === 'auto' ? config.face === undefined : config.face === face;
-              return (
-                <button
-                  key={face}
-                  type="button"
-                  data-testid={`pomo-face-${face}`}
-                  aria-pressed={isActive}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCommand('pomo.setFace', { face });
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style={{
-                    flex: '1 0 auto',
-                    padding: '5px 6px',
-                    background: isActive ? 'var(--rust-deep, var(--rust))' : 'transparent',
-                    color: isActive ? 'var(--paper)' : 'var(--ink-3)',
-                    border: `1px solid ${isActive ? 'var(--rust-deep, var(--rust))' : 'var(--paper-3)'}`,
-                    borderRadius: 4,
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    cursor: 'pointer',
-                    letterSpacing: '0.02em',
-                    textTransform: 'uppercase',
-                    transition: 'background 0.12s, color 0.12s, border-color 0.12s',
-                  }}
-                >
-                  {face}
-                </button>
-              );
-            })}
-          </div>
-
-          </>)}
-          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-            <button
-              type="button"
-              data-testid="pomo-settings-cancel"
-              onClick={(e) => { e.stopPropagation(); closeGear(); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                flex: 1,
-                padding: '8px',
-                background: 'transparent',
-                color: 'var(--ink-2)',
-                border: '1px solid var(--paper-3)',
-                borderRadius: 5,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                cursor: 'pointer',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
-            >
-              CANCEL
-            </button>
-            <button
-              type="button"
-              data-testid="pomo-settings-save"
-              onClick={(e) => { e.stopPropagation(); saveGear(); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                flex: 1,
-                padding: '8px',
-                background: 'var(--btn-primary-bg)',
-                color: 'var(--btn-primary-fg)',
-                border: 'none',
-                borderRadius: 5,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: 'pointer',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                boxShadow: '0 0 0 1px var(--btn-primary-ring)',
-              }}
-            >
-              SAVE
-            </button>
+          {/* window-frame.md — the standard footer. */}
+          <div className="kw-foot">
+            <button type="button" className="kw-action" data-testid="pomo-settings-cancel" onClick={(e) => { e.stopPropagation(); closeGear(); }} onMouseDown={(e) => e.stopPropagation()}>Cancel</button>
+            <button type="button" className="kw-action kw-action--primary" style={{ flex: 1 }} data-testid="pomo-settings-save" onClick={(e) => { e.stopPropagation(); saveGear(); }} onMouseDown={(e) => e.stopPropagation()}>Save</button>
           </div>
         </div>
       ) : logOpen ? (
@@ -680,18 +523,24 @@ export function PomoNode({
           )}
         </div>
       ) : (
-        <div ref={setBodyEl} style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap, ...(inStation ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
+        <div ref={setBodyEl} className="pomo-body" data-idle={state.status === 'idle' || state.status === 'done' ? 'true' : undefined} style={{ padding: bodyPadding, display: 'flex', flexDirection: 'column', gap: bodyGap, flex: '1 1 auto', minHeight: 0 }}>
           {/* PR4 — timer face switch: swap inner face without touching outer chrome.
               In a station slot the face is fitted to the room left, so the
               controls below it (START, task) are never cut off. */}
+          {/* window-frame.md, Timer — the stopwatch face sits in the middle of
+              the room it has (this and the footer share the free space). */}
+          <div aria-hidden style={{ marginTop: 'auto' }} />
           <FaceWrap
             fit={inStation}
+            grow={!(observe || oneFace)}
             compact={observe
               ? <CompactFace time={formatRemaining(observedMs)} label={state.status === 'break' ? 'On break' : state.status === 'running' ? 'Observing' : 'Ready to observe'} pct={null} />
               : <CompactFace time={clockText} label={state.status === 'break' ? 'Break' : running ? 'Focus' : state.status === 'paused' ? 'Paused' : 'Ready'} pct={state.status === 'idle' || state.status === 'done' ? null : elapsedPct} />}
           >
           {observe ? (
-            <ObserveDash state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} plain={easy} />
+            <ObserveDash part="clock" state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} plain={easy} />
+          ) : oneFace ? (
+            <TimerClock text={clockText} blink={running} />
           ) : (<>
           {activeFace === 'ascii' && (
             <Ascii m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />
@@ -720,22 +569,14 @@ export function PomoNode({
           </>)}
           </FaceWrap>
 
-          {/* Today's full-cycle counter — distinct visual from the session pips
-              (squares + numeric badge + acid glow) so it reads as "achievement"
-              not "in-progress session". Always rendered so the user gets a
-              live count even at 0 cycles. Tooltip carries the breakdown. */}
+          {/* One progress row: the session dots. (A second counter for today's
+              full cycles sat above it; that number is now in this row's tooltip.) */}
           {observe ? null : (<>
-          {compact < 2 && <CycleCounter
-            cyclesToday={cyclesToday}
-            sessionsToday={sessionsToday}
-            progressToNext={progressToNext}
-            longBreakEvery={config.longBreakEvery}
-          />}
-
-          {compact < 3 && <div
+          {compact < 3 && !oneFace && <div
             className="pomo-pips"
             data-testid="pomo-pips"
-            style={{ display: 'flex', gap: 4, justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: 10 }}
+            title={`${sessionsToday} session${sessionsToday === 1 ? '' : 's'} today · ${cyclesToday} full round${cyclesToday === 1 ? '' : 's'} of ${config.longBreakEvery}`}
+            style={{ display: 'flex', gap: oneFace ? 7 : 4, justifyContent: oneFace ? 'center' : 'flex-start', alignItems: 'center', flexWrap: 'nowrap', marginTop: oneFace ? 0 : 10 }}
           >
             {/* Pips — reality readout only. Filled = completed session, no
                 pre-planned break lines. Issue #166: plan stripped, keep reality. */}
@@ -774,16 +615,14 @@ export function PomoNode({
                 +{overflowPips} more
               </span>
             )}
-            <span style={{
+            {!oneFace && <span style={{
               marginLeft: 'auto',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
+              fontFamily: 'var(--font-read)',
+              fontSize: 12.5,
               color: 'var(--ink-3)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
             }}>
-              session {sessionsForDisplay} / {pipCount}
-            </span>
+              Session {sessionsForDisplay} of {pipCount}
+            </span>}
           </div>}
           </>)}
 
@@ -803,6 +642,26 @@ export function PomoNode({
               Calendar/Clock. Starting untagged suggests the task planned now. */}
           {/* Observe mode — pick what you're doing (recent, a task, or new);
               Start / Continue / Back to work record it. */}
+          {/* window-frame.md, Timer A — one row under the time: the state as a small
+              marker, the session dots, then what you are on. No line of words. */}
+          <div className="pomo-what" data-testid="pomo-what" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
+          {oneFace && compact < 3 && (
+            <span
+              data-testid="pomo-pips"
+              className="pomo-pips"
+              title={`Session ${Math.min(sessionsForDisplay + 1, pipCount)} of ${pipCount} · ${sessionMin} minutes each · ${sessionsToday} session${sessionsToday === 1 ? '' : 's'} today`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}
+            >
+              {Array.from({ length: visiblePipCount }).map((_, i) => {
+                const ps = pipState(i, completedDots, state.status);
+                return (
+                  <span key={i} className={`pip ${ps}`} data-pip-index={i} data-pip-state={ps}
+                    style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: ps === 'done' ? 'var(--acid)' : ps === 'active' ? 'var(--ink-2)' : 'var(--paper-3)' }} />
+                );
+              })}
+              {overflowPips > 0 && <span data-testid="pomo-pips-overflow" style={{ fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-3)' }}>+{overflowPips}</span>}
+            </span>
+          )}
           {observe && !easy && !askRec && (
             <DoingPicker
               caption={state.status === 'running' ? 'doing' : 'next'}
@@ -823,35 +682,40 @@ export function PomoNode({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '4px 8px',
-              border: `1px solid ${isTaskMode ? 'var(--acid)' : 'var(--paper-3)'}`,
-              borderRadius: 5,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.06em',
+              alignSelf: 'center',
+              maxWidth: '100%',
+              minWidth: 0,
+              gap: 8,
+              height: 36,
+              padding: '0 8px 0 14px',
+              borderRadius: 999,
+              background: 'var(--paper-2)',
+              fontFamily: 'var(--font-read)',
+              fontSize: 12.5,
               color: 'var(--ink-3)',
             }}
           >
             <span aria-hidden style={{ color: isTaskMode ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', lineHeight: 0 }}><SettingsIcon name={isTaskMode ? 'finished' : 'box'} size={12} /></span>
-            <span>TASK</span>
             <AppSelect
               ariaLabel="Link this session to a task"
               testId="pomo-tag-select"
               value={state.activeTaskId ?? ''}
               onChange={(v) => onCommand('pomo.tag', { taskId: v === '' ? null : v })}
               options={[
-                { value: '', label: 'no task (optional)' },
+                { value: '', label: 'No task' },
                 ...(state.activeTaskId !== null && !tagOptions.some((o) => o.id === state.activeTaskId)
                   ? [{ value: state.activeTaskId, label: state.label || 'task' }]
                   : []),
                 // The running session can only be on an open task (a done one is reopened first).
                 ...tagOptions.filter((o) => !o.done).map((o) => ({ value: o.id, label: truncate(o.text, 28) })),
               ]}
-              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', fontSize: 11, padding: '2px 0' }}
+              style={{ flex: '0 1 auto', minWidth: 0, background: 'transparent', border: 'none', fontFamily: 'var(--font-read)', fontSize: 13.5, padding: '2px 0' }}
             />
           </label>
           )}
+          {/* time-model F5 (#207): the plan that is due now, one press. */}
+          {!away && <PlannedNowChip state={state} easy={easy} onCommand={onCommand} />}
+          </div>
 
           {askRec && (
             <SpanLabeler
@@ -879,11 +743,17 @@ export function PomoNode({
             />
           )}
 
-          {/* time-model F5 (#207): suggest the task planned for now; one click, never silent. */}
-          {!away && <PlannedNowChip state={state} easy={easy} onCommand={onCommand} />}
+          {/* Today as one line over the day strip, in both modes (hidden in a short window). */}
+          {(observe || oneFace) && compact < 2 && !askRec && (
+            <div style={{ marginTop: inStation ? 4 : 12 }}>
+              <ObserveDash part="today" state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} plain={easy} />
+            </div>
+          )}
 
           {/* Observe mode: Start → (Break ⇄ Back to work) → Stop. Work and
               breaks are both recorded spans; there is no pause. */}
+          {/* window-frame.md — the standard footer row: the main button(s). */}
+          <div className={`kw-foot pomo-foot${away ? ' pomo-foot--tall' : ''}`} style={{ margin: inStation ? 'auto -14px -12px' : 'auto -20px -16px' }}>
           {away ? (
             <div
               data-testid="pomo-away"
@@ -894,15 +764,15 @@ export function PomoNode({
                 background: 'color-mix(in srgb, var(--rust) 8%, transparent)',
               }}
             >
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--ink)', textAlign: 'center', letterSpacing: '0.04em' }}>
-                AWAY {clockHM(away.fromMs)}–{clockHM(away.toMs)} · {spanText(away.toMs - away.fromMs)}
+              <span style={{ fontFamily: 'var(--font-read)', fontSize: 13, fontWeight: 600, color: 'var(--ink)', textAlign: 'center' }}>
+                Away {clockHM(away.fromMs)}–{clockHM(away.toMs)} · {spanText(away.toMs - away.fromMs)}
               </span>
-              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-3)', textAlign: 'center' }}>
                 The {state.status === 'break' ? 'break' : 'timer'} kept running. Count that time?
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button type="button" data-testid="pomo-away-keep" onClick={dismissAway} style={ghostBtnStyle} title="Keep the whole span as recorded">
-                  COUNT IT
+                  Count it
                 </button>
                 <button
                   type="button"
@@ -911,15 +781,15 @@ export function PomoNode({
                   style={primaryBtnStyle}
                   title="Record the span up to when you left, and stop"
                 >
-                  STOP AT {clockHM(away.fromMs)}
+                  Stop at {clockHM(away.fromMs)}
                 </button>
               </div>
             </div>
           ) : observe && state.status !== 'paused' ? (
             <div className="pomo-controls" style={{ display: 'flex', gap: 6 }}>
               {state.status === 'running' && (
-                <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={{ ...ghostBtnStyle, height: 38 }} title="Break — records the work so far, then times your break">
-                  BREAK
+                <button type="button" data-testid="pomo-break" onClick={handleBreak} className="pomo-btn ghost" style={ghostBtnStyle} title="Break — records the work so far, then times your break">
+                  Break
                 </button>
               )}
               {/* After a break or a stop: carry on with what you were doing, or
@@ -930,10 +800,10 @@ export function PomoNode({
                   data-testid="pomo-new"
                   onClick={() => { onCommand('pomo.tag', { taskId: null }); onCommand('pomo.resume'); }}
                   className="pomo-btn ghost"
-                  style={{ ...ghostBtnStyle, flex: '0 0 auto', height: 38, padding: '0 12px' }}
+                  style={{ ...ghostBtnStyle, flex: '0 0 auto' }}
                   title="Start something new — you'll be asked what it was when it ends"
                 >
-                  NEW
+                  New
                 </button>
               )}
               {state.status === 'break' && (
@@ -942,10 +812,10 @@ export function PomoNode({
                   data-testid="pomo-resume"
                   onClick={() => onCommand('pomo.resume')}
                   className="pomo-btn ghost"
-                  style={{ ...ghostBtnStyle, height: 38, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  style={{ ...ghostBtnStyle, overflow: 'hidden', textOverflow: 'ellipsis' }}
                   title={continueName ? `Back to "${continueName}" — records the break` : 'Back to work — records the break, starts a new work span'}
                 >
-                  {continueName ? `BACK TO ${truncate(continueName, 14)}` : 'BACK TO WORK'}
+                  {continueName ? `Back to ${truncate(continueName, 14)}` : 'Back to work'}
                 </button>
               )}
               {(state.status === 'idle' || state.status === 'done') && continueName && (
@@ -954,10 +824,10 @@ export function PomoNode({
                   data-testid="pomo-new"
                   onClick={() => { onCommand('pomo.tag', { taskId: null }); onCommand('pomo.start'); }}
                   className="pomo-btn ghost"
-                  style={{ ...ghostBtnStyle, flex: '0 0 auto', height: 38, padding: '0 14px' }}
+                  style={{ ...ghostBtnStyle, flex: '0 0 auto' }}
                   title="Start something new — you'll be asked what it was when it ends"
                 >
-                  NEW
+                  New
                 </button>
               )}
               <button
@@ -973,8 +843,8 @@ export function PomoNode({
                 <PomoIcon kind={state.status === 'idle' || state.status === 'done' ? 'play' : 'stop'} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {state.status === 'idle' || state.status === 'done'
-                    ? continueName ? `CONTINUE ${truncate(continueName, 18)}` : 'START'
-                    : 'STOP'}
+                    ? continueName ? `Continue ${truncate(continueName, 18)}` : 'Start'
+                    : 'Stop'}
                 </span>
               </button>
               {(state.status === 'running' || state.status === 'break') && (
@@ -996,20 +866,18 @@ export function PomoNode({
               }}
             >
               <span style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                fontWeight: 700,
+                fontFamily: 'var(--font-read)',
+                fontSize: 13,
+                fontWeight: 600,
                 color: 'var(--acid-ink, var(--acid))',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
                 textAlign: 'center',
               }}>
                 Are you done?
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button type="button" data-testid="pomo-extend" onClick={handleExtend} style={ghostBtnStyle} title="Keep going — count this pomodoro and start a fresh span">EXTEND</button>
-                <button type="button" data-testid="pomo-break" onClick={handleBreak} style={ghostBtnStyle} title="Take a break — records the work so far, then times your break">BREAK</button>
-                <button type="button" data-testid="pomo-primary" onClick={handleStop} style={primaryBtnStyle} title="Stop — record this session and end">STOP</button>
+                <button type="button" data-testid="pomo-extend" onClick={handleExtend} style={ghostBtnStyle} title="Keep going — count this pomodoro and start a fresh span">Extend</button>
+                <button type="button" data-testid="pomo-break" onClick={handleBreak} style={ghostBtnStyle} title="Take a break — records the work so far, then times your break">Break</button>
+                <button type="button" data-testid="pomo-primary" onClick={handleStop} style={primaryBtnStyle} title="Stop — record this session and end">Stop</button>
               </div>
             </div>
           ) : (
@@ -1039,6 +907,7 @@ export function PomoNode({
           )}
           {/* #207 — fix recorded time where it happens: stop at the real time, or add forgotten time. */}
           {compact < 1 && <PomoTimeLinks state={state} />}
+          </div>
 
         </div>
       )}
@@ -1050,155 +919,6 @@ function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 1) + '…';
 }
-
-// CycleCounter — today's completed pomodoro cycles, visually distinct from
-// the small per-session pips. Compact single-line strip: numeric badge +
-// filled diamonds for completed cycles + thin progress bar toward the next.
-//
-// Designed to add minimum vertical height (~24px) so it fits in the narrow
-// station-view pomo cell without pushing other content off the bottom.
-// Diamonds are capped at MAX; extras are summarised as "+N".
-function CycleCounter({
-  cyclesToday,
-  sessionsToday,
-  progressToNext,
-  longBreakEvery,
-}: {
-  cyclesToday: number;
-  sessionsToday: number;
-  progressToNext: number;
-  longBreakEvery: number;
-}) {
-  const MAX_DIAMONDS = 6;
-  const visibleDiamonds = Math.min(cyclesToday, MAX_DIAMONDS);
-  const overflow = cyclesToday > MAX_DIAMONDS ? cyclesToday - MAX_DIAMONDS : 0;
-  const hasAny = cyclesToday > 0;
-  const cellColor = hasAny ? 'var(--acid)' : 'var(--ink-4)';
-
-  return (
-    <div
-      data-testid="pomo-cycles-today"
-      data-cycles={cyclesToday}
-      data-sessions={sessionsToday}
-      title={`${cyclesToday} cycle${cyclesToday === 1 ? '' : 's'} today · ${sessionsToday} sessions · ${progressToNext}/${longBreakEvery} toward next`}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 7,
-        padding: '3px 8px',
-        background: hasAny
-          ? 'linear-gradient(90deg, color-mix(in srgb, var(--acid) 10%, transparent), color-mix(in srgb, var(--acid) 2%, transparent) 60%)'
-          : 'var(--paper-2)',
-        border: `1px solid ${hasAny ? 'color-mix(in srgb, var(--acid) 40%, transparent)' : 'var(--paper-3)'}`,
-        borderRadius: 4,
-        boxShadow: hasAny ? '0 0 8px color-mix(in srgb, var(--acid) 14%, transparent) inset' : 'none',
-      }}
-    >
-      {/* Numeric badge */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, flexShrink: 0 }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-3)',
-          }}
-        >
-          ×
-        </span>
-        <span
-          data-testid="pomo-cycles-today-count"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 14,
-            fontVariantNumeric: 'tabular-nums',
-            fontWeight: 700,
-            lineHeight: 1,
-            // acid-ink: lime text is unreadable on a light pomo.
-            color: hasAny ? 'var(--acid-ink, var(--acid))' : cellColor,
-          }}
-        >
-          {cyclesToday}
-        </span>
-      </div>
-
-      {/* Diamonds + progress bar — flex:1 so it absorbs slack */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
-        {Array.from({ length: visibleDiamonds }).map((_, i) => (
-          <span
-            key={i}
-            data-testid="pomo-cycle-diamond"
-            style={{
-              width: 7,
-              height: 7,
-              background: 'var(--acid)',
-              transform: 'rotate(45deg)',
-              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--acid-ink, var(--acid)) 60%, transparent)',
-              flexShrink: 0,
-            }}
-          />
-        ))}
-        {overflow > 0 && (
-          <span
-            data-testid="pomo-cycles-overflow"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              color: 'var(--acid-ink, var(--acid))',
-              letterSpacing: '0.06em',
-              marginLeft: 1,
-            }}
-          >
-            +{overflow}
-          </span>
-        )}
-        {longBreakEvery > 0 && (
-          <span
-            data-testid="pomo-cycle-progress"
-            data-progress={progressToNext}
-            data-of={longBreakEvery}
-            style={{
-              flexShrink: 0,
-              marginLeft: visibleDiamonds > 0 || overflow > 0 ? 4 : 0,
-              display: 'inline-block',
-              width: 28,
-              height: 3,
-              borderRadius: 1.5,
-              background: 'var(--paper-3)',
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            <span
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: `${(progressToNext / longBreakEvery) * 100}%`,
-                background: 'var(--acid)',
-                opacity: progressToNext > 0 ? 0.85 : 0,
-              }}
-            />
-          </span>
-        )}
-      </div>
-
-      {/* Single-line label — flexShrink:0 keeps it readable even when crowded */}
-      <span
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          color: 'var(--ink-3)',
-          letterSpacing: '0.02em',
-          flexShrink: 0,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        cycles today
-      </span>
-    </div>
-  );
-}
-
-export default PomoNode;
 
 function PomoIcon({ kind }: { kind: 'play' | 'pause' | 'stop' | 'break' | 'skip' }) {
   const p = { width: 15, height: 15, viewBox: '0 0 16 16', 'aria-hidden': true } as const;
@@ -1216,6 +936,6 @@ function PomoIcon({ kind }: { kind: 'play' | 'pause' | 'stop' | 'break' | 'skip'
 }
 
 /** The face, fitted to the room left in a station slot; as-is elsewhere. */
-function FaceWrap({ fit, compact, children }: { fit: boolean; compact?: React.ReactNode; children: React.ReactNode }) {
-  return fit ? <FaceFit compact={compact}>{children}</FaceFit> : <>{children}</>;
+function FaceWrap({ fit, grow, compact, children }: { fit: boolean; grow?: boolean; compact?: React.ReactNode; children: React.ReactNode }) {
+  return fit ? <FaceFit compact={compact} grow={grow ?? true}>{children}</FaceFit> : <>{children}</>;
 }

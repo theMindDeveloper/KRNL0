@@ -172,6 +172,31 @@ describe('WeekView — clashing plans as letter bars (F28)', () => {
     }
   });
 
+  it('F31 — a plan alone in a narrow column wraps its name down the block; clashing plans keep letters', () => {
+    // A Station week: the calendar is about 360 px wide, each day about 45 px.
+    const RO = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(private cb: ResizeObserverCallback) {}
+      observe() { this.cb([{ contentRect: { width: 360 } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
+      unobserve() { /* none */ }
+      disconnect() { /* none */ }
+    } as unknown as typeof ResizeObserver;
+    try {
+      seed([...three(), task('t-d', 'Physics exercises', '2026-05-15T10:00', 90)]);
+      render(<WeekView state={{ ...state, zoom: 2 }} config={config} onCommand={() => undefined} />);
+      const wrapped = document.querySelector('[data-testid="task-wrap-t-d"]') as HTMLElement;
+      expect(wrapped.textContent).toBe('Physics exercises');
+      // Whole lines only: the height is a multiple of the 11 px line.
+      expect(parseFloat(wrapped.style.maxHeight) % 11).toBe(0);
+      expect(document.querySelector('[data-testid="task-letter-t-d"]')).toBeNull();
+      // The three that clash stay letter bars (F28).
+      expect(document.querySelector('[data-testid="task-wrap-t-a"]')).toBeNull();
+      expect(document.querySelector('[data-testid="task-block-t-a"]')).toBeTruthy();
+    } finally {
+      globalThis.ResizeObserver = RO;
+    }
+  });
+
   it('two plans in a wide day keep their names (no letters)', () => {
     seed(three().slice(0, 2));
     render(<WeekView state={{ ...state, anchorDate: '2026-05-14' }} config={config} onCommand={() => undefined} singleDay />);

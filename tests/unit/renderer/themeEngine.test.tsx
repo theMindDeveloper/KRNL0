@@ -113,8 +113,8 @@ describe('F7 — default Pomo face', () => {
     expect(MANIFESTS.classic.components.pomo.face).toBeUndefined();
   });
 
-  it('Pro defaults to blocks', () => {
-    expect(MANIFESTS.pro.components.pomo.face).toBe('blocks');
+  it('Pro names no face: the Timer shows its standard clock (window-frame.md, Timer A)', () => {
+    expect(MANIFESTS.pro.components.pomo.face).toBeUndefined();
   });
 });
 

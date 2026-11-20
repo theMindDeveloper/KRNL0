@@ -27,7 +27,7 @@ function task(id: string, extra: Partial<TaskState> = {}): Board['nodes'][number
 }
 
 describe('WeekView — push notice', () => {
-  it('shows where a chained task actually landed when the drop was too early', () => {
+  it('a chained plan dropped on a time lands exactly there: nothing is pushed, so there is no notice', () => {
     useBoardStore.setState({
       board: {
         version: 1, schemaVersion: 2, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 },
@@ -57,8 +57,8 @@ describe('WeekView — push notice', () => {
     fireEvent.drop(cell!, {
       dataTransfer: { getData: (t: string) => (t === 'application/krnl-task' ? payload : ''), types: ['application/krnl-task'] },
     });
-    const notice = document.querySelector('[data-testid="calendar-push-notice"]');
-    expect(notice?.textContent).toContain('10:00');
-    expect(notice?.textContent).toContain('Task b');
+    expect(document.querySelector('[data-testid="calendar-push-notice"]')).toBeNull();
+    const b = useBoardStore.getState().board!.nodes.find((n) => n.id === 'b')!;
+    expect(String((b.state as TaskState).scheduledFor)).toContain('T09:00');
   });
 });

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 // ADR 0001 — CalendarNode (Slice 2: MonthView wired).
 // Slice 1 shell upgraded: 'month' case now renders the real MonthView.
 // Week and year remain placeholder stubs for Slices 3/4.
@@ -17,6 +18,8 @@ export function CalendarNode({
   slotTotal = MOTHER_TOTAL,
 }: NodeProps<CalendarState, CalendarConfig>) {
   const config = (node.config ?? defaultCalendarConfig()) as CalendarConfig;
+  // window-frame.md — the header's last slot: the day and week views put the Calendar's menu there.
+  const [headSlot, setHeadSlot] = useState<HTMLElement | null>(null);
 
   // Placeholder body — replaced by real views in Slices 2/3/4.
   const renderBody = () => {
@@ -28,6 +31,7 @@ export function CalendarNode({
             config={config}
             onCommand={onCommand}
             singleDay
+            headSlot={headSlot}
           />
         );
       case 'week':
@@ -36,6 +40,7 @@ export function CalendarNode({
             state={node.state as CalendarState}
             config={config}
             onCommand={onCommand}
+            headSlot={headSlot}
           />
         );
       case 'month':
@@ -64,23 +69,27 @@ export function CalendarNode({
       width={MOTHER_WIDTH}
       position={node.position}
     >
-      {/* Header */}
-      <div className="krnl-node-header"
-        style={{
-          padding: '12px 16px 10px',
-          borderBottom: '1px solid var(--paper-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          color: 'var(--ink-2)',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <span>Calendar</span>
-        <span style={{ color: 'var(--ink-3)' }}>{config.view}</span>
+      {/* window-frame.md — the standard header: name, then the views. */}
+      <div className="krnl-node-header kw-head">
+        <span className="kw-dot" style={{ background: 'var(--cyan)' }} />
+        <span className="kw-title">Calendar</span>
+        <span className="kw-sp" />
+        <span className="kw-views nodrag" role="tablist" aria-label="Calendar view" data-testid="calendar-view-switch">
+          {(['day', 'week', 'month', 'year'] as const).map((view) => (
+            <button
+              key={view}
+              type="button"
+              role="tab"
+              aria-selected={config.view === view}
+              data-testid={`calendar-view-${view}`}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => onCommand('calendar.setView', { view })}
+            >
+              {view}
+            </button>
+          ))}
+        </span>
+        <span ref={setHeadSlot} style={{ display: 'inline-flex' }} />
       </div>
 
       {/* View placeholder body */}
@@ -88,38 +97,6 @@ export function CalendarNode({
         {renderBody()}
       </div>
 
-      {/* View toggle buttons (stub — wired to calendar.setView) */}
-      <div
-        style={{
-          display: 'flex',
-          borderTop: '1px solid var(--paper-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-        }}
-      >
-        {(['day', 'week', 'month', 'year'] as const).map((view) => (
-          <button
-            key={view}
-            type="button"
-            onClick={() => onCommand('calendar.setView', { view })}
-            style={{
-              flex: 1,
-              padding: '6px 0',
-              background: config.view === view ? 'var(--paper-2)' : 'transparent',
-              border: 'none',
-              borderRight: view !== 'year' ? '1px solid var(--paper-3)' : 'none',
-              color: config.view === view ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-            }}
-          >
-            {view}
-          </button>
-        ))}
-      </div>
     </MotherFrame>
   );
 }

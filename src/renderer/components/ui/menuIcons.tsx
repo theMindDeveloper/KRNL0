@@ -38,6 +38,9 @@ const P: Record<string, ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
   list: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
   canvas: <><rect x="3" y="3" width="18" height="18" rx="2.5" /><path d="M8 3v18M3 9h5" /></>,
+  // menus.md — the rare things of a menu sit behind "More".
+  more: <g strokeWidth="2.6"><path d="M5 12h.01M12 12h.01M19 12h.01" /></g>,
+  back: <path d="M15 6l-6 6 6 6" />,
 };
 
 export type MenuIconName = keyof typeof P;

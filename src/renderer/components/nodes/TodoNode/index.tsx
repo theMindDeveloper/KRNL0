@@ -514,27 +514,31 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     // The eye: its card on the canvas and its place on the Calendar, at once.
     const taskId = item.taskNodeId;
     const missedEnd = taskId ? plannedEndMs(taskId) : null;
-    const show: ContextMenuItem[] = taskId ? [
-      { label: 'Show', icon: <MenuIcon name="show" />, hint: w.day ? 'card + Calendar' : 'card', divider: true, onSelect: () => { void showTask(taskId); } },
-    ] : [];
-    return [
-      { label: 'When…', icon: <MenuIcon name="when" />, ...(whenText(w) ? { hint: whenText(w)! } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId) },
+    // menus.md — the plan menu, the same from its row, its card and its
+    // Calendar block: what happened, when, its name, More, then Won't do and
+    // Delete. Everything used less often sits behind More.
+    const more: ContextMenuItem[] = [
       // easy-mode D19 — Deadline is Advanced (one date per plan in Easy).
-      ...(easy ? [] : [{ label: 'Deadline…', icon: <MenuIcon name="deadline" />, ...(w.deadline ? { hint: dayWord(w.deadline, todayYMD) } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId, 'deadline') }]),
-      ...show,
       ...(easy ? [] : [
-        ...(hasTaskNode ? [{ ...timer, divider: true }] : []),
-        { label: 'Tag…', icon: <MenuIcon name="tag" />, ...(tagLabel ? { hint: tagLabel } : {}), ...(hasTaskNode ? {} : { divider: true }), onSelect: () => setTagPicker({ x: at.x, y: at.y, itemId }) },
+        { label: 'Deadline…', icon: <MenuIcon name="deadline" />, ...(w.deadline ? { hint: dayWord(w.deadline, todayYMD) } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId, 'deadline') },
+        { label: 'Tag…', icon: <MenuIcon name="tag" />, ...(tagLabel ? { hint: tagLabel } : {}), onSelect: () => setTagPicker({ x: at.x, y: at.y, itemId }) },
+        ...(hasTaskNode ? [timer] : []),
       ]),
-      { ...rename, ...(easy ? { divider: true } : {}) },
-      // task-node F21 — the same choices as its card: a plan whose time has
-      // passed can be ticked for that day (the checkbox means "done now").
-      ...(missedEnd !== null && taskId ? [{ label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, divider: true, onSelect: () => { void markDoneAsPlanned(taskId); } }] : []),
+      ...(taskId ? [{ label: 'Show', icon: <MenuIcon name="show" />, hint: w.day ? 'card + Calendar' : 'card', onSelect: () => { void showTask(taskId); } }] : []),
+    ];
+    return [
+      // A plan whose time has passed counts on that day ("Done on Mon 16").
+      missedEnd !== null && taskId
+        ? { label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, onSelect: () => { void markDoneAsPlanned(taskId); } }
+        : { label: 'Mark done', icon: <MenuIcon name="check" />, onSelect: () => onCommand('todo.toggle', { id: itemId }) },
+      { label: 'When…', icon: <MenuIcon name="when" />, ...(whenText(w) ? { hint: whenText(w)! } : {}), onSelect: () => openWhen({ clientX: at.x, clientY: at.y }, itemId) },
+      rename,
+      ...(more.length > 0 ? [{ label: 'More', icon: <MenuIcon name="more" />, children: more, onSelect: () => {} }] : []),
       {
         label: "Won't do",
         icon: <MenuIcon name="drop" />,
-        hint: 'off the board, not missed',
-        divider: missedEnd === null,
+        hint: 'not missed',
+        divider: true,
         // Off the Calendar too: a dropped plan is not "missed"; one Ctrl+Z,
         // and the notice's UNDO puts its time and links back (planActions).
         onSelect: () => wontDoItem(node.id, itemId),
@@ -849,25 +853,14 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
 
   return (
     <MotherFrame nodeId={node.id} slotIndex={slotIndex} slotTotal={slotTotal} width={MOTHER_WIDTH} position={node.position}>
-      <div style={{ overflow: 'hidden', borderRadius: 6, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="todo-win" style={{ overflow: 'hidden', borderRadius: 6, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {/* Header — F7: shows "Todos (N)" with reactive undone count */}
-        <div className="krnl-node-header"
-          style={{
-            padding: '7px 10px 6px',
-            borderBottom: '1px solid var(--paper-3)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-3)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span data-testid="todo-header">
-            <span style={{ color: 'var(--cyan)' }}><LineGlyph name="dot" size={10} /></span>
-            {` Todos (${undoneCount})`}
+        {/* window-frame.md — the standard header row. */}
+        <div className="krnl-node-header kw-head">
+          <span data-testid="todo-header" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span className="kw-dot" style={{ color: 'var(--cyan)', background: 'var(--cyan)' }} />
+            <span className="kw-title">Todos</span>
+            <span className="kw-ctx" data-testid="todo-open-count">{undoneCount}</span>
             {/* PR8 — overdue count badge in rust. Only visible when at least
                 one undone item's scheduled-end has passed. */}
             {overdueCount > 0 && (
@@ -876,10 +869,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 style={{
                   // Mixed toward the ink: darker on paper, lighter on dark — 4.5:1 in both themes.
                   color: 'color-mix(in srgb, var(--rust) 78%, var(--ink))',
-                  marginLeft: 8,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.02em',
+                  fontFamily: 'var(--font-read)',
+                  fontSize: 12.5,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 5,
@@ -978,20 +969,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         })()}
 
         {/* F4: add-task row — "add task" placeholder swaps to input on click, ↵ always visible */}
-        <div
-          className="todo-add"
-          ref={addRowRef}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 9,
-            padding: '8px 14px',
-            fontSize: 12,
-            color: 'var(--ink-4)',
-            fontFamily: 'var(--font-mono)',
-            borderTop: '1px dashed var(--paper-3)',
-          }}
-        >
+        {/* window-frame.md — the standard footer row. */}
+        <div className="todo-add kw-foot" ref={addRowRef}>
           {inputFocused ? (
             <input
               ref={inputRef}
@@ -1039,8 +1018,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           ) : (
             <span
               data-testid="add-task-placeholder"
+              className="kw-add"
               onClick={() => setInputFocused(true)}
-              style={{ flex: 1, cursor: 'text' }}
             >
               add a plan
             </span>
@@ -1048,16 +1027,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           {/* F4b: ↵ hint always visible */}
           <span
             data-testid="enter-hint"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              color: 'var(--ink-4)',
-              background: 'var(--paper-2)',
-              border: '1px solid var(--paper-3)',
-              padding: '1px 4px',
-              borderRadius: 3,
-              flexShrink: 0,
-            }}
+            className="kw-kbd"
           >
             ↵
           </span>
@@ -1091,6 +1061,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
             actions={[
               ...(!easy && it.taskNodeId ? [{ key: 'timer', label: pomoConfig.mode === 'observe' ? 'Track it now' : 'Focus on it', icon: (pomoConfig.mode === 'observe' ? 'observe' : 'play') as 'observe' | 'play', onClick: () => { onCommand('todo.startPomoForItem', { itemId: it.id }); setWhenPick(null); } }] : []),
               { key: 'done', label: it.done ? 'Not done yet' : 'Mark done', icon: (it.done ? 'undo' : 'check') as 'undo' | 'check', onClick: () => { onCommand('todo.toggle', { id: it.id }); setWhenPick(null); } },
+              ...(!it.done ? [{ key: 'wontdo', label: "Won't do", icon: 'drop' as const, onClick: () => { wontDoItem(node.id, it.id); setWhenPick(null); } }] : []),
               ...(it.taskNodeId ? [{ key: 'show', label: 'Show', icon: 'show' as const, onClick: () => { const t = it.taskNodeId!; setWhenPick(null); void showTask(t); } }] : []),
               { key: 'delete', label: 'Delete', icon: 'delete' as const, danger: true, onClick: () => { removeItem(it.id); setWhenPick(null); } },
             ]}

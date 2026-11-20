@@ -31,7 +31,7 @@ const isoAt = (ms: number, fallback: string): string => (Number.isFinite(ms) ? n
 
 export const pomoSource: AnalyticsDataSource = {
   id: 'pomo',
-  label: 'Pomo',
+  label: 'Timer',
   collect(board: BoardLike): AnalyticsEvent[] {
     const out: AnalyticsEvent[] = [];
     for (const n of board.nodes) {

@@ -43,9 +43,10 @@ const hm = (ms: number) => {
 };
 const fmtMin = (m: number) => (m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}m` : ''}`);
 
+// window-frame.md, cards — filled buttons in sentence case, no outlined boxes.
 const btn: React.CSSProperties = {
-  flex: 1, padding: '5px 6px', background: 'transparent', border: '1px solid var(--paper-3)', borderRadius: 4,
-  color: 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em', textTransform: 'uppercase', cursor: 'pointer',
+  flex: 1, minWidth: 0, height: 34, padding: '0 8px', background: 'var(--paper-2)', border: 'none', borderRadius: 10,
+  color: 'var(--ink)', fontFamily: 'var(--font-read)', fontSize: 13, whiteSpace: 'nowrap', cursor: 'pointer',
 };
 
 export function TaskInfoPopup(props: TaskInfoPopupProps) {
@@ -64,22 +65,25 @@ function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () 
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
       <div
         data-testid="task-info-popup"
+        className="kw-card"
         style={{
           position: 'fixed',
-          left: Math.min(x + 4, window.innerWidth - 270),
+          left: Math.max(8, Math.min(x + 4, window.innerWidth - 308)),
           top: Math.max(8, Math.min(y + 6, window.innerHeight - 170)),
           // A tall popup near the bottom scrolls instead of leaving the screen.
           maxHeight: 'calc(100vh - 16px)',
           overflowY: 'auto',
           zIndex: Z.popup,
-          width: 250,
+          width: 300,
+          boxSizing: 'border-box',
           background: 'var(--paper)',
           border: '1px solid var(--paper-3)',
-          borderRadius: 8,
-          padding: '12px 14px',
-          fontFamily: 'var(--font-mono)',
+          borderRadius: 14,
+          padding: 16,
+          fontFamily: 'var(--font-read)',
+          fontSize: 13,
           color: 'var(--ink)',
-          boxShadow: 'var(--shadow-1)',
+          boxShadow: '0 18px 44px rgba(0,0,0,0.5)',
         }}
       >
         {children}
@@ -132,31 +136,31 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
 
   return (
     <Shell x={x} y={y} onClose={onClose}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, flexShrink: 0, background: tone }} />
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: info.done ? 'line-through' : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <span aria-hidden style={{ width: 9, height: 9, borderRadius: 999, flexShrink: 0, background: tone }} />
+        <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: info.done ? 'line-through' : 'none' }}>
           {info.text || 'Untitled task'}
         </span>
-        {info.done && <span style={{ fontSize: 11, color: 'var(--acid-ink, var(--acid))' }} ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><LineGlyph name="check" size={9} weight={2.6} />DONE</span></span>}
+        {info.done && <span style={{ fontSize: 12.5, color: 'var(--acid-ink, var(--acid))' }} ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><LineGlyph name="check" size={10} weight={2.6} />Done</span></span>}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8 }}>{when}</div>
-      {!easy && <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--ink-2)', marginBottom: 10, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 12, paddingLeft: 19 }}>{when}</div>
+      {!easy && <div style={{ display: 'flex', gap: '4px 14px', fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 12, flexWrap: 'wrap', padding: '10px 12px', borderRadius: 10, background: 'var(--paper-2)' }}>
         {info.catId && info.catColor && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <CategoryIcon id={info.catId} color={info.catColor} size={11} />{info.catLabel}
           </span>
         )}
-        <span>plan {info.plannedMin ? fmtMin(info.plannedMin) : '—'}</span>
-        <span style={{ color: info.trackedMin > 0 ? 'var(--ink)' : 'var(--ink-4)' }}>tracked {fmtMin(info.trackedMin)}</span>
+        <span>Planned <b style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--ink)' }}>{info.plannedMin ? fmtMin(info.plannedMin) : '—'}</b></span>
+        <span>Recorded <b style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: info.trackedMin > 0 ? 'var(--ink)' : 'var(--ink-4)' }}>{fmtMin(info.trackedMin)}</b></span>
       </div>}
       {/* #207 — the task's story from the time log (per-day work, plan moves, completions). */}
       {!easy && <TaskTimeline taskId={taskId} />}
-      <div style={{ display: 'flex', gap: 4 }}>
-        {!info.done && !easy && <button type="button" data-testid="task-info-focus" style={btn} onClick={act(() => { void startFocusOnTask(taskId); })}>Focus</button>}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {!info.done && !easy && <button type="button" data-testid="task-info-focus" title="Start the Timer on this plan" style={{ ...btn, background: 'var(--btn-primary-bg, var(--acid))', color: 'var(--btn-primary-fg, #111)', fontWeight: 600 }} onClick={act(() => { void startFocusOnTask(taskId); })}>Start</button>}
         <button type="button" data-testid="task-info-done" style={btn} onClick={act(() => { void toggleTaskDone(taskId); })}>{info.done ? 'Reopen' : 'Done'}</button>
         <button type="button" data-testid="task-info-show" style={btn} onClick={act(() => focusNode(taskId))}>Show</button>
         {/* A chain successor has no scheduledFor of its own but is planned too. */}
-        {planAnchor && <button type="button" data-testid="task-info-unschedule" title={planAnchor === taskId ? 'Remove from the calendar (keeps the task)' : 'Remove the whole chain from the calendar (keeps the tasks)'} style={{ ...btn, color: 'var(--rust)', borderColor: 'var(--rust)' }} onClick={act(() => { void unscheduleTask(taskId); })}>{planAnchor === taskId ? 'Unplan' : 'Unplan chain'}</button>}
+        {planAnchor && <button type="button" data-testid="task-info-unschedule" title={planAnchor === taskId ? 'Remove from the calendar (keeps the task)' : 'Remove the whole chain from the calendar (keeps the tasks)'} style={{ ...btn, color: 'var(--rust)' }} onClick={act(() => { void unscheduleTask(taskId); })}>{planAnchor === taskId ? 'Unplan' : 'Unplan chain'}</button>}
       </div>
     </Shell>
   );

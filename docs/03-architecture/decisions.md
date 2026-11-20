@@ -2631,3 +2631,49 @@ Plans get a card on the board (TaskNode, CardParts: 220 × 120, name + box, kind
 
 ### Round two (2026-11-09)
 The user found the cards unclear (a bare "0" in a circle, no clear click target, an event with nothing to do, a time tile without a day) and questioned the wire dots. Picked draft A of "Habit and event cards, round two": **no wire dots** on either card (wires mean "this plan, then that one"; a habit or an event never sits in that order — old wires are not drawn but kept); the **habit** keeps its week as seven lettered squares and **today's square is the button** (tick, or "+1 · 1/2" for an amount); the **event** carries a calendar page with the **next date** it happens, its time span and rule, and two buttons — **Skip this one** (`habit.lane.skip|unskip`) and **Show** (rings its block on the Calendar; `krnl show <event>`).
+
+## Decision 44 — Chains give the order; they never move a plan that has its own time (2026-11-19)
+
+**Amends Decision 30.** Decision 30 made a plan's own time an earliest start: when the plan before it in a chain ended later, the plan was pushed. That moved plans the owner had placed (the "tasks jumped to today and tomorrow" report, and overlaps resolved by silently shifting the later plan). The owner approved: keep the order, stop the pushing.
+
+**Rule.**
+- A plan with its own time (`scheduledFor`) is placed at that time. Nothing before it in its chain changes it.
+- A plan in a chain with **no** time of its own is still placed by the chain: it starts after everything before it has ended (the later of the previous ends). The same holds for a parallel branch without its own time.
+- Two chained plans may therefore overlap on the Calendar when their own times overlap. The app shows that as it is; it does not resolve it.
+
+**Consequences.**
+- Moving or lengthening one plan never moves another plan that has a time. The Calendar's "pushed" notice no longer fires for timed plans.
+- No data change and no migration: only the derived placements differ.
+- Tests: `scheduleSelector.chainPush.test.ts`, `scheduleSelector.test.ts` (Test 15), `WeekView.pushNotice.test.tsx`, `calendar.parallelDrop.test.ts` assert the new rule.
+
+## Decision 45 — One frame for windows, one pattern for menus and cards (2026-11-19)
+
+Every window uses the shared header, time row and footer (`docs/04-visual-system/window-frame.md`); every right-click menu has six rows at most with rarer rows behind More (`docs/04-visual-system/menus.md`); the plan card is short by default and its main button says Save. A new control gets a slot in these, not a new spot. `tests/unit/renderer/windowFrame.test.ts` guards it.
+
+## Decision 46 — One name per window: the Timer (2026-11-19)
+
+The timer window had five names (RECORD, TIME LOG, POMO, DEEP WORK · POMO.025, POMO / OBSERVE). It is now **Timer** everywhere a person reads it: the top bar, the window header, the floating timer, Settings, the tutorials, the status bar. Its two ways of working are **Sessions** (timed rounds with breaks) and **Stopwatch** (runs until you stop). A window's header says what its top-bar toggle says, and a mode never renames a window.
+
+- Words only. The node kind (`pomo`), the config values (`mode: 'pomodoro' | 'observe'`), the commands (`krnl pomo …`) and every test id are unchanged, so no board migration and no CLI change.
+- The Clock's header says "Clock" for the same reason (it said "Today · Schedule").
+- Guard: `tests/unit/renderer/windowFrame.test.ts`.
+
+## Decision 47 — Cards are a list you read; words get a reading font (2026-11-19)
+
+The owner found the add cards "ugly, unreadable, not user friendly" after their sizes were unified (same width and gaps, but still rows of identical outlined boxes labelled in small capitals in the code font). Three redesigns were drafted (a list, questions, one sentence); the owner picked the list (A) and, for the Timer, "the time, and the one plan" (A).
+
+- **Cards:** a name, one filled block with a line per setting, one main button. No outlined boxes. Rule and sizes: `docs/04-visual-system/window-frame.md`, "Cards"; code: `ui/addCard.tsx`.
+- **Type:** a second font token, `--font-read` (Geist), for words; `--font-mono` keeps times and numbers. This is the first change to the app's type since the cyber theme; it applies only where a surface has been moved to the new design.
+- **Timer:** the stopwatch face is the time, its state in words and today as one line; the three total tiles are gone (Analytics has them). A plan due now is one card with one button.
+- No behaviour, command, test id or board field changed, so no migration and no CLI change.
+- Guard: `tests/unit/renderer/windowFrame.test.ts`.
+
+## Decision 48 — The window standard; Timer A (2026-11-20)
+
+The owner asked for "a standard, a template so all are unified and simple", after pointing at three headers that each looked different. One sheet (H) drew the standard and three sheets drew full Timer redesigns; the owner picked the standard and Timer A, then corrected the built Timer twice (no stacked status line; no dimmed time, no crowded row).
+
+- **Standard:** header 40 / time row 36 / footer 48, the reading font in normal letters, a filled view switch with the chosen view lifted, borderless 28 px icon buttons, filled 34 px footer buttons. It is one block of CSS on the classes every window already uses (`.kw-head`, `.kw-views`, `.kw-btn`, `.kw-range`, `.kw-foot`, `.kw-action`), so it reaches all windows at once. Rule: `docs/04-visual-system/window-frame.md`.
+- **Timer A:** one clock for Sessions and Stopwatch; the state in the header; one rounded button for what you are on; today as one line. The Pro frame style no longer names the Blocks face, so "Standard" is the default; the other faces remain selectable.
+- **Never:** underlined text links for actions; a line of state words under the time; dimming the time.
+- No behaviour, command, test id or board field changed. Button and header words changed from capitals to normal letters.
+- Guard: `tests/unit/renderer/windowFrame.test.ts`.

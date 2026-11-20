@@ -31,7 +31,8 @@ export interface DoingPickerProps {
   onClear: () => void;
 }
 
-const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-4)' };
+// Section names in the list: sentence case, the reading font (window-frame.md, cards).
+const mono: React.CSSProperties = { fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-3)' };
 
 export function DoingPicker({ caption, current, recents, tasks, library, onPick, onClear }: DoingPickerProps) {
   const anchor = useRef<HTMLButtonElement>(null);
@@ -92,9 +93,9 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
         onClick={() => pick(c)}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer',
-          padding: '6px 8px', borderRadius: 6, border: 'none',
+          minHeight: 34, padding: '0 10px', borderRadius: 8, border: 'none',
           background: on ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
-          color: on ? 'var(--ink)' : 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 11,
+          color: on ? 'var(--ink)' : 'var(--ink)', fontFamily: 'var(--font-read)', fontSize: 13.5,
         }}
       >
         {c.taskId
@@ -110,10 +111,10 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
     <>
       <div
         data-testid="pomo-now"
-        style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30, padding: '0 4px 0 8px', border: `1px solid ${curCat?.color ?? (current ? 'var(--acid)' : 'var(--paper-3)')}`, borderRadius: 5 }}
+        data-caption={caption}
+        style={{ alignSelf: 'center', maxWidth: '100%', minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 8, height: 36, padding: '0 8px 0 14px', borderRadius: 999, background: 'var(--paper-2)', fontFamily: 'var(--font-read)' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <span style={mono}>{caption}</span>
         <button
           ref={anchor}
           type="button"
@@ -121,16 +122,17 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
           title="Pick what you're doing: a recent one, a task, or type a new name"
           onClick={() => setOpen((o) => !o)}
           style={{
-            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: '100%', padding: 0,
+            flex: '0 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: '100%', padding: 0,
             background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-            fontFamily: 'var(--font-mono)', fontSize: 11, color: current ? 'var(--ink)' : 'var(--ink-4)',
+            fontFamily: 'var(--font-read)', fontSize: 13.5, fontWeight: current ? 600 : 400, color: current ? 'var(--ink)' : 'var(--ink-3)',
           }}
         >
           {current && icon(current)}
-          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {current ? current.label : 'pick or type what you’re doing…'}
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {current ? current.label : 'What are you doing?'}
           </span>
-          {curCat && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{curCat.label}</span>}
+          {/* The kind of work, unless it is the name itself ("Study Study"). */}
+          {curCat && current && curCat.label.toLowerCase() !== current.label.toLowerCase() && <span style={{ fontSize: 12.5, fontWeight: 400, color: 'var(--ink-3)', flexShrink: 0 }}>{curCat.label}</span>}
           <span aria-hidden style={{ opacity: 0.6, fontSize: 11, color: 'var(--ink-3)' }}><LineGlyph name="caretDown" size={9} /></span>
         </button>
         {current && (
@@ -148,27 +150,27 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
       </div>
 
       <Popover anchor={anchor.current} open={open} onClose={() => setOpen(false)} minWidth={280}>
-        <div style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: 4 }}>
+        <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: 8, fontFamily: 'var(--font-read)' }}>
           <input
             data-testid="pomo-now-type"
             autoFocus
             value={typed}
-            placeholder="Search, or type something new…"
+            placeholder="Search, or type something new"
             onChange={(e) => setTyped(e.target.value)}
             onKeyDown={(e) => {
               if (e.key !== 'Enter' || !typed.trim()) return;
               const only = shownOpen.length === 1 && shownOpen[0] ? { label: shownOpen[0].text, tag: null, taskId: shownOpen[0].id } : null;
               pick(only ?? { label: typed.trim(), tag: null, taskId: null });
             }}
-            style={{ margin: '0 0 6px', padding: '7px 9px', background: 'var(--paper-2)', border: '1px solid var(--paper-3)', borderRadius: 6, color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 11, outline: 'none' }}
+            style={{ margin: '0 0 6px', height: 36, padding: '0 12px', boxSizing: 'border-box', background: 'var(--paper-3)', border: 'none', borderRadius: 10, color: 'var(--ink)', fontFamily: 'var(--font-read)', fontSize: 13.5, outline: 'none' }}
           />
           {q && !typedHit && row('new', { label: typed.trim(), tag: null, taskId: null }, 'pomo-now-new')}
-          {shownOpen.length > 0 && <span style={{ ...mono, padding: '8px 8px 2px' }}>Tasks</span>}
+          {shownOpen.length > 0 && <span style={{ ...mono, padding: '8px 10px 4px' }}>Your plans</span>}
           {shownOpen.map((t) => row(`t-${t.id}`, { label: t.text, tag: null, taskId: t.id }, `pomo-now-task-${t.id}`))}
-          {openTasks.length > shownOpen.length && <span style={{ ...mono, textTransform: 'none', letterSpacing: 0, padding: '0 8px' }}>+{openTasks.length - shownOpen.length} more — keep typing</span>}
+          {openTasks.length > shownOpen.length && <span style={{ ...mono, padding: '2px 10px' }}>+{openTasks.length - shownOpen.length} more: keep typing</span>}
           {doneAll.length > 0 && !q && (
             <button type="button" data-testid="pomo-now-show-done" onClick={() => setShowDone((v) => !v)}
-              style={{ ...mono, padding: '8px 8px 2px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+              style={{ ...mono, padding: '8px 10px 2px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', textDecoration: 'underline', textUnderlineOffset: 3 }}>
               {showDone ? 'Hide done' : `Show done (${doneAll.length})`}
             </button>
           )}
@@ -176,15 +178,15 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
             <button key={`d-${t.id}`} type="button" data-testid={`pomo-now-reopen-${t.id}`}
               title={`"${t.text}" is done — reopen it to work on it`}
               onClick={() => { void toggleTaskDone(t.id).then(() => pick({ label: t.text, tag: null, taskId: t.id })); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', padding: '6px 8px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', minHeight: 34, padding: '0 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-3)', fontFamily: 'var(--font-read)', fontSize: 13.5 }}>
               <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(t.id), opacity: 0.5 }} />
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'line-through' }}>{t.text}</span>
-              <span style={{ fontSize: 11, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>↺ reopen &amp; track</span>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Reopen and record</span>
             </button>
           ))}
-          {cats.length > 0 && <span style={{ ...mono, padding: '8px 8px 4px' }}>{q ? `"${typed.trim()}" as category` : 'Or track a category'}</span>}
+          {cats.length > 0 && <span style={{ ...mono, padding: '10px 10px 6px' }}>{q ? `"${typed.trim()}" as a kind of work` : 'Or a kind of work'}</span>}
           {cats.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4, padding: '0 4px 4px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6, padding: '0 2px 2px' }}>
               {cats.map((t) => (
                 <button
                   key={t.id}
@@ -193,12 +195,12 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
                   title={q ? `"${typed.trim()}" as ${t.label}` : t.label}
                   onClick={() => pick({ label: q ? typed.trim() : t.label, tag: t.id, taskId: null })}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, cursor: 'pointer', padding: '4px 6px', borderRadius: 6,
-                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)',
-                    background: `color-mix(in srgb, ${t.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${t.color} 40%, transparent)`,
+                    display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0, cursor: 'pointer', height: 34, padding: '0 10px', borderRadius: 10,
+                    fontFamily: 'var(--font-read)', fontSize: 13, color: 'var(--ink)',
+                    background: 'var(--paper-3)', border: 'none',
                   }}
                 >
-                  <CategoryIcon id={t.id} color={t.color} size={11} />
+                  <CategoryIcon id={t.id} color={t.color} size={13} />
                   <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.label}</span>
                 </button>
               ))}

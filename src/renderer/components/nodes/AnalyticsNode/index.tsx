@@ -26,7 +26,7 @@ import { HoldButton } from '../../ui/HoldButton';
 import { PagedView } from '../../ui/PagedView';
 import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
-import { EASY_HIDDEN_PAGES, PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
+import { EASY_HIDDEN_PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
 import { useEasyMode } from '../../../store/uiMode';
 import { PageNav } from './PageNav';
 import { AnalyticsSettings } from './AnalyticsSettings';
@@ -175,38 +175,23 @@ const rootStyle: React.CSSProperties = {
   color: 'var(--k-an-ink-1, #eef1f4)',
 };
 
+// window-frame.md — size, spacing and type come from .kw-head; only the
+// Analytics colours are set here.
 const titlebarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  padding: '10px 14px',
   background: 'linear-gradient(180deg, var(--k-an-bg-3, #1f2226) 0%, var(--k-an-bg-2, #16181a) 100%)',
   borderBottom: '1px solid var(--k-an-line, #0a0c0e)',
   boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.03)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
   color: 'var(--k-an-ink-2, #c8cdd3)',
-  flexShrink: 0,
 };
 
-const dotStyle: React.CSSProperties = {
-  width: 8,
-  height: 8,
-  borderRadius: '50%',
-  background: 'var(--acid, #c9f158)',
-};
+const dotStyle: React.CSSProperties = { background: 'var(--acid, #c9f158)' };
 
+// window-frame.md — the header's context is plain words (no pills).
 const summaryChipStyle: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  letterSpacing: '0.06em',
-  padding: '2px 8px',
-  border: '1px solid var(--k-an-line-2, #2a2e33)',
-  borderRadius: 999,
-  background: 'var(--k-an-bg-3, rgba(20,22,24,0.6))',
-  color: 'var(--k-an-ink-1, #eef1f4)',
+  fontSize: 10.5,
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
   whiteSpace: 'nowrap',
   flexShrink: 0,
 };
@@ -227,12 +212,15 @@ const gearBtnStyle = (active: boolean): React.CSSProperties => ({
 });
 
 const toolbarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '10px 14px 0',
-  flexShrink: 0,
+  // The frame's time row in the Analytics' own colours. The page icons come
+  // first; the range switch moves to a second line when the window is narrow.
+  height: 'auto',
+  minHeight: 32,
   flexWrap: 'wrap',
+  gap: '6px 8px',
+  padding: '5px 12px',
+  borderBottom: '1px solid var(--k-an-line-2, #2a2e33)',
+  color: 'var(--k-an-ink-2, #c8cdd3)',
 };
 
 const tabPill = (active: boolean): React.CSSProperties => ({
@@ -583,12 +571,9 @@ export function AnalyticsNode({
       {/* Titlebar — the shared header class, so every frame style's header
           skin (Macintosh title bar, Submarine module tag, …) reaches it as it
           does the other mother windows. */}
-      <div className="krnl-node-header an-head" style={titlebarStyle}>
-        <span style={dotStyle} aria-hidden />
+      <div className="krnl-node-header an-head kw-head" style={titlebarStyle}>
+        <span className="kw-dot" style={dotStyle} aria-hidden />
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
-        <span style={{ color: 'var(--k-an-ink-4, #7d848b)' }}>·</span>
-        {/* The page you are on (the toolbar is icons only) — "3 sources" told a new user nothing. */}
-        <span data-testid="analytics-page-name" title={`${sources.length} data sources`} style={{ color: 'var(--k-an-ink-2b, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{PAGES.find((pg) => pg.id === currentPage)?.label ?? 'Summary'}</span>
         <div style={{ flex: 1 }} />
         <span className="an-chip an-chip--done" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>done </span>
@@ -596,40 +581,35 @@ export function AnalyticsNode({
         </span>
         <span className="an-chip an-chip--focus" style={summaryChipStyle}>
           <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>focus </span>
-          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin}m</span>
+          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin >= 60 ? `${Math.floor(tot.focusMin / 60)}h ${String(tot.focusMin % 60).padStart(2, '0')}m` : `${tot.focusMin}m`}</span>
         </span>
-        {streaks.longestHabitStreak > 0 && (
-          <span className="an-chip an-chip--streak" style={summaryChipStyle} title="Longest habit streak in this range">
-            <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>streak </span>
-            <span style={{ color: 'var(--acid-ink, var(--acid, #c9f158))', fontWeight: 600 }}>{streaks.longestHabitStreak}d</span>
-          </span>
-        )}
         <button
           type="button"
           data-testid="analytics-gear"
           aria-label={settingsOpen ? 'Close settings' : 'Open settings'}
           onClick={(e) => { e.stopPropagation(); onCommand('analytics.setSettingsOpen', { open: !settingsOpen }); }}
           onMouseDown={(e) => e.stopPropagation()}
-          style={gearBtnStyle(settingsOpen)}
+          className="kw-btn"
+          aria-expanded={settingsOpen}
           title={settingsOpen ? 'Done curating' : 'Pin or hide cards'}
         >
           {settingsOpen ? <SettingsIcon name="check" size={12} /> : <SettingsIcon name="settings" size={12} />}
         </button>
       </div>
 
-      {/* Page icons + range chips — one compact row; the rest is charts. */}
-      <div style={toolbarStyle}>
+      {/* window-frame.md — the time row: which page (an icon each, the current one named), then the range. */}
+      <div className="kw-range" style={toolbarStyle}>
         <PageNav current={currentPage} pages={pages} onPick={(id) => setJumpTo(pageSelector(id))} />
-        <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 4 }}>
+        {/* window-frame.md — the range is the same switch every window uses. */}
+        <div className="kw-views" role="group" aria-label="Range" style={{ marginLeft: 'auto' }}>
           {RANGE_PRESETS.map((days) => (
             <button
               key={days}
               type="button"
               data-testid={`analytics-range-${days}`}
+              aria-pressed={state.rangeDays === days}
               onClick={(e) => { e.stopPropagation(); onCommand('analytics.setRangeDays', { days }); }}
               onMouseDown={(e) => e.stopPropagation()}
-              style={chipBtn(state.rangeDays === days)}
             >
               {days}d
             </button>
@@ -826,7 +806,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
         cardId: 'estimates.perTask' as const,
         render: () => card('estimates.perTask', 'Estimate vs actual · per task', 2, 250, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Legend items={[{ label: 'Planned (estimate)', color: COLOR_PLANNED }, { label: 'Tracked (pomo, tagged)', color: COLOR_TRACKED }]} />
+            <Legend items={[{ label: 'Planned (estimate)', color: COLOR_PLANNED }, { label: 'Recorded on the task', color: COLOR_TRACKED }]} />
             <EstimateBars tasks={est.tasks} width={chartWidth(size.width, 480)} {...(size.height > 0 ? { height: size.height - 30 } : {})} />
           </div>
         )),
@@ -841,7 +821,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
         cardId: 'estimates.daily' as const,
         render: () => card('estimates.daily', 'Planned vs worked · per day', 3, 200, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Legend items={[{ label: 'Planned on calendar', color: COLOR_PLANNED }, { label: 'Worked (pomo)', color: COLOR_TRACKED }]} />
+            <Legend items={[{ label: 'Planned on calendar', color: COLOR_PLANNED }, { label: 'Recorded', color: COLOR_TRACKED }]} />
             <DailyPlanActual days={est.days} width={chartWidth(size.width, 640)} height={chartHeight(size.height - 20, 170)} />
           </div>
         )),

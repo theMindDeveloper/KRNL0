@@ -262,6 +262,10 @@ export const DOCK_REGISTRY = defineRegistry({
 export type DockStyle = keyof typeof DOCK_REGISTRY;
 export const DOCK_STYLES = Object.keys(DOCK_REGISTRY) as DockStyle[];
 export const DEFAULT_DOCK_STYLE: DockStyle = 'pro';
+/** The styles a person can pick (Settings → General → Appearance). The others
+ *  stay in the code but are not offered, and a saved one falls back to Pro
+ *  (owner, 2026-11-20: "keep just Paper and Pro"). */
+export const VISIBLE_DOCK_STYLES: DockStyle[] = ['classic', 'pro'];
 
 /** Convenience: read theme constraint for a given style (TopBar dark-only). */
 export function isDarkOnly(style: DockStyle): boolean {

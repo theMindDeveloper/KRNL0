@@ -173,7 +173,8 @@ const PRO_LIGHT: TokenMap = {
 const PRO: ThemeManifest = {
   tokens: { light: PRO_LIGHT, dark: PRO_DARK },
   components: {
-    pomo: { face: 'blocks' },
+    // No face of its own: the Timer shows its standard clock (window-frame.md, Timer A).
+    pomo: {},
     clock: { bezel: 'ring', hand: 'line', readoutWindow: true },
     terminal: { xterm: { dark: { background: '#0b0b10', foreground: '#c9cfc6', cursor: '#c9f158', cursorAccent: '#0b0b10' } } },
   },
