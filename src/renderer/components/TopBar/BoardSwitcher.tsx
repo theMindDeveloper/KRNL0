@@ -62,7 +62,12 @@ export function BoardSwitcher({ quiet = false }: { quiet?: boolean }) {
   // Close on a click elsewhere or Escape.
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false); };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      // The guide's own card (Next, Back) is not "elsewhere": the menu a tour step shows stays open.
+      if (t?.closest?.('[data-testid="tour-card"]')) return;
+      if (wrap.current && !wrap.current.contains(t as Node)) setOpen(false);
+    };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('mousedown', onDown, true);
     window.addEventListener('keydown', onKey);

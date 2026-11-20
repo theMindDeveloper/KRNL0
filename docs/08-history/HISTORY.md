@@ -3106,3 +3106,15 @@ Typecheck clean; all tests pass.
 - **Connectors only on task cards** (Decision 50).
 
 Typecheck clean; all tests pass.
+
+## [2026-11-20] — A tutorial for separate boards
+
+**Type:** Feature
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `Tour/tours.ts`, `Tour/voice/` (8 clips, `manifest.json`), `TopBar/BoardSwitcher.tsx`, `shared/cli/commandRegistry.ts`, docs (`boards.md` F12), tests (`tours.test.tsx`)
+
+**Summary:**
+- **Separate boards** tour (`krnl tour start boards`, Advanced): the name in the top bar, opening the menu, what a line shows, rename and delete, New board with its two ways to start, one timer at a time and reminders from every board. Two steps wait for the real press. Voiced.
+- The board menu stays open while the guide's own card is pressed, so a tour step can point inside it.
+
+Typecheck clean; all tests pass. Run once in the preview, step by step, with real presses.

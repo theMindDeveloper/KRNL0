@@ -185,6 +185,7 @@ const ANALYTICS = '[data-tour="mother-analytics"]';
 const TERM = '[data-tour="mother-term"]';
 const ORB = '[aria-label^="AI assistant"]';
 const GEAR = '[data-testid="topbar-settings"]';
+const BOARDS = '[data-testid="topbar-canvas-switcher"]';
 const CARD = '[data-testid="task-node-root"]';
 // The names of the examples a tour adds (store/tourExamples.ts), so a step can ring that card.
 const EXAMPLE_MISSED_TEXT = 'Example: Read chapter 2';
@@ -431,6 +432,24 @@ export const TOURS: readonly Tour[] = [
       { say: "Need a separate space? Make another board here, one per project. Each board has its own plans, habits and calendar.", onlyIn: 'advanced', target: '[data-testid="topbar-canvas-switcher"]', badge: 'BOARDS', text: 'Need a separate space? Make **another board** here, one per project. Each board has its own plans, habits and calendar.' },
       { say: "Drag from the dot on a card's side to another card, to put plans in order. The wire shows what comes next.", onlyIn: 'advanced', target: '[data-testid="task-node-root"]', badge: 'IN ORDER', text: '**Drag from the dot** on a card’s side to another card to put plans **in order**: the wire shows what comes next.' },
       { say: "That's the board! Ask me to show something, add a note, or tidy up. I can change it for you.", target: ORB, badge: 'ASK ME', text: 'That’s the board. **Ask me** to show something, add a note or tidy up: I can change it for you.' },
+    ],
+  },
+  // boards.md F12 — separate boards, by opening the menu and the New board form.
+  // Advanced only: in Easy the menu appears once a second board exists.
+  {
+    id: 'boards',
+    onlyIn: 'advanced',
+    title: 'Separate boards',
+    summary: 'One board per project, each with its own plans, habits and time',
+    steps: [
+      { say: "Up here is the name of your board. A board is a whole space of its own, with its own to-dos, habits, calendar, timer history and analytics. Nothing is shared between boards.", target: BOARDS, badge: 'YOUR BOARD', text: 'Up here is the name of your **board**. A board is a whole space of its own: its own **todos, habits, calendar, timer history and analytics**. Nothing is shared between boards.' },
+      { say: "Press the name to open your boards.", target: BOARDS, badge: 'PRESS', text: 'Press the **name** to open your boards.', waitFor: { click: BOARDS }, hint: 'Waiting for a press on the name…' },
+      { say: "Every line is one board, with how many plans and habits it holds. The tick marks the one you're in. Press another one, and the whole app moves there.", target: '[data-testid="board-menu"]', badge: 'YOUR BOARDS', text: 'Every line is one board, with how many **plans and habits** it holds. The **tick** marks the one you are in. Press another and the whole app moves there.' },
+      { say: "The two small buttons on a line rename a board, or delete it. The board you're in can't be deleted, and neither can your last one.", target: '[data-testid="board-menu"]', badge: 'RENAME · DELETE', text: 'The two small buttons on a line **rename** a board or **delete** it. The board you are in cannot be deleted, and neither can your last one.' },
+      { say: "Now press \"New board\".", target: '[data-testid="board-new"]', badge: 'PRESS', text: 'Now press **New board**.', waitFor: { click: '[data-testid="board-new"]' }, hint: 'Waiting for New board…' },
+      { say: "Give it a name, then choose. \"Start empty\" gives you a clean space. \"Copy my habits\" brings your habits along, starting from zero. Creating it takes you straight there, so this tour ends. Or press Next to keep looking.", target: '[data-testid="board-new-form"]', badge: 'TWO WAYS', text: 'Name it, then choose: **Start empty**, or **Copy my habits** (the same habits, starting from zero). Creating it takes you straight there and ends this tour. Or press **Next** to keep looking.' },
+      { say: "One timer runs at a time. If it's still running in another board, a note appears up here, and one press takes you back to it. Reminders reach you from every board, with the board's name.", target: BOARDS, badge: 'ONE TIMER', text: '**One timer at a time.** If it is still running in another board, a note appears up here; one press takes you back. **Reminders** reach you from every board, with the board’s name.' },
+      { say: "That's boards! One per project, or one for work and one for home. You can also ask me to make one.", target: ORB, badge: 'ASK ME', text: 'That’s boards: one per project, or one for work and one for home. You can also **ask me** to make one.' },
     ],
   },
   {

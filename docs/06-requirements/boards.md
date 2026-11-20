@@ -19,6 +19,7 @@ A board is a separate space: its own todos, habits, calendar, timer history, ana
 | F9 | **A switch is not a start.** Opening another board never shows the start-up screen, What's new or Welcome back, and the AI does not say hello: the board simply appears. |
 | F10 | **Reminders from every board.** A plan with a reminder in a board that is not open still reminds, and the notification names the board. |
 | F11 | **One timer, every way to start.** F4 holds for every way a timer can start: the Timer's button, a task, the calendar, a shortcut and `krnl pomo start` (which answers with the board the timer runs in). |
+| F12 | **A tutorial.** `krnl tour start boards` (and the Orb's Tutorials list, Advanced): the name in the top bar, opening the menu, what a line shows, rename and delete, **New board** with its two ways to start, one timer at a time and reminders from every board. It is voiced like every tour. |
 
 ## Non-Functional Requirements
 

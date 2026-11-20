@@ -425,7 +425,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Guided tutorials — one per part of the app',
     subcommands: [
       { name: 'list', usage: 'tour list', summary: 'List the tutorials' },
-      { name: 'start', usage: 'tour start <id>', summary: 'Start a tutorial in the KRNL0 window (first-day, welcome, pomo, todo, calendar, clock, habits, analytics, terminal)' },
+      { name: 'start', usage: 'tour start <id>', summary: 'Start a tutorial in the KRNL0 window (first-day, welcome, pomo, todo, calendar, clock, habits, analytics, board, boards, terminal)' },
     ],
   },
   {

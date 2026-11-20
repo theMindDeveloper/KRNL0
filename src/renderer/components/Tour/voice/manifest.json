@@ -785,6 +785,54 @@
       "board"
     ]
   },
+  "fe598dae": {
+    "text": "Up here is the name of your board. A board is a whole space of its own, with its own to-dos, habits, calendar, timer history and analytics. Nothing is shared between boards.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "2b281e05": {
+    "text": "Press the name to open your boards.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "e764412f": {
+    "text": "Every line is one board, with how many plans and habits it holds. The tick marks the one you're in. Press another one, and the whole app moves there.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "a86a89e5": {
+    "text": "The two small buttons on a line rename a board, or delete it. The board you're in can't be deleted, and neither can your last one.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "48aa8214": {
+    "text": "Now press \"New board\".",
+    "tours": [
+      "boards"
+    ]
+  },
+  "5e17fb84": {
+    "text": "Give it a name, then choose. \"Start empty\" gives you a clean space. \"Copy my habits\" brings your habits along, starting from zero. Creating it takes you straight there, so this tour ends. Or press Next to keep looking.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "539497ee": {
+    "text": "One timer runs at a time. If it's still running in another board, a note appears up here, and one press takes you back to it. Reminders reach you from every board, with the board's name.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "8b706560": {
+    "text": "That's boards! One per project, or one for work and one for home. You can also ask me to make one.",
+    "tours": [
+      "boards"
+    ]
+  },
   "b64a60c8": {
     "text": "The Terminal runs a real shell. Everything in the app can also be done with kernel commands. Try \"kernel help\"!",
     "tours": [
