@@ -22,8 +22,8 @@ export function AnalyticsMother(props: NodeProps<AnalyticsState, AnalyticsConfig
       slotTotal={slotTotal}
       width={MOTHER_WIDTH}
       position={node.position}
-      background="transparent"
-      borderColor="transparent"
+      // The standard frame, like every window: Analytics no longer paints a
+      // background and border of its own inside a transparent frame.
     >
       <div data-testid="analytics-mother" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <AnalyticsNode {...props} />

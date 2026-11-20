@@ -29,13 +29,12 @@ export function TimerClock({ text, blink = false, testId = 'pomo-clock' }: { tex
   const i = text.lastIndexOf(':');
   return (
     <div data-testid="pomo-timer-clock" style={{ display: 'flex', justifyContent: 'center', width: '100%', containerType: 'inline-size' }}>
-      {/* The reading font's numerals (plain zeros, equal widths), not the code
-          font's dotted zeros. The colon is two drawn dots centred on the digits:
-          a typed ":" sits low beside large numerals. */}
-      <div data-testid={testId} style={{ display: 'flex', alignItems: 'center', fontFamily: 'var(--font-read)', fontVariantNumeric: 'tabular-nums lining-nums', fontFeatureSettings: '"tnum" 1, "lnum" 1', lineHeight: 1,
-        // Grows with the window (about a quarter of its width), so a large window is not mostly empty.
-        // Geist 500 was chosen from twelve faces: plain zeros, equal-width digits, calm at this size.
-        fontSize: 'clamp(64px, 24cqw, 168px)', fontWeight: 500, letterSpacing: '-0.025em', color: 'var(--ink)' }}>
+      {/* The clock font (--font-clock): monospaced like the app, with plain
+          zeros. The colon is two drawn dots centred on the digits: a typed ":"
+          sits low beside large numerals. */}
+      <div data-testid={testId} style={{ display: 'flex', alignItems: 'center', fontFamily: 'var(--font-clock)', fontVariantNumeric: 'tabular-nums lining-nums', lineHeight: 1,
+        // Grows with the window, so a large window is not mostly empty; smaller once it shows hours.
+        fontSize: text.length > 5 ? 'clamp(44px, 14cqw, 112px)' : 'clamp(60px, 20cqw, 152px)', fontWeight: 500, letterSpacing: '-0.05em', color: 'var(--ink)' }}>
         <span>{i < 0 ? text : text.slice(0, i)}</span>
         {i >= 0 && (
           <span data-testid="pomo-colon" role="presentation" style={{ display: 'inline-flex', flexDirection: 'column', justifyContent: 'center', gap: '0.24em', margin: '0 0.13em', animation: blink ? 'pomo-blink 1s steps(1) infinite' : 'none' }}>

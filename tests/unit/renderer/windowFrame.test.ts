@@ -372,10 +372,10 @@ describe('Visual bugs fixed (owner list, 2026-11-20)', () => {
 describe('The Timer clock, the layout switch and a flat Analytics header (owner, 2026-11-20)', () => {
   const root = join(process.cwd(), 'src/renderer');
   const read = (f: string): string => readFileSync(join(root, f), 'utf8');
-  it('the time is set in the reading font, grows with the window, and its colon is two drawn dots centred on the digits', () => {
+  it('the time is set in the clock font, grows with the window, and its colon is two drawn dots centred on the digits', () => {
     const d = read('components/nodes/PomoNode/ObserveDash.tsx');
-    expect(d).toContain("fontSize: 'clamp(64px, 24cqw, 168px)', fontWeight: 500");
-    expect(d).toContain("alignItems: 'center', fontFamily: 'var(--font-read)'");
+    expect(d).toContain("text.length > 5 ? 'clamp(44px, 14cqw, 112px)' : 'clamp(60px, 20cqw, 152px)'");
+    expect(d).toContain("alignItems: 'center', fontFamily: 'var(--font-clock)'");
     expect(d).toContain('data-testid="pomo-colon" role="presentation"');
   });
   it('Fit sits before the Station / Free switch, so the switch never moves when Fit appears', () => {

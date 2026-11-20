@@ -3023,3 +3023,15 @@ Typecheck clean; all tests pass. Checked as screenshots in light and dark; the w
 - **Analytics:** the header and the window body are flat (its own gradient read as a shadow under the header).
 
 Typecheck clean; all tests pass. Checked as screenshots in light and dark at three window sizes.
+
+## [2026-11-20] — Analytics frame restored; the Timer's clock font
+
+**Type:** Bug Fix + Feature (UI)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `AnalyticsNode/AnalyticsMother.tsx`, `PomoNode/ObserveDash.tsx`, `styles/tokens.css`, `index.html`, tests (`windowFrame.test.ts`)
+
+**Summary:**
+- **Analytics:** its frame was set to transparent because the dashboard used to paint its own background and border; after those were removed the window had no background in the Free layout. It now uses the standard frame like every window.
+- **Timer clock:** a font of its own, `--font-clock` (Azeret Mono 500): monospaced like the rest of the app, with plain zeros. Chosen from 28 faces compared on the app's colours. The time is a little smaller once it shows hours, so it always fits.
+
+Typecheck clean; all tests pass. Checked as screenshots in both layouts, light and dark.
