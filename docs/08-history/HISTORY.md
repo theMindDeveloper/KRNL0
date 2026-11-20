@@ -3183,3 +3183,14 @@ Typecheck clean; all tests pass.
 - Not part of this PR: the tag `v0.13.0` and the Publish click.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-20] — v0.13.0 published
+
+**Type:** Release
+**PRs/Commits:** #263 (release PR), tag `v0.13.0`
+
+**Summary:**
+- Tag `v0.13.0` pushed on `main`; the release workflow built the Windows installer and the web app and created the draft with `KRNL0-Setup-0.13.0.exe`, its `.blockmap`, `latest.yml` (version 0.13.0) and `krnl0-web-0.13.0.tar.gz` with its `.sha256` (checked: the checksum matches and the archive has the web app's `index.html`). The owner approved, and the release was published.
+- The KRNL0 server 0.1.0 (`theMindDeveloper/krnl0-server`, now public) pins this web app through its repository variable `KRNL0_WEB_VERSION=0.13.0` and checks its SHA-256 before bundling it; its Linux bundles and Docker image (public on GHCR) were published the same evening.
+- The website has a Server page with the step-by-step setup (theminddev.com/krnl0/server.html) and the 0.13 news.
+
