@@ -119,7 +119,7 @@ async function boot(): Promise<void> {
   };
 
   const bridge = createWebBridge({
-    host, engine, transport, appVersion: APP_VERSION, origin: location.origin,
+    host, engine, store, transport, appVersion: APP_VERSION, origin: location.origin,
     flush: () => kv.flush(), reload: () => location.reload(), logout,
   });
   bridgeRef = bridge;

@@ -150,4 +150,17 @@ describe('the saved badge, which also tells how sync is doing', () => {
     fireEvent.click(screen.getByText('Open website'));
     expect(bridge.appOpenExternal).toHaveBeenCalledWith('https://home.lan:8443');
   });
+
+  it('when logging out would drop changes the server lacks, it asks first (web)', async () => {
+    mount(info());
+    bridge.syncDisconnect = vi.fn(async (force?: boolean) => (force ? { ok: true } : { ok: false, unsent: 2 }));
+    render(<SaveSyncBadge />);
+    await act(async () => {});
+    await act(async () => { fireEvent.click(screen.getByTestId('topbar-live-badge')); });
+    await act(async () => { fireEvent.click(screen.getByText('Disconnect')); });
+    expect(bridge.syncDisconnect).toHaveBeenCalledWith(false);
+    expect(screen.getByTestId('sync-unsent').textContent).toContain('2 changes have not reached your server yet');
+    await act(async () => { fireEvent.click(screen.getByText('Log out anyway')); });
+    expect(bridge.syncDisconnect).toHaveBeenLastCalledWith(true);
+  });
 });

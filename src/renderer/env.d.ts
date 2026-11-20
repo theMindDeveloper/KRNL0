@@ -100,7 +100,8 @@ interface KrnlBridge {
   syncStatus?: () => Promise<unknown>
   syncBegin?: (address: string) => Promise<unknown>
   syncFinish?: (password: string, code?: string) => Promise<unknown>
-  syncDisconnect?: () => Promise<unknown>
+  /** Web: `force` logs out even with changes the server does not have yet. */
+  syncDisconnect?: (force?: boolean) => Promise<unknown>
   syncRetry?: () => Promise<unknown>
   syncDevices?: () => Promise<unknown>
   onSyncStatus?: (callback: (info: unknown) => void) => () => void

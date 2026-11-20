@@ -47,13 +47,24 @@ export function SaveSyncBadge() {
   const [connecting, setConnecting] = useState(false);
   const [devices, setDevices] = useState<SyncDevice[]>([]);
   const [busy, setBusy] = useState(false);
+  // Web: changes the server does not have yet, found when logging out.
+  const [unsent, setUnsent] = useState(0);
   const ref = useRef<HTMLButtonElement>(null);
   const look = chipLook(info);
   const configured = !!info?.configured;
 
   useEffect(() => {
     if (open && configured) void fetchDevices().then(setDevices);
+    if (!open) setUnsent(0);
   }, [open, configured]);
+
+  const leave = async (force: boolean): Promise<void> => {
+    setBusy(true);
+    const r = await disconnectSync(force);
+    setBusy(false);
+    if (r.unsent > 0) { setUnsent(r.unsent); return; }
+    setOpen(false);
+  };
 
   // No sync service in this window (tests, old builds): the plain badge.
   if (!info) {
@@ -137,13 +148,23 @@ export function SaveSyncBadge() {
                   ))}
                 </div>
               )}
-              {info.state === 'signed-out' && !IS_WEB ? (
+              {unsent > 0 ? (
+                <div role="alert" data-testid="sync-unsent" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 8, background: 'var(--paper-2)', border: '1px solid var(--rust)' }}>
+                  <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--ink)' }}>
+                    {unsent === 1 ? '1 change has' : `${unsent} changes have`} not reached your server yet. Logging out now removes {unsent === 1 ? 'it' : 'them'} from this browser.
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                    <SheetButton primary onClick={() => setUnsent(0)}>STAY</SheetButton>
+                    <SheetButton danger disabled={busy} onClick={() => void leave(true)}>Log out anyway</SheetButton>
+                  </div>
+                </div>
+              ) : info.state === 'signed-out' && !IS_WEB ? (
                 <SheetButton primary onClick={() => { setOpen(false); setConnecting(true); }}>CONNECT AGAIN</SheetButton>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${IS_WEB ? 2 : 3}, minmax(0, 1fr))`, gap: 8 }}>
                   <SheetButton disabled={busy} onClick={() => { setBusy(true); void syncNow().finally(() => setBusy(false)); }}>{busy ? 'Syncing…' : 'Sync now'}</SheetButton>
                   {!IS_WEB && <SheetButton onClick={() => { if (info.origin) void window.krnl?.appOpenExternal?.(info.origin); }}>Open website</SheetButton>}
-                  <SheetButton danger onClick={() => { setOpen(false); void disconnectSync(); }}>{IS_WEB ? 'Log out' : 'Disconnect'}</SheetButton>
+                  <SheetButton danger disabled={busy} onClick={() => void leave(false)}>{IS_WEB ? (busy ? 'Sending…' : 'Log out') : 'Disconnect'}</SheetButton>
                 </div>
               )}
             </>

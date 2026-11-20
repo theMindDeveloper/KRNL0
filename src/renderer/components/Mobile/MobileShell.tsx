@@ -306,6 +306,19 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
     <button type="button" className="m-icon-btn" aria-label="Settings" onClick={() => setSettings(true)} data-testid="m-settings"><Icon d={GEAR} /></button>
   );
 
+  // Focus takes the place of the views (never on top of them): one Timer window
+  // at a time, as on the desktop — two would both act when a session ends.
+  if (focus) {
+    return (
+      <MothersElsewhereContext.Provider value={true}>
+        <div className={`m-shell m-shell--${ff}`} data-testid={`m-shell-${ff}`}>
+          <Focus onClose={() => setFocus(false)} />
+          {settings && <SettingsModal theme={theme} onTheme={chooseTheme} onClose={() => setSettings(false)} />}
+        </div>
+      </MothersElsewhereContext.Provider>
+    );
+  }
+
   return (
     <MothersElsewhereContext.Provider value={true}>
     <div className={`m-shell m-shell--${ff}`} data-testid={`m-shell-${ff}`}>
@@ -341,7 +354,6 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
 
       {ff === 'phone' && <nav className="m-tabbar" aria-label="Views">{nav}</nav>}
 
-      {focus && <Focus onClose={() => setFocus(false)} />}
       {settings && <SettingsModal theme={theme} onTheme={chooseTheme} onClose={() => setSettings(false)} />}
     </div>
     </MothersElsewhereContext.Provider>

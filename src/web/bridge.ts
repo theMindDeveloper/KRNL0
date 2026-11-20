@@ -5,7 +5,7 @@
 
 import { mergeBoards } from '../shared/boardMerge';
 import { migrateBoard, seedBoard } from '../shared/boardMigrate';
-import { docName } from '../shared/sync/shape';
+import { docName, sameContent, stripDevice } from '../shared/sync/shape';
 import { stampEntry, TimeLogInputSchema, type TimeLogEntry } from '../shared/timelog';
 import { applyPrefsPatch, parseAppState, updateKind, type AppStateFile, type LaunchInfo } from '../shared/appState';
 import type { Json } from '../shared/sync/types';
@@ -13,6 +13,7 @@ import type { SyncEngine } from '../shared/sync/engine';
 import type { SyncDevice, SyncInfo } from '../shared/sync/port';
 import { newAssetId, type BoardMeta, type WebHost } from './sync/host';
 import type { WebTransport } from './sync/transport';
+import type { WebSyncStore } from './sync/store';
 
 const isObject = (v: unknown): v is Record<string, Json> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -26,6 +27,8 @@ const MIME: Record<string, string> = {
 export interface WebBridgeDeps {
   host: WebHost;
   engine: SyncEngine;
+  /** What this browser last agreed with the server (to tell unsent changes before logging out). */
+  store: WebSyncStore;
   transport: WebTransport;
   appVersion: string;
   /** Writes what is still queued for IndexedDB (before a reload). */
@@ -55,6 +58,22 @@ function resolveBoard(boards: BoardMeta[], ref: string | undefined): BoardMeta |
   const loose = boards.filter((b) => b.id.startsWith(r) || b.name.toLowerCase().startsWith(r.toLowerCase()));
   if (loose.length === 1) return loose[0]!;
   return loose.length > 1 || exact.length > 1 ? `board "${r}" is ambiguous` : `no board "${r}"`;
+}
+
+/** How long logging out waits for the last changes to reach the server. */
+const LOGOUT_WAIT_MS = 5000;
+
+/** Changes this browser holds that the server does not have yet (logging out would wipe them). */
+export function unsentChanges(host: WebHost, store: WebSyncStore): number {
+  let n = store.pendingTimelog().length;
+  for (const name of host.localDocs()) {
+    const local = host.read(name);
+    if (local === null) continue;
+    const base = store.getBase(name);
+    const mine = stripDevice(name, host.normalize(name, local));
+    if (!base || base.body === null || !sameContent(mine, base.body)) n++;
+  }
+  return n;
 }
 
 export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: (info: SyncInfo) => void } {
@@ -333,8 +352,21 @@ export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: 
         return [];
       }
     },
-    // On the web "disconnect" is logging out of this browser.
-    syncDisconnect: async () => { await d.logout(); return { ok: true }; },
+    // On the web "disconnect" is logging out of this browser, which wipes its
+    // copy: first send what is left (F4, F5); if the server still lacks
+    // something, say how much instead of logging out (unless forced).
+    syncDisconnect: async (force?: boolean) => {
+      if (!force) {
+        await Promise.race([
+          engine.syncNow().then(() => engine.idle()),
+          new Promise((r) => setTimeout(r, LOGOUT_WAIT_MS)),
+        ]).catch(() => {});
+        const unsent = unsentChanges(host, d.store);
+        if (unsent > 0) return { ok: false, unsent };
+      }
+      await d.logout();
+      return { ok: true };
+    },
   };
   return bridge;
 }

@@ -80,4 +80,8 @@ export async function finishConnect(password: string, code?: string): Promise<Re
 }
 
 export async function syncNow(): Promise<void> { await window.krnl?.syncRetry?.(); }
-export async function disconnectSync(): Promise<void> { await window.krnl?.syncDisconnect?.(); }
+/** Disconnect (desktop) or log out (web). On the web, `unsent` > 0 means it did not, to keep changes the server lacks. */
+export async function disconnectSync(force = false): Promise<{ ok: boolean; unsent: number }> {
+  const r = (await window.krnl?.syncDisconnect?.(force)) as { ok?: boolean; unsent?: number } | undefined;
+  return { ok: r?.ok !== false, unsent: typeof r?.unsent === 'number' ? r.unsent : 0 };
+}

@@ -107,7 +107,7 @@ async function login(): Promise<{ cookie: string; csrf: string }> {
 interface Desk { kind: 'desk'; name: string; dir: string; svc: SyncService }
 interface Browser {
   kind: 'web'; name: string; host: WebHost; engine: SyncEngine; bridge: ReturnType<typeof createWebBridge>;
-  reloads: number; boardChanged: number;
+  reloads: number; boardChanged: number; logouts: number;
 }
 type Device = Desk | Browser;
 const desks: Desk[] = [];
@@ -154,10 +154,11 @@ async function makeBrowser(name: string, opts: { blockSocket?: boolean } = {}): 
     headers: { Cookie: cookie, Origin: at },
   });
   const engine = new SyncEngine({ transport, host, store, debounceMs: 100 });
-  const b: Browser = { kind: 'web', name, host, engine, bridge: null as unknown as Browser['bridge'], reloads: 0, boardChanged: 0 };
+  const b: Browser = { kind: 'web', name, host, engine, bridge: null as unknown as Browser['bridge'], reloads: 0, boardChanged: 0, logouts: 0 };
   b.bridge = createWebBridge({
-    host, engine, transport, appVersion: '0.13.0-sim', origin: at,
-    flush: async () => {}, reload: () => { b.reloads++; }, logout: async () => {},
+    host, engine, store, transport, appVersion: '0.13.0-sim', origin: at,
+    flush: async () => {}, reload: () => { b.reloads++; }, // As the page does (web/main.tsx): sync stops at once, then the copy is wiped.
+    logout: async () => { b.logouts++; engine.stop(); },
   });
   b.bridge.onBoardChanged(() => { b.boardChanged++; });
   engine.start();
@@ -323,4 +324,33 @@ describe.skipIf(!available)('web app + desktop sync against the real server (NF7
     await converged([desk, web, phone], 60_000);
     expect(ids(desk)).toEqual(expect.arrayContaining(['off-web', 'off-phone', 'off-desk']));
   }, 90_000);
+
+  it('log out right after an edit sends the edit first (F4, F5)', async () => {
+    const [desk] = desks as [Desk];
+    const [web] = browsers as [Browser, Browser];
+    await pageEdit(web, (x) => { x.nodes.push(task('bye', 'typed a moment before logging out')); });
+    const r = await web.bridge.syncDisconnect!(false) as { ok: boolean };
+    expect(r.ok).toBe(true);
+    expect(web.logouts).toBe(1);
+    // The server had it before the browser's copy went: the desktop gets it.
+    const until = Date.now() + 20_000;
+    while (!ids(desk).includes('bye') && Date.now() < until) await sleep(150);
+    expect(ids(desk)).toContain('bye');
+  }, 60_000);
+
+  it('log out with the server down keeps the browser\'s copy and says what is unsent', async () => {
+    const [, phone] = browsers as [Browser, Browser];
+    await killServer();
+    await pageEdit(phone, (x) => { x.nodes.push(task('kept', 'typed offline, then log out')); });
+    const r = await phone.bridge.syncDisconnect!(false) as { ok: boolean; unsent?: number };
+    expect(r.ok).toBe(false);
+    expect(r.unsent).toBeGreaterThanOrEqual(1);
+    expect(phone.logouts).toBe(0);
+    expect(ids(phone)).toContain('kept');
+    // "Log out anyway" is the owner's explicit choice.
+    const forced = await phone.bridge.syncDisconnect!(true) as { ok: boolean };
+    expect(forced.ok).toBe(true);
+    expect(phone.logouts).toBe(1);
+    await startServer();
+  }, 60_000);
 });
