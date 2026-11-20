@@ -11,6 +11,36 @@ switch that ships it.
 
 ---
 
+## 0. The release train — every release, in this order (app, server, website)
+
+Three things ship together, and one script walks them (`scripts/release.mjs`, server-updates F10).
+Every step that ships something waits for the owner's OK in the moment (AGENTS.md rule 11).
+Nothing here needs a paid GitHub feature or a personal token.
+
+| # | What | Command | Who |
+|---|---|---|---|
+| 1 | Release notes + What's new designed and approved; feature PRs merged | — | owner approves |
+| 2 | Release PR: version, CHANGELOG date, history; typecheck + tests | `npm run release -- prepare patch` or `minor` | agent |
+| 3 | Merge the release PR | `gh pr merge <n> --merge` | agent, after green |
+| 4 | Tag; CI builds the draft (installer, `latest.yml`, `krnl0-web-X.Y.Z.tar.gz` + `.sha256`) | `npm run release -- tag` | agent, with the owner's OK to release |
+| 5 | Check the draft | `npm run release -- check` | agent |
+| 6 | **Publish** (ships to every install) and start the server's follow workflow | `npm run release -- publish --yes` | only after the owner says yes |
+| 7 | Server: `follow-krnl0.yml` opens a PR that pins this website (`web-version`) and bumps the server's patch version, with tests run | automatic (also every 6 h) | — |
+| 8 | Server: merge that PR → `tag.yml` tags it → `release.yml` builds the signed draft | `gh pr merge <n> -R theMindDeveloper/krnl0-server --merge` | agent |
+| 9 | Server: check the draft (bundles, `release.json`, signature verified in CI), owner's OK, **Publish** → `published.yml` moves `:latest`; updaters and the app's server-update notice see it | `gh release edit vX.Y.Z -R theMindDeveloper/krnl0-server --draft=false --latest` | only after the owner says yes |
+| 10 | Website: fallback version in `theminddev-site/krnl0/index.html` (`data-krnl-v`, `softwareVersion`); news section for feature releases | PR on the site repo | agent |
+| 11 | History: a "vX.Y.Z published" entry in both repos | PR | agent |
+
+`npm run release -- status` shows where everything stands in both repos. A server-only fix (no
+new app) is a normal server PR with a patch bump in `package.json`; merging it lets `tag.yml` do the rest.
+
+**One-time repo setting** (free): on `theMindDeveloper/krnl0-server`, Settings → Actions → General →
+"Allow GitHub Actions to create and approve pull requests" must be on for step 7. Scheduled workflows
+pause after 60 days without activity in a repo; step 6 starts the follow workflow directly, so
+releases never depend on the schedule.
+
+---
+
 ## 1. Pick the version (SemVer, before 1.0)
 
 | Change | Bump | Example | Command |
