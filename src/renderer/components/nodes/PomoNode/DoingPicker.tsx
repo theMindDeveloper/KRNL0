@@ -111,10 +111,10 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
     <>
       <div
         data-testid="pomo-now"
-        style={{ display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 8px 0 14px', borderRadius: 10, background: 'var(--paper-2)', fontFamily: 'var(--font-read)' }}
+        data-caption={caption}
+        style={{ alignSelf: 'center', maxWidth: '100%', minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 8, height: 36, padding: '0 8px 0 14px', borderRadius: 999, background: 'var(--paper-2)', fontFamily: 'var(--font-read)' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <span style={{ fontSize: 12.5, color: 'var(--ink-3)', flexShrink: 0 }}>{caption === 'doing' ? 'Doing' : 'Next'}</span>
         <button
           ref={anchor}
           type="button"
@@ -122,16 +122,17 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
           title="Pick what you're doing: a recent one, a task, or type a new name"
           onClick={() => setOpen((o) => !o)}
           style={{
-            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: '100%', padding: 0,
+            flex: '0 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: '100%', padding: 0,
             background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-            fontFamily: 'var(--font-read)', fontSize: 13.5, fontWeight: current ? 600 : 400, color: current ? 'var(--ink)' : 'var(--ink-4)',
+            fontFamily: 'var(--font-read)', fontSize: 13.5, fontWeight: current ? 600 : 400, color: current ? 'var(--ink)' : 'var(--ink-3)',
           }}
         >
           {current && icon(current)}
-          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {current ? current.label : 'pick or type what you are doing'}
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {current ? current.label : 'What are you doing?'}
           </span>
-          {curCat && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{curCat.label}</span>}
+          {/* The kind of work, unless it is the name itself ("Study Study"). */}
+          {curCat && current && curCat.label.toLowerCase() !== current.label.toLowerCase() && <span style={{ fontSize: 12.5, fontWeight: 400, color: 'var(--ink-3)', flexShrink: 0 }}>{curCat.label}</span>}
           <span aria-hidden style={{ opacity: 0.6, fontSize: 11, color: 'var(--ink-3)' }}><LineGlyph name="caretDown" size={9} /></span>
         </button>
         {current && (

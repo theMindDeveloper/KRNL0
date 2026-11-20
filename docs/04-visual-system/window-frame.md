@@ -108,3 +108,31 @@ A widget tucked at a screen edge (the ambient radio) shows only its 14px tab. No
 - A range on a card is written "15:30 – 17:30": the field, then the other end at the same size.
 - Popups that open from a plan (the Clock's plan popup, the "what are you doing" list) follow the card rules: reading font, sentence case, filled buttons, no outlined boxes.
 - **Calendar, Year:** the months always fit with 12 px clear at each side; an empty day is one clear shade above the window; the time row is ‹ year Today ›; one line under the months names the two colours.
+
+## The window standard (owner pick, 2026-11-20; Decision 48)
+
+Every window's top and bottom are built from the same parts in the same order. The sizes and the look are set once, in the last block of `styles/window-frame.css`.
+
+**Header (40 px):**
+1. The window's dot, then **the name** in normal letters (Timer, not TIMER), 13.5 px semibold, reading font.
+2. **One short fact** after it when there is one, as plain words: `18` and `3 overdue` (Todos), `Week 47` (Habits), `Recording` / `Break` / `Paused` (Timer). No pills.
+3. **The view switch**, the same control everywhere: a quiet filled bar (28 px), 24 px segments, the chosen view lifted one shade. Not outlined, not lime. Words in normal letters; AM / PM stay capitals.
+4. **At most two icon buttons** at the far right, 28 px, no outline. Settings is the last one.
+
+**Time row (36 px), when a window moves through time:** earlier at the left edge, later at the right edge, the label and **Today** in the middle; a second switch (AM / PM, the range) sits before the right arrow. Arrow buttons are filled; Today is a small filled chip.
+
+**Footer (48 px):** a bar at the bottom edge with a line above it. It holds the add field (Todos, Habits, Calendar; reading font, 13.5 px, with a filled ↵ key) or the main button (Timer). Other actions sit in the same row as quiet filled buttons, 34 px. No second row. **No underlined text links, anywhere.**
+
+**Edges:** 16 px at the left, 12 px at the right, 8 px between parts.
+
+The "01 · spine · 05" badge that sat over a window's header in the Free layout is no longer drawn.
+
+## Timer A: one face (owner pick and corrections, 2026-11-20)
+
+- **Both modes are the same screen.** The time (64 px, code font, always at full brightness), one row under it with what you are on, then today.
+- **Two layers, not three.** There is no line of words under the time. The state is said in the header beside the name: Recording (lime, with a lime dot), Break, Paused. The time never dims.
+- **The row under the time:** one rounded button with what you are on ("What are you doing?", "No task", or the name). In Sessions the four session dots sit to its left. A plan that is due now is the same rounded button with the plan's name and "planned now"; × brings the normal button back. There is no Planned now card.
+- **Today:** "Today" and "2h 35m recorded" on one line (the breaks and span count are in its tooltip), over a 10 px day strip.
+- **The clock face setting:** Standard is this face. The other faces (Blocks, LCD, Vapor, …) are still a choice in settings, and a frame style may still name its own.
+- **Footer:** the standard bar. Buttons in normal letters: Start, Start session, Continue …, Pause, Break, Stop, New, Log past time.
+- **Settings:** one filled block, a line per setting with "− 25 min +"; the faces as a grid of filled buttons; Cancel and Save in the standard footer.

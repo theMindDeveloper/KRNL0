@@ -2667,3 +2667,13 @@ The owner found the add cards "ugly, unreadable, not user friendly" after their 
 - **Timer:** the stopwatch face is the time, its state in words and today as one line; the three total tiles are gone (Analytics has them). A plan due now is one card with one button.
 - No behaviour, command, test id or board field changed, so no migration and no CLI change.
 - Guard: `tests/unit/renderer/windowFrame.test.ts`.
+
+## Decision 48 — The window standard; Timer A (2026-11-20)
+
+The owner asked for "a standard, a template so all are unified and simple", after pointing at three headers that each looked different. One sheet (H) drew the standard and three sheets drew full Timer redesigns; the owner picked the standard and Timer A, then corrected the built Timer twice (no stacked status line; no dimmed time, no crowded row).
+
+- **Standard:** header 40 / time row 36 / footer 48, the reading font in normal letters, a filled view switch with the chosen view lifted, borderless 28 px icon buttons, filled 34 px footer buttons. It is one block of CSS on the classes every window already uses (`.kw-head`, `.kw-views`, `.kw-btn`, `.kw-range`, `.kw-foot`, `.kw-action`), so it reaches all windows at once. Rule: `docs/04-visual-system/window-frame.md`.
+- **Timer A:** one clock for Sessions and Stopwatch; the state in the header; one rounded button for what you are on; today as one line. The Pro frame style no longer names the Blocks face, so "Standard" is the default; the other faces remain selectable.
+- **Never:** underlined text links for actions; a line of state words under the time; dimming the time.
+- No behaviour, command, test id or board field changed. Button and header words changed from capitals to normal letters.
+- Guard: `tests/unit/renderer/windowFrame.test.ts`.

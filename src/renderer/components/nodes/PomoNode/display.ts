@@ -22,11 +22,11 @@ export function calcRemainingPct(
 /** Label for the primary action button (F5). */
 export function primaryButtonLabel(status: PomoState['status']): string {
   switch (status) {
-    case 'running': return 'PAUSE';
-    case 'paused':  return 'RESUME';
-    case 'break':   return 'END BREAK';
-    case 'done':    return 'START';
-    default:        return 'START'; // 'idle'
+    case 'running': return 'Pause';
+    case 'paused':  return 'Resume';
+    case 'break':   return 'End break';
+    case 'done':    return 'Start session';
+    default:        return 'Start session'; // 'idle'
   }
 }
 

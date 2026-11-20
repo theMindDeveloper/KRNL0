@@ -2941,3 +2941,18 @@ Typecheck clean; all tests pass. Checked as full-size screenshots of each card a
 - No behaviour or command changed.
 
 Typecheck clean; all tests pass. Checked as full-size screenshots; the plan popup was not captured; not yet used by the owner.
+
+## [2026-11-20] — The window standard (header, time row, footer) and Timer A
+
+**Type:** Feature (UI redesign, owner picks; Decision 48)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `styles/window-frame.css`, `MotherFrame/index.tsx`, `TodoNode/index.tsx`, `HabitNode/index.tsx`, `PomoNode/index.tsx`, `PomoNode/ObserveDash.tsx`, `PomoNode/PlannedNowChip.tsx`, `PomoNode/DoingPicker.tsx`, `PomoNode/FaceFit.tsx`, `PomoNode/PomoTimeLinks.tsx`, `PomoNode/display.ts`, `themes/manifests.ts`, `dev/previewBridge.ts`, tests (`windowFrame.test.ts`, `PomoNode.scenarios.test.ts`, `TodoNode.scenarios.test.ts`, `TodoNode.doneArchive.ui.test.tsx`, `themeEngine.test.tsx`), docs (`window-frame.md`, Decision 48, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Window standard:** header 40 px, time row 36 px, footer 48 px for every window; names and labels in the reading font and normal letters; one filled view switch with the chosen view lifted; borderless icon buttons; filled footer buttons; one font for add fields. Todos and Habits show the name, then the fact (18 · 3 overdue, Week 47).
+- **Free layout:** the "01 · spine · 05" badge over a window's header is no longer drawn.
+- **Timer A:** one clock for Sessions and Stopwatch; the state (Recording, Break, Paused) in the header, never under the time, and the time never dims; one rounded button for what you are on (session dots beside it in Sessions); a plan due now is that same button, not a card; today as one line. Settings are a list with a stepper per line. Button words are in normal letters (Start session, Pause, Stop, …).
+- **Default face:** the Pro frame style no longer names Blocks, so the standard clock is the default; other faces stay selectable.
+- No behaviour, command or test id changed.
+
+Typecheck clean; all tests pass. Checked as full-size screenshots of the whole app and of the Timer in five states; not yet used by the owner.

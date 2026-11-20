@@ -16,11 +16,29 @@ export interface ObserveDashProps {
   nowMs: number;
   /** Easy mode — all work in one colour. */
   plain?: boolean;
+  /** Which part to draw: the clock, today's line, or both (the default). The
+   *  Timer draws them apart so what you are on sits between them. */
+  part?: 'clock' | 'today' | 'both';
 }
 
+/** The Timer's clock in both modes (window-frame.md, Timer A): the time,
+ *  large and centred, always at full brightness, and nothing else. The state
+ *  (Recording, Break, Paused) is said in the header beside the window's name,
+ *  not under the time and not in the row with the task (owner, 2026-11-20). */
+export function TimerClock({ text, testId = 'pomo-clock' }: { text: string; testId?: string }): JSX.Element {
+  const i = text.lastIndexOf(':');
+  return (
+    <div data-testid="pomo-timer-clock" style={{ display: 'flex', justifyContent: 'center' }}>
+      <div data-testid={testId} style={{ display: 'flex', alignItems: 'baseline', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, fontSize: 64, fontWeight: 500, letterSpacing: '-0.035em', color: 'var(--ink)' }}>
+        <span>{i < 0 ? text : text.slice(0, i)}</span>
+        {i >= 0 && <span style={{ color: 'var(--ink-4)' }}>:</span>}
+        {i >= 0 && <span>{text.slice(i + 1)}</span>}
+      </div>
+    </div>
+  );
+}
 
-
-export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: ObserveDashProps) {
+export function ObserveDash({ state, liveMs, library, nowMs, plain = false, part = 'both' }: ObserveDashProps) {
   const { d0, spans, workMs, breakMs, workSpans } = todaySpans(state, library, nowMs, plain);
 
   // Show the waking part of the day: 06–22 by default, widened to fit spans.
@@ -36,34 +54,27 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  const status = state.status === 'running' ? 'Recording' : state.status === 'break' ? 'On break' : 'Not running';
-  const statusColor = state.status === 'running' ? 'var(--acid-ink, var(--acid))' : state.status === 'break' ? 'var(--ink-2)' : 'var(--ink-3)';
-  const todayLine = workMs <= 0 && breakMs <= 0 ? 'nothing recorded yet'
-    : `${fmtMin(workMs)} recorded${breakMs > 0 ? ` · ${fmtMin(breakMs)} break` : ''}${workSpans > 1 ? ` · ${workSpans} spans` : ''}`;
+  const todayLine = workMs <= 0 ? 'nothing recorded yet' : `${fmtMin(workMs)} recorded`;
+  const todayMore = `${fmtMin(workMs)} recorded in ${workSpans} span${workSpans === 1 ? '' : 's'}${breakMs > 0 ? `, ${fmtMin(breakMs)} of breaks` : ''}`;
 
   const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' };
 
   return (
-    <div data-testid="pomo-observe-dash" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-        <div data-testid="pomo-observe-clock" style={{ display: 'flex', alignItems: 'baseline', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, fontSize: 64, fontWeight: 500, letterSpacing: '-0.03em', color: 'var(--ink)' }}>
-          <span>{h > 0 ? `${h}:${String(m).padStart(2, '0')}` : `${String(m).padStart(2, '0')}`}</span>
-          <span style={{ color: 'var(--ink-4)' }}>:</span>
-          <span>{String(s).padStart(2, '0')}</span>
-        </div>
-        <span data-testid="pomo-observe-status" style={{ fontFamily: 'var(--font-read)', fontSize: 13.5, color: statusColor, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-          {state.status === 'running' && <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--acid)', boxShadow: '0 0 6px var(--acid)' }} />}
-          {status}
-        </span>
-      </div>
+    <div data-testid={part === 'today' ? 'pomo-today-part' : 'pomo-observe-dash'} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {part !== 'today' && (
+        <TimerClock
+          testId="pomo-observe-clock"
+          text={h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`}
+        />
+      )}
 
       {/* Today on a strip: where the time went. */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8, fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-3)' }}>
-          <span>Today</span>
-          <span data-testid="pomo-observe-today" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{todayLine}</span>
+      {part !== 'clock' && <div data-testid="pomo-today">
+        <div title={todayMore} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 12, fontFamily: 'var(--font-read)', fontSize: 13.5 }}>
+          <span style={{ color: 'var(--ink-2)', fontWeight: 500 }}>Today</span>
+          <span data-testid="pomo-observe-today" style={{ color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{todayLine}</span>
         </div>
-        <div data-testid="pomo-observe-strip" style={{ position: 'relative', height: 8, background: 'var(--paper-2)', borderRadius: 999 }}>
+        <div data-testid="pomo-observe-strip" style={{ position: 'relative', height: 10, background: 'var(--paper-2)', borderRadius: 999 }}>
           {spans.map((sp) => {
             const w = ((sp.end - sp.start) / (hi - lo)) * 100;
             // Work: a rounded segment, 1px clear of its neighbours so spans
@@ -90,14 +101,14 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false }: Ob
           })}
           <span aria-hidden style={{ position: 'absolute', top: -3, bottom: -3, left: pct(nowMs), width: 2, marginLeft: -1, borderRadius: 999, background: 'var(--ink)' }} />
         </div>
-        <div style={{ position: 'relative', height: 12, marginTop: 3 }}>
+        <div style={{ position: 'relative', height: 14, marginTop: 8 }}>
           {ticks.map((t) => (
-            <span key={t} style={{ ...mono, position: 'absolute', left: pct(d0 + t * 3_600_000), transform: 'translateX(-50%)', fontSize: 'var(--face-label, 11px)', color: 'var(--ink-4)', letterSpacing: 0 }}>
+            <span key={t} style={{ ...mono, position: 'absolute', left: pct(d0 + t * 3_600_000), transform: 'translateX(-50%)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: 0, textTransform: 'none' }}>
               {String(t).padStart(2, '0')}
             </span>
           ))}
         </div>
-      </div>
+      </div>}
 
     </div>
   );

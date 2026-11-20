@@ -34,6 +34,9 @@ export { MOTHER_DRAG_MIME };
 // fixed 540×540 prevents the card from filling the panel. StationCell
 // wraps its child in this provider so any nested MotherFrame auto-switches
 // to the fluid 100%/100% variant — no per-kind component changes needed.
+/** The "01 · spine · 05" slot badge over a window in the Free layout. Off: it covered the header's name. */
+const SHOW_SLOT_BADGE: boolean = false;
+
 export const MotherFrameStationContext = createContext(false);
 
 interface Props {
@@ -214,7 +217,8 @@ export function MotherFrame({
           clock) so a slot index would be visual noise. It also got clipped
           by overflow:hidden on the station mother frame ("splice box cut in
           half" bug). Skip it entirely in station variant. */}
-      {variant !== 'station' && (
+      {/* window-frame.md (2026-11-20): the badge sat on top of the window's own header; it is no longer drawn. */}
+      {SHOW_SLOT_BADGE && variant !== 'station' && (
         typeof document !== 'undefined' && portalTarget && createPortal(
           <div
             ref={badgeRef}

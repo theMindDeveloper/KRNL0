@@ -2,7 +2,7 @@
 
 Written 2026-11-19, after the overnight pass. Everything here is on the branch `feat/unified-windows` (draft PR #257, on top of #253 and #251). The dev app from this worktree shows all of it; restart it with `npm run dev` if it is closed.
 
-Nothing is merged or released. Typecheck is clean and all 2,668 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
+Nothing is merged or released. Typecheck is clean and all 2,677 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
 
 ## The rule behind every change
 
@@ -221,6 +221,27 @@ I went through Advanced and Easy again, window by window, and fixed what stood o
 | Analytics: you preferred the icons | The icon row is back, with the page's name beside it. I had replaced it with a list on my own judgement; that was the wrong call | Analytics |
 | Analytics: DONE / FOCUS pills | Plain words, like the other headers | Analytics header |
 | Log time | Shows "next day" only when it crosses midnight; the length is on the button ("Add 1h") | Timer, Log past time |
+
+## 19. One standard for every window, and the Timer rebuilt (your picks)
+
+**The window standard.** You asked for "a standard, a template". Every window's header, time row and footer now come from one set of rules:
+
+| Part | Before | Now |
+|---|---|---|
+| Name | TIMER, TODOS (18), HABITS — WEEK 47 in small capitals, code font | Timer, Todos, Habits in normal letters, reading font; the fact after it as plain words (18 · 3 overdue, Week 47) |
+| View switch | outlined, the chosen view lime, different heights | one quiet filled bar, the chosen view lifted |
+| Icon buttons | outlined squares, three sizes | 28 px, no outline, settings last |
+| Time row | 32 px, capitals | 36 px; ‹ label Today ›; arrows and Today are filled |
+| Footer | 44 px; the Timer had its own | 48 px bar with a line above it in every window; add fields in one font |
+| The "01 · SPINE · 05" tag | sat over the header in the Free layout | gone |
+
+**Where:** every window. Compare the tops of Timer, Todos, Habits, Calendar, Analytics and Clock.
+
+**The Timer (your pick A, with your two corrections).** Sessions and Stopwatch are now the same screen: the time, one rounded button for what you are on, today. You then said the stacked "time / status words / button" was ugly, and that the dimmed time on a break was unreadable, so: there is no line of words under the time, the time never dims, and the state is in the header beside the name (Recording in lime, Break, Paused). "Planned now" is no longer a card: a plan that is due is the same rounded button with its name. Settings are a list with "− 25 min +". Buttons read Start, Pause, Stop, Break in normal letters.
+
+**Why this and not something else:** you picked it from three drafts (the ring and the list version were the others). The standard is CSS on parts every window already shared, so it could not drift per window.
+
+**Costs:** in a narrow Timer the word Recording / Break can be squeezed by the Sessions / Stopwatch switch; the header dot (lime, or orange on a break) and the footer buttons still say it. The Blocks face is no longer the default; it is one press away in settings.
 
 ## Your three answers
 

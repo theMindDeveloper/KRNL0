@@ -49,7 +49,8 @@ describe('Done dropdown (F16)', () => {
     renderNode(seed());
     expect(texts()).toEqual(['open task']);
     expect(screen.getByTestId('todo-done-toggle').textContent).toContain('Done today (1)');
-    expect(screen.getByTestId('todo-header').textContent).toContain('Todos (1)');
+    expect(screen.getByTestId('todo-header').textContent).toContain('Todos');
+    expect(screen.getByTestId('todo-open-count').textContent).toBe('1');
   });
 
   it('expands to show today\'s done items', () => {

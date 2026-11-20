@@ -859,7 +859,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         <div className="krnl-node-header kw-head">
           <span data-testid="todo-header" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <span className="kw-dot" style={{ color: 'var(--cyan)', background: 'var(--cyan)' }} />
-            <span className="kw-title">{`Todos (${undoneCount})`}</span>
+            <span className="kw-title">Todos</span>
+            <span className="kw-ctx" data-testid="todo-open-count">{undoneCount}</span>
             {/* PR8 — overdue count badge in rust. Only visible when at least
                 one undone item's scheduled-end has passed. */}
             {overdueCount > 0 && (
@@ -868,10 +869,8 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
                 style={{
                   // Mixed toward the ink: darker on paper, lighter on dark — 4.5:1 in both themes.
                   color: 'color-mix(in srgb, var(--rust) 78%, var(--ink))',
-                  marginLeft: 8,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.02em',
+                  fontFamily: 'var(--font-read)',
+                  fontSize: 12.5,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 5,

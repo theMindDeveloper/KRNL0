@@ -2,10 +2,13 @@
    Every window (Timer, Todo, Calendar, Clock, Habits, Analytics, Terminal)
    uses these rows, so the same job is in the same place at the same size:
 
-     .kw-head    36px  name · context ········ views · buttons (menu last)
-     .kw-range   32px  ‹ where in time ›  Today          (only if it moves in time)
+     .kw-head    40px  name · one fact ········ views · icon buttons (settings last)
+     .kw-range   36px  ‹ where in time ›  Today          (only if it moves in time)
      …body…
-     .kw-foot    44px  the one thing you do here: the add field or the main button
+     .kw-foot    48px  the one thing you do here: the add field or the main button
+
+   The sizes and the look are set once, at the end of this file ("The window
+   standard"); the rules above it keep the layout.
 
    A window builds nothing of its own for these rows. */
 
@@ -178,8 +181,8 @@
 
 /* Timer, not running: when a plan is due now its card is the one choice shown;
    "pick something else" hides the card and the picker row comes back. */
-.pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"]) > [data-testid="pomo-now"],
-.pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"]) > [data-testid="pomo-tag"] { display: none !important; }
+.pomo-body[data-idle="true"] .pomo-what:has(> [data-testid="pomo-planned-now"]) > [data-testid="pomo-now"],
+.pomo-body[data-idle="true"] .pomo-what:has(> [data-testid="pomo-planned-now"]) > [data-testid="pomo-tag"] { display: none !important; }
 
 /* One height for header and time-row controls. A wider rule (tokens.css, the
    24 px click floor) made some segments 24 px inside a 22 px switch, so the
@@ -193,3 +196,53 @@
 .kw-btn.clock-day-today[data-state="other"] { background: transparent; color: var(--ink); border-color: var(--ink-4); }
 .kw-btn.clock-day-today[data-state="other"]:hover { background: transparent; color: var(--ink); border-color: var(--ink-3); }
 .kw-btn.clock-day-today:disabled:hover { background: transparent; color: var(--ink-3); }
+
+/* ── The window standard (window-frame.md; owner pick, 2026-11-20) ───────────
+   One header, one time row, one footer for every window. Words are in the
+   reading font and in normal letters; nothing is outlined; the chosen view is
+   lifted, not coloured. Sizes: header 40, time row 36, footer 48; switch
+   segments 24, icon buttons 28, footer buttons 34; 16 px at the left edge,
+   12 px at the right, 8 px between parts. */
+.kw-head { height: 40px; padding: 0 12px 0 16px; font-family: var(--font-read); font-size: 12.5px; letter-spacing: 0; text-transform: none; color: var(--ink-3); }
+.kw-dot { width: 7px; height: 7px; }
+.kw-title { font-family: var(--font-read); font-size: 13.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.kw-ctx { font-family: var(--font-read); font-size: 12.5px; letter-spacing: 0; text-transform: none; }
+
+/* The view switch: a quiet filled bar, the chosen view lifted. */
+.kw-views { height: 28px; padding: 2px; border: 0; border-radius: 8px; background: var(--paper-2); overflow: visible; }
+.kw-views > button { display: inline-block; height: 24px; line-height: 24px; padding: 0 10px; border-radius: 6px; font-family: var(--font-read); font-size: 12.5px; font-weight: 500; letter-spacing: 0; text-transform: lowercase; color: var(--ink-3); }
+.kw-views > button::first-letter { text-transform: uppercase; }
+.kw-views > button + button { border-left: 0; }
+.kw-views > button[aria-pressed='true'],
+.kw-views > button[aria-selected='true'] { background: var(--paper-3); color: var(--ink); font-weight: 600; }
+/* AM / PM are abbreviations: they stay in capitals. */
+.kw-views > button[data-testid^="clock-window-"] { text-transform: uppercase; }
+
+/* Icon buttons: 28 px, no outline; settings is the last one in a header. */
+.kw-btn { height: 28px; min-width: 28px; padding: 0; border: 0; border-radius: 8px; color: var(--ink-3); font-family: var(--font-read); font-size: 12.5px; letter-spacing: 0; text-transform: none; }
+.kw-btn:hover { background: var(--paper-2); color: var(--ink); border-color: transparent; }
+.kw-btn[aria-pressed='true'],
+.kw-btn[aria-expanded='true'] { background: var(--paper-2); color: var(--ink); border-color: transparent; }
+
+/* The time row: earlier at the left edge, later at the right, the label and Today in the middle. */
+.kw-range { height: 36px; gap: 8px; font-family: var(--font-read); font-size: 13px; letter-spacing: 0; }
+.kw-range .kw-btn { background: var(--paper-2); }
+.kw-range .kw-btn:hover { background: var(--paper-3); }
+.kw-range__label, .kw-range > span.kw-range__label { height: 24px; color: var(--ink); font-weight: 600; }
+/* A word button in the time row (Today): a small filled chip. */
+.kw-range .kw-btn:not(:has(svg)) { display: inline-block; height: 24px; line-height: 24px; min-width: 0; padding: 0 9px; border-radius: 6px; color: var(--ink-2); text-transform: lowercase; }
+.kw-range .kw-btn:not(:has(svg))::first-letter { text-transform: uppercase; }
+.kw-btn.clock-day-today, .kw-btn.clock-day-today[data-state="other"] { font-size: 12.5px; letter-spacing: 0; padding: 0 9px; background: var(--paper-2); color: var(--ink-2); }
+.kw-btn.clock-day-today[data-state="other"]:hover { background: var(--paper-3); color: var(--ink); }
+
+/* The footer: a bar with a line above it; the add field, or the main button and quiet buttons in one row. */
+.kw-foot { height: 48px; font-family: var(--font-read); font-size: 13.5px; }
+.kw-kbd { width: 24px; height: 24px; box-sizing: border-box; padding: 0; border: 0; border-radius: 6px; background: var(--paper-2); color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+.kw-action { height: 34px; border: 0; border-radius: 9px; background: var(--paper-2); color: var(--ink-2); font-family: var(--font-read); font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; flex-shrink: 0; }
+.kw-action:hover { background: var(--paper-3); color: var(--ink); border-color: transparent; }
+.kw-action--primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); font-size: 13.5px; font-weight: 600; box-shadow: none; }
+.kw-action--primary:hover { background: var(--btn-primary-bg-hover, var(--btn-primary-bg)); color: var(--btn-primary-fg); }
+.pomo-foot .pomo-controls > button { height: 34px !important; }
+
+/* Every add field in a footer reads the same: the reading font, 13.5 px. */
+.kw-foot input, .kw-foot textarea, .kw-add { font-family: var(--font-read) !important; font-size: 13.5px !important; letter-spacing: 0 !important; }

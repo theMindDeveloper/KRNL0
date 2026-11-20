@@ -106,10 +106,10 @@ describe('The plan card is short by default (window-frame.md, cards)', () => {
 describe('One name per window; no second summary rows (window-frame.md)', () => {
   it('the Timer is called Timer in every mode; its modes are Sessions and Stopwatch', () => {
     const s = src('PomoNode/index.tsx');
-    expect(s).toContain(": 'TIMER';");
+    expect(s).toContain("const headerLeft = 'Timer';");
     expect(s).not.toContain("'TIME LOG'");
     expect(s).not.toContain('DEEP WORK');
-    expect(s).toContain("m === 'pomodoro' ? 'SESSIONS' : 'STOPWATCH'");
+    expect(s).toContain("m === 'pomodoro' ? 'Sessions' : 'Stopwatch'");
     const bar = readFileSync(join(process.cwd(), 'src/renderer/components/Station/StationToolbar.tsx'), 'utf8');
     expect(bar).not.toMatch(/'(Record|Pomo)'/);
   });
@@ -193,12 +193,12 @@ describe('Cards are a list you read; the Timer is a clock first (window-frame.md
     expect(c).toContain("['tmrw', 'Tomorrow', tomorrow]");
     expect(c).toContain('<div style={cardDays}>');
   });
-  it('the Timer face: the time, its state in words, today as one line; no total tiles', () => {
+  it('the Timer face: the time, today as one line; no total tiles', () => {
     const d = read('components/nodes/PomoNode/ObserveDash.tsx');
     expect(d).toContain('data-testid="pomo-observe-today"');
-    expect(d).toContain("'Not running'");
+    expect(d).toContain('export function TimerClock(');
     expect(d).not.toContain("'work today'");
-    expect(read('styles/window-frame.css')).toContain('.pomo-body[data-idle="true"]:has(> [data-testid="pomo-planned-now"])');
+    expect(read('styles/window-frame.css')).toContain('.pomo-body[data-idle="true"] .pomo-what:has(> [data-testid="pomo-planned-now"])');
   });
 });
 
@@ -228,5 +228,62 @@ describe('Aligned and unified (owner list, 2026-11-20)', () => {
     const y = read('components/nodes/CalendarNode/YearView.tsx');
     expect(y).toContain('data-testid="calendar-year-today"');
     expect(y).toContain('data-testid="calendar-year-legend"');
+  });
+});
+
+describe('The window standard: one header, time row and footer (owner pick, 2026-11-20)', () => {
+  const root = join(process.cwd(), 'src/renderer');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  const css = read('styles/window-frame.css');
+  it('sizes: header 40, time row 36, footer 48; words in the reading font, in normal letters', () => {
+    expect(css).toContain('.kw-head { height: 40px; padding: 0 12px 0 16px; font-family: var(--font-read);');
+    expect(css).toContain('.kw-range { height: 36px;');
+    expect(css).toContain('.kw-foot { height: 48px;');
+    expect(css).toContain('.kw-title { font-family: var(--font-read); font-size: 13.5px; font-weight: 600; letter-spacing: 0; text-transform: none;');
+  });
+  it('the view switch is a quiet filled bar with the chosen view lifted (not outlined, not lime)', () => {
+    expect(css).toContain('.kw-views { height: 28px; padding: 2px; border: 0; border-radius: 8px; background: var(--paper-2);');
+    expect(css).toContain(".kw-views > button[aria-selected='true'] { background: var(--paper-3); color: var(--ink); font-weight: 600; }");
+  });
+  it('icon and footer buttons have no outline', () => {
+    expect(css).toContain('.kw-btn { height: 28px; min-width: 28px; padding: 0; border: 0;');
+    expect(css).toContain('.kw-action { height: 34px; border: 0;');
+  });
+  it('a header is the name, then one fact: Todos and Habits no longer put the fact inside the name', () => {
+    expect(read('components/nodes/TodoNode/index.tsx')).toContain('<span className="kw-title">Todos</span>');
+    expect(read('components/nodes/HabitNode/index.tsx')).toContain('<span className="kw-title">Habits</span>');
+  });
+  it('the slot badge over a window header in the Free layout is not drawn', () => {
+    expect(read('components/nodes/MotherFrame/index.tsx')).toContain('const SHOW_SLOT_BADGE: boolean = false;');
+  });
+});
+
+describe('Timer A: one face, two layers (owner pick and corrections, 2026-11-20)', () => {
+  const root = join(process.cwd(), 'src/renderer/components/nodes/PomoNode');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('both modes draw the same clock; a chosen face still wins', () => {
+    const s = read('index.tsx');
+    expect(s).toContain("const oneFace = !observe && config.face === undefined && !frameManifest.components.pomo.face;");
+    expect(s).toContain('<TimerClock text={clockText} />');
+  });
+  it('no line of words under the time, and the time never dims: the state is said in the header', () => {
+    const d = read('ObserveDash.tsx');
+    expect(d).not.toContain("'Not running'");
+    expect(d).not.toContain("'On break'");
+    expect(d).not.toContain('dim');
+    expect(read('index.tsx')).toContain('<span className="kw-ctx" data-testid="pomo-observe-status" role="status"');
+    expect(read('index.tsx')).toContain('<div className="pomo-what" data-testid="pomo-what"');
+  });
+  it('a plan due now is one pill (no card, no underlined link)', () => {
+    const c = read('PlannedNowChip.tsx');
+    expect(c).not.toContain('pick something else</');
+    expect(c).not.toContain('inset 0 -1px 0');
+    expect(c).toContain("borderRadius: 999, background: 'var(--paper-2)'");
+  });
+  it('footer buttons are in normal letters; settings are a list with a stepper per line', () => {
+    const s = read('index.tsx');
+    expect(s).not.toMatch(/>\s*(START|STOP|BREAK|NEW|EXTEND|CANCEL|SAVE)\s*</);
+    expect(s).toContain('data-testid={`pomo-settings-${key}-inc`}');
+    expect(read('display.ts')).toContain("case 'running': return 'Pause';");
   });
 });

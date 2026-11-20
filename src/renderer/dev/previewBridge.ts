@@ -37,7 +37,7 @@ function mothers(): Json[] {
         sessionsCompleted: 0, activeTaskId: null, history: [], pausedAt: null,
         pausedElapsedMs: 0, sessionWorkSec: 0,
       },
-      config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, face: 'blocks', stationSlot: 'top-left' },
+      config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, stationSlot: 'top-left' },
     },
     {
       id: 'mother-todo', kind: 'todo', position: { x: -840, y: 0 }, isMother: true,

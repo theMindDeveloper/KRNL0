@@ -24,7 +24,7 @@ export function compactLevelFor(h: number): 0 | 1 | 2 | 3 {
   return h >= 330 ? 0 : h >= 295 ? 1 : h >= 262 ? 2 : 3;
 }
 
-export function FaceFit({ children }: { children: ReactNode; compact?: ReactNode }) {
+export function FaceFit({ children, grow = true }: { children: ReactNode; compact?: ReactNode; /** False: take only the face's own height, so the face and what follows it sit together in the middle. */ grow?: boolean }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -75,7 +75,7 @@ export function FaceFit({ children }: { children: ReactNode; compact?: ReactNode
       data-scale={scale}
       data-labels={labelsOff ? 'off' : undefined}
       // Takes what's left after the controls; never forces the window taller.
-      style={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}
+      style={{ flex: grow ? '1 1 auto' : '0 1 auto', minHeight: 0, overflow: 'hidden', display: 'flex', justifyContent: 'center' }}
     >
       <div
         ref={inner}

@@ -244,9 +244,9 @@ export function HabitNode({
   );
 
   const titleByView: Record<HabitView, string> = {
-    week: `HABITS — WEEK ${weekNum}`,
-    month: `HABITS — ${MONTH_LABELS[now.getMonth()]}`,
-    year: `HABITS — ${now.getFullYear()}`,
+    week: `Week ${weekNum}`,
+    month: `${MONTH_LABELS[now.getMonth()]}`,
+    year: `${now.getFullYear()}`,
   };
 
   const menuHabit = menu ? visibleHabits.find((h) => h.id === menu.habitId) ?? null : null;
@@ -304,9 +304,9 @@ export function HabitNode({
         {/* window-frame.md — the standard header: name, then views, then the menu. */}
         <div className="krnl-node-header kw-head">
           <span className="kw-dot" style={{ background: 'var(--rust)' }} />
-          <span className="kw-title" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {titleByView[view]}
-          </span>
+          {/* window-frame.md — the name, then one fact. */}
+          <span className="kw-title">Habits</span>
+          <span className="kw-ctx" data-testid="habit-header-context" style={{ flex: 1 }}>{titleByView[view]}</span>
           {/* Week · Month · Year right here, not inside Settings. */}
           <span role="tablist" aria-label="Habit view" data-testid="habit-view-switch" className="nodrag kw-views">
             {HABIT_VIEWS.map((v) => (

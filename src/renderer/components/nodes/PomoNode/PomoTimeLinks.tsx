@@ -19,7 +19,7 @@ export function PomoTimeLinks({ state }: { state: PomoState }): JSX.Element | nu
           openLogTime({ ...logTimeDefaults(Date.now() - 60 * 60_000), x: r.left, y: r.bottom });
         }}
       >
-        + log past time
+        Log past time
       </button>
     );
   }
