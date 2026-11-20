@@ -25,13 +25,13 @@ export interface ObserveDashProps {
  *  large and centred, always at full brightness, and nothing else. The state
  *  (Recording, Break, Paused) is said in the header beside the window's name,
  *  not under the time and not in the row with the task (owner, 2026-11-20). */
-export function TimerClock({ text, testId = 'pomo-clock' }: { text: string; testId?: string }): JSX.Element {
+export function TimerClock({ text, blink = false, testId = 'pomo-clock' }: { text: string; /** The colon blinks while time is being recorded; it is still when paused or idle. */ blink?: boolean; testId?: string }): JSX.Element {
   const i = text.lastIndexOf(':');
   return (
     <div data-testid="pomo-timer-clock" style={{ display: 'flex', justifyContent: 'center' }}>
       <div data-testid={testId} style={{ display: 'flex', alignItems: 'baseline', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, fontSize: 64, fontWeight: 500, letterSpacing: '-0.035em', color: 'var(--ink)' }}>
         <span>{i < 0 ? text : text.slice(0, i)}</span>
-        {i >= 0 && <span style={{ color: 'var(--ink-4)' }}>:</span>}
+        {i >= 0 && <span data-testid="pomo-colon" style={{ color: 'var(--ink-4)', animation: blink ? 'pomo-blink 1s steps(1) infinite' : 'none' }}>:</span>}
         {i >= 0 && <span>{text.slice(i + 1)}</span>}
       </div>
     </div>
@@ -64,6 +64,7 @@ export function ObserveDash({ state, liveMs, library, nowMs, plain = false, part
       {part !== 'today' && (
         <TimerClock
           testId="pomo-observe-clock"
+          blink={state.status === 'running'}
           text={h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`}
         />
       )}

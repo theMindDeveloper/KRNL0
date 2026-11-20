@@ -38,6 +38,9 @@ function readAnchor(): DockAnchor {
 }
 
 /** Nearest snap place for a drop point inside the canvas box. Exported for tests. */
+/** The frame-style button on the canvas tool panel. Off: styles are picked in Settings. */
+const SHOW_STYLE_PICKER: boolean = false;
+
 export function anchorFor(x: number, y: number, w: number, h: number): DockAnchor {
   if (y > h * 0.72 && x > w * 0.22 && x < w * 0.78) return 'bottom-center';
   if (y < h / 3) return 'top';
@@ -474,7 +477,8 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
 
       {/* Mother-row chassis-style picker — opens a tile flyout. Button shows
           the active style's glyph; flyout has 4 rich tiles to switch styles. */}
-      {dockStyle !== undefined && onDockStyleChange ? (
+      {/* The style is chosen in Settings → General → Appearance (owner, 2026-11-20); not on the canvas. */}
+      {SHOW_STYLE_PICKER && dockStyle !== undefined && onDockStyleChange ? (
         <>
           <div aria-hidden style={divider} />
           <button

@@ -2,7 +2,7 @@
 
 Written 2026-11-19, after the overnight pass. Everything here is on the branch `feat/unified-windows` (draft PR #257, on top of #253 and #251). The dev app from this worktree shows all of it; restart it with `npm run dev` if it is closed.
 
-Nothing is merged or released. Typecheck is clean and all 2,677 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
+Nothing is merged or released. Typecheck is clean and all 2,681 tests pass (the one test that had been failing for days depended on the real date; it is fixed).
 
 ## The rule behind every change
 
@@ -242,6 +242,18 @@ I went through Advanced and Easy again, window by window, and fixed what stood o
 **Why this and not something else:** you picked it from three drafts (the ring and the list version were the others). The standard is CSS on parts every window already shared, so it could not drift per window.
 
 **Costs:** in a narrow Timer the word Recording / Break can be squeezed by the Sessions / Stopwatch switch; the header dot (lime, or orange on a break) and the footer buttons still say it. The Blocks face is no longer the default; it is one press away in settings.
+
+## 20. Two styles, one Timer clock, and the small extras removed
+
+| What you asked | What I did | Where |
+|---|---|---|
+| Keep only the standard Timer face | The face picker is gone from the Timer's settings; the Timer always shows the one clock. The colon blinks while it records | Timer → settings |
+| Keep only Paper and Pro | The other six styles are hidden; a board that used one opens as Pro | Settings → General → Appearance |
+| Styles in Settings, not on the canvas panel | The style button left the canvas tool panel; Paper / Pro sit above Light / Dark | Settings → General → Appearance |
+| Deadline should open like Date, not as a new pane | It opens under its line: Today, Tomorrow, In a week, None, then the month | Any plan card → Deadline |
+| Remove the small things | "Fill a gap" chips, "One click a day marks it done" and "Not something you tick? Put it on the Calendar" are gone; the overlap message is one tinted line with a real button | Log past time; add a habit |
+
+**Costs:** the six hidden styles and the eight other clock faces are still in the code, unused; removing them properly is a clean-up for later. Making a repeating event from the habit card is no longer one press (use the Calendar's +, Repeats).
 
 ## Your three answers
 

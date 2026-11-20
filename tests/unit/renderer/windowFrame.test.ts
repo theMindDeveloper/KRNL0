@@ -93,7 +93,7 @@ describe('Menus: six rows at most, the rest behind More (menus.md)', () => {
 describe('The plan card is short by default (window-frame.md, cards)', () => {
   const card = readFileSync(join(process.cwd(), 'src/renderer/components/ui/WhenPopover.tsx'), 'utf8');
   it('the month opens only when asked for, and the main button says Save', () => {
-    expect(card).toContain('{gridOpen && (');
+    expect(card).toContain("{gridOpen && monthBlock('when')}");
     expect(card).toContain("primaryLabel ?? 'Save ↵'");
     expect(card).not.toContain("'Done ↵'");
   });
@@ -261,10 +261,10 @@ describe('The window standard: one header, time row and footer (owner pick, 2026
 describe('Timer A: one face, two layers (owner pick and corrections, 2026-11-20)', () => {
   const root = join(process.cwd(), 'src/renderer/components/nodes/PomoNode');
   const read = (f: string): string => readFileSync(join(root, f), 'utf8');
-  it('both modes draw the same clock; a chosen face still wins', () => {
+  it('both modes draw the same clock; there is no choice of faces', () => {
     const s = read('index.tsx');
-    expect(s).toContain("const oneFace = !observe && config.face === undefined && !frameManifest.components.pomo.face;");
-    expect(s).toContain('<TimerClock text={clockText} />');
+    expect(s).toContain('const oneFace = !observe;');
+    expect(s).toContain('<TimerClock text={clockText} blink={running} />');
   });
   it('no line of words under the time, and the time never dims: the state is said in the header', () => {
     const d = read('ObserveDash.tsx');
@@ -285,5 +285,33 @@ describe('Timer A: one face, two layers (owner pick and corrections, 2026-11-20)
     expect(s).not.toMatch(/>\s*(START|STOP|BREAK|NEW|EXTEND|CANCEL|SAVE)\s*</);
     expect(s).toContain('data-testid={`pomo-settings-${key}-inc`}');
     expect(read('display.ts')).toContain("case 'running': return 'Pause';");
+  });
+});
+
+describe('Two styles, one clock, no small extras (owner, 2026-11-20)', () => {
+  const root = join(process.cwd(), 'src/renderer');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('only Paper and Pro are offered, in Settings; the canvas panel has no style button', () => {
+    expect(read('components/ChassisLayer/dockRegistry.tsx')).toContain("export const VISIBLE_DOCK_STYLES: DockStyle[] = ['classic', 'pro'];");
+    expect(read('components/TopBar/SettingsModal.tsx')).toContain('data-testid={`settings-style-${s}`}');
+    expect(read('components/Dock/index.tsx')).toContain('const SHOW_STYLE_PICKER: boolean = false;');
+    expect(read('components/ChassisLayer/useDockStyle.ts')).toContain('VISIBLE_DOCK_STYLES.includes(v as DockStyle)');
+  });
+  it('the Timer has one clock: no face picker in its settings', () => {
+    const s = read('components/nodes/PomoNode/index.tsx');
+    expect(s).not.toContain('data-testid="pomo-face-picker"');
+    expect(s).toContain('const oneFace = !observe;');
+  });
+  it('the plan card has no second pane: the deadline opens under its line', () => {
+    const c = read('components/ui/WhenPopover.tsx');
+    expect(c).toContain('data-testid="when-deadline-open"');
+    expect(c).toContain("{monthBlock('deadline')}");
+    expect(c).not.toContain('data-testid="when-tab-when"');
+  });
+  it('no helper line or underlined link on the habit card; no gap chips on Log time', () => {
+    const h = read('components/nodes/HabitNode/HabitAddAsk.tsx');
+    expect(h).not.toContain('data-testid="habit-ask-calendar"');
+    expect(h).not.toContain('data-testid="habit-ask-goal-help"');
+    expect(read('components/ui/SpanEditor.tsx')).not.toContain('<LogTimeGaps');
   });
 });

@@ -2956,3 +2956,18 @@ Typecheck clean; all tests pass. Checked as full-size screenshots; the plan popu
 - No behaviour, command or test id changed.
 
 Typecheck clean; all tests pass. Checked as full-size screenshots of the whole app and of the Timer in five states; not yet used by the owner.
+
+## [2026-11-20] — Two styles in Settings, one Timer clock, deadline opens in place
+
+**Type:** Feature (UI simplification, owner requests)
+**Branch:** `feat/unified-windows` (PR #257)
+**Files changed:** `ChassisLayer/dockRegistry.tsx`, `ChassisLayer/useDockStyle.ts`, `Dock/index.tsx`, `TopBar/SettingsModal.tsx`, `PomoNode/index.tsx`, `PomoNode/ObserveDash.tsx`, `ui/WhenPopover.tsx`, `HabitNode/HabitAddAsk.tsx`, `ui/SpanEditor.tsx`, tests (`windowFrame.test.ts`, `HabitNode.addField.test.tsx`), docs (`window-frame.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Styles:** only Paper and Pro are offered, in Settings → General → Appearance. The style button on the canvas tool panel is removed. The other six styles stay in the code, unoffered; a saved one opens as Pro.
+- **Timer:** one clock; the face picker is removed from its settings. The colon blinks while recording.
+- **Plan card:** the deadline opens in place under its line (quick days, None, the month); there is no second pane.
+- **Habit card:** the helper sentence and the underlined "Put it on the Calendar" link are removed.
+- **Log time:** the "Fill a gap" chips are removed; the overlap message is one tinted line with a filled button.
+
+Typecheck clean; all tests pass. Checked as screenshots (Settings, the plan card with the deadline open, the habit card); not yet used by the owner.

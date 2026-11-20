@@ -319,7 +319,9 @@ export function PomoNode({
   const activeFace: TimerFace = config.face ?? defaultFace;
   // window-frame.md, Timer A — one face for both modes, unless a face was chosen
   // (in settings, or by the frame style).
-  const oneFace = !observe && config.face === undefined && !frameManifest.components.pomo.face;
+  // Only the standard clock is drawn (owner, 2026-11-20: "leave just the
+  // standard"). A face saved earlier or named by a frame style is ignored.
+  const oneFace = !observe;
 
   // window-frame.md — one name for the window in every mode and state.
   const headerLeft = 'Timer';
@@ -490,37 +492,6 @@ export function PomoNode({
               </div>
             </CardGroup>
 
-            <span style={{ fontSize: 12.5, color: 'var(--ink-3)', padding: '0 2px' }}>Clock face</span>
-            <div
-              data-testid="pomo-face-picker"
-              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 6 }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {(['auto', ...TIMER_FACES] as const).map((face) => {
-                // 'auto' = no saved face: the one clock both modes share (or the frame style's own).
-                const isActive = face === 'auto' ? config.face === undefined : config.face === face;
-                const name = face === 'auto' ? 'Standard' : face === 'lcd' ? 'LCD' : face === 'vu' ? 'VU' : face === 'ascii' ? 'ASCII' : face.charAt(0).toUpperCase() + face.slice(1);
-                return (
-                  <button
-                    key={face}
-                    type="button"
-                    data-testid={`pomo-face-${face}`}
-                    aria-pressed={isActive}
-                    onClick={(e) => { e.stopPropagation(); onCommand('pomo.setFace', { face }); }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    style={{
-                      height: 34, minWidth: 0, padding: '0 6px', border: 'none', borderRadius: 8, cursor: 'pointer',
-                      background: isActive ? 'var(--acid)' : 'var(--paper-2)',
-                      color: isActive ? 'var(--ink-on-bright, #111)' : 'var(--ink-2)',
-                      fontFamily: 'var(--font-read)', fontSize: 12.5, fontWeight: isActive ? 600 : 500,
-                    }}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-            </div>
           </div>
           {/* window-frame.md — the standard footer. */}
           <div className="kw-foot">
@@ -569,7 +540,7 @@ export function PomoNode({
           {observe ? (
             <ObserveDash part="clock" state={state} liveMs={observedMs} library={tagLibrary} nowMs={Date.now()} plain={easy} />
           ) : oneFace ? (
-            <TimerClock text={clockText} />
+            <TimerClock text={clockText} blink={running} />
           ) : (<>
           {activeFace === 'ascii' && (
             <Ascii m={mm} s={ss} elapsedPct={elapsedPct} remainingPct={remainingPct} total={faceTotalMin} running={running} />

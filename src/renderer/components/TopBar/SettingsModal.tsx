@@ -18,6 +18,8 @@ import { Switch } from '../ui/Switch';
 import { gridScopeOf } from '../Canvas/alignGrid';
 import { SettingsIcon, type SettingsIconName } from '../ui/SettingsIcons';
 
+import { useDockStyle, VISIBLE_DOCK_STYLES } from '../ChassisLayer/useDockStyle';
+import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 export type Theme = 'light' | 'dark';
 export type SettingsSection = 'general' | 'timer' | 'sounds' | 'finished' | 'celebrations' | 'updates' | 'reset';
 
@@ -137,9 +139,19 @@ function General({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void
   const alignGrid = useBoardStore((s) => gridScopeOf(s.board?.alignGrid));
   const setAlignGrid = useBoardStore((s) => s.setAlignGrid);
   const easy = useEasyMode();
+  const [dockStyle, setDockStyle] = useDockStyle();
   return (
     <>
       <Card title="Appearance" icon="appearance">
+        {/* The app's style: two to choose from (it was eight, picked on the canvas). */}
+        <div role="radiogroup" aria-label="Style" className="st-choices" style={{ marginBottom: 12 }}>
+          {VISIBLE_DOCK_STYLES.map((s) => (
+            <button key={s} type="button" role="radio" aria-checked={dockStyle === s} data-testid={`settings-style-${s}`} onClick={() => setDockStyle(s)} className="st-choice">
+              <span className="st-choice__label">{DOCK_REGISTRY[s].glyph}{DOCK_REGISTRY[s].label}</span>
+              <span className="st-choice__hint">{DOCK_REGISTRY[s].sublabel}</span>
+            </button>
+          ))}
+        </div>
         <div role="radiogroup" aria-label="Light or dark" className="st-choices">
           {(['light', 'dark'] as const).map((t) => (
             <button key={t} type="button" role="radio" aria-checked={theme === t} data-testid={`settings-theme-${t}`} onClick={() => onTheme(t)} className="st-choice">

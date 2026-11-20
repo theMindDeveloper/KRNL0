@@ -88,7 +88,9 @@ export function dayWord(day: string, today: string): string {
 
 export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, onClose, title, actions, onChange, anchorAbove, primaryLabel }: Props) {
   const easy = useEasyMode();
-  const [tab, setTab] = useState<'when' | 'deadline'>(tab0);
+  // One card, no second pane (owner, 2026-11-20): the deadline opens in place under its line.
+  const tab = 'when' as 'when' | 'deadline';
+  const [dlOpen, setDlOpen] = useState(tab0 === 'deadline');
   const [vLocal, setVLocal] = useState<WhenValue>(value);
   // Controlled (adding a plan): the parent's value is the card's value.
   const v = onChange ? value : vLocal;
@@ -146,7 +148,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   const clearDay = () => { setV((p) => ({ ...p, day: null, time: null })); setTimeText(''); setTimeTouched(true); };
   const clearDeadline = () => setV((p) => ({ ...p, deadline: null }));
   // Pressing the chosen day again clears it.
-  const pickOrClear = (d: string) => { if (d !== selected) pick(d); else if (tab === 'when') clearDay(); else clearDeadline(); };
+  const pickOrClear = (d: string) => { if (d !== selected) pick(d); else clearDay(); };
   const late = !!(v.day && v.deadline && v.day > v.deadline);
   const hasTime = !!(v.day && shownTime.trim() && parseTime(shownTime));
   // A day that is none of the chips shows on the "Date" chip itself.
@@ -157,6 +159,50 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   const moreActions = (actions ?? []).filter((a) => !MAIN.includes(a.key));
   // "Done on Mon 16" needs the room: Won't do then shows as its icon (named in its tooltip).
   const longDone = (mainActions.find((a) => a.key === 'done')?.label.length ?? 0) > 11;
+
+  // The month: for the plan's day, or (under the Deadline line) for its deadline.
+  const monthBlock = (mode: 'when' | 'deadline') => {
+    const sel = mode === 'when' ? v.day : v.deadline;
+    const choose = (d: string) => setV((p) => (mode === 'when' ? { ...p, day: d } : { ...p, deadline: d }));
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--ink-3)' }}>
+          <button type="button" aria-label="Earlier weeks" onClick={() => setWeekOffset((w) => Math.max(0, w - 5))} disabled={weekOffset === 0} style={navBtn(weekOffset === 0)}>‹</button>
+          <span>{monthLabel}</span>
+          <button type="button" aria-label="Later weeks" onClick={() => setWeekOffset((w) => w + 5)} style={navBtn(false)}>›</button>
+        </div>
+        <div data-testid="when-month" data-for={mode} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+          {LETTERS.map((l, i) => <span key={i} style={{ textAlign: 'center', fontSize: 11, color: 'var(--ink-4)' }}>{l}</span>)}
+          {days.map((d) => {
+            const past = d < today;
+            const on = d === sel;
+            const isDeadline = mode === 'when' && d === v.deadline;
+            const isWhen = mode === 'deadline' && d === v.day;
+            return (
+              <button
+                key={d}
+                type="button"
+                data-testid={`when-day-${d}`}
+                disabled={past}
+                title={new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                onClick={() => choose(d)}
+                style={{
+                  position: 'relative', height: 26, borderRadius: 6, padding: 0, cursor: past ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 11.5,
+                  border: d === today ? '1px solid var(--ink-3)' : '1px solid transparent',
+                  background: on ? 'var(--acid)' : 'transparent', color: on ? 'var(--ink-on-bright, #111)' : past ? 'var(--ink-4)' : 'var(--ink-2)',
+                  opacity: past ? 0.45 : 1, fontWeight: on ? 700 : 500,
+                }}
+              >
+                {Number(d.slice(8))}
+                {isDeadline && <span aria-label="deadline" style={{ position: 'absolute', top: 1, right: 2, color: d < today ? 'var(--rust)' : 'var(--ink-2)', lineHeight: 0 }}><MenuIcon name="deadline" size={8} /></span>}
+                {isWhen && <span aria-label="its day" style={{ position: 'absolute', bottom: 2, left: '50%', marginLeft: -2, width: 4, height: 4, borderRadius: 2, background: 'var(--acid)' }} />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   const W = CARD_W;
   const left = Math.max(8, Math.min(anchorAbove ? anchorAbove.left : x, window.innerWidth - W - 8));
@@ -190,66 +236,18 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
             <CardClose onClick={onClose} />
           </div>
         )}
-        {/* Picking the deadline uses the same day picker, named, with a way back. */}
-        {tab === 'deadline' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button type="button" role="tab" aria-selected={false} data-testid="when-tab-when" onClick={() => { setTab('when'); setGridOpen(false); }} style={{ ...ghost, height: 26, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 6px 0 2px' }}>
-              <MenuIcon name="back" size={12} />When
-            </button>
-            <span style={{ flex: 1 }} />
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--ink-2)', fontSize: 11.5, fontWeight: 650 }}><MenuIcon name="deadline" size={11} />Deadline</span>
-          </div>
-        )}
-
         <CardGroup>
         <div style={cardDays}>
           {quick.map(([key, label, ymd]) => (
             <button key={key} type="button" data-testid={`when-quick-${key}`} aria-pressed={selected === ymd} onClick={() => pickOrClear(ymd)} style={cardDay(selected === ymd)}>{label}</button>
           ))}
-          <button type="button" data-testid="when-pick-date" aria-expanded={gridOpen} title="Pick another date" onClick={() => setGridOpen((o) => !o)}
+          <button type="button" data-testid="when-pick-date" aria-expanded={gridOpen} title="Pick another date" onClick={() => { setDlOpen(false); setGridOpen((o) => !o); }}
             style={{ ...cardDay(offQuick), ...(gridOpen && !offQuick ? { background: 'var(--paper-3)', color: 'var(--ink)' } : {}) }}>
             <MenuIcon name="day" size={12} />{offQuick && selected ? dayWord(selected, today) : 'Date'}
           </button>
         </div>
 
-        {gridOpen && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px 10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--ink-3)' }}>
-              <button type="button" aria-label="Earlier weeks" onClick={() => setWeekOffset((w) => Math.max(0, w - 5))} disabled={weekOffset === 0} style={navBtn(weekOffset === 0)}>‹</button>
-              <span>{monthLabel}</span>
-              <button type="button" aria-label="Later weeks" onClick={() => setWeekOffset((w) => w + 5)} style={navBtn(false)}>›</button>
-            </div>
-            <div data-testid="when-month" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
-              {LETTERS.map((l, i) => <span key={i} style={{ textAlign: 'center', fontSize: 11, color: 'var(--ink-4)' }}>{l}</span>)}
-              {days.map((d) => {
-                const past = d < today;
-                const on = d === selected;
-                const isDeadline = d === v.deadline;
-                const isWhen = tab === 'deadline' && d === v.day;
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    data-testid={`when-day-${d}`}
-                    disabled={past}
-                    title={new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    onClick={() => pick(d)}
-                    style={{
-                      position: 'relative', height: 26, borderRadius: 6, padding: 0, cursor: past ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 11.5,
-                      border: d === today ? '1px solid var(--ink-3)' : '1px solid transparent',
-                      background: on ? 'var(--acid)' : 'transparent', color: on ? 'var(--ink-on-bright, #111)' : past ? 'var(--ink-4)' : 'var(--ink-2)',
-                      opacity: past ? 0.45 : 1, fontWeight: on ? 700 : 500,
-                    }}
-                  >
-                    {Number(d.slice(8))}
-                    {isDeadline && tab === 'when' && <span aria-label="deadline" style={{ position: 'absolute', top: 1, right: 2, color: d < today ? 'var(--rust)' : 'var(--ink-2)', lineHeight: 0 }}><MenuIcon name="deadline" size={8} /></span>}
-                    {isWhen && <span aria-label="its day" style={{ position: 'absolute', bottom: 2, left: '50%', marginLeft: -2, width: 4, height: 4, borderRadius: 2, background: 'var(--acid)' }} />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {gridOpen && monthBlock('when')}
 
         {tab === 'when' && (
           <>
@@ -290,11 +288,23 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
               <div style={cardRow}>
                 <span style={cardLabel}>Deadline</span>
                 <div style={cardCtls}>
-                  <button type="button" role="tab" aria-selected={false} data-testid="when-tab-deadline" onClick={() => { setTab('deadline'); setGridOpen(false); }}
+                  <button type="button" aria-expanded={dlOpen} data-testid="when-tab-deadline" title={dlOpen ? 'Close' : 'Pick a deadline'} onClick={() => { setGridOpen(false); setDlOpen((o) => !o); }}
                     style={{ ...cardPill(false), display: 'inline-flex', alignItems: 'center', gap: 4, background: 'transparent', paddingRight: 2, color: v.deadline ? (late ? 'var(--rust)' : 'var(--ink)') : 'var(--ink-4)', fontWeight: v.deadline ? 500 : 400 }}>
-                    {v.deadline ? dayWord(v.deadline, today) : 'None'}<LineGlyph name="chevron" size={12} />
+                    {v.deadline ? dayWord(v.deadline, today) : 'None'}<LineGlyph name={dlOpen ? 'caretDown' : 'chevron'} size={12} />
                   </button>
                 </div>
+              </div>
+            )}
+            {/* The deadline opens here, under its line: three quick days, no deadline, and the month. */}
+            {dlOpen && (!easy || !!value.deadline) && (
+              <div data-testid="when-deadline-open">
+                <div style={cardDays}>
+                  {([['today', 'Today', today], ['tmrw', 'Tomorrow', tomorrow], ['in-a-week', 'In a week', addDays(today, 7)]] as const).map(([key, label, ymd]) => (
+                    <button key={key} type="button" data-testid={`when-deadline-${key}`} aria-pressed={v.deadline === ymd} onClick={() => setV((p) => ({ ...p, deadline: p.deadline === ymd ? null : ymd }))} style={cardDay(v.deadline === ymd)}>{label}</button>
+                  ))}
+                  <button type="button" data-testid="when-no-deadline" aria-pressed={!v.deadline} onClick={clearDeadline} style={cardDay(false)}>None</button>
+                </div>
+                {monthBlock('deadline')}
               </div>
             )}
           </>
@@ -339,9 +349,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
         )}
 
         <div style={{ ...cardFoot, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {tab === 'when'
-            ? (v.day ? <button type="button" data-testid="when-clear" onClick={clearDay} style={cardGhost}>No day</button> : null)
-            : (v.deadline ? <button type="button" data-testid="when-no-deadline" onClick={clearDeadline} style={cardGhost}>No deadline</button> : null)}
+          {v.day ? <button type="button" data-testid="when-clear" onClick={clearDay} style={cardGhost}>No day</button> : null}
           <button type="button" data-testid="when-done" onClick={apply} title="Save the day, time and deadline"
             style={{ ...cardPrimary(true), flex: 1 }}>
             {primaryLabel ?? 'Save ↵'}

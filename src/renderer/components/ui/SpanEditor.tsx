@@ -22,7 +22,7 @@ import { TimeField, parseTime } from './TimeField';
 import { AppSelect } from './AppSelect';
 import { Z } from './layers';
 import { TaskTagPicker } from './TaskTagPicker';
-import { LogTimeBar, LogTimeDayStepper, LogTimeGaps, freeStretchWithin, toHM, toMin, useDaySpans } from './LogTimeDial';
+import { LogTimeBar, LogTimeDayStepper, freeStretchWithin, toHM, toMin, useDaySpans } from './LogTimeDial';
 import { SPACE, popupColumn } from './spacing';
 import { toneVarForTask } from '../../utils/taskColor';
 import { boardTagLibrary } from '../../store/spanTags';
@@ -358,13 +358,13 @@ export function LogTimeHost(): JSX.Element | null {
           </div>
         </CardGroup>
         <LogTimeBar dayYMD={day} startHM={startHM} endHM={endHM} />
-        <LogTimeGaps dayYMD={day} onChange={setRange} />
         {(error ?? problem) && (
-          <div role="alert" data-testid="log-time-problem" style={{ display: 'flex', alignItems: 'center', gap: SPACE.inline, fontSize: 12.5, color: 'var(--rust)' }}>
-            <span style={{ flex: 1 }}>{error ?? problem}</span>
+          <div role="alert" data-testid="log-time-problem" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'color-mix(in srgb, var(--rust) 12%, transparent)', fontSize: 13, color: 'var(--ink)' }}>
+            <span style={{ flex: 1, minWidth: 0 }}>{error ?? problem}</span>
             {fit && (
-              <button type="button" data-testid="log-time-trim" style={btn(false)} onClick={() => setRange(toHM(fit.startMin), toHM(fit.endMin))}>
-                Trim to {toHM(fit.startMin)}–{toHM(fit.endMin)}
+              <button type="button" data-testid="log-time-trim" title="Use the free part of that time" onClick={() => setRange(toHM(fit.startMin), toHM(fit.endMin))}
+                style={{ flexShrink: 0, height: 30, padding: '0 10px', borderRadius: 8, border: 'none', background: 'var(--paper-3)', color: 'var(--ink)', cursor: 'pointer', fontFamily: 'var(--font-read)', fontSize: 13, whiteSpace: 'nowrap' }}>
+                Use {toHM(fit.startMin)}–{toHM(fit.endMin)}
               </button>
             )}
           </div>

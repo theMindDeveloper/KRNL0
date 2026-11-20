@@ -136,3 +136,15 @@ The "01 · spine · 05" badge that sat over a window's header in the Free layout
 - **The clock face setting:** Standard is this face. The other faces (Blocks, LCD, Vapor, …) are still a choice in settings, and a frame style may still name its own.
 - **Footer:** the standard bar. Buttons in normal letters: Start, Start session, Continue …, Pause, Break, Stop, New, Log past time.
 - **Settings:** one filled block, a line per setting with "− 25 min +"; the faces as a grid of filled buttons; Cancel and Save in the standard footer.
+
+## Two styles, chosen in Settings (owner, 2026-11-20)
+
+- The app offers two styles: **Paper** and **Pro**, each in light and dark. They are chosen in **Settings → General → Appearance**. The frame-style button on the canvas tool panel is gone.
+- The other six styles (Synthesizer, Telemetry, Nuclear, Blueprint, Macintosh, Submarine) stay in the code but are not offered; a board that had one opens as Pro.
+- **The Timer has one clock.** There is no choice of faces in its settings; a face saved earlier is ignored. (`krnl pomo face …` still stores the value; nothing draws it.)
+
+## Cards: nothing opens as a second pane, and no small extras (owner, 2026-11-20)
+
+- **Deadline** opens in place under its line, the way Date does: Today, Tomorrow, In a week, None, then the month. Only one month is open at a time. There is no "back to When".
+- **Habit card:** no helper sentence under Goal (it is the Tick button's tooltip) and no link under the main button. A repeating event is made from the Calendar's + (Repeats).
+- **Log time:** no "Fill a gap" chips. When the time overlaps something recorded, one tinted line says so, with a filled button: "Use 00:15–00:55".
