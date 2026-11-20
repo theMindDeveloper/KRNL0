@@ -8,9 +8,11 @@ import { SettingsIcon } from '../ui/SettingsIcons';
 import { MOMENT_LABELS, SOUND_MOMENTS, SOUND_PACK_IDS, SOUND_PACKS } from '../../sfx/soundPacks';
 import { useSoundSettings } from '../../sfx/soundSettings';
 import { uiSounds } from '../../sfx/uiSounds';
+import { voicePlayer } from '../Assistant/VoicePlayer';
 
 export function SoundSection() {
-  const { pack, volume, enabled, setPack, setVolume, setEnabled } = useSoundSettings();
+  const { pack, volume, enabled, voiceVolume, setPack, setVolume, setEnabled, setVoiceVolume } = useSoundSettings();
+  const voiceSample = () => { void voicePlayer.play('click_im_here').catch(() => { /* no audio device */ }); };
   const sample = () => uiSounds.play('done');
   const dim: CSSProperties = { opacity: enabled ? 1 : 0.45, pointerEvents: enabled ? 'auto' : 'none' };
 
@@ -30,7 +32,7 @@ export function SoundSection() {
           />
         </div>
         <label className="st-row" style={dim}>
-          <span className="st-row__title" style={{ width: 64 }}>Volume</span>
+          <span className="st-row__title" style={{ width: 84 }}>App sounds</span>
           <input
             type="range"
             min={0}
@@ -47,6 +49,33 @@ export function SoundSection() {
             onKeyUp={sample}
           />
           <span className="st-row__value">{volume}</span>
+        </label>
+      </section>
+
+      <section className="st-card">
+        <div className="st-row">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="st-row__title">AI voice</div>
+            <div className="st-row__hint">How loud KRNL0 speaks: its hello, its replies and the tour guide. At 0 it says nothing.</div>
+          </div>
+        </div>
+        <label className="st-row">
+          <span className="st-row__title" style={{ width: 84 }}>Volume</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={voiceVolume}
+            aria-label="AI voice volume"
+            data-testid="settings-voice-volume"
+            className="st-range"
+            style={{ '--st-fill': `${voiceVolume}%` } as CSSProperties}
+            onChange={(e) => setVoiceVolume(Number(e.target.value))}
+            onPointerUp={voiceSample}
+            onKeyUp={voiceSample}
+          />
+          <span className="st-row__value">{voiceVolume}</span>
         </label>
       </section>
 

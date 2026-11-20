@@ -325,6 +325,8 @@ export function Orb() {
   useEffect(() => {
     if (greetedRef.current) return;
     greetedRef.current = true;
+    // A switch to another board is not the app opening: say nothing (boards.md F9).
+    if (window.__krnlBoardSwitch) return;
 
     const hour = new Date().getHours();
     // Time-of-day adds a couple flavors; rest of pool is the always-on

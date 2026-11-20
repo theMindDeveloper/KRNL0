@@ -23,6 +23,7 @@ import { stepsFor, tourById, type Tour } from './tours';
 import { setGuideSpeaking, setTourActive, setTourAnchor } from './tourAnchor';
 import { fillTour, spokenText, voiceKey } from './tourVoice';
 import { voicePlayer } from '../Assistant/VoicePlayer';
+import { voiceLevel } from '../../sfx/soundSettings';
 
 // The guide's recorded voice (tourVoice.ts): ./voice/<key>.mp3, bundled by Vite.
 const VOICE_CLIPS = import.meta.glob('./voice/*.mp3', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
@@ -537,11 +538,11 @@ export function TourHost(): JSX.Element | null {
     if (!voiceReady || !voiceOn || !step) return;
     const mode = (ownMode.current ?? uiMode) === 'easy' ? 'easy' : 'advanced';
     const url = clipFor(voiceKey(spokenText(step.text, mode, step.say, timer)));
-    if (!url) return;
+    if (!url || voiceLevel() <= 0) return;
     // One voice at a time: the orb's own lines (its greeting) stop for the guide.
     voicePlayer.stop();
     const a = new Audio(url);
-    a.volume = 0.9;
+    a.volume = 0.9 * voiceLevel();
     audioRef.current = a;
     // The orb speaks while the guide talks.
     a.addEventListener('playing', () => setGuideSpeaking(true));

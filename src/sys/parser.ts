@@ -146,7 +146,7 @@ export type SysCommand =
   | { kind: 'recap'; sub: 'today' | 'yesterday' | 'week' | 'show' }
   | { kind: 'sound'; sub: 'status' | 'list' | 'on' | 'off' }
   | { kind: 'sound'; sub: 'pack'; pack: string | undefined }
-  | { kind: 'sound'; sub: 'volume'; volume: number | undefined }
+  | { kind: 'sound'; sub: 'volume' | 'voice'; volume: number | undefined }
   | { kind: 'sound'; sub: 'play'; moment: string | undefined }
   | { kind: 'radio'; sub: 'list' | 'status' | 'stop' }
   | { kind: 'radio'; sub: 'play'; preset: string | undefined }
@@ -1091,9 +1091,9 @@ export class SysParser {
       if (sub === 'list' || sub === 'on' || sub === 'off') return { kind: 'sound', sub };
       if (sub === 'pack') return { kind: 'sound', sub: 'pack', pack: rest[0] };
       if (sub === 'play') return { kind: 'sound', sub: 'play', moment: rest[0] };
-      if (sub === 'volume') {
+      if (sub === 'volume' || sub === 'voice') {
         const v = rest[0] !== undefined ? Number(rest[0]) : NaN;
-        return { kind: 'sound', sub: 'volume', volume: Number.isFinite(v) ? v : undefined };
+        return { kind: 'sound', sub, volume: Number.isFinite(v) ? v : undefined };
       }
     }
 

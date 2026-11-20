@@ -3046,3 +3046,15 @@ Typecheck clean; all tests pass. Checked as screenshots in both layouts, light a
 - A board switch reloads the window, and every reload played the start-up screen and then the launch dialogs. The main process now marks the reload as a board switch; the page removes the start-up screen before it is painted and skips What's new / Welcome back. A real start is unchanged.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-20] — No hello on a board switch; AI voice volume in Settings
+
+**Type:** Bug Fix + Feature
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `Orb/index.tsx`, `sfx/soundSettings.ts`, `Assistant/VoicePlayer.ts`, `Tour/TourHost.tsx`, `TopBar/SoundSection.tsx`, `sfx/soundCli.ts`, `store/useCliDispatch.ts`, `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, docs (`ui-sounds.md` F9, `boards.md` F9), tests
+
+**Summary:**
+- **Board switch:** the window reload for a switch replayed the AI's spoken hello. It now stays silent on a switch.
+- **Two volumes in Settings → Sounds:** **App sounds** (the existing slider, renamed) and a new **AI voice** slider (0–100, default 60; the voice was fixed at 85). It covers the hello, the voice's replies and the tour guide; 0 is silent; moving it changes a line already being spoken. CLI: `sound voice <0-100>`.
+
+Typecheck clean; all tests pass.

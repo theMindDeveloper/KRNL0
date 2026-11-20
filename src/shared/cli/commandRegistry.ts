@@ -327,6 +327,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'list', usage: 'sound list', summary: 'The packs (snd01, zen, crisp) and the moments' },
       { name: 'pack', usage: 'sound pack <snd01|zen|crisp>', summary: 'Choose the sound pack' },
       { name: 'volume', usage: 'sound volume <0-100>', summary: 'Set the UI sound volume' },
+      { name: 'voice', usage: 'sound voice <0-100>', summary: 'Set how loud the AI voice speaks (0 = silent)' },
       { name: 'on', usage: 'sound on', summary: 'Turn UI sounds on' },
       { name: 'off', usage: 'sound off', summary: 'Turn UI sounds off' },
       { name: 'play', usage: 'sound play <moment>', summary: 'Play one moment in the current pack (add, done, start, …)' },

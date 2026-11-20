@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import { CLIP_MAP } from './clipMap';
+import { useSoundSettings, voiceLevel } from '../../sfx/soundSettings';
 
 // Eagerly load every .mp3 under ./audio at bundle time.
 // Vite resolves them to hashed asset URLs for both dev and production.
@@ -23,6 +24,8 @@ function resolveUrl(clipId: string): string | undefined {
 // Slightly attenuated so the recording's noise floor sits lower in the mix.
 // Drops perceived hiss without losing intelligibility. Tune here if needed.
 const VOICE_VOLUME = 0.85;
+/** The level for a clip right now: the recording's trim times Settings → Sounds → AI voice. */
+const level = (): number => VOICE_VOLUME * voiceLevel();
 
 export class VoicePlayer {
   private cache = new Map<string, HTMLAudioElement>();
@@ -35,7 +38,7 @@ export class VoicePlayer {
       if (url) {
         const audio = new Audio(url);
         audio.preload = 'auto';
-        audio.volume = VOICE_VOLUME;
+        audio.volume = level();
         this.cache.set(id, audio);
       }
     }
@@ -43,6 +46,8 @@ export class VoicePlayer {
 
   play(clipId: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      // AI voice at 0: nothing is said, and the caller carries on as if it had been.
+      if (voiceLevel() <= 0) { this.stop(); resolve(); return; }
       let audio = this.cache.get(clipId);
       if (!audio) {
         const url = resolveUrl(clipId);
@@ -57,7 +62,7 @@ export class VoicePlayer {
       this.stop();
       this.current = audio;
 
-      audio.volume = VOICE_VOLUME;
+      audio.volume = level();
       audio.currentTime = 0;
       audio.onended = () => {
         this.current = null;
@@ -82,6 +87,13 @@ export class VoicePlayer {
     }
   }
 
+  /** Apply the current AI voice volume to the line being spoken. */
+  setLevel(): void {
+    if (!this.current) return;
+    if (voiceLevel() <= 0) this.stop();
+    else this.current.volume = level();
+  }
+
   playRandom(clipIds: string[]): Promise<void> {
     const id = clipIds[Math.floor(Math.random() * clipIds.length)];
     return this.play(id!);
@@ -89,3 +101,8 @@ export class VoicePlayer {
 }
 
 export const voicePlayer = new VoicePlayer();
+
+// Moving the slider changes a line that is being spoken, not only the next one.
+useSoundSettings.subscribe((s, prev) => {
+  if (s.voiceVolume !== prev.voiceVolume) voicePlayer.setLevel();
+});

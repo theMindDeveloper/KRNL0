@@ -24,6 +24,11 @@ describe('F9: switching boards skips the start-up screen', () => {
     expect(page).toContain(`sessionStorage.removeItem('${MARK}')`);
     expect(page).toContain('if (boardSwitch || ');
   });
+  it('the AI does not say hello after a switch', () => {
+    const orb = read('renderer/components/Orb/index.tsx');
+    const at = orb.indexOf('greetedRef.current = true;');
+    expect(orb.slice(at, at + 220)).toContain('if (window.__krnlBoardSwitch) return;');
+  });
   it('the launch dialogs do not open after a switch', () => {
     expect(read('renderer/App.tsx')).toContain('if (!window.__krnlBoardSwitch) window.setTimeout(runLaunchFlow, 500)');
   });

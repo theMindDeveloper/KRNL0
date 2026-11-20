@@ -44,6 +44,7 @@ Each moment is a short **phrase** (`soundPacks.ts`): a few hits with their own t
 - **F6** With sounds off, or at volume 0, nothing plays and no audio is decoded.
 - **F7** `sys sound status | pack <id> | volume <0-100> | on | off | play <moment> | list` reads and sets the same settings from the CLI (renderer required, exit 2 without one). Settings → Sounds shows what the CLI set.
 - **F8** The same moment does not play twice within 80 ms (a bulk action makes one sound, not a burst).
+- **F9** **AI voice volume.** Settings → Sounds has a second slider, **AI voice** (0–100, default 60), beside **App sounds**. It sets how loud the voice speaks: the hello at start, its replies, the tour guide. At 0 nothing is said. It does not depend on the sounds switch. CLI: `sound voice <0-100>`; `sound status` shows it.
 
 ## Non-Functional Requirements
 

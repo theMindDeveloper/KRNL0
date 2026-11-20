@@ -7,7 +7,7 @@ import { uiSounds } from './uiSounds';
 
 function status(): string {
   const s = useSoundSettings.getState();
-  return `sound: ${s.enabled ? 'on' : 'off'} · pack ${s.pack} (${SOUND_PACKS[s.pack].name}) · volume ${s.volume}`;
+  return `sound: ${s.enabled ? 'on' : 'off'} · pack ${s.pack} (${SOUND_PACKS[s.pack].name}) · volume ${s.volume} · voice ${s.voiceVolume}`;
 }
 
 export function runSoundCommand(command: string, args: Record<string, unknown>): { ok: boolean; message: string } {
@@ -40,6 +40,12 @@ export function runSoundCommand(command: string, args: Record<string, unknown>):
       const v = Number(args['volume']);
       if (!Number.isFinite(v) || v < 0 || v > 100) return { ok: false, message: 'sound volume requires a number from 0 to 100' };
       s.setVolume(v);
+      return { ok: true, message: status() };
+    }
+    case 'sound.voice': {
+      const v = Number(args['volume']);
+      if (!Number.isFinite(v) || v < 0 || v > 100) return { ok: false, message: 'sound voice requires a number from 0 to 100' };
+      s.setVoiceVolume(v);
       return { ok: true, message: status() };
     }
     case 'sound.play': {

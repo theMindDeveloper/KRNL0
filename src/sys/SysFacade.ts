@@ -692,6 +692,11 @@ export class SysFacade {
             return { ok: false, message: 'sound volume requires a number from 0 to 100' };
           }
           return this.deps.cliDispatch('sound.volume', { volume: command.volume });
+        case 'voice':
+          if (command.volume === undefined || command.volume < 0 || command.volume > 100) {
+            return { ok: false, message: 'sound voice requires a number from 0 to 100' };
+          }
+          return this.deps.cliDispatch('sound.voice', { volume: command.volume });
         case 'play':
           if (!command.moment) return { ok: false, message: 'sound play requires <moment> (see: krnl sound list)' };
           return this.deps.cliDispatch('sound.play', { moment: command.moment });
