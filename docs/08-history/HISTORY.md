@@ -3144,3 +3144,11 @@ Typecheck clean; all tests pass.
 - Not part of this PR: the tag `v0.12.0` and the Publish click. They wait for the owner's OK.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-20] — v0.12.0 published
+
+**Type:** Release
+**PRs/Commits:** #259 (release PR), tag `v0.12.0`
+
+**Summary:**
+- Tag `v0.12.0` pushed on `main`; the release workflow built the Windows installer and created the draft with `KRNL0-Setup-0.12.0.exe`, its `.blockmap` and `latest.yml` (version 0.12.0). The owner approved, and the release was published on 2026-11-20. It is the latest release, so installs now update to it.
