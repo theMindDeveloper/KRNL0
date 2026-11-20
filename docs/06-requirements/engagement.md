@@ -38,6 +38,7 @@ Rules from the research:
 - **F17** When the last scheduled day before today was missed and the scheduled day before that was done, the row asks "Missed yesterday? Tick it if you did it." **I DID IT** ticks that day. **No, start fresh** hides the prompt for that day. The CLI equivalent is `habit done <id> --date`.
 - **F18** The Clock draws an outer ring that closes as the day's planned blocks are ticked, shown only when there is a plan. Under the dial, one small ring per day of this week: a check when complete, dotted when nothing was planned. Clicking a day opens it.
 - **F19** A missed calendar block (its time passed, not done) has a dashed outline and a **↻ REPLAN** badge in its corner at any size ("didn't happen? drag it to a new time" when the block is wide). REPLAN makes the block itself lift and hop once, with a tiny "drag to a new time" chip beside it. Nothing covers the Calendar. Right-click → Unschedule takes it off. The CLI equivalent is `task schedule` / `task unschedule`.
+- **F20** (UX review pick 3A, 2026-11-18) **A done card says why it stays.** When the finished-cards policy would have taken a done card off the board but its chain or subtasks are not all done, its meta row reads **waits on chain** (tooltip: the open task that holds it). Every done card has an Archive button (task-node F22).
 
 ## Non-Functional Requirements
 

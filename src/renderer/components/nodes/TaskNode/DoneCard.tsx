@@ -5,7 +5,11 @@
 // Clock). Ticking plays a one-shot reward: the check pops, eight small dots
 // burst from it, the border glows once. Then it rests.
 
+import { useMemo } from 'react';
 import { useEasyMode } from '../../../store/uiMode';
+import { useBoardStore } from '../../../store/boardStore';
+import { useFinishedCards, waitingOnChain } from '../../../store/finishedCards';
+import { archiveDoneTask } from '../../../store/planActions';
 import { LineGlyph } from '../../ui/LineGlyph';
 import type { MouseEvent, ReactNode } from 'react';
 import { CARD_H, CardIcon, CardMetaRow, CardMeter, cardFrameStyle } from './CardParts';
@@ -67,6 +71,12 @@ export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onCon
     ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
     : '';
   const tone = toneVarForTask(taskId);
+  // engagement.md F20 — would have left the board by now, but its chain (or
+  // subtasks) is not all done: say so, and name the task that holds it.
+  const board = useBoardStore((st) => st.board);
+  const policy = useFinishedCards((st) => st.policy);
+  const holderId = useMemo(() => waitingOnChain(board, policy, Date.now()).get(taskId), [board, policy, taskId]);
+  const holderText = holderId ? String((board?.nodes.find((n) => n.id === holderId)?.state as { text?: string } | undefined)?.text ?? 'a task') : null;
   const planned = !state.timeOpen && plannedMin > 0;
   // A finished task never ends on a penalty: it reads "took X", in plain ink.
   const verdict = !planned || tookMin <= 0 ? null
@@ -108,6 +118,18 @@ export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onCon
         <button
           type="button"
           className="nodrag task-card-action"
+          data-testid="done-card-archive"
+          onClick={(e) => { e.stopPropagation(); archiveDoneTask(taskId); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Archive: off the board and Done today now (Analytics keeps it)"
+          aria-label="Archive"
+          style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, border: 0, cursor: 'pointer', background: 'transparent', color: 'var(--ink-3)' }}
+        >
+          <CardIcon name="archive" size={13} />
+        </button>
+        <button
+          type="button"
+          className="nodrag task-card-action"
           onClick={(e) => { e.stopPropagation(); onReopen(); }}
           onMouseDown={(e) => e.stopPropagation()}
           title="Reopen"
@@ -120,7 +142,15 @@ export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onCon
 
       {/* Row 2: tag · when it was finished */}
       {/* Easy hides tags (D8, #228). */}
-      <CardMetaRow tag={easy ? '' : state.tag ?? ''} tone={tone} icon="check" when={atLabel ? `Done ${atLabel}` : 'Done'} whenColor="var(--acid-ink, var(--acid))" />
+      <div title={holderText ? `Stays on the board until "${holderText}" is done. Archive takes it off now.` : undefined} data-testid={holderText ? 'done-card-waiting' : undefined}>
+        <CardMetaRow
+          tag={easy ? '' : state.tag ?? ''}
+          tone={tone}
+          icon={holderText ? 'follows' : 'check'}
+          when={holderText ? 'waits on chain' : atLabel ? `Done ${atLabel}` : 'Done'}
+          whenColor={holderText ? 'var(--ink-3)' : 'var(--acid-ink, var(--acid))'}
+        />
+      </div>
 
       {/* Meter: full — how long it took, against the plan */}
       <CardMeter

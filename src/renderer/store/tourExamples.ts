@@ -17,6 +17,8 @@ export type { ExampleKind };
 export const EXAMPLE_PLAN = 'Example: Read chapter 3';
 export const EXAMPLE_HABIT = 'Example: Walk';
 export const EXAMPLE_EVENT = 'Example: Class';
+/** A plan from yesterday, never ticked (the "When plans change" tour). */
+export const EXAMPLE_MISSED = 'Example: Read chapter 2';
 
 interface Added { itemIds: string[]; taskIds: string[]; segIds: string[]; habitIds: string[] }
 let added: Added | null = null;
@@ -31,7 +33,7 @@ const habitsOf = (b: Board): HabitLite[] => ((mother(b, 'habit')?.state as { hab
 // Recorded time lives in the timer's history (spanEdit.ts pomoAddSegment).
 const segsOf = (b: Board): Seg[] => ((b.nodes.find((n) => n.kind === 'pomo')?.state as { history?: Seg[] } | undefined)?.history ?? []);
 
-/** What the board already has: a plan on today, time recorded today, a habit, a repeating event. */
+/** What the board already has: a plan on today, time recorded today, a habit, a repeating event, a missed plan (an earlier day, not done). */
 export function missingExamples(board: Board, want: readonly ExampleKind[], now = new Date()): ExampleKind[] {
   const today = ymd(now);
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -40,6 +42,10 @@ export function missingExamples(board: Board, want: readonly ExampleKind[], now 
     recorded: segsOf(board).some((s) => Date.parse(s.endedAt ?? '') > startOfDay),
     habit: habitsOf(board).some((h) => h.kind !== 'routine'),
     event: habitsOf(board).some((h) => h.kind === 'routine'),
+    missed: board.nodes.some((n) => {
+      const s = n.state as { done?: boolean; scheduledFor?: string };
+      return n.kind === 'todo.task' && s.done !== true && !!s.scheduledFor && s.scheduledFor.slice(0, 10) < today;
+    }),
   };
   return want.filter((k) => !has[k]);
 }
@@ -61,6 +67,13 @@ export async function addExamples(want: readonly ExampleKind[], easy: boolean, n
     if (need.includes('plan')) await addPlanAt(EXAMPLE_PLAN, today, `${String(h).padStart(2, '0')}:00`, 45);
     const item = itemsOf(useBoardStore.getState().board!).find((i) => !before.items.has(i.id) && i.text === EXAMPLE_PLAN);
     if (item) { a.itemIds.push(item.id); if (item.taskNodeId) { a.taskIds.push(item.taskNodeId); planTask = item.taskNodeId; } }
+  }
+  // The missed plan: yesterday 14:00, 45 minutes, not ticked.
+  if (need.includes('missed')) {
+    const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    await addPlanAt(EXAMPLE_MISSED, ymd(y), '14:00', 45);
+    const item = itemsOf(useBoardStore.getState().board!).find((i) => !before.items.has(i.id) && i.text === EXAMPLE_MISSED);
+    if (item) { a.itemIds.push(item.id); if (item.taskNodeId) a.taskIds.push(item.taskNodeId); }
   }
   // Recorded time: 40 minutes that ended 10 minutes ago (inside today).
   if (need.includes('recorded')) {
@@ -115,7 +128,10 @@ export function withoutExamples(board: Board, ex: Added): Board {
     return n;
   });
   const edges = board.edges.filter((e) => !gone.has(e.from.nodeId) && !gone.has(e.to.nodeId));
-  return { ...board, nodes, edges };
+  // An example ticked during the tour leaves no completion behind (Analytics).
+  const out: Board = { ...board, nodes, edges };
+  if (board.completions) out.completions = board.completions.filter((c) => !gone.has(c.taskId));
+  return out;
 }
 
 /** Takes the examples out (at the tour's end, before the practice question). */

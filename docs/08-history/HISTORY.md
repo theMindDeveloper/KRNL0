@@ -2736,3 +2736,62 @@ The first-day voice clips no longer match the corrected words: the clip check is
 - a done anchor is never pushed by its chain
 
 The full user-journey review, with proposals for canvases, archive and chains, is in `docs/research/ux-review-2026-11-18.md`. Typecheck is at 0 errors. 2,609 tests pass. The one failure, `routines.test.ts`, depends on the date and also fails on the unchanged branch. Not yet walked in the real window: the owner checks it.
+
+## [2026-11-18] — UX review picks: Welcome back checklist, Won't do / Done-on-day in menus, Archive, canvas note, chain captions
+
+**Type:** Feature (UX)
+**Branch:** `feat/ux-review-picks` (builds on `fix/ux-review-welcome-back`, PR #251)
+**Files changed:**
+- **New code:** `src/renderer/store/planActions.ts`
+- **Store:** `store/finishedCards.ts` (archive, `waitingOnChain`)
+- **Shared:** `shared/dispatch/task.ts` (`archiveTask`; reopening clears the archive)
+- **Task card:** `TaskNode/index.tsx` (menu), `TaskNode/DoneCard.tsx`, `TaskNode/CardParts.tsx`, `TaskNode/types.ts`
+- **Todo:** `TodoNode/index.tsx` (Won't do moved to the shared helper)
+- **Calendar:** `CalendarNode/WeekView.tsx` (popup actions, "after X")
+- **UI:** `ui/WhenPopover.tsx` (title `sub`), `TopBar/CanvasSwitcher.tsx`
+- **Welcome back:** `Launch/WelcomeBack.tsx` (checklist)
+- **CLI:** `sys/parser.ts`, `SysFacade.ts`, `commands/task.ts` (`task archive`), `shared/cli/commandRegistry.ts`, `claude/CLAUDE.md`
+- **Requirements:** launch-experience F14c, task-node F21–F22, engagement F20, canvases F9, calendar-clock-visuals F30
+- **Tests:** `uxReviewPicks.test.ts` (new); launch dialogs and the sys task tests updated
+
+**Summary:** The owner asked for the option a senior UX designer would choose in each row of the review canvas. The picks, adapted to the code:
+
+- **1A: Welcome back is a checklist.** A tick counts on the planned day and unticking reopens the task. Open rows get Move (Today / Tomorrow / Off the calendar) and Won't do. Followers have their own rows. **Close** moves nothing.
+- **2B: the card menu and the calendar popup offer the real choices.** "Done on Mon 16" (or "Done at 14:00", or "Mark done") and Won't do sit above Delete. 2A was dropped because the card keeps one fixed shape. The rule: the checkbox means "now", and the menu dates the tick to the plan.
+- **3A, adapted to the fixed card.** Done cards get an Archive button and an Archive menu item, and say **waits on chain** when an unfinished chain is what holds them on the board. `krnl task archive <id> [--undo]`.
+- **4A, box only.** The switcher says what every canvas shares and what is on each one. Renaming "canvas" to "page" touches about 100 strings, so it is left as its own change.
+- **5A-lite.** Chained calendar blocks and their popup say "after <task>". Drawn connectors are left out. 5B was dropped: its default ("keep their own days") is already Decision 30 behaviour.
+
+Won't do now has one implementation (`planActions.wontDoItem`, with UNDO restoring links and time) used everywhere. Typecheck 0. Tests: 2,620 passed; one date-dependent routines test also fails on the unchanged branch. **Open, blocks Done:** the guided tour for these changes. It needs recorded voice clips for every step (guided-tours F12). Not yet walked in the real window.
+
+## [2026-11-19] — Guided tour "When plans change"
+
+**Type:** Feature (tutorial)
+**Branch:** `feat/ux-review-picks` (PR #253)
+**Files changed:** `Tour/tours.ts` (new tour `plans-change`, example kind `missed`), `store/tourExamples.ts` (missed example; examples take their completions with them), `TaskNode/index.tsx` (`data-missed` on a card whose time has passed), `TaskNode/DoneCard.tsx` and `store/planActions.ts` (Archive wording), `docs/06-requirements/guided-tours.md` F13, `task-node.md` F22 wording, tests (`tourPlansChange.test.ts` new; catalogue and examples lists).
+
+**Summary:** This is the tour for the UX review picks. The user does each thing for real:
+- **Missed plan.** They right-click a plan they missed and pick **Done on …** or **Won't do**, and the step waits for either one.
+- **Calendar.** The Calendar's popup has the same two choices.
+- **Archive.** They tick a plan for today and **Archive** its done card.
+
+Advanced adds Settings → Finished cards, **waits on chain**, the Calendar's **after …**, and what every canvas shares. Welcome back is explained in words. Easy has 8 steps and Advanced has 12. On a board with no missed plan, a yesterday example ("Example: Read chapter 2") is added and removed again, along with any completion it got, so Analytics never counts it.
+
+While checking every line against the app, one claim turned out to be wrong: there is no "Todo → Archive" to look in. An archived card also leaves **Done today**, and Analytics keeps it. The tour, the button's tooltip and task-node F22 now say that.
+
+**Voice:** 12 clips recorded with `scripts/gen-tour-voice.ts plans-change` (about 1,700 characters, 1.9 MB). `tourVoice.test.ts` passes for Easy, Observe and Pomo.
+
+## [2026-11-19] — Won't do takes the card off the board; Done on in the Todo row menu
+
+**Type:** Bug Fix (UX), found by the owner while running the new tour
+**Branch:** `feat/ux-review-picks` (PR #253)
+**Files changed:** `store/finishedCards.ts`, `store/planActions.ts` (`bringBackTask`), `TaskNode/index.tsx`, `TodoNode/index.tsx`, `Tour/tours.ts`, `Tour/voice/*`, `docs/06-requirements/task-node.md` F21, tests (`uxReviewPicks.test.ts`, `tourPlansChange.test.ts`, `TodoNode.new.scenarios.test.ts`).
+
+**Summary:** The owner chose Won't do on a card and the card stayed on the board, looking open, with Won't do still in its menu. They could not tell Won't do from Delete or Archive.
+
+- **Won't do now takes the card off the board at once**, under every Finished cards setting. A Won't-do plan also no longer holds its chain on the board.
+- **The card menu never offers Won't do twice.** With "Show finished cards" on, a Won't-do card offers **Bring back** instead.
+- **The Todo row menu has "Done on …" too**, for a plan whose time has passed. The tour told the owner to look for it and the row menu did not have it.
+- **The tour says what each choice does in the step where you choose.** The separate "what happened" step is gone (Easy 7 steps, Advanced 11). "Staying on track" now says how Won't do differs from Delete. 2 clips re-recorded; 5 clips no step uses were removed.
+
+The three, in one line each: **Won't do** = skipped on purpose, kept as "won't do", not missed. **Archive** = a done card off the board now. **Delete** = erased.

@@ -30,6 +30,7 @@ import { MenuIcon } from '../../ui/menuIcons';
 import { dueLabel } from '../../../../shared/due';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { scheduleTaskAt, setTaskReminder, showTask, unscheduleTask } from '../../../store/scheduleActions';
+import { doneLabel, markDoneAsPlanned, plannedEndMs, wontDoItem } from '../../../store/planActions';
 import { parseQuickAdd, type QuickAdd } from '../../../../shared/quickAdd';
 import { effectiveDraft, type PlanDraft, type PlanOverrides } from './PlanAddCard';
 
@@ -512,6 +513,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     const tagLabel = item.tag !== undefined ? tagDisplay(tagLibrary, item.tag).label : undefined;
     // The eye: its card on the canvas and its place on the Calendar, at once.
     const taskId = item.taskNodeId;
+    const missedEnd = taskId ? plannedEndMs(taskId) : null;
     const show: ContextMenuItem[] = taskId ? [
       { label: 'Show', icon: <MenuIcon name="show" />, hint: w.day ? 'card + Calendar' : 'card', divider: true, onSelect: () => { void showTask(taskId); } },
     ] : [];
@@ -525,42 +527,17 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         { label: 'Tag…', icon: <MenuIcon name="tag" />, ...(tagLabel ? { hint: tagLabel } : {}), ...(hasTaskNode ? {} : { divider: true }), onSelect: () => setTagPicker({ x: at.x, y: at.y, itemId }) },
       ]),
       { ...rename, ...(easy ? { divider: true } : {}) },
+      // task-node F21 — the same choices as its card: a plan whose time has
+      // passed can be ticked for that day (the checkbox means "done now").
+      ...(missedEnd !== null && taskId ? [{ label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, divider: true, onSelect: () => { void markDoneAsPlanned(taskId); } }] : []),
       {
         label: "Won't do",
         icon: <MenuIcon name="drop" />,
-        divider: true,
-        onSelect: () => {
-          // Off the Calendar too: a dropped plan is not "missed". Dropped
-          // plans leave the list, so the notice offers UNDO (time put back).
-          const taskId = item.taskNodeId;
-          const board0 = useBoardStore.getState().board;
-          const node0 = taskId ? board0?.nodes.find((n) => n.id === taskId) : undefined;
-          // Its own time (a chained plan has none: it follows the one before),
-          // and the "next" link into it, so UNDO puts both back.
-          const was = (node0?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor ?? null;
-          const links = taskId ? (board0?.edges ?? []).filter((e) => e.from.event === 'task.next' && e.to.nodeId === taskId) : [];
-          // One action, one Ctrl+Z (the unschedule lands after an await).
-          void historyGroup(async () => {
-            onCommand('todo.drop', { id: itemId });
-            if (taskId) await unscheduleTask(taskId);
-          });
-          revertible(`Won't do "${item.text}"`, () => {
-            void historyGroup(async () => {
-              onCommand('todo.undrop', { id: itemId });
-              if (links.length) {
-                useBoardStore.setState((st) => {
-                  if (!st.board) return st;
-                  const ids = new Set(st.board.nodes.map((n) => n.id));
-                  const add = links.filter((l) => ids.has(l.from.nodeId) && !st.board!.edges.some((e) => e.id === l.id));
-                  return add.length ? { ...pushHistory(st), board: { ...st.board, edges: [...st.board.edges, ...add] } } : st;
-                });
-                const b = useBoardStore.getState().board;
-                if (b) void saveBoard(b);
-              }
-              if (taskId && was) await scheduleTaskAt(taskId, was);
-            });
-          });
-        },
+        hint: 'off the board, not missed',
+        divider: missedEnd === null,
+        // Off the Calendar too: a dropped plan is not "missed"; one Ctrl+Z,
+        // and the notice's UNDO puts its time and links back (planActions).
+        onSelect: () => wontDoItem(node.id, itemId),
       },
       del,
     ];

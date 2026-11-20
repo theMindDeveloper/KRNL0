@@ -74,20 +74,23 @@ describe('launch flow (F5, F12)', () => {
   });
 });
 
-describe('Welcome back (F13, F14)', () => {
-  it('only the first task of a chain gets buttons', () => {
+describe('Welcome back (F13, F14, F14c)', () => {
+  it('lists the head and its follower as checklist rows; Close moves nothing', () => {
     bridge();
     useBoardStore.setState({ board: slippedBoard as never });
     act(() => { openWelcomeBack(true, 4 * 86_400_000); });
     render(<WelcomeBack />);
     const dialog = screen.getByTestId('welcome-back');
     expect(dialog.textContent).toContain('Outline chapter 3');
-    expect(dialog.textContent).toContain('comes along');
     expect(dialog.textContent).toContain('4 days');
-    // Only the first task of the chain gets buttons: one "Plan it today" button.
-    expect(screen.getAllByTitle(/^Plan it today/)).toHaveLength(1);
-    fireEvent.click(screen.getByText('Later'));
+    // The follower without its own time is its own row, under its head.
+    expect(screen.getByTestId('welcome-check-a')).toBeTruthy();
+    expect(screen.getByTestId('welcome-check-b')).toBeTruthy();
+    expect(screen.getByTestId('welcome-row-b').textContent).toContain('after Outline chapter 3');
+    expect(screen.getByTestId('welcome-tally').textContent).toBe('0 done · 2 open');
+    fireEvent.click(screen.getByTestId('welcome-done'));
     expect(useLaunchStore.getState().welcome).toBeNull();
+    expect((useBoardStore.getState().board!.nodes.find((n) => n.id === 'a')!.state as { scheduledFor?: string }).scheduledFor).toBe('2020-01-02T09:00');
   });
 });
 
@@ -138,7 +141,7 @@ describe('Welcome back never moves by accident; Did it and Won’t do', () => {
         { id: 'todo', kind: 'todo', isMother: true, position: { x: 0, y: 0 }, config: {}, state: { items: [
           { id: 'it-a', text: 'Day 3', done: false, createdAt: '2026-11-10T00:00:00.000Z', completedAt: null, taskNodeId: 'a', scheduledFor: '2026-11-15T10:00' },
         ] } },
-        { id: 'a', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Day 3', done: false, scheduledFor: '2026-11-15T10:00', plannedMin: 360, parentTodoId: 'todo', parentTaskId: null, todoItemId: 'it-a' } },
+        { id: 'a', kind: 'todo.task', isMother: false, position: { x: 0, y: 0 }, config: {}, state: { text: 'Day 3', done: false, kind: 'event', scheduledFor: '2026-11-15T10:00', plannedMin: 360, parentTodoId: 'todo', parentTaskId: null, todoItemId: 'it-a' } },
       ],
       edges: [],
     };
@@ -157,12 +160,17 @@ describe('Welcome back never moves by accident; Did it and Won’t do', () => {
     vi.useRealTimers();
   });
 
-  it('"Did it" ticks the task where it was planned, done at the end of its block', async () => {
+  it('ticking counts on the planned day; the row stays, and unticking reopens', async () => {
     const node = await setup();
-    fireEvent.click(screen.getByTestId('welcome-did-a'));
+    fireEvent.click(screen.getByTestId('welcome-check-a'));
     await vi.waitFor(() => expect(node('a')['done']).toBe(true), { timeout: 5000 });
     expect(node('a')['scheduledFor']).toBe('2026-11-15T10:00');
     expect(node('a')['completedAt']).toBe(new Date('2026-11-15T16:00').toISOString());
+    await vi.waitFor(() => expect(screen.getByTestId('welcome-row-a').textContent).toContain('done · counts Sun 15'), { timeout: 5000 });
+    expect(screen.getByTestId('welcome-tally').textContent).toBe('1 done · 0 open');
+    fireEvent.click(screen.getByTestId('welcome-check-a'));
+    await vi.waitFor(() => expect(node('a')['done']).toBe(false), { timeout: 5000 });
+    expect(node('a')['completedAt']).toBeUndefined();
     vi.useRealTimers();
   }, 20_000);
 

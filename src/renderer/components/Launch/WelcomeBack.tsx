@@ -1,19 +1,24 @@
-// "Welcome back" (launch-experience.md F12–F15): after two or more days away,
-// once, a short list of what slipped. Nothing moves by itself — every change
-// is a button. Only the head of a chain gets buttons; its followers move with
-// it. A broken streak is said plainly, with the best run, no guilt.
+// "Welcome back" (launch-experience.md F12–F15, F14c): after two or more days
+// away, once, a checklist of what was planned meanwhile. You know what you did,
+// so ticking comes first: a tick counts on the day it was planned. Only what is
+// still open gets Move / Won't do. Nothing moves by itself, and the main button
+// moves nothing. A broken streak is said plainly, with the best run, no guilt.
 //
 // Built from the app's own parts: the days away as calendar-like columns, the
 // task card's tag chips, the habit week grid, icon buttons.
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Z } from '../ui/layers';
 import { CloseButton } from '../ui/CloseButton';
 import { closeWelcomeBack, refreshWelcomeBack, todayYMD, useLaunchStore } from '../../launch/launchStore';
 import { landingTimes, type Catchup, type SlippedTask } from '../../launch/catchup';
 import { useBoardStore } from '../../store/boardStore';
-import { focusNode, unscheduleTask } from '../../store/scheduleActions';
+import { focusNode } from '../../store/scheduleActions';
+import { dayLabel, setPlanDone, todoRowOf, wontDoTask } from '../../store/planActions';
+import { ContextMenu, type ContextMenuItem } from '../ContextMenu';
+import { MenuIcon } from '../ui/menuIcons';
+import type { TodoState } from '../nodes/TodoNode/types';
 import { toneVarForTask } from '../../utils/taskColor';
 
 const DAY = 86_400_000;
@@ -76,44 +81,46 @@ async function plan(tasks: readonly SlippedTask[], day: string | null): Promise<
   refreshWelcomeBack();
 }
 
-const moveAll = (tasks: readonly SlippedTask[]): Promise<void> => plan(tasks, todayYMD());
 
-/**
- * "Did it": the task was done, just not ticked. It stays where it was planned
- * and counts on that day — done at the end of its block (never later than
- * now). Its followers are not ticked: they show up on their own if they slipped.
- */
-async function didIt(t: SlippedTask): Promise<void> {
-  const { makeCommandHandler } = await import('../Canvas/commandDispatch');
-  const end = new Date(`${t.wasDay}T${t.time}`).getTime() + lengthOf(t.id) * 60_000;
-  const at = Number.isFinite(end) ? new Date(Math.min(end, Date.now())).toISOString() : undefined;
-  makeCommandHandler(t.id)('task.toggle', at ? { at } : {});
-  refreshWelcomeBack();
+/** One checklist row: a slipped task, or an open follower listed under it. */
+interface Row {
+  id: string;
+  text: string;
+  /** "Fri 13 · 10:00", or "after <head>" for a follower with no time of its own. */
+  when: string;
+  tag?: string;
+  /** The head's id for a follower row. */
+  headId: string | null;
+  /** How this row moves on its own (a follower moves alone once its head is settled). */
+  move: SlippedTask;
 }
 
-/** The Todo row behind a task card, for "Won't do". */
-function todoRowOf(taskId: string): { todoId: string; itemId: string } | null {
-  const n = useBoardStore.getState().board?.nodes.find((x) => x.id === taskId);
-  const s = (n?.state ?? {}) as { parentTodoId?: unknown; todoItemId?: unknown };
-  return typeof s.parentTodoId === 'string' && typeof s.todoItemId === 'string' ? { todoId: s.parentTodoId, itemId: s.todoItemId } : null;
+/** The rows, fixed when the dialog opens, so ticked rows stay in view. */
+function rowsOf(tasks: readonly SlippedTask[]): Row[] {
+  const out: Row[] = [];
+  for (const t of tasks) {
+    const d = dayParts(t.wasDay);
+    out.push({ id: t.id, text: t.text, when: `${d.dow} ${d.num} · ${t.time}`, ...(t.tag ? { tag: t.tag } : {}), headId: null, move: t });
+    for (const f of t.followers) {
+      out.push({
+        id: f.id, text: f.text, headId: t.id,
+        when: f.time ? `${d.dow} ${d.num} · ${f.time}` : `after ${t.text}`,
+        move: { id: f.id, text: f.text, wasDay: t.wasDay, time: f.time ?? t.time, followers: [] },
+      });
+    }
+  }
+  return out;
 }
 
-/** "Won't do": skipped on purpose — off the Calendar, not missed, not deleted. */
-async function wontDo(t: SlippedTask): Promise<void> {
-  const row = todoRowOf(t.id);
-  if (!row) return;
-  const { makeCommandHandler } = await import('../Canvas/commandDispatch');
-  makeCommandHandler(row.todoId)('todo.drop', { id: row.itemId });
-  await unscheduleTask(t.id);
-  refreshWelcomeBack();
-}
+type RowState = 'open' | 'done' | 'dropped' | 'moved' | 'gone';
+
+const MOVE_WORD: Record<string, string> = { today: 'today', tomorrow: 'tomorrow', off: 'off the calendar' };
 
 const PATHS: Record<string, ReactNode> = {
   today: <><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></>,
   tomorrow: <path d="M5 12h12M13 7l5 5-5 5" />,
   unplan: <><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4M10 13.5l4 4M14 13.5l-4 4" /></>,
   bring: <path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5M4.5 19.5h15" />,
-  later: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
   follows: <path d="M6 4v8a3 3 0 0 0 3 3h10M15 11l4 4-4 4" />,
   flame: <path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.6 3-5.3 3.6-8.8 2.6 1.4 4 3.6 4.1 5.6 1-.6 1.6-1.7 1.8-3 1.9 1.6 3.5 3.8 3.5 6.3 0 3.5-2.6 6.1-6.5 6.1z" />,
   locate: <><circle cx="12" cy="12" r="3" /><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" /></>,
@@ -154,6 +161,123 @@ function DaysAway({ catchup, fromDay }: { catchup: Catchup; fromDay: string }) {
   );
 }
 
+/** F14c — the loose ends as a checklist: tick first, then place what is left. */
+function Checklist({ rows, today }: { rows: readonly Row[]; today: string }) {
+  const board = useBoardStore((st) => st.board);
+  const [moved, setMoved] = useState<ReadonlyMap<string, string>>(new Map());
+  const [menu, setMenu] = useState<{ x: number; y: number; row: Row } | null>(null);
+
+  const stateOf = (r: Row): RowState => {
+    const node = board?.nodes.find((x) => x.id === r.id && x.kind === 'todo.task');
+    if (!node) return 'gone';
+    const ts = node.state as { done?: boolean; todoItemId?: string | null; parentTodoId?: string };
+    if (ts.done === true) return 'done';
+    const todo = board?.nodes.find((x) => x.id === ts.parentTodoId && x.kind === 'todo');
+    if ((todo?.state as TodoState | undefined)?.items.some((i) => i.id === ts.todoItemId && i.droppedAt !== undefined)) return 'dropped';
+    return moved.has(r.id) ? 'moved' : 'open';
+  };
+  const states = new Map(rows.map((r) => [r.id, stateOf(r)]));
+  const live = rows.filter((r) => states.get(r.id) !== 'gone');
+  const open = live.filter((r) => states.get(r.id) === 'open');
+  const doneCount = live.filter((r) => states.get(r.id) === 'done').length;
+
+  /** What moves when `rows` move: a head takes its open followers along. */
+  const units = (picked: readonly Row[]): SlippedTask[] => {
+    const ids = new Set(picked.map((r) => r.id));
+    const out: SlippedTask[] = [];
+    for (const r of picked) {
+      if (r.headId !== null && ids.has(r.headId)) continue; // moves with its head
+      out.push(r.headId === null
+        ? { ...r.move, followers: r.move.followers.filter((f) => states.get(f.id) === 'open') }
+        : r.move);
+    }
+    return out;
+  };
+  const placeRows = (picked: readonly Row[], where: 'today' | 'tomorrow' | 'off') => {
+    const day = where === 'today' ? today : where === 'tomorrow' ? addDays(today, 1) : null;
+    const us = units(picked);
+    void plan(us, day);
+    const next = new Map(moved);
+    for (const u of us) {
+      next.set(u.id, MOVE_WORD[where]!);
+      for (const f of u.followers) next.set(f.id, MOVE_WORD[where]!);
+    }
+    setMoved(next);
+  };
+  const openMenu = (e: MouseEvent, row: Row) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenu({ x: r.left, y: r.bottom + 4, row });
+  };
+  const menuItems = (row: Row): ContextMenuItem[] => [
+    { label: 'Today', icon: <MenuIcon name="day" />, hint: 'around today’s plans', onSelect: () => placeRows([row], 'today') },
+    { label: 'Tomorrow', icon: <MenuIcon name="when" />, hint: 'same time', onSelect: () => placeRows([row], 'tomorrow') },
+    { label: 'Off the calendar', icon: <MenuIcon name="unschedule" />, hint: 'stays in the list', divider: true, onSelect: () => placeRows([row], 'off') },
+  ];
+
+  return (
+    <section className="wb-section" data-testid="welcome-checklist">
+      <div className="wb-section__head">
+        <h3>While you were away</h3>
+        <span className="ln-meta" data-testid="welcome-tally"><span style={{ color: 'var(--acid-ink, var(--acid))' }}>{doneCount} done</span> · {open.length} open</span>
+      </div>
+      {live.map((r) => {
+        const st = states.get(r.id)!;
+        const tone = toneVarForTask(r.id);
+        const node = board?.nodes.find((x) => x.id === r.id);
+        const doneAt = (node?.state as { completedAt?: string } | undefined)?.completedAt;
+        const status = st === 'done' ? `done · counts ${doneAt ? dayLabel(Date.parse(doneAt)) : 'today'}`
+          : st === 'dropped' ? "won't do"
+          : st === 'moved' ? `moved · ${moved.get(r.id)}`
+          : null;
+        return (
+          <div key={r.id} className={`wb-task wb-row--${st}`} data-testid={`welcome-row-${r.id}`} style={r.headId ? { paddingLeft: 26 } : undefined}>
+            {r.headId && <span style={{ color: 'var(--ink-4)', marginLeft: -20, display: 'inline-flex' }}><Icon name="follows" size={12} /></span>}
+            <button
+              type="button"
+              className={`task-check${st === 'done' ? ' task-check--done' : ''}`}
+              style={{ marginTop: 0 }}
+              role="checkbox"
+              aria-checked={st === 'done'}
+              aria-label={`Did it: ${r.text}`}
+              data-testid={`welcome-check-${r.id}`}
+              disabled={st === 'dropped'}
+              onClick={() => { void setPlanDone(r.id, st !== 'done'); }}
+            >
+              {st === 'done' && <span className="task-check__mark"><Icon name="check" size={11} /></span>}
+            </button>
+            <div className="wb-task__main">
+              <div className="wb-task__title" title={r.text} style={st === 'open' ? undefined : { color: 'var(--ink-3)', textDecoration: st === 'moved' ? 'none' : 'line-through' }}>{r.text}</div>
+              <div className="wb-task__meta">
+                {r.tag && <span className="wb-tag" style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, color: `color-mix(in srgb, ${tone} 75%, var(--ink))` }}><i style={{ background: tone }} />{r.tag.toLowerCase()}</span>}
+                {status
+                  ? <span style={{ color: st === 'done' ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', whiteSpace: 'nowrap' }}>{status}</span>
+                  : <span className="wb-was">missed · {r.when}</span>}
+              </div>
+            </div>
+            <div className="wb-task__actions">
+              {st === 'open' && (
+                <>
+                  <button type="button" className="ln-btn ln-btn--xs wb-ic" data-testid={`welcome-move-${r.id}`} aria-haspopup="menu" onClick={(e) => openMenu(e, r)}>Move<Icon name="tomorrow" size={12} /></button>
+                  {todoRowOf(r.id) && <button type="button" className="ln-btn ln-btn--xs ln-btn--line" data-testid={`welcome-wontdo-${r.id}`} onClick={() => { wontDoTask(r.id); }} title="Skip it on purpose: kept in your list as won't do, not counted as missed">Won't do</button>}
+                </>
+              )}
+              <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { closeWelcomeBack(); focusNode(r.id); }} title="Show it on the canvas" aria-label="Show on the canvas"><Icon name="locate" size={14} /></button>
+            </div>
+          </div>
+        );
+      })}
+      {open.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 10 }}>
+          <button type="button" className="ln-btn ln-btn--xs ln-btn--line wb-ic" data-testid="welcome-move-all" onClick={() => placeRows(open, 'today')}>
+            <Icon name="bring" size={13} />Move the {open.length} open to today
+          </button>
+        </div>
+      )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems(menu.row)} onDismiss={() => setMenu(null)} />}
+    </section>
+  );
+}
+
 export function WelcomeBack() {
   const welcome = useLaunchStore((s) => s.welcome);
 
@@ -165,7 +289,13 @@ export function WelcomeBack() {
   }, [welcome]);
 
   if (!welcome) return null;
+  return <WelcomeDialog key={welcome.catchup.today} welcome={welcome} />;
+}
+
+function WelcomeDialog({ welcome }: { welcome: NonNullable<ReturnType<typeof useLaunchStore.getState>['welcome']> }) {
   const { catchup, awayMs } = welcome;
+  // Fixed when the dialog opens: a ticked or moved row stays, marked.
+  const [rows] = useState(() => rowsOf(catchup.tasks));
   const today = catchup.today;
   const days = awayMs !== null ? Math.max(1, Math.floor(awayMs / DAY)) : null;
   const fromDay = awayMs !== null ? todayYMD(new Date(Date.now() - awayMs)) : addDays(today, -3);
@@ -180,7 +310,7 @@ export function WelcomeBack() {
             <h2 id="ln-wb-title" className="ln-display" style={{ fontSize: 40 }}>Welcome back.</h2>
             <p className="wb-sub">
               {days !== null ? <>You were away <b>{days} day{days === 1 ? '' : 's'}</b> · {range}. </> : null}
-              {n === 0 ? 'No tasks slipped — your board is as you left it.' : `${n === 1 ? 'One task' : `${n} tasks`} slipped. Nothing moves until you press a button.`}
+              {n === 0 ? 'No tasks slipped — your board is as you left it.' : 'Tick what you did: it counts on the day it was planned. Nothing moves unless you choose.'}
             </p>
           </div>
           <CloseButton onClick={closeWelcomeBack} label="Close" />
@@ -189,42 +319,7 @@ export function WelcomeBack() {
         <div className="wb-body">
           <DaysAway catchup={catchup} fromDay={fromDay} />
 
-          {n > 0 && (
-            <section className="wb-section">
-              <div className="wb-section__head">
-                <h3>Loose ends</h3>
-                <button type="button" className="ln-btn ln-btn--xs ln-btn--line wb-ic" data-testid="welcome-move-all" onClick={() => { void moveAll(catchup.tasks); }}>
-                  <Icon name="bring" size={13} />Move all to today
-                </button>
-              </div>
-              {catchup.tasks.map((t) => {
-                const tone = toneVarForTask(t.id);
-                const was = dayParts(t.wasDay);
-                return (
-                  <div key={t.id} className="wb-task">
-                    <div className="wb-task__main">
-                      <div className="wb-task__title" title={t.text}>{t.text}</div>
-                      <div className="wb-task__meta">
-                        {t.tag && <span className="wb-tag" style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, color: `color-mix(in srgb, ${tone} 75%, var(--ink))` }}><i style={{ background: tone }} />{t.tag.toLowerCase()}</span>}
-                        <span className="wb-was">was {was.dow} {was.num} · {t.time}</span>
-                      </div>
-                      {t.followers.map((f) => (
-                        <div key={f.id} className="wb-follow"><Icon name="follows" size={12} /><span>{f.text}</span><em>comes along</em></div>
-                      ))}
-                    </div>
-                    <div className="wb-task__actions">
-                      <button type="button" className="ln-btn ln-btn--xs ln-btn--primary wb-ic" onClick={() => { void plan([t], today); }} title={`Plan it today at ${t.time} (or from now, if that time has passed)`}><Icon name="today" size={13} />Today</button>
-                      <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { void plan([t], addDays(today, 1)); }} title={`Tomorrow at ${t.time}`} aria-label="Tomorrow"><Icon name="tomorrow" size={14} /></button>
-                      <button type="button" className="ln-btn ln-btn--xs wb-icon" data-testid={`welcome-did-${t.id}`} onClick={() => { void didIt(t); }} title="I did it — tick it done on the day it was planned" aria-label="Did it"><Icon name="check" size={14} /></button>
-                      {todoRowOf(t.id) && <button type="button" className="ln-btn ln-btn--xs wb-icon" data-testid={`welcome-wontdo-${t.id}`} onClick={() => { void wontDo(t); }} title="Won't do — skip it on purpose (kept in your list as won't do, not counted as missed)" aria-label="Won't do"><Icon name="drop" size={14} /></button>}
-                      <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { void plan([t], null); }} title="Take it off the calendar (it stays in your list)" aria-label="Unplan"><Icon name="unplan" size={14} /></button>
-                      <button type="button" className="ln-btn ln-btn--xs wb-icon" onClick={() => { closeWelcomeBack(); focusNode(t.id); }} title="Show it on the canvas" aria-label="Show on the canvas"><Icon name="locate" size={14} /></button>
-                    </div>
-                  </div>
-                );
-              })}
-            </section>
-          )}
+          {rows.length > 0 && <Checklist rows={rows} today={today} />}
 
           {(catchup.due ?? []).length > 0 && (
             <section className="wb-section" data-testid="welcome-due">
@@ -272,11 +367,9 @@ export function WelcomeBack() {
         </div>
 
         <footer className="wb-foot">
-          <button type="button" className="ln-btn ln-btn--sm wb-ic" onClick={closeWelcomeBack}><Icon name="later" size={14} />Later</button>
           <span style={{ flex: 1 }} />
-          {/* The main button never moves anything: a bulk move is a deliberate
-              choice ("Move all to today" above), not the way out of the dialog. */}
-          <button type="button" className="ln-btn ln-btn--sm ln-btn--primary wb-ic" data-testid="welcome-done" onClick={closeWelcomeBack}><Icon name="check" size={14} />{n > 0 ? 'Keep as is' : 'Plan today'}</button>
+          {/* The main button never moves anything (F14b/F14c). */}
+          <button type="button" className="ln-btn ln-btn--sm ln-btn--primary wb-ic" data-testid="welcome-done" onClick={closeWelcomeBack}><Icon name="check" size={14} />{rows.length > 0 ? 'Close' : 'Plan today'}</button>
         </footer>
       </div>
     </div>,

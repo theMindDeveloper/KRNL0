@@ -12,7 +12,7 @@
 import type { Board } from '../../../shared/types';
 
 /** Examples a tour can add to an empty board (store/tourExamples.ts). */
-export type ExampleKind = 'plan' | 'recorded' | 'habit' | 'event';
+export type ExampleKind = 'plan' | 'recorded' | 'habit' | 'event' | 'missed';
 
 export type TourWait =
   | { click: string }
@@ -126,6 +126,12 @@ const routineAdded = (now: Board, start: Board) => routineCount(now) > routineCo
 const routineSkipped = (now: Board, start: Board) => exceptionCount(now) > exceptionCount(start);
 const routineEnded = (now: Board, start: Board) => endedCount(now) > endedCount(start);
 const taskDone = (now: Board, start: Board) => doneCount(now) > doneCount(start);
+// "When plans change" tour (task-node F21/F22): a missed plan is settled
+// (Done on its day, or Won't do), a done card is archived.
+const droppedCount = (b: Board) => ((b.nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as { items?: Array<{ droppedAt?: string | null }> } | undefined)?.items ?? []).filter((i) => !!i.droppedAt).length;
+const archivedCount = (b: Board) => tasks(b).filter((n) => typeof (n.state as { archivedAt?: unknown }).archivedAt === 'string').length;
+const settled = (now: Board, start: Board) => taskDone(now, start) || droppedCount(now) > droppedCount(start);
+const archived = (now: Board, start: Board) => archivedCount(now) > archivedCount(start);
 // "Staying on track" tour: weekly targets, rest days, due dates, reminders.
 const targetsKey = (b: Board) => habits(b).map((h) => h.perWeek ?? 0).join(',');
 const restCount = (b: Board) => habits(b).reduce((n, h) => n + (h.rest?.length ?? 0), 0);
@@ -179,6 +185,10 @@ const ANALYTICS = '[data-tour="mother-analytics"]';
 const TERM = '[data-tour="mother-term"]';
 const ORB = '[aria-label^="AI assistant"]';
 const GEAR = '[data-testid="topbar-settings"]';
+const CARD = '[data-testid="task-node-root"]';
+// The names of the examples a tour adds (store/tourExamples.ts), so a step can ring that card.
+const EXAMPLE_MISSED_TEXT = 'Example: Read chapter 2';
+const EXAMPLE_PLAN_TEXT = 'Example: Read chapter 3';
 const MODE = '[role="radiogroup"][aria-label="Easy or Advanced"]';
 
 export const TOURS: readonly Tour[] = [
@@ -337,7 +347,30 @@ export const TOURS: readonly Tour[] = [
       { say: "Sick or away? Right-click a habit you haven't done today, and choose \"Rest today\". A rest day never breaks a streak. It shows as a quiet hatch.", node: 'mother-habit', target: HABIT, badge: 'REST DAY', text: 'Sick or away? **Right-click** a habit you have not done today and choose **Rest today**. A rest day never breaks a streak — it shows as a quiet hatch.', waitFor: { board: restAdded }, hint: 'Waiting for a rest day… (or Skip)' },
       { say: "When you do something and when it must be done can differ. Right-click a To-do row and choose \"Deadline\". The row shows a flag, the Calendar a dashed flag on that day, and the Clock lists it.", onlyIn: 'advanced', node: 'mother-todo', target: TODO, badge: 'DEADLINE', text: 'When you do it and when it must be done can differ. **Right-click** a Todo row and choose **Deadline…** — the row shows a flag, the Calendar a dashed flag on that day in its **ANY TIME** strip, and the Clock lists it.', waitFor: { board: dueSet }, hint: 'Waiting for a deadline… (or Skip)' },
       { onlyIn: 'advanced', say: "Want a nudge? Right-click a row, choose \"When\", give it a time, and set a reminder. A notification comes before it starts, even with the window closed!", node: 'mother-todo', target: TODO, badge: 'REMIND ME', text: 'Want a nudge? **Right-click** a row, choose **When…**, give it a time and set a **Reminder**. A notification comes before it starts, even with the window closed.', waitFor: { board: remindSet }, hint: 'Waiting for a reminder… (or Skip)' },
-      { say: "Not doing something any more? \"Won't do\" takes it off your list and the Calendar: not done, and not missed. \"Undo\", in the notice, brings it back.", node: 'mother-todo', target: TODO, badge: "WON'T DO", text: "Not doing something any more? **Won't do** takes it off your list and the Calendar — not done and not missed. **UNDO** in the notice brings it back." },
+      { say: "Not doing something any more? \"Won't do\" takes it off your list, the Calendar and the board: not done, and not missed. Unlike Delete, the app remembers you chose to skip it. \"Undo\", in the notice, brings it back.", node: 'mother-todo', target: TODO, badge: "WON'T DO", text: "Not doing something any more? **Won't do** takes it off your list, the Calendar and the board — not done and not missed. Unlike **Delete**, the app remembers you chose to skip it. **UNDO** in the notice brings it back." },
+    ],
+  },
+  // UX review 2026-11-18 (task-node F21/F22, engagement F20, launch F14c,
+  // canvases F9): what to do with a plan whose time has passed, and with done
+  // cards. A missed example is added on a board that has none.
+  {
+    id: 'plans-change',
+    examples: ['missed', 'plan'],
+    title: 'When plans change',
+    summary: 'Missed plans, Won’t do, done cards, chains',
+    summaryEasy: 'Missed plans, Won’t do, done cards',
+    steps: [
+      { say: "Plans change. Some you did, but forgot to tick, and some you won't do at all. Here's how to tell the app what really happened, so your days stay true.", text: "Plans change. Some you did but forgot to tick, some you won't do at all. Here's how to tell the app **what really happened**, so your days stay true." },
+      { say: "This plan's time has passed, and it was never ticked. Right-click its card, or its row in the To-do list, and pick one. \"Done on\", if you did it: it counts on that day, and the card leaves the board. Or \"Won't do\", if you skipped it: it leaves the board and the Calendar, and it isn't counted as missed.", target: `${CARD}[data-missed="true"]`, targetText: EXAMPLE_MISSED_TEXT, badge: 'RIGHT-CLICK', text: "This plan's time has passed and it was never ticked. **Right-click** its card (or its Todo row) and pick one: **Done on …** if you did it (it counts on that day, and the card leaves the board), or **Won't do** if you skipped it (off the board and the Calendar, not missed).", waitFor: { board: settled }, hint: "Waiting for Done on… or Won't do (or Skip)" },
+      { say: "The Calendar has the same two. Click a block whose time has passed, and choose \"Done on\", or \"Won't do\", on its card.", node: 'mother-calendar', target: '[data-testid="calendar-grid-body"]', badge: 'SAME CHOICES', text: "The Calendar has the same two: **click a block** whose time has passed, and pick **Done on …** or **Won't do** on its card." },
+      { say: "Now a plan for today. Tick it, right on its card.", target: CARD, targetText: EXAMPLE_PLAN_TEXT, badge: 'TICK', text: 'Now a plan for today: **tick it** on its card.', waitFor: { board: taskDone }, hint: 'Waiting for a tick… (or Skip)' },
+      { say: "A done card stays on the board until tomorrow morning, so you can see your day. Want it gone now? Press \"Archive\". It leaves the board and the done list, and Analytics keeps it.", target: '[data-testid="done-card-archive"]', badge: 'PRESS', text: 'A done card stays on the board **until tomorrow morning**, so you see your day. Want it gone now? Press **Archive**: it leaves the board and **Done today**, and Analytics keeps it.', waitFor: { board: archived }, hint: 'Waiting for Archive… (or Skip)' },
+      { onlyIn: 'advanced', say: "When done cards leave is up to you. Settings, then Finished cards: overnight, after an hour, or keep them.", press: GEAR, target: '[data-testid="settings-finished"]', badge: 'WHEN THEY GO', text: 'When done cards leave is up to you: **Settings → Finished cards** — overnight, after an hour, or keep them.' },
+      { onlyIn: 'advanced', say: "Plans in a chain leave the board together, once all of them are done. Until then, a done card says \"waits on chain\". Hover it to see which plan is holding it, or archive it.", target: CARD, badge: 'CHAINS', text: 'Plans in a **chain** leave the board together, once all of them are done. Until then a done card says **waits on chain**: hover it to see which plan holds it — or **Archive** it.' },
+      { onlyIn: 'advanced', say: "On the Calendar, a plan in a chain says \"after\", and the one before it. It starts when that one ends.", node: 'mother-calendar', target: CAL, badge: 'IN ORDER', text: 'On the Calendar, a plan in a chain says **after** the one before it: it starts when that one ends.' },
+      { say: "Away for a day or more? \"Welcome back\" opens with the plans you missed. Tick what you did, and it counts on its own day. Then move the rest, or choose \"Won't do\". Close moves nothing.", text: "Away for a day or more? **Welcome back** opens with the plans you missed. **Tick** what you did (it counts on its own day), then **Move** or **Won't do** the rest. **Close** moves nothing." },
+      { onlyIn: 'advanced', say: "One more thing. Every canvas shows the same plans, calendar, habits and timer. Notes, images and drawings belong to one canvas. Open this to see what's on each.", target: '[data-testid="topbar-canvas-switcher"]', badge: 'SHARED', text: "One more: every canvas shows the same **plans, Calendar, habits and timer**. Notes, images and drawings belong to **one canvas**. Open this to see what's on each." },
+      { say: "That's how your days stay true. Done on its day, won't do, and archive. Every tour is in my menu.", target: ORB, badge: 'ASK ME', text: "That's how your days stay true: **done on its day**, **won't do**, **archive**. Every tour is in my menu." },
     ],
   },
   {

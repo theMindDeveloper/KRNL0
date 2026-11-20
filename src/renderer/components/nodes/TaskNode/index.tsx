@@ -16,6 +16,7 @@ import { DoneCard } from './DoneCard';
 import { CardIcon, CardMetaRow, CardMeter, cardFrameStyle, fmtDayAnyTime, fmtDur, fmtWhen } from './CardParts';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
+import { archiveDoneTask, bringBackTask, doneLabel, markDoneAsPlanned, plannedEndMs, wontDoTask } from '../../../store/planActions';
 import { toneVarForTask } from '../../../utils/taskColor';
 
 // TaskNode — child task card spawned when a todo item is added.
@@ -91,6 +92,13 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     const todo = s.board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
     const items = (todo?.state as { items?: Array<{ taskNodeId: string | null; onDay?: string }> } | undefined)?.items;
     return items?.find((i) => i.taskNodeId === taskId)?.onDay ?? null;
+  });
+  // task-node F21 — marked Won't do (its Todo row is dropped). The card is off
+  // the board then; it only shows with "Show finished cards" on.
+  const dropped = useBoardStore((s) => {
+    const todo = s.board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+    const items = (todo?.state as { items?: Array<{ taskNodeId: string | null; droppedAt?: string }> } | undefined)?.items;
+    return items?.some((i) => i.taskNodeId === taskId && i.droppedAt !== undefined) ?? false;
   });
 
   // engagement.md F1–F2 — the done moment: ticking turns the card into the
@@ -309,6 +317,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
 
   // Read when the menu is open only (a chain successor has no scheduledFor of
   // its own but is on the calendar too).
+  // When the plan's block ended, if it did (read with the menu open only).
+  const missedEnd = ctxMenu !== null && !state.done ? plannedEndMs(taskId) : null;
   const onCalendar = ctxMenu !== null
     && (!!state.scheduledFor || selectSchedule(useBoardStore.getState().board).placements.has(taskId));
 
@@ -356,9 +366,21 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     ...(onCalendar || onDay
       ? [{ label: 'Show', icon: <MenuIcon name="show" />, hint: 'card + Calendar', onSelect: () => { void import('../../../store/scheduleActions').then((m) => m.showTask(taskId)); } }]
       : []),
+    // task-node F21/F22 — what really happened, above Delete. A plan whose
+    // block is over counts on that day ("Done on Mon 16"); the checkbox
+    // itself always means "done now".
+    ...(dropped && state.todoItemId !== null
+      ? [{ label: 'Bring back', icon: <MenuIcon name="undo" />, hint: "undo Won't do", divider: true, onSelect: () => { void bringBackTask(taskId); } }]
+      : state.done
+        ? [{ label: 'Archive', icon: <MenuIcon name="archive" />, hint: 'off the board', divider: true, onSelect: () => archiveDoneTask(taskId) }]
+        : [{ label: doneLabel(missedEnd), icon: <MenuIcon name="check" />, divider: true, onSelect: () => { void markDoneAsPlanned(taskId); } }]),
+    ...(!state.done && !dropped && state.todoItemId !== null
+      ? [{ label: "Won't do", icon: <MenuIcon name="drop" />, hint: 'off the board, not missed', onSelect: () => { wontDoTask(taskId); } }]
+      : []),
     {
       label: 'Delete',
       danger: true,
+      divider: true,
       onSelect: () => undoable(`Deleted "${state.text || 'task'}"`, () => onCommand('task.delete')),
     },
   ];
@@ -405,6 +427,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
     <div
       data-testid="task-node-root"
       data-done={undefined}
+      // Its time has passed and it is not done (the "When plans change" tour rings it).
+      data-missed={isPastScheduled ? 'true' : undefined}
       data-active={isActive ? 'true' : undefined}
       data-card-tone={cardTone}
       className={isActive ? 'active' : undefined}

@@ -35,6 +35,7 @@ export type SysCommand =
   | { kind: 'task'; sub: 'add'; todoId: string | undefined; text: string | undefined; durationMin: number | undefined }
   | { kind: 'task'; sub: 'edit'; id: string | undefined; text: string | undefined }
   | { kind: 'task'; sub: 'toggle'; id: string | undefined; at?: string }
+  | { kind: 'task'; sub: 'archive'; id: string | undefined; undo: boolean }
   | { kind: 'task'; sub: 'delete'; id: string | undefined }
   | { kind: 'task'; sub: 'pomo'; id: string | undefined }
   | { kind: 'task'; sub: 'subtask'; parentId: string | undefined; text: string | undefined }
@@ -543,6 +544,9 @@ export class SysParser {
       if (sub === 'toggle') {
         const at = flag(rest, 'at');
         return { kind: 'task', sub: 'toggle', id: rest[0], ...(at !== undefined ? { at } : {}) };
+      }
+      if (sub === 'archive') {
+        return { kind: 'task', sub: 'archive', id: rest[0], undo: hasFlag(rest, 'undo') };
       }
       if (sub === 'delete') {
         return { kind: 'task', sub: 'delete', id: rest[0] };
