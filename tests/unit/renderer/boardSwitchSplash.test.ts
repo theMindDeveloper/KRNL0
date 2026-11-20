@@ -33,3 +33,12 @@ describe('F9: switching boards skips the start-up screen', () => {
     expect(read('renderer/App.tsx')).toContain('if (!window.__krnlBoardSwitch) window.setTimeout(runLaunchFlow, 500)');
   });
 });
+
+describe('a plan card keeps what was changed when you click elsewhere', () => {
+  it('the backdrop saves a touched card; Escape and the close button still cancel', () => {
+    const card = read('renderer/components/ui/WhenPopover.tsx');
+    expect(card).toContain('if (touched.current && !onChange) apply(); else onClose();');
+    expect(card).toContain("if (e.key === 'Escape') { if (pickerOpen()) return; e.stopPropagation(); onClose(); }");
+    expect(card).toContain('<CardClose onClick={onClose} />');
+  });
+});

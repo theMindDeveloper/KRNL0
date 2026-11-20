@@ -6,6 +6,7 @@
 // when KRNL0 was last in use (for "Welcome back"). The window reads the result
 // over `app:launch`; the sys CLI reads it through getAppStatePort().
 
+import { parkedBoardDirs } from './persistence/boards';
 import { app, ipcMain, shell, type BrowserWindow } from 'electron';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
@@ -117,6 +118,9 @@ export function initAppState(boardDir: string, env: NodeJS.ProcessEnv = process.
 
   const changed = kind === 'feature' || kind === 'patch' || kind === 'downgrade';
   const backupFile = changed ? backupBoard(boardDir, previous, version) : null;
+  // Every board, not only the open one: a parked board is upgraded the next
+  // time it is opened, and must have its copy from before too.
+  if (changed) for (const parked of parkedBoardDirs(boardDir)) backupBoard(parked, previous, version);
 
   const lastActive = fakeAway !== null ? now - fakeAway : state.lastActiveAt;
   const awayMs = lastActive !== null ? Math.max(0, now - lastActive) : null;

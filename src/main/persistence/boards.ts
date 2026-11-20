@@ -17,8 +17,9 @@
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'fs';
 import { join } from 'path';
-import { isSharedNode } from '../../shared/canvas';
-import { readBoardText, saveBoardTo, seedBoard, writeFileAtomic } from './board';
+import { activeCanvasOf, isSharedNode } from '../../shared/canvas';
+import { randomUUID } from 'crypto';
+import { readBoardText, saveBoardTo, seedBoard, sleepSync, writeFileAtomic } from './board';
 import { TIMELOG_DIRNAME } from './timelog';
 
 export const BOARDS_INDEX = 'boards.json';
@@ -107,7 +108,10 @@ function migrateCanvasesToBoards(dir: string): BoardsIndex {
   const first = canvases[0]!;
   const others = canvases.slice(1);
   const drawings = (board.drawings as Array<Record<string, unknown>> | undefined) ?? [];
-  const freeOn = (canvasId: string) => board.nodes.filter((n) => !isSharedNode(n as { kind: string; isMother?: boolean }) && n.canvasId === canvasId);
+  // Content without a stamp counts as the canvas that was open (as the app shows it).
+  const openCanvas = activeCanvasOf(board as { canvases?: BoardMeta[]; activeCanvasId?: string });
+  const canvasOf = (x: Record<string, unknown>): string => (typeof x.canvasId === 'string' ? x.canvasId : openCanvas);
+  const freeOn = (canvasId: string) => board.nodes.filter((n) => !isSharedNode(n as { kind: string; isMother?: boolean }) && canvasOf(n) === canvasId);
 
   for (const c of others) {
     const nodes = freeOn(c.id);
@@ -126,7 +130,7 @@ function migrateCanvasesToBoards(dir: string): BoardsIndex {
       activeCanvasId: c.id,
       nodes: [...seed.nodes, ...nodes],
       edges: [...seed.edges, ...edges],
-      drawings: drawings.filter((s) => s.canvasId === c.id),
+      drawings: drawings.filter((s) => canvasOf(s) === c.id),
     };
     mkdirSync(parkedDir(dir, c.id), { recursive: true });
     saveBoardTo(join(parkedDir(dir, c.id), BOARD_FILE), parked);
@@ -144,7 +148,7 @@ function migrateCanvasesToBoards(dir: string): BoardsIndex {
       const to = (e.to as { nodeId?: string } | undefined)?.nodeId;
       return !(from && gone.has(from)) && !(to && gone.has(to));
     }),
-    drawings: drawings.filter((s) => !goneCanvas.has(s.canvasId as string)),
+    drawings: drawings.filter((s) => !goneCanvas.has(canvasOf(s))),
     savedAt: new Date().toISOString(),
   };
   saveBoardTo(path, kept);
@@ -213,6 +217,19 @@ export function listBoards(dir: string): BoardsList {
   return { activeId: index.activeId, boards, recording: rec, notice: index.notice ?? null };
 }
 
+/** The folder of each board that is not open (for the safety copy before an update). */
+export function parkedBoardDirs(dir: string): string[] {
+  const root = join(dir, BOARDS_DIRNAME);
+  if (!existsSync(root)) return [];
+  try {
+    return readdirSync(root, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.') && existsSync(join(root, e.name, BOARD_FILE)))
+      .map((e) => join(root, e.name));
+  } catch {
+    return [];
+  }
+}
+
 /** Every board that is not open, as stored (for reminders: a plan in a parked board still reminds). */
 export function parkedBoards(dir: string): Array<BoardMeta & { board: unknown }> {
   const index = readBoardsIndex(dir);
@@ -255,7 +272,8 @@ export function createBoard(dir: string, name: string | undefined, opts: { copyH
           // The habit starts today here, so no earlier day reads as missed.
           const { log: _l, counts: _c, exceptions: _e, rest: _r, pauses: _p, ...keep } = h;
           void _l; void _c; void _e; void _r; void _p;
-          return { ...keep, log: [], createdAt: new Date().toISOString() };
+          // A new id too: nothing remembered about the original (a dismissed hint) applies here.
+          return { ...keep, id: randomUUID(), log: [], createdAt: new Date().toISOString() };
         }),
       };
     }
@@ -303,7 +321,18 @@ export function deleteBoard(dir: string, ref: string | undefined): BoardMeta | s
 function moveInto(from: string, to: string): void {
   if (!existsSync(from)) return;
   if (existsSync(to)) rmSync(to, { recursive: true, force: true });
-  renameSync(from, to);
+  // On Windows a scanner or a sync client can hold a file for a moment: wait
+  // it out, as every board write does, before calling the switch failed.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if ((code === 'EPERM' || code === 'EBUSY' || code === 'EACCES') && attempt < 5) { sleepSync(30 * (attempt + 1)); continue; }
+      throw err;
+    }
+  }
 }
 
 /**

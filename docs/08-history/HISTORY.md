@@ -3075,3 +3075,20 @@ Typecheck clean; all tests pass.
 - **No underlined links:** "Show done" in the two task pickers and the small actions in the launch dialogs are quiet filled buttons.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-20] — Second pre-release review: data safety
+
+**Type:** Bug Fix
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `main/persistence/boards.ts`, `main/persistence/board.ts`, `main/appState.ts`, `main/ipc/handlers.ts`, `ui/WhenPopover.tsx`, tests (`boards.test.ts`, `boardSwitchSplash.test.ts`)
+
+**Summary:**
+- **A board switch waits out a short file lock** (antivirus, a sync client) like every board write does, instead of failing at once.
+- **The safety copy before an update covers every board**, not only the open one.
+- **Canvases → boards:** content with no canvas stamp goes with the canvas that was open (where the app showed it), not with the first.
+- **A copied habit is a new habit** with its own id.
+- **Each board's time log** gets "app closed" when it is left and "app opened" when it is arrived at.
+- **A plan card keeps what you changed when you click elsewhere.** Before, only Save kept it; a click outside threw the day, time or deadline away without a word. Escape and the close button still cancel.
+- Walked as a user in the preview: add a plan, give it a day and a deadline, tick and untick, add a habit and tick it, start and stop the timer. Each step was checked in the saved board.
+
+Typecheck clean; all tests pass.

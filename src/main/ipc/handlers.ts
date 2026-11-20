@@ -11,7 +11,7 @@ import { SysFacade } from '../../sys/SysFacade';
 import { getUpdater } from '../updater';
 import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard, BoardCorruptError } from '../persistence/board';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
-import { ackBoardsNotice, createBoard, deleteBoard, listBoards, readBoardsIndex, renameBoard, switchBoard } from '../persistence/boards';
+import { ackBoardsNotice, BOARDS_DIRNAME, createBoard, deleteBoard, listBoards, readBoardsIndex, renameBoard, switchBoard } from '../persistence/boards';
 import { mergeBoards } from '../../shared/boardMerge';
 import { renderMotd } from '../rpc/motd';
 import {
@@ -116,6 +116,8 @@ let awaitingReload = false;
 // Separate boards (Decision 49): between swapping the board files and the
 // window's reload, the old window must not write its board over the new one.
 let boardsSwitching = false;
+/** App session markers (#207): true between app.opened and app.closed. */
+let appSessionOpen = false;
 
 /** Swap to another board and reload the window (boards.md F3). Also used by `krnl board switch`. */
 export function switchBoardAndReload(ref: string | undefined): { ok: boolean; message: string } {
@@ -132,6 +134,16 @@ export function switchBoardAndReload(ref: string | undefined): { ok: boolean; me
   if (typeof res === 'string') { boardsSwitching = false; return { ok: false, message: res }; }
   // Already on that board: nothing moved, so nothing to reload.
   if (res.id === activeBeforeSwitch) { boardsSwitching = false; return { ok: true, message: `already on board "${res.name}"` }; }
+  // Each board's time log says when the app was open on it: closed on the
+  // board being left, opened on the one arriving.
+  if (appSessionOpen && activeBeforeSwitch) {
+    try {
+      appendTimeLog(join(BOARD_DIR, BOARDS_DIRNAME, activeBeforeSwitch), [{ type: 'app.closed' }]);
+      appendTimeLog(BOARD_DIR, [{ type: 'app.opened' }]);
+    } catch (err) {
+      console.warn('[timelog] board switch not logged:', err instanceof Error ? err.message : err);
+    }
+  }
   const w = getMainWindow();
   if (w && !w.isDestroyed()) {
     // A board switch is not a start: the page is told to skip the start-up
@@ -163,7 +175,6 @@ function saveBoard(data: unknown) {
  * board leaves no marker (retried next start). Never throws.
  */
 /** App session markers (#207): one line when the app starts, one when it quits. */
-let appSessionOpen = false;
 export function logAppSession(type: 'app.opened' | 'app.closed'): void {
   // A second launch that hands over to the running window quits without ever
   // opening — don't log a close for it (or a second close on a repeat quit).

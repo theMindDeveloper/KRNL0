@@ -9,7 +9,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { seedBoard } from '../../../src/main/persistence/board';
 import {
-  ackBoardsNotice, createBoard, deleteBoard, listBoards, readBoardsIndex, renameBoard, switchBoard,
+  ackBoardsNotice, createBoard, deleteBoard, listBoards, parkedBoardDirs, readBoardsIndex, renameBoard, switchBoard,
 } from '../../../src/main/persistence/boards';
 
 type Raw = { nodes: Array<Record<string, unknown>>; edges: Array<Record<string, unknown>>; [k: string]: unknown };
@@ -313,5 +313,39 @@ describe('F2 — copied habits start today', () => {
     expect(h.pauses).toBeUndefined();
     expect(h.perWeek).toBe(3);
     expect(String(h.createdAt).slice(0, 4)).not.toBe('2025');
+  });
+});
+
+describe('second review: nothing is misplaced, nothing is left without a copy', () => {
+  it('content with no canvas stamp goes with the canvas that was open, not the first', () => {
+    const b = seeded();
+    b.canvases = [{ id: 'canvas-main', name: 'Main' }, { id: 'c-research', name: 'Research' }];
+    b.activeCanvasId = 'c-research';
+    b.nodes.push({ id: 'note-loose', kind: 'text', position: { x: 1, y: 1 }, state: { text: 'pushed by the CLI' } });
+    b.drawings = [{ id: 's-loose' }];
+    write(b);
+    readBoardsIndex(dir);
+    const research = read(join(dir, 'boards', 'c-research', 'board.json'));
+    expect(research.nodes.map((n) => n.id)).toContain('note-loose');
+    expect((research.drawings as Array<{ id: string }>).map((s) => s.id)).toEqual(['s-loose']);
+    expect(read().nodes.map((n) => n.id)).not.toContain('note-loose');
+    expect(read().drawings).toEqual([]);
+  });
+
+  it('a copied habit is a new habit, with its own id', () => {
+    write(seeded());
+    const id = (createBoard(dir, 'Uni', { copyHabits: true }) as { id: string }).id;
+    const habits = (mother(read(join(dir, 'boards', id, 'board.json')), 'habit').state as { habits: Array<{ id: string; name: string }> }).habits;
+    expect(habits.map((h) => h.name)).toEqual(['Run', 'Read']);
+    expect(habits.some((h) => h.id === 'h1' || h.id === 'h2')).toBe(false);
+    expect(new Set(habits.map((h) => h.id)).size).toBe(2);
+  });
+
+  it('the folders of the parked boards are listed for the safety copy, without the deleted bin', () => {
+    write(seeded());
+    const uni = (createBoard(dir, 'Uni') as { id: string }).id;
+    const gone = (createBoard(dir, 'Gone') as { id: string }).id;
+    deleteBoard(dir, gone);
+    expect(parkedBoardDirs(dir)).toEqual([join(dir, 'boards', uni)]);
   });
 });
