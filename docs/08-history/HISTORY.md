@@ -3131,3 +3131,16 @@ Typecheck clean; all tests pass. Run once in the preview, step by step, with rea
 - The release page and the changelog entry are written. **Not done here:** the version bump, the tag and the publish. They belong to the release PR and wait for the owner's OK.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-20] — Release v0.12.0
+
+**Type:** Release
+**PRs/Commits:** #251, #253, #257, #258 (merged to `main`), release PR on `chore/release-v0.12.0`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Feature release: separate boards (canvases become boards, with a migration and a copy of the board from before), the window standard, the unified cards, two styles and two volumes in Settings, connectors only on task cards, a voiced boards tutorial, and the data-safety fixes from two pre-release reviews.
+- Version `0.11.3 → 0.12.0`. What's new (`src/shared/whatsnew.ts`) and `docs/releases/v0.12.0.md` were approved by the owner on 2026-11-20.
+- Not part of this PR: the tag `v0.12.0` and the Publish click. They wait for the owner's OK.
+
+Typecheck clean; all tests pass.

@@ -5,7 +5,7 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.12.0] — unreleased
+## [0.12.0] — 2026-11-20
 
 ### Added
 - **Separate boards:** each board has its own todos, habits, calendar, timer history, analytics, notes and drawings. Existing canvases become boards by themselves, with a copy of the board from before. One timer at a time across boards; reminders from every board. `krnl board list | new | switch | rename | delete`.
