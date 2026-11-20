@@ -28,6 +28,7 @@ import { copyFileSync, createReadStream, openSync, readSync, closeSync, statSync
 import { Readable } from 'stream';
 import { homedir } from 'os';
 import { randomBytes } from 'crypto';
+import { assetStored } from '../sync/observers';
 
 const BOARD_DIR =
   process.env.KRNL0_BOARD_DIR ?? join(homedir(), 'Documents', app.getName());
@@ -190,6 +191,7 @@ export function writeAsset(rawExt: string, buf: Uint8Array): AssetWriteResult {
   const path = join(ASSETS_DIR, `${assetId}.${ext}`);
   writeFileSync(path, buf);
   assetExt.set(assetId, ext);
+  assetStored(assetId); // Decision 51
   return { assetId, ext };
 }
 
@@ -214,6 +216,7 @@ export function importAssetFromPath(srcPath: string): AssetWriteResult {
   const assetId = newAssetId();
   copyFileSync(srcPath, join(ASSETS_DIR, `${assetId}.${ext}`));
   assetExt.set(assetId, ext);
+  assetStored(assetId); // Decision 51
   return { assetId, ext };
 }
 

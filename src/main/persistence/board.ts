@@ -6,6 +6,7 @@ import { copyFileSync, existsSync, readFileSync, renameSync, statSync, unlinkSyn
 import { dirname } from 'path';
 import { normalizeCanvases, DEFAULT_CANVAS_ID, DEFAULT_CANVAS_NAME } from '../../shared/canvas';
 import type { CanvasBoardLike } from '../../shared/canvas';
+import { fileWritten } from '../sync/observers';
 
 // ADR 0001 — local helper; mirrors HabitNode/types.ts toYMD but kept here to
 // avoid importing renderer modules from the main process.
@@ -925,6 +926,7 @@ export function writeFileAtomic(path: string, text: string): void {
   for (let attempt = 0; ; attempt++) {
     try {
       renameSync(tmp, path);
+      fileWritten(path); // Decision 51: the sync service learns about every board / board-list write
       return;
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
