@@ -154,6 +154,10 @@ export class WebHost implements SyncHost {
     if (name === 'boards') return this.writeIndex(body);
     const id = docName.boardId(name);
     if (!id || !isObject(body)) return;
+    // The layout is this browser's own and never synced: a board seen here for
+    // the first time opens in the layout a new board has (Station), not the
+    // "missing → Free" migration default meant for boards from before Station.
+    if (!this.boards.has(id) && body.layoutMode === undefined) body = { ...body, layoutMode: 'station' };
     this.saveBoard(id, body);
     // A board that arrived before the list names it: list it, so it shows in the menu.
     if (this.index && !this.index.boards.some((b) => b.id === id)) {

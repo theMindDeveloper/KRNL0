@@ -87,12 +87,15 @@ async function boot(): Promise<void> {
 
   const statusSubs = new Set<(st: SyncStatus) => void>();
   let bridgeRef: ReturnType<typeof createWebBridge> | null = null;
+  // Set while the first-run page is up: boards arriving from another device open the app.
+  let onBoardsArrived: (() => void) | null = null;
   const engine = new SyncEngine({
     transport,
     host,
     store,
     onStatus: (st) => {
       for (const cb of statusSubs) cb(st);
+      if (onBoardsArrived && host.hasBoards()) onBoardsArrived();
       if (bridgeRef) bridgeRef.notifyStatus({ configured: true, origin: location.origin, fingerprint: null, deviceName: 'This browser', ...st });
       if (st.state === 'signed-out') { void kv.flush().then(toLogin); }
     },
@@ -121,7 +124,11 @@ async function boot(): Promise<void> {
     await firstSync(engine, (cb) => statusSubs.add(cb), FIRST_SYNC_WAIT_MS);
   }
 
+  let appShown = false;
   const renderApp = async (): Promise<void> => {
+    if (appShown) return;
+    appShown = true;
+    onBoardsArrived = null;
     const [{ App }, log, themes, colors, budget] = await Promise.all([
       import('../renderer/App'),
       import('../renderer/store/eventLog'),
@@ -140,6 +147,8 @@ async function boot(): Promise<void> {
 
   if (!host.hasBoards()) {
     bootDone();
+    // The desktop app connects while this page is open: its boards arrive, the app opens.
+    onBoardsArrived = () => { void renderApp(); };
     root.render(
       <FirstRun
         onStart={() => {
