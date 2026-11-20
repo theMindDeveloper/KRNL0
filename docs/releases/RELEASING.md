@@ -26,8 +26,8 @@ Nothing here needs a paid GitHub feature or a personal token.
 | 5 | Check the draft | `npm run release -- check` | agent |
 | 6 | **Publish** (ships to every install) and start the server's follow workflow | `npm run release -- publish --yes` | only after the owner says yes |
 | 7 | Server: `follow-krnl0.yml` opens a PR that pins this website (`web-version`) and bumps the server's patch version, with tests run | automatic (also every 6 h) | — |
-| 8 | Server: merge that PR → `tag.yml` tags it → `release.yml` builds the signed draft | `gh pr merge <n> -R theMindDeveloper/krnl0-server --merge` | agent |
-| 9 | Server: check the draft (bundles, `release.json`, signature verified in CI), owner's OK, **Publish** → `published.yml` moves `:latest`; updaters and the app's server-update notice see it | `gh release edit vX.Y.Z -R theMindDeveloper/krnl0-server --draft=false --latest` | only after the owner says yes |
+| 8 | Server: merge that PR → `tag.yml` tags it → `release.yml` builds the signed draft (merging **is** tagging: the image `:X.Y.Z` is public from then on) | `gh pr merge <n> -R theMindDeveloper/krnl0-server --merge` | only with the owner's OK to release |
+| 9 | Server: check the draft (bundles, `release.json`, signature verified in CI), owner's OK, **Publish** → `published.yml` moves `:latest`; updaters and the app's server-update notice see it. Then check `:latest` is the signed image: `docker buildx imagetools inspect ghcr.io/theminddeveloper/krnl0-server:latest` shows the digest in the release's `release.json` | `gh release edit vX.Y.Z -R theMindDeveloper/krnl0-server --draft=false --latest` | only after the owner says yes |
 | 10 | Website: fallback version in `theminddev-site/krnl0/index.html` (`data-krnl-v`, `softwareVersion`); news section for feature releases | PR on the site repo | agent |
 | 11 | History: a "vX.Y.Z published" entry in both repos | PR | agent |
 
