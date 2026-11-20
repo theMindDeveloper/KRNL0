@@ -13,6 +13,8 @@
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
 }
+/* No double-tap zoom, no iOS callout on a long-press (it opens the row's menu instead). */
+.m-shell { touch-action: manipulation; -webkit-touch-callout: none; }
 .m-shell * { scrollbar-width: none; }
 .m-shell *::-webkit-scrollbar { display: none; }
 .m-shell button { font-family: inherit; }
