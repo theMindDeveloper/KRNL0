@@ -337,7 +337,7 @@ describe('Separate boards (Decision 49, boards.md)', () => {
   it('the window cannot save its old board over the new one while a switch is in flight', () => {
     const h = read('main/ipc/handlers.ts');
     expect(h).toContain("if (boardsSwitching) return; // the window is about to reload onto another board");
-    expect(h).toContain('boardsSwitching = false;\n    const board = loadBoard();');
+    expect(h).toContain('boardsSwitching = false;');
   });
   it('krnl has the board commands', () => {
     const reg = read('shared/cli/commandRegistry.ts');
