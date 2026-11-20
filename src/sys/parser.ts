@@ -70,6 +70,10 @@ export type SysCommand =
   | { kind: 'draw'; sub: 'stroke'; points: string | undefined; tool: string | undefined; color: string | undefined; size: number | undefined }
   | { kind: 'analytics'; sub: 'clear-history'; yes: boolean }
   | { kind: 'draw'; sub: 'clear' }
+  | { kind: 'boards'; sub: 'list'; json: boolean }
+  | { kind: 'boards'; sub: 'new'; name: string | undefined; copyHabits: boolean }
+  | { kind: 'boards'; sub: 'switch' | 'delete'; ref: string | undefined }
+  | { kind: 'boards'; sub: 'rename'; ref: string | undefined; name: string | undefined }
   | { kind: 'canvas'; sub: 'list'; json: boolean }
   | { kind: 'canvas'; sub: 'add'; name: string | undefined }
   | { kind: 'canvas'; sub: 'switch' | 'delete'; ref: string | undefined }
@@ -331,6 +335,13 @@ export class SysParser {
       if (sub === 'save' || sub === 'load') {
         return { kind: 'board', sub, path: rest[0] };
       }
+      // Separate boards (Decision 49). Names may contain spaces.
+      const bWords = rest.filter((w) => !w.startsWith('--'));
+      const bJoin = (ws: string[]): string | undefined => (ws.length ? ws.join(' ') : undefined);
+      if (sub === 'list') return { kind: 'boards', sub: 'list', json: hasFlag(rest, 'json') };
+      if (sub === 'new' || sub === 'add') return { kind: 'boards', sub: 'new', name: bJoin(bWords), copyHabits: hasFlag(rest, 'copy-habits') };
+      if (sub === 'switch' || sub === 'delete') return { kind: 'boards', sub, ref: bJoin(bWords) };
+      if (sub === 'rename') return { kind: 'boards', sub: 'rename', ref: bWords[0], name: bJoin(bWords.slice(1)) };
     }
 
     if (cmd === 'node') {

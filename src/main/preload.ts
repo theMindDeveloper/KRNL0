@@ -44,6 +44,14 @@ contextBridge.exposeInMainWorld('krnl', {
   assetDelete: (assetId: string) =>
     ipcRenderer.invoke('asset:delete', { assetId }),
 
+  // Separate boards (Decision 49).
+  boardsList: () => ipcRenderer.invoke('boards:list'),
+  boardsCreate: (name: string, copyHabits: boolean) => ipcRenderer.invoke('boards:create', name, copyHabits),
+  boardsRename: (ref: string, name: string) => ipcRenderer.invoke('boards:rename', ref, name),
+  boardsDelete: (ref: string) => ipcRenderer.invoke('boards:delete', ref),
+  boardsSwitch: (ref: string) => ipcRenderer.invoke('boards:switch', ref),
+  boardsAckNotice: () => ipcRenderer.invoke('boards:ackNotice'),
+
   // Live sync - main -> renderer notification that board.json was mutated
   // outside the renderer (e.g. via sys CLI). Renderer should re-load.
   onBoardChanged: (callback: () => void) => {

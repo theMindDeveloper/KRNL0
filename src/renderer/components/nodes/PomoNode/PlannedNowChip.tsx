@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import type { PomoState } from './types';
 import { useBoardStore } from '../../../store/boardStore';
 import { plannedTaskAt } from '../../../store/plannedNow';
+import { blockedByOtherBoard } from '../../../store/boardsInfo';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { LineGlyph } from '../../ui/LineGlyph';
 
@@ -41,7 +42,7 @@ export function PlannedNowChip({ state, easy, onCommand }: {
         data-testid="pomo-planned-accept"
         onClick={() => (running
           ? onCommand('pomo.tag', { taskId: planned.id })
-          : onCommand('pomo.start', { activeTaskId: planned.id, label: planned.text }))}
+          : (blockedByOtherBoard() ? undefined : onCommand('pomo.start', { activeTaskId: planned.id, label: planned.text })))}
         style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 8, height: 28, padding: '0 10px', borderRadius: 999, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5 }}
         title={running ? `Count this session toward "${planned.text}"` : `Start on "${planned.text}"`}
       >

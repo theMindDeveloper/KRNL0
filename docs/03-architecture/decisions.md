@@ -2677,3 +2677,15 @@ The owner asked for "a standard, a template so all are unified and simple", afte
 - **Never:** underlined text links for actions; a line of state words under the time; dimming the time.
 - No behaviour, command, test id or board field changed. Button and header words changed from capitals to normal letters.
 - Guard: `tests/unit/renderer/windowFrame.test.ts`.
+
+## Decision 49 — Separate boards; canvases no longer share data in the UI (2026-11-20)
+
+Decision 33 made canvases half-shared: notes and drawings per canvas, plans, habits and the timer on all of them. The canvas menu needed a note to explain that, and the owner asked for the note to go and for a new canvas to be "a completely new board, analytics etc". Drafts (row 14 of the design board) showed the menu, the timer rule and the migration; the owner said Build.
+
+- **Model:** a board is complete on its own (todos, habits, calendar, timer history, the time log, notes). Nothing is shared between boards.
+- **Storage:** the open board stays `board.json` + `timelog/` in the board folder, so no reader of the board changes (window, CLI, reminders, floating timer). Other boards are parked in `boards/<id>/`; `boards.json` lists them. Switching swaps the files and reloads the window. Rejected: one file with per-board mother nodes (every `find(kind === 'todo' && isMother)` in the code would need a board id), and a path switch (every reader would need the active path).
+- **Timer:** one at a time across boards. It keeps running in its board; `boards.json` remembers where; other boards show a chip and refuse to start a second one.
+- **Migration:** canvases become boards once (requirement F8), with a copy of the old file kept.
+- **CLI:** `krnl board list / new / switch / rename / delete` join `board show / summary / stats`.
+- **Canvases:** still exist inside a board (`krnl canvas …`), but the app's UI no longer offers them.
+- Requirements: `docs/06-requirements/boards.md`. Tests: `tests/unit/main/boards.test.ts`.

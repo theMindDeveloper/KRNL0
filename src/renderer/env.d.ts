@@ -20,6 +20,15 @@ interface KrnlAssetReadResult {
   mimeType: string
 }
 
+interface KrnlBoardRow { id: string; name: string; active: boolean; plans: number; habits: number }
+interface KrnlBoardsList {
+  activeId: string
+  boards: KrnlBoardRow[]
+  recording: { boardId: string; startedAt: string; label: string } | null
+  notice: { kept: string; others: string[] } | null
+}
+interface KrnlBoardsResult { ok: boolean; message: string; board?: { id: string; name: string } }
+
 interface KrnlBridge {
   boardLoad: () => Promise<unknown>
   boardSave: (data: unknown) => Promise<void>
@@ -38,6 +47,13 @@ interface KrnlBridge {
   assetRead: (assetId: string) => Promise<KrnlAssetReadResult | null>
   assetDelete: (assetId: string) => Promise<void>
   onBoardChanged: (callback: () => void) => () => void
+  // Separate boards (Decision 49)
+  boardsList?: () => Promise<KrnlBoardsList>
+  boardsCreate?: (name: string, copyHabits: boolean) => Promise<KrnlBoardsResult>
+  boardsRename?: (ref: string, name: string) => Promise<KrnlBoardsResult>
+  boardsDelete?: (ref: string) => Promise<KrnlBoardsResult>
+  boardsSwitch?: (ref: string) => Promise<{ ok: boolean; message: string }>
+  boardsAckNotice?: () => Promise<void>
   // Phase 2: cli:dispatch
   onCliDispatch?: (callback: (id: string, command: string, args: Record<string, unknown>) => void) => () => void
   cliDispatchReply?: (id: string, ok: boolean, message: string) => void

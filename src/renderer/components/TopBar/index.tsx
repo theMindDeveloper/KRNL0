@@ -20,7 +20,7 @@ import { MANIFESTS } from '../../themes/manifests';
 import { runLookTransition } from '../../themes/transition';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
-import { CanvasSwitcher } from './CanvasSwitcher';
+import { BoardSwitcher } from './BoardSwitcher';
 import { Z } from '../ui/layers';
 import { SettingsModal, type SettingsSection } from './SettingsModal';
 import { HelpMenu } from '../Launch/HelpMenu';
@@ -187,7 +187,8 @@ export function TopBar() {
 
         {/* Decision 33 — canvas switcher (the breadcrumb's last segment).
             easy-mode D24: one canvas in Easy. */}
-        {!easyMode && <CanvasSwitcher />}
+        {/* Decision 49 — separate boards. In Easy the menu shows once there is more than one board. */}
+        <BoardSwitcher quiet={easyMode} />
 
         {/* Live badge */}
         {/* New-user review 1.7: a static "live" said nothing; this says what a

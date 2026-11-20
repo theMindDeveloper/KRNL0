@@ -207,11 +207,16 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
   },
   {
     group: 'board',
-    summary: 'Board read + persistence',
+    summary: 'The open board, and your separate boards (each has its own todos, habits, calendar, timer history, analytics and notes)',
     subcommands: [
       { name: 'show', usage: 'board show [--json]', summary: 'Print board: --json emits bare JSON; default is a human summary' },
       { name: 'summary', usage: 'board summary [--json]', summary: 'One-line counts of nodes + edges' },
       { name: 'stats', usage: 'board stats [--json]', summary: 'Per-kind node counts + per-event edge counts' },
+      { name: 'list', usage: 'board list [--json]', summary: 'List your boards (* = the open one) with their open plans and habits' },
+      { name: 'new', usage: 'board new <name> [--copy-habits]', summary: 'Create a separate board: empty, or with the habits of the open board (their history starts at zero)' },
+      { name: 'switch', usage: 'board switch <id|name>', summary: 'Open a board (the window reloads onto it)' },
+      { name: 'rename', usage: 'board rename <id|name> <new name>', summary: 'Rename a board' },
+      { name: 'delete', usage: 'board delete <id|name>', summary: 'Delete a board (not the open one, not the last one); its files are kept in boards/.deleted' },
     ],
   },
   {
@@ -237,7 +242,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
   },
   {
     group: 'canvas',
-    summary: 'Free-content canvases (mothers, tasks and analytics are shared across all of them)',
+    summary: 'The drawing areas inside the open board (kept for older boards; the app uses separate boards, see `board list`)',
     subcommands: [
       { name: 'list', usage: 'canvas list [--json]', summary: 'List canvases (* = active) with free-node counts' },
       { name: 'add', usage: 'canvas add <name>', summary: 'Create a canvas and switch to it' },

@@ -587,8 +587,8 @@
       "plans-change"
     ]
   },
-  "1a6e56ce": {
-    "text": "One more thing. Every canvas shows the same plans, calendar, habits and timer. Notes, images and drawings belong to one canvas. Open this to see what's on each.",
+  "05022cdb": {
+    "text": "One more thing. You can keep separate boards, one for each part of your life. Every board has its own plans, calendar, habits and timer. Open this to see them.",
     "tours": [
       "plans-change"
     ]
@@ -695,8 +695,8 @@
       "modes"
     ]
   },
-  "fa9c484f": {
-    "text": "And the board grows: several canvases, frames to group cards, the Terminal with Claude Code, and weekly targets and goals for your habits!",
+  "a9e3189b": {
+    "text": "And there is more: separate boards, frames to group cards, the Terminal with Claude Code, and weekly targets and goals for your habits!",
     "tours": [
       "modes"
     ]
@@ -773,8 +773,8 @@
       "board"
     ]
   },
-  "774bbd9e": {
-    "text": "Need more room? Make another canvas here, one per project. Your windows are the same on every canvas.",
+  "e88d64e8": {
+    "text": "Need a separate space? Make another board here, one per project. Each board has its own plans, habits and calendar.",
     "tours": [
       "board"
     ]

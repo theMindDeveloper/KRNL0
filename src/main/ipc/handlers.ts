@@ -11,6 +11,7 @@ import { SysFacade } from '../../sys/SysFacade';
 import { getUpdater } from '../updater';
 import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard, BoardCorruptError } from '../persistence/board';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
+import { ackBoardsNotice, createBoard, deleteBoard, listBoards, readBoardsIndex, renameBoard, switchBoard } from '../persistence/boards';
 import { mergeBoards } from '../../shared/boardMerge';
 import { renderMotd } from '../rpc/motd';
 import {
@@ -112,6 +113,20 @@ const rendererRev = new RendererRevGuard(BOARD_PATH);
 // saves already in flight were made before it saw the merged board.
 let rendererBase: Record<string, unknown> | null = null;
 let awaitingReload = false;
+// Separate boards (Decision 49): between swapping the board files and the
+// window's reload, the old window must not write its board over the new one.
+let boardsSwitching = false;
+
+/** Swap to another board and reload the window (boards.md F3). Also used by `krnl board switch`. */
+export function switchBoardAndReload(ref: string | undefined): { ok: boolean; message: string } {
+  boardsSwitching = true;
+  const res = switchBoard(BOARD_DIR, ref);
+  if (typeof res === 'string') { boardsSwitching = false; return { ok: false, message: res }; }
+  const w = getMainWindow();
+  if (w && !w.isDestroyed()) w.webContents.reload();
+  else boardsSwitching = false;
+  return { ok: true, message: `switched to board "${res.name}"` };
+}
 const asBoard = (b: unknown): Record<string, unknown> | null =>
   typeof b === 'object' && b !== null && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
 /** A board in the shape loadBoard returns (migrations mutate, so on a copy). */
@@ -160,6 +175,10 @@ function hasOpenRenderer(): boolean {
 
 export function registerHandlers(rpcServer?: RpcServer): void {
   ipcMain.handle('board:load', async () => {
+    // The list of boards exists before the first load (this is also where
+    // canvases become boards, once).
+    try { readBoardsIndex(BOARD_DIR); } catch (err) { console.warn('[boards] index not ready:', err instanceof Error ? err.message : err); }
+    boardsSwitching = false;
     const board = loadBoard();
     rendererRev.sync();
     rendererBase = asBoard(board);
@@ -168,6 +187,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   });
 
   ipcMain.handle('board:save', async (_event, data: unknown) => {
+    if (boardsSwitching) return; // the window is about to reload onto another board
     if (rendererRev.isStale() || awaitingReload) {
       // A newer write landed (sys CLI / the AI terminal) after the renderer's
       // last load. Saving as-is would revert it, refusing would drop the
@@ -219,6 +239,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
   });
 
   ipcMain.handle('board:saveViewport', async (_event, viewport: unknown) => {
+    if (boardsSwitching) return;
     // A pan is never worth risking the board: if it can't be read right now
     // (locked by antivirus / sync), skip this viewport write.
     let board: unknown;
@@ -239,6 +260,23 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     if (wasInSync) rendererRev.sync();
   });
 
+  // Separate boards (Decision 49, boards.md).
+  ipcMain.handle('boards:list', () => listBoards(BOARD_DIR));
+  ipcMain.handle('boards:create', (_event, name: unknown, copyHabits: unknown) => {
+    const res = createBoard(BOARD_DIR, typeof name === 'string' ? name : undefined, { copyHabits: copyHabits === true });
+    return typeof res === 'string' ? { ok: false, message: res } : { ok: true, message: '', board: res };
+  });
+  ipcMain.handle('boards:rename', (_event, ref: unknown, name: unknown) => {
+    const res = renameBoard(BOARD_DIR, typeof ref === 'string' ? ref : undefined, typeof name === 'string' ? name : undefined);
+    return typeof res === 'string' ? { ok: false, message: res } : { ok: true, message: '', board: res };
+  });
+  ipcMain.handle('boards:delete', (_event, ref: unknown) => {
+    const res = deleteBoard(BOARD_DIR, typeof ref === 'string' ? ref : undefined);
+    return typeof res === 'string' ? { ok: false, message: res } : { ok: true, message: '', board: res };
+  });
+  ipcMain.handle('boards:switch', (_event, ref: unknown) => switchBoardAndReload(typeof ref === 'string' ? ref : undefined));
+  ipcMain.handle('boards:ackNotice', () => { ackBoardsNotice(BOARD_DIR); });
+
   ipcMain.handle('sys:run', async (_event, argv: string[]) => {
     const updater = getUpdater();
     const pocket = getPocket();
@@ -246,6 +284,7 @@ export function registerHandlers(rpcServer?: RpcServer): void {
       boardPath: BOARD_PATH,
       hasOpenRenderer,
       onBoardChanged: notifyBoardChanged,
+      onBoardSwitch: switchBoardAndReload,
       viewSize: windowViewSize,
       ...(cliDispatchFn ? { cliDispatch: cliDispatchFn } : {}),
       ...(updater ? { updater } : {}),

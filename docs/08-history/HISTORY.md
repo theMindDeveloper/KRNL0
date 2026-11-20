@@ -2979,3 +2979,19 @@ Typecheck clean; all tests pass. Checked as screenshots (Settings, the plan card
 **Files changed:** `TopBar/CanvasSwitcher.tsx`
 
 **Summary:** the "On every canvas / Only on this one" note under the canvas list is removed at the owner's request. What is shared is still said in the switcher's tooltip. Behaviour is unchanged: canvases still share plans, calendar, habits and the timer.
+
+## [2026-11-20] — Separate boards
+
+**Type:** Feature (Decision 49)
+**Branch:** `feat/separate-boards` (on `feat/unified-windows`)
+**Files changed:** `main/persistence/boards.ts` (new), `main/ipc/handlers.ts`, `main/preload.ts`, `renderer/env.d.ts`, `TopBar/BoardSwitcher.tsx` (new), `TopBar/index.tsx`, `store/boardsInfo.ts` (new), `PomoNode/index.tsx`, `PomoNode/PlannedNowChip.tsx`, `sys/commands/boards.ts` (new), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `Tour/tours.ts` + voice clips, `dev/previewBridge.ts`, tests (`tests/unit/main/boards.test.ts`, `windowFrame.test.ts`), docs (`06-requirements/boards.md`, Decision 49, `canvases.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Boards:** each board has its own todos, habits, calendar, timer history, time log and notes. The top-bar menu lists them with one fact each, makes a new one (empty or with your habits), renames and deletes. Opening one reloads the window onto it.
+- **Storage:** the open board is still `board.json` + `timelog/`; other boards are parked in `boards/<id>/` and swapped in on switch; `boards.json` is the list.
+- **Timer:** one at a time; a chip in the top bar says where it is still running, and the Timer refuses to start a second one.
+- **Migration:** several canvases become several boards once, with a copy of the old file kept and a one-time notice.
+- **CLI:** `board list / new / switch / rename / delete`.
+- **Tutorials:** three lines that described shared canvases now describe boards (re-recorded).
+
+Typecheck clean; all tests pass. Storage and commands tested (unit tests and an end-to-end run on a copy); the menu checked in the browser preview. Not yet used by the owner; the switch inside the real window was not pressed by me.

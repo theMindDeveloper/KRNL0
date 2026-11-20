@@ -315,3 +315,32 @@ describe('Two styles, one clock, no small extras (owner, 2026-11-20)', () => {
     expect(read('components/ui/SpanEditor.tsx')).not.toContain('<LogTimeGaps');
   });
 });
+
+describe('Separate boards (Decision 49, boards.md)', () => {
+  const root = join(process.cwd(), 'src');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('the top bar shows the board menu, not the canvas menu', () => {
+    const bar = read('renderer/components/TopBar/index.tsx');
+    expect(bar).toContain('<BoardSwitcher quiet={easyMode} />');
+    expect(bar).not.toContain('<CanvasSwitcher');
+  });
+  it('the menu has no explanatory note, and a new board asks: empty, or copy my habits', () => {
+    const m = read('renderer/components/TopBar/BoardSwitcher.tsx');
+    expect(m).toContain("'Start empty'");
+    expect(m).toContain("'Copy my habits'");
+    expect(m).not.toMatch(/on every (canvas|board)/i);
+  });
+  it('one timer at a time: the Timer checks the other boards before it starts', () => {
+    expect(read('renderer/components/nodes/PomoNode/index.tsx')).toContain("(state.status === 'idle' || state.status === 'done') && blockedByOtherBoard()");
+    expect(read('renderer/components/TopBar/BoardSwitcher.tsx')).toContain('data-testid="board-recording-chip"');
+  });
+  it('the window cannot save its old board over the new one while a switch is in flight', () => {
+    const h = read('main/ipc/handlers.ts');
+    expect(h).toContain("if (boardsSwitching) return; // the window is about to reload onto another board");
+    expect(h).toContain('boardsSwitching = false;\n    const board = loadBoard();');
+  });
+  it('krnl has the board commands', () => {
+    const reg = read('shared/cli/commandRegistry.ts');
+    for (const u of ['board list [--json]', 'board new <name> [--copy-habits]', 'board switch <id|name>', 'board rename <id|name> <new name>', 'board delete <id|name>']) expect(reg).toContain(u);
+  });
+});
