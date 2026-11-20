@@ -104,9 +104,9 @@ describe('F1 — Topbar left content', () => {
 // ── F2 — Topbar right buttons ─────────────────────────────────────────────────
 
 describe('F2 — Topbar right buttons present', () => {
-  it('renders a "FIT" button', () => {
+  it('renders a "Fit" button', () => {
     renderWithWrapper(React.createElement(TopBar));
-    expect(screen.getByTestId('topbar-fit').textContent).toBe('FIT');
+    expect(screen.getByTestId('topbar-fit').textContent).toBe('Fit');
   });
 
   it('has no theme button: light / dark is in Settings (window-frame.md, top bar)', () => {

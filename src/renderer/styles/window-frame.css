@@ -246,3 +246,25 @@
 
 /* Every add field in a footer reads the same: the reading font, 13.5 px. */
 .kw-foot input, .kw-foot textarea, .kw-add { font-family: var(--font-read) !important; font-size: 13.5px !important; letter-spacing: 0 !important; }
+
+/* Two icon buttons side by side sit closer than other header parts (they read as one group). */
+.kw-head .kw-btn + .kw-btn { margin-left: -4px; }
+
+/* ── The top bar follows the window standard (2026-11-20) ────────────────────
+   Its controls were small capitals in the code font with outlines, beside
+   window headers in normal letters. Same rules here: reading font, normal
+   letters, filled controls, no outlines. */
+[data-testid="topbar"] .krnl-topbar-btn {
+  height: 28px; min-width: 28px; box-sizing: border-box; padding: 0 10px !important; justify-content: center;
+  border: 0 !important; border-radius: 8px !important; background: var(--paper-2) !important; color: var(--ink-2) !important;
+  font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
+}
+[data-testid="topbar"] .krnl-topbar-btn:hover { background: var(--paper-3) !important; color: var(--ink) !important; }
+[data-testid="layout-mode-toggle"] { height: 28px; box-sizing: border-box; padding: 2px; border: 0 !important; border-radius: 8px !important; background: var(--paper-2); overflow: visible !important; }
+[data-testid="layout-mode-toggle"] > button {
+  height: 24px; min-height: 0; padding: 0 10px !important; border-left: 0 !important; border-radius: 6px;
+  font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
+}
+[data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
+  font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
+}

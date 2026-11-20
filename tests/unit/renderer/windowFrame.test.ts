@@ -344,3 +344,27 @@ describe('Separate boards (Decision 49, boards.md)', () => {
     for (const u of ['board list [--json]', 'board new <name> [--copy-habits]', 'board switch <id|name>', 'board rename <id|name> <new name>', 'board delete <id|name>']) expect(reg).toContain(u);
   });
 });
+
+describe('Visual bugs fixed (owner list, 2026-11-20)', () => {
+  const root = join(process.cwd(), 'src');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('Timer header: opening settings closes the spans log, so there is never a second ×', () => {
+    expect(read('renderer/components/nodes/PomoNode/index.tsx')).toContain('else { setLogOpen(false); openGear(); }');
+  });
+  it('the top bar follows the window standard: reading font, normal letters, no outlines', () => {
+    const css = read('renderer/styles/window-frame.css');
+    expect(css).toContain('[data-testid="topbar"] .krnl-topbar-btn {');
+    expect(css).toContain('[data-testid="topbar-panel-toggles"] .krnl-panel-toggle {');
+    const t = read('renderer/components/ui/LayoutModeToggle.tsx');
+    expect(t).toContain('label="Station"');
+    expect(t).toContain('label="Free"');
+  });
+  it('no second frame inside a window: Analytics draws no border of its own, Pro light has no inset highlight', () => {
+    expect(read('renderer/components/nodes/AnalyticsNode/index.tsx')).toContain("borderRadius: 'calc(var(--k-mother-radius, 8px) - 1px)'");
+    expect(read('renderer/themes/manifests.ts')).toContain("'--k-mother-shadow': '0 0 0 1px #cfcfca, 0 18px 36px rgba(0,0,0,0.10)',");
+  });
+  it('the window buttons take the top bar colours (no dark block in a light theme)', () => {
+    expect(read('main/ipc/handlers.ts')).toContain("ipcMain.handle('window:titleBarColors'");
+    expect(read('renderer/components/TopBar/index.tsx')).toContain('window.krnl.titleBarColors(bg, ink)');
+  });
+});

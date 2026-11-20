@@ -2995,3 +2995,18 @@ Typecheck clean; all tests pass. Checked as screenshots (Settings, the plan card
 - **Tutorials:** three lines that described shared canvases now describe boards (re-recorded).
 
 Typecheck clean; all tests pass. Storage and commands tested (unit tests and an end-to-end run on a copy); the menu checked in the browser preview. Not yet used by the owner; the switch inside the real window was not pressed by me.
+
+## [2026-11-20] — Visual bugs: double close button, top bar, light-theme corners and window buttons
+
+**Type:** Bug Fix (UI)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `PomoNode/index.tsx`, `styles/window-frame.css`, `ui/LayoutModeToggle.tsx`, `TopBar/index.tsx`, `themes/manifests.ts`, `AnalyticsNode/index.tsx`, `main/ipc/handlers.ts`, `main/preload.ts`, `renderer/env.d.ts`, tests (`windowFrame.test.ts`, `AppChrome.scenarios.test.ts`)
+
+**Summary:**
+- **Timer header:** opening settings closes the spans log, so two × buttons never show; two icon buttons sit closer together.
+- **Top bar:** the window toggles, Station / Free, Fit, Help and Settings use the window standard (reading font, normal letters, filled, no outlines).
+- **Light theme corners:** the Analytics window drew a second border with a larger radius inside the frame, and the Pro light frame had a 90% white inset line; both left a bright crescent in the corner. Removed.
+- **Analytics header:** "Done 0 · Focus 3m" in normal letters.
+- **Window buttons (minimise, maximise, close):** they take the top bar's colours when the theme or style changes (they stayed dark with lime symbols in a light theme).
+
+Typecheck clean; all tests pass. Checked as screenshots in light and dark; the window-button colours can only be seen in the real window.

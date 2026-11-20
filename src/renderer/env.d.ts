@@ -47,6 +47,7 @@ interface KrnlBridge {
   assetRead: (assetId: string) => Promise<KrnlAssetReadResult | null>
   assetDelete: (assetId: string) => Promise<void>
   onBoardChanged: (callback: () => void) => () => void
+  titleBarColors?: (color: string, symbolColor: string) => Promise<void>
   // Separate boards (Decision 49)
   boardsList?: () => Promise<KrnlBoardsList>
   boardsCreate?: (name: string, copyHabits: boolean) => Promise<KrnlBoardsResult>

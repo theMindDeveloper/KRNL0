@@ -437,7 +437,7 @@ export function PomoNode({
           onClick={(e) => {
             e.stopPropagation();
             if (gearOpen) closeGearAndClearActive();
-            else openGear();
+            else { setLogOpen(false); openGear(); }
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >

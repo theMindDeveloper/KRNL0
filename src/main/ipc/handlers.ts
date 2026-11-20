@@ -260,6 +260,15 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     if (wasInSync) rendererRev.sync();
   });
 
+  // The window's own buttons sit on the top bar: they take its colours, so a
+  // light theme does not show a dark block with lime symbols (Windows / Linux).
+  ipcMain.handle('window:titleBarColors', (_event, color: unknown, symbolColor: unknown) => {
+    const ok = (v: unknown): v is string => typeof v === 'string' && /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\))$/i.test(v.trim());
+    const w = getMainWindow();
+    if (!w || w.isDestroyed() || !ok(color) || !ok(symbolColor) || typeof w.setTitleBarOverlay !== 'function') return;
+    try { w.setTitleBarOverlay({ color: color.trim(), symbolColor: symbolColor.trim(), height: 44 }); } catch { /* not supported on this platform */ }
+  });
+
   // Separate boards (Decision 49, boards.md).
   ipcMain.handle('boards:list', () => listBoards(BOARD_DIR));
   ipcMain.handle('boards:create', (_event, name: unknown, copyHabits: unknown) => {

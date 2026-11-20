@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld('krnl', {
   assetDelete: (assetId: string) =>
     ipcRenderer.invoke('asset:delete', { assetId }),
 
+  // The window's own buttons take the top bar's colours.
+  titleBarColors: (color: string, symbolColor: string) => ipcRenderer.invoke('window:titleBarColors', color, symbolColor),
+
   // Separate boards (Decision 49).
   boardsList: () => ipcRenderer.invoke('boards:list'),
   boardsCreate: (name: string, copyHabits: boolean) => ipcRenderer.invoke('boards:create', name, copyHabits),

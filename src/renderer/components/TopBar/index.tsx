@@ -107,6 +107,19 @@ export function TopBar() {
     document.documentElement.setAttribute('data-theme', shownTheme);
   }, [shownTheme]);
 
+  // The window's own buttons (minimise, maximise, close) are drawn by the
+  // system on top of this bar: tell it the bar's colours whenever the look changes.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      const bar = document.querySelector('[data-testid="topbar"]');
+      if (!bar || !window.krnl?.titleBarColors) return;
+      const bg = getComputedStyle(bar).backgroundColor;
+      const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink-2').trim();
+      if (bg && ink && bg !== 'rgba(0, 0, 0, 0)') void window.krnl.titleBarColors(bg, ink);
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [shownTheme, dockStyle]);
+
   // Light/dark is always available. A dark-only frame style has no light
   // tokens, so choosing Light switches to Classic (which has both) — and
   // remembers the frame, so going back to Dark restores it (unless another
@@ -229,7 +242,7 @@ export function TopBar() {
         {/* window-frame.md, top bar — FIT only where it does something (the
             Free layout; Station's small canvas has its own fit control). The
             light / dark switch lives in Settings → General. */}
-        {!stationShown && <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />}
+        {!stationShown && <TopBarButton label="Fit" title="Fit everything in view" onClick={handleFit} testId="topbar-fit" />}
         <HelpMenu />
         <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
       </div>

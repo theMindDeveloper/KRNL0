@@ -164,8 +164,10 @@ const rootStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
   background: 'linear-gradient(180deg, var(--k-an-bg-2, #16181a) 0%, var(--k-an-bg, #0e1012) 100%)',
-  border: '1px solid var(--k-an-line-2, #2a2e33)',
-  borderRadius: 10,
+  // The window frame around it draws the border and the corner (a second
+  // border with its own, larger radius left a bright crescent in each corner).
+  border: 'none',
+  borderRadius: 'calc(var(--k-mother-radius, 8px) - 1px)',
   // No soft drop shadow (it read as a blur around the window) — a flat border.
   boxShadow: 'none',
   display: 'flex',
@@ -188,10 +190,10 @@ const dotStyle: React.CSSProperties = { background: 'var(--acid, #c9f158)' };
 
 // window-frame.md — the header's context is plain words (no pills).
 const summaryChipStyle: React.CSSProperties = {
-  fontFamily: 'var(--font-mono)',
-  fontSize: 10.5,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
+  fontFamily: 'var(--font-read)',
+  fontSize: 12.5,
+  letterSpacing: 0,
+  textTransform: 'none',
   whiteSpace: 'nowrap',
   flexShrink: 0,
 };
@@ -576,11 +578,11 @@ export function AnalyticsNode({
         <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
         <div style={{ flex: 1 }} />
         <span className="an-chip an-chip--done" style={summaryChipStyle}>
-          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>done </span>
+          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>Done </span>
           <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.tasksDone}</span>
         </span>
         <span className="an-chip an-chip--focus" style={summaryChipStyle}>
-          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>focus </span>
+          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>Focus </span>
           <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin >= 60 ? `${Math.floor(tot.focusMin / 60)}h ${String(tot.focusMin % 60).padStart(2, '0')}m` : `${tot.focusMin}m`}</span>
         </span>
         <button
