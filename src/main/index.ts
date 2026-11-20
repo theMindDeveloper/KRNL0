@@ -4,7 +4,7 @@ import { mkdirSync, copyFileSync, existsSync, chmodSync } from 'fs';
 import { readFile, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { createServer, type Server } from 'http';
-import { registerHandlers, getCliDispatch, backfillTimeLogAtStartup, logAppSession, getBoardDir } from './ipc/handlers';
+import { registerHandlers, getCliDispatch, backfillTimeLogAtStartup, logAppSession, getBoardDir, switchBoardAndReload } from './ipc/handlers';
 import { initAppState, registerAppStateHandlers, trackActivity } from './appState';
 import { initTaskbar } from './taskbar';
 import {
@@ -14,6 +14,8 @@ import {
 import { createRpcServer } from './rpc/server';
 import type { RpcServer } from './rpc/server';
 import { initUpdater } from './updater';
+import { initSync } from './sync';
+import { notifyBoardChanged } from './boardIo';
 import { getMainWindow, revealMainWindow, setMainWindow } from './mainWindow';
 import { attachMainWindow, initPocket, registerPocketSettings, setPocketPort } from './pocket';
 import { startReminders } from './reminders';
@@ -316,6 +318,8 @@ app.whenReady().then(async () => {
   // Decision 36: update checks + IPC. Before the window, so its first
   // update:get is answered; off in dev and isolated worktrees.
   initUpdater(getCliDispatch);
+  // Decision 51: sync with the owner's KRNL0 server (stays off until connected).
+  initSync({ boardDir: getBoardDir(), notifyBoardChanged, switchToBoard: (id) => switchBoardAndReload(id).ok });
 
   // Only the packaged path needs the local renderer server; dev uses Vite.
   if (process.env['NODE_ENV'] !== 'development') {

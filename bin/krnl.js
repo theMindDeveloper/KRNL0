@@ -35,7 +35,7 @@ const VERSION = readVersion();
 
 // ── Arg parsing ────────────────────────────────────────────────────────────
 
-const argv = process.argv.slice(2);
+let argv = process.argv.slice(2);
 const [cmd] = argv;
 
 // T15: krnl (no args) — short overview
@@ -63,6 +63,16 @@ if (cmd === 'whoami') {
     process.stdout.write(`auth   : ${ok ? '✓' : '✗'}\n`);
   }
   process.exit(0);
+}
+
+// `--password-stdin` (krnl sync pair): read the password here, so it never
+// shows in the shell history or the process list; it travels only over the
+// token-protected local socket.
+if (argv.includes('--password-stdin')) {
+  const chunks = [];
+  for await (const c of process.stdin) chunks.push(c);
+  const pw = Buffer.concat(chunks).toString('utf8').replace(/\r?\n$/, '');
+  argv = argv.filter((a) => a !== '--password-stdin').concat([`--password=${pw}`]);
 }
 
 // Route to RPC

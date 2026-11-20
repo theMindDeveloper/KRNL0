@@ -151,4 +151,16 @@ contextBridge.exposeInMainWorld('krnl', {
   appPrefsSet: (patch: unknown): Promise<unknown> => ipcRenderer.invoke('app:prefs:set', patch),
   appBackupsOpen: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('app:backups:open'),
   appOpenExternal: (url: string): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('app:open-external', url),
+
+  // Decision 51 — sync with the owner's KRNL0 server (Settings › Sync, status chip).
+  syncStatus: (): Promise<unknown> => ipcRenderer.invoke('sync:status'),
+  syncBegin: (address: string): Promise<unknown> => ipcRenderer.invoke('sync:begin', address),
+  syncFinish: (password: string, code?: string): Promise<unknown> => ipcRenderer.invoke('sync:finish', password, code),
+  syncDisconnect: (): Promise<unknown> => ipcRenderer.invoke('sync:disconnect'),
+  syncRetry: (): Promise<unknown> => ipcRenderer.invoke('sync:retry'),
+  onSyncStatus: (callback: (info: unknown) => void) => {
+    const listener = (_event: unknown, info: unknown) => callback(info)
+    ipcRenderer.on('sync:status', listener)
+    return () => { ipcRenderer.removeListener('sync:status', listener) }
+  },
 })
