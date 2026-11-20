@@ -3152,3 +3152,19 @@ Typecheck clean; all tests pass.
 
 **Summary:**
 - Tag `v0.12.0` pushed on `main`; the release workflow built the Windows installer and created the draft with `KRNL0-Setup-0.12.0.exe`, its `.blockmap` and `latest.yml` (version 0.12.0). The owner approved, and the release was published on 2026-11-20. It is the latest release, so installs now update to it.
+
+## [2026-11-20] — Sync with your own KRNL0 server, and the KRNL0 website
+
+**Type:** Feature
+**Branch:** `feat/server-sync` (server side: `theMindDeveloper/krnl0-server` `feat/realtime-sync`)
+**Files changed:** `src/shared/sync/*`, `src/shared/boardMigrate.ts`, `src/main/sync/*`, `src/main/persistence/board.ts`, `src/sys/commands/sync.ts`, `src/web/*`, `vite.web.config.ts`, `src/renderer/components/Sync/*`, `src/renderer/components/Mobile/*`, `src/renderer/utils/assetUrl.ts`, `src/renderer/platform.ts`, `TopBar/index.tsx`, `Canvas/CanvasFlow.tsx`, `Station/*`, `Tour/tours.ts`, `ui/Popover.tsx`, `.github/workflows/release.yml`, docs, tests
+
+**Summary:**
+- **Sync (Decision 51):** boards, the board list, the time log and pictures sync through the owner's server — revisioned documents, a WebSocket for changes, the app's own three-way merge. Offline edits are kept and sent later; per-device keys (view, layout, open board) stay local. Pairing checks the server's fingerprint and pins its certificate; the device key sits in the OS keychain. `krnl sync status|connect|pair|disconnect|retry`.
+- **Saved badge:** the top bar's own "● saved" also tells sync: saved · synced, syncing, saved · offline, sync paused, update KRNL0, saved · signed out. A click shows the server, the devices, Sync now, Open website, Disconnect — or, without a server, Connect server (design "Sync B" sheet: address, fingerprint, password).
+- **Website:** the same app in a browser, built by `npm run build:web` and served by the server after login. Phone: Today (Timer, Plans, Habits), Calendar (with Clock, Day by default), Habits, Insights, Canvas, and Focus while the timer runs. iPad: the same in a side rail. Desktop browsers: the Station and Canvas. No terminal, AI, floating timer or updates on the web. Touch: a long-press opens row menus, one finger pans the canvas, no zoom on fields. Pictures show from the browser's own copy. Log out wipes the browser's copy.
+- **Tour:** "Saved and synced" (Help › Tutorials, `krnl tour start sync`); its five voice lines wait to be recorded.
+- **Release pipeline:** the KRNL0 release also attaches `krnl0-web-<version>.tar.gz` and its `.sha256` for KRNL0 servers.
+- Tested against the real server: 7 desktop and 8 web+desktop sync scenarios (crash mid-burst, offline, concurrent edits, stale saves, a blocked socket), plus headless-Chrome walks: login, a phone day by touch, pictures across two browsers, boards, the tour.
+
+Typecheck clean; all tests pass except the three voice-clip checks of the new tour (recording waits for the owner's OK).
