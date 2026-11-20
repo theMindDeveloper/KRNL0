@@ -3194,3 +3194,18 @@ Typecheck clean; all tests pass.
 - The KRNL0 server 0.1.0 (`theMindDeveloper/krnl0-server`, now public) pins this web app through its repository variable `KRNL0_WEB_VERSION=0.13.0` and checks its SHA-256 before bundling it; its Linux bundles and Docker image (public on GHCR) were published the same evening.
 - The website has a Server page with the step-by-step setup (theminddev.com/krnl0/server.html) and the 0.13 news.
 
+## [2026-11-21] — Server updates from the app; the release train
+
+**Type:** Feature
+**Branch:** `feat/server-updates` (server side: `theMindDeveloper/krnl0-server` `feat/server-updates`)
+**Files changed:** `src/shared/sync/serverUpdate.ts`, `src/shared/sync/port.ts`, `src/main/sync/{service,index}.ts`, `src/main/preload.ts`, `src/web/{bridge,sync/transport}.ts`, `src/renderer/store/syncStore.ts`, `src/renderer/components/Sync/{ServerUpdate,SyncChip}.tsx`, `src/renderer/components/TopBar/SettingsModal.tsx`, `src/renderer/components/nodes/{registry.ts,UnknownNode}`, `src/renderer/components/Canvas/CanvasFlow.tsx`, `src/sys/{parser,SysFacade,commands/sync}.ts`, `src/renderer/components/Tour/{tours.ts,voice/*}`, `src/shared/whatsnew.ts`, `src/renderer/assets/launch/plate-update.webp`, `scripts/release.mjs`, docs (`server-updates.md`, Decision 52, `RELEASING.md` § 0, `v0.14.0.md`), tests
+
+**Summary:**
+- The owner asked for one-click server updates from the app, Docker in one command with an updater, the version edge cases solved, and a release workflow every agent can follow without paid GitHub features.
+- **App (owner's pick: both drafts):** a dot on the saved badge and a row in its menu (draft A) open one sheet: the password, the steps (backup, download, signature, restart, back online), the result ("Nothing was lost" with the reason when it went back), the command when the server can't update itself, and a warning when the server needs a newer KRNL0. Settings › Updates shows the server (draft B) with "Update by itself at night"; on the website too. `krnl sync server`.
+- **Edge cases:** an older KRNL0 keeps unknown fields, items and window kinds (test over the real store actions; the merge would read a missing key as deleted); unknown kinds show a "Made in a newer KRNL0" card on the canvas; a wrong password on the web is a message, not a logout; the update is followed by its own job (no clock comparison) through the restart; the server's state is normalised once (the Linux command was dropped on desktop).
+- **Release train:** `npm run release` (status · prepare · tag · check · publish --yes) and RELEASING.md § 0; publishing starts the server's follow workflow.
+- Tested: unit and UI tests, a simulation against the real server (desktop and web: one click, wrong password, the rolled-back job, night updates, plain docker run), and a real run on Docker Desktop of the server side (see the server's history).
+
+Typecheck clean; all tests pass.
+
