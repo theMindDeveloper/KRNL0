@@ -28,10 +28,20 @@ export interface ObserveDashProps {
 export function TimerClock({ text, blink = false, testId = 'pomo-clock' }: { text: string; /** The colon blinks while time is being recorded; it is still when paused or idle. */ blink?: boolean; testId?: string }): JSX.Element {
   const i = text.lastIndexOf(':');
   return (
-    <div data-testid="pomo-timer-clock" style={{ display: 'flex', justifyContent: 'center' }}>
-      <div data-testid={testId} style={{ display: 'flex', alignItems: 'baseline', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', lineHeight: 1, fontSize: 64, fontWeight: 500, letterSpacing: '-0.035em', color: 'var(--ink)' }}>
+    <div data-testid="pomo-timer-clock" style={{ display: 'flex', justifyContent: 'center', width: '100%', containerType: 'inline-size' }}>
+      {/* The clock font (--font-clock): monospaced like the app, with plain
+          zeros. The colon is two drawn dots centred on the digits: a typed ":"
+          sits low beside large numerals. */}
+      <div data-testid={testId} style={{ display: 'flex', alignItems: 'center', fontFamily: 'var(--font-clock)', fontVariantNumeric: 'tabular-nums lining-nums', lineHeight: 1,
+        // Grows with the window, so a large window is not mostly empty; smaller once it shows hours.
+        fontSize: text.length > 5 ? 'clamp(44px, 14cqw, 112px)' : 'clamp(60px, 20cqw, 152px)', fontWeight: 500, letterSpacing: '-0.05em', color: 'var(--ink)' }}>
         <span>{i < 0 ? text : text.slice(0, i)}</span>
-        {i >= 0 && <span data-testid="pomo-colon" style={{ color: 'var(--ink-4)', animation: blink ? 'pomo-blink 1s steps(1) infinite' : 'none' }}>:</span>}
+        {i >= 0 && (
+          <span data-testid="pomo-colon" role="presentation" style={{ display: 'inline-flex', flexDirection: 'column', justifyContent: 'center', gap: '0.24em', margin: '0 0.13em', animation: blink ? 'pomo-blink 1s steps(1) infinite' : 'none' }}>
+            <span style={{ width: '0.13em', height: '0.13em', borderRadius: '50%', background: 'var(--ink-4)' }} />
+            <span style={{ width: '0.13em', height: '0.13em', borderRadius: '50%', background: 'var(--ink-4)' }} />
+          </span>
+        )}
         {i >= 0 && <span>{text.slice(i + 1)}</span>}
       </div>
     </div>

@@ -111,6 +111,8 @@
   --font-serif: 'Instrument Serif', Georgia, serif;
   /* Words you read (cards, the Timer's lines): a reading face. Times and numbers stay in --font-mono. */
   --font-read:  'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The Timer's big time: monospaced like the rest of the app, with plain zeros (chosen from 28 faces). */
+  --font-clock: 'Azeret Mono', 'JetBrains Mono', ui-monospace, monospace;
 
   /* Contrast lock.
    * Theme-invariant near-black for text that sits ON a bright accent

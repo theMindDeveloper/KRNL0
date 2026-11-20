@@ -28,6 +28,7 @@ import type { UpdaterPort } from '../shared/update';
 import { textAdd, textSet, textResize, textLook } from './commands/text';
 import { drawList, drawClear, drawDelete, drawStroke } from './commands/draw';
 import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
+import { boardList, boardNew, boardSwitch, boardRename, boardDelete } from './commands/boards';
 import { mediaAdd, mediaList, mediaResize, mediaPage } from './commands/media';
 import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments, pomoEditSegmentCmd, pomoAddSegmentCmd } from './commands/pomo';
 import {
@@ -82,6 +83,8 @@ export interface SysFacadeDeps {
   boardPath: string;
   hasOpenRenderer: () => boolean;
   onBoardChanged?: () => void;
+  /** Decision 49: the app's own board switch (swaps the files, reloads the window). Absent headless. */
+  onBoardSwitch?: (ref: string | undefined) => { ok: boolean; message: string };
   /** Phase 2: renderer-coupled dispatch for viewport/undo/redo/theme commands. */
   cliDispatch?: CliDispatchFn;
   /** Content size of the open window, for placing new nodes at the visible centre. */
@@ -689,6 +692,11 @@ export class SysFacade {
             return { ok: false, message: 'sound volume requires a number from 0 to 100' };
           }
           return this.deps.cliDispatch('sound.volume', { volume: command.volume });
+        case 'voice':
+          if (command.volume === undefined || command.volume < 0 || command.volume > 100) {
+            return { ok: false, message: 'sound voice requires a number from 0 to 100' };
+          }
+          return this.deps.cliDispatch('sound.voice', { volume: command.volume });
         case 'play':
           if (!command.moment) return { ok: false, message: 'sound play requires <moment> (see: krnl sound list)' };
           return this.deps.cliDispatch('sound.play', { moment: command.moment });
@@ -944,6 +952,20 @@ export class SysFacade {
         case 'clear':  return drawClear(dCtx);
         case 'delete': return drawDelete(dCtx, command.id);
         case 'stroke': return drawStroke(dCtx, { points: command.points, tool: command.tool, color: command.color, size: command.size });
+      }
+    }
+
+    if (command.kind === 'boards') {
+      const bsCtx = {
+        boardDir: dirname(this.deps.boardPath),
+        ...(this.deps.onBoardSwitch ? { onBoardSwitch: this.deps.onBoardSwitch } : {}),
+      };
+      switch (command.sub) {
+        case 'list':   return boardList(bsCtx, command.json);
+        case 'new':    return boardNew(bsCtx, command.name, command.copyHabits);
+        case 'switch': return boardSwitch(bsCtx, command.ref);
+        case 'rename': return boardRename(bsCtx, command.ref, command.name);
+        case 'delete': return boardDelete(bsCtx, command.ref);
       }
     }
 

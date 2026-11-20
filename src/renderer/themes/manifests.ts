@@ -156,7 +156,8 @@ const PRO_LIGHT: TokenMap = {
   '--k-pointer-core': '#fff5ec',
   '--k-mother-radius': '6px',
   '--k-mother-wash': 'linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 18%)',
-  '--k-mother-shadow': 'inset 0 1px 0 rgba(255,255,255,0.9), 0 0 0 1px #cfcfca, 0 18px 36px rgba(0,0,0,0.10)',
+  // No inset highlight: at 90% white it drew a bright crescent inside each rounded corner.
+  '--k-mother-shadow': '0 0 0 1px #cfcfca, 0 18px 36px rgba(0,0,0,0.10)',
   '--k-term-border': '#1a1a1a',
   '--k-clock-bezel': '#e6e6e2',
   '--k-clock-bezel-edge': '#cdcdc8',

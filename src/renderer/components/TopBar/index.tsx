@@ -20,7 +20,7 @@ import { MANIFESTS } from '../../themes/manifests';
 import { runLookTransition } from '../../themes/transition';
 import { useBoardStore } from '../../store/boardStore';
 import { BrandMark } from './BrandMark';
-import { CanvasSwitcher } from './CanvasSwitcher';
+import { BoardSwitcher } from './BoardSwitcher';
 import { Z } from '../ui/layers';
 import { SettingsModal, type SettingsSection } from './SettingsModal';
 import { HelpMenu } from '../Launch/HelpMenu';
@@ -107,6 +107,19 @@ export function TopBar() {
     document.documentElement.setAttribute('data-theme', shownTheme);
   }, [shownTheme]);
 
+  // The window's own buttons (minimise, maximise, close) are drawn by the
+  // system on top of this bar: tell it the bar's colours whenever the look changes.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      const bar = document.querySelector('[data-testid="topbar"]');
+      if (!bar || !window.krnl?.titleBarColors) return;
+      const bg = getComputedStyle(bar).backgroundColor;
+      const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink-2').trim();
+      if (bg && ink && bg !== 'rgba(0, 0, 0, 0)') void window.krnl.titleBarColors(bg, ink);
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [shownTheme, dockStyle]);
+
   // Light/dark is always available. A dark-only frame style has no light
   // tokens, so choosing Light switches to Classic (which has both) — and
   // remembers the frame, so going back to Dark restores it (unless another
@@ -187,7 +200,8 @@ export function TopBar() {
 
         {/* Decision 33 — canvas switcher (the breadcrumb's last segment).
             easy-mode D24: one canvas in Easy. */}
-        {!easyMode && <CanvasSwitcher />}
+        {/* Decision 49 — separate boards. In Easy the menu shows once there is more than one board. */}
+        <BoardSwitcher quiet={easyMode} />
 
         {/* Live badge */}
         {/* New-user review 1.7: a static "live" said nothing; this says what a
@@ -224,11 +238,12 @@ export function TopBar() {
 
       {/* Right: action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <LayoutModeToggle />
-        {/* window-frame.md, top bar — FIT only where it does something (the
-            Free layout; Station's small canvas has its own fit control). The
+        {/* window-frame.md, top bar — Fit only where it does something (the Free
+            layout; Station's small canvas has its own fit control). It sits
+            before the switch, so the switch never moves when it appears. The
             light / dark switch lives in Settings → General. */}
-        {!stationShown && <TopBarButton label="FIT" onClick={handleFit} testId="topbar-fit" />}
+        {!stationShown && <TopBarButton label="Fit" title="Fit everything in view" onClick={handleFit} testId="topbar-fit" />}
+        <LayoutModeToggle />
         <HelpMenu />
         <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
       </div>

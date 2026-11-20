@@ -264,6 +264,8 @@ function blinkCard(taskId: string, note?: string): void {
 
 /** Window event the Calendar listens for to bring a task block into view and pulse it. */
 export const CALENDAR_REVEAL_EVENT = 'krnl:calendar-reveal';
+/** Ask the Calendar's Day view for the hour grid ('grid') or its own choice ('auto'). detail: { pref }. */
+export const CALENDAR_LAYOUT_EVENT = 'krnl:calendar-layout';
 
 /**
  * "Show on calendar" from a task's right-click menu: open the Calendar on the

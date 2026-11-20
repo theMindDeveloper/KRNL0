@@ -55,13 +55,13 @@ export function LayoutModeToggle() {
       }}
     >
       <PillSegment
-        label="◳ STATION"
+        label="Station"
         active={isStation}
         testId="layout-toggle-station"
         onClick={() => { if (!isStation) setLayoutMode('station'); }}
       />
       <PillSegment
-        label="◰ FREE"
+        label="Free"
         active={!isStation}
         testId="layout-toggle-canvas"
         onClick={() => { if (isStation) setLayoutMode('canvas'); }}
@@ -84,6 +84,7 @@ function PillSegment({ label, active, testId, onClick, borderLeft }: PillSegment
     <button
       type="button"
       data-testid={testId}
+      aria-pressed={active}
       onClick={onClick}
       style={{
         background: active ? 'var(--paper-3)' : 'transparent',
@@ -93,7 +94,8 @@ function PillSegment({ label, active, testId, onClick, borderLeft }: PillSegment
         cursor: active ? 'default' : 'pointer',
         fontFamily: 'var(--font-mono)',
         fontSize: 11,
-        color: active ? 'var(--ink)' : 'var(--ink-4)',
+        color: active ? 'var(--ink)' : 'var(--ink-3)',
+        fontWeight: active ? 600 : 500,
         letterSpacing: '0.04em',
         textTransform: 'uppercase' as const,
         whiteSpace: 'nowrap' as const,

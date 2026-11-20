@@ -346,6 +346,7 @@ export function useCliDispatch(): void {
           case 'sound.on':
           case 'sound.off':
           case 'sound.pack':
+          case 'sound.voice':
           case 'sound.volume':
           case 'sound.play': {
             ({ ok, message } = runSoundCommand(command, args as Record<string, unknown>));

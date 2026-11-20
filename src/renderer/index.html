@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Geist:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Geist:wght@300;400;500;600&family=Azeret+Mono:wght@500&family=Instrument+Serif:ital@0;1&display=swap"
       rel="stylesheet"
     />
     <!-- Startup splash (launch-experience.md F1–F3). Plain HTML so it paints
@@ -73,7 +73,11 @@
     </div>
     <script>
       // The pocket timer loads this same page: it never shows the splash.
-      if (new URLSearchParams(location.search).get('pocket') === '1') {
+      var boardSwitch = false;
+      try { boardSwitch = sessionStorage.getItem('krnl0-board-switch') === '1'; sessionStorage.removeItem('krnl0-board-switch'); } catch (e) {}
+      if (boardSwitch) window.__krnlBoardSwitch = true;
+      // Nor does a switch to another board: that is not a start (boards.md F9).
+      if (boardSwitch || new URLSearchParams(location.search).get('pocket') === '1') {
         var s = document.getElementById('boot-splash'); if (s) s.remove();
       } else {
         var bar = document.getElementById('bs-bar');

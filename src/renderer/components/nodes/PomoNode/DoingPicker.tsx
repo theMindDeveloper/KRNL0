@@ -170,7 +170,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
           {openTasks.length > shownOpen.length && <span style={{ ...mono, padding: '2px 10px' }}>+{openTasks.length - shownOpen.length} more: keep typing</span>}
           {doneAll.length > 0 && !q && (
             <button type="button" data-testid="pomo-now-show-done" onClick={() => setShowDone((v) => !v)}
-              style={{ ...mono, padding: '8px 10px 2px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+              style={{ ...mono, alignSelf: 'flex-start', margin: '8px 10px 2px', padding: '5px 10px', background: 'var(--paper-2)', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left' }}>
               {showDone ? 'Hide done' : `Show done (${doneAll.length})`}
             </button>
           )}

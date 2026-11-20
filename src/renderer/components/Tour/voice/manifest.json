@@ -587,8 +587,8 @@
       "plans-change"
     ]
   },
-  "1a6e56ce": {
-    "text": "One more thing. Every canvas shows the same plans, calendar, habits and timer. Notes, images and drawings belong to one canvas. Open this to see what's on each.",
+  "05022cdb": {
+    "text": "One more thing. You can keep separate boards, one for each part of your life. Every board has its own plans, calendar, habits and timer. Open this to see them.",
     "tours": [
       "plans-change"
     ]
@@ -695,8 +695,8 @@
       "modes"
     ]
   },
-  "fa9c484f": {
-    "text": "And the board grows: several canvases, frames to group cards, the Terminal with Claude Code, and weekly targets and goals for your habits!",
+  "a9e3189b": {
+    "text": "And there is more: separate boards, frames to group cards, the Terminal with Claude Code, and weekly targets and goals for your habits!",
     "tours": [
       "modes"
     ]
@@ -773,8 +773,8 @@
       "board"
     ]
   },
-  "774bbd9e": {
-    "text": "Need more room? Make another canvas here, one per project. Your windows are the same on every canvas.",
+  "e88d64e8": {
+    "text": "Need a separate space? Make another board here, one per project. Each board has its own plans, habits and calendar.",
     "tours": [
       "board"
     ]
@@ -783,6 +783,54 @@
     "text": "Drag from the dot on a card's side to another card, to put plans in order. The wire shows what comes next.",
     "tours": [
       "board"
+    ]
+  },
+  "fe598dae": {
+    "text": "Up here is the name of your board. A board is a whole space of its own, with its own to-dos, habits, calendar, timer history and analytics. Nothing is shared between boards.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "2b281e05": {
+    "text": "Press the name to open your boards.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "e764412f": {
+    "text": "Every line is one board, with how many plans and habits it holds. The tick marks the one you're in. Press another one, and the whole app moves there.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "a86a89e5": {
+    "text": "The two small buttons on a line rename a board, or delete it. The board you're in can't be deleted, and neither can your last one.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "48aa8214": {
+    "text": "Now press \"New board\".",
+    "tours": [
+      "boards"
+    ]
+  },
+  "5e17fb84": {
+    "text": "Give it a name, then choose. \"Start empty\" gives you a clean space. \"Copy my habits\" brings your habits along, starting from zero. Creating it takes you straight there, so this tour ends. Or press Next to keep looking.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "539497ee": {
+    "text": "One timer runs at a time. If it's still running in another board, a note appears up here, and one press takes you back to it. Reminders reach you from every board, with the board's name.",
+    "tours": [
+      "boards"
+    ]
+  },
+  "8b706560": {
+    "text": "That's boards! One per project, or one for work and one for home. You can also ask me to make one.",
+    "tours": [
+      "boards"
     ]
   },
   "b64a60c8": {

@@ -2979,3 +2979,155 @@ Typecheck clean; all tests pass. Checked as screenshots (Settings, the plan card
 **Files changed:** `TopBar/CanvasSwitcher.tsx`
 
 **Summary:** the "On every canvas / Only on this one" note under the canvas list is removed at the owner's request. What is shared is still said in the switcher's tooltip. Behaviour is unchanged: canvases still share plans, calendar, habits and the timer.
+
+## [2026-11-20] — Separate boards
+
+**Type:** Feature (Decision 49)
+**Branch:** `feat/separate-boards` (on `feat/unified-windows`)
+**Files changed:** `main/persistence/boards.ts` (new), `main/ipc/handlers.ts`, `main/preload.ts`, `renderer/env.d.ts`, `TopBar/BoardSwitcher.tsx` (new), `TopBar/index.tsx`, `store/boardsInfo.ts` (new), `PomoNode/index.tsx`, `PomoNode/PlannedNowChip.tsx`, `sys/commands/boards.ts` (new), `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, `Tour/tours.ts` + voice clips, `dev/previewBridge.ts`, tests (`tests/unit/main/boards.test.ts`, `windowFrame.test.ts`), docs (`06-requirements/boards.md`, Decision 49, `canvases.md`, `ui-simplification-summary.md`)
+
+**Summary:**
+- **Boards:** each board has its own todos, habits, calendar, timer history, time log and notes. The top-bar menu lists them with one fact each, makes a new one (empty or with your habits), renames and deletes. Opening one reloads the window onto it.
+- **Storage:** the open board is still `board.json` + `timelog/`; other boards are parked in `boards/<id>/` and swapped in on switch; `boards.json` is the list.
+- **Timer:** one at a time; a chip in the top bar says where it is still running, and the Timer refuses to start a second one.
+- **Migration:** several canvases become several boards once, with a copy of the old file kept and a one-time notice.
+- **CLI:** `board list / new / switch / rename / delete`.
+- **Tutorials:** three lines that described shared canvases now describe boards (re-recorded).
+
+Typecheck clean; all tests pass. Storage and commands tested (unit tests and an end-to-end run on a copy); the menu checked in the browser preview. Not yet used by the owner; the switch inside the real window was not pressed by me.
+
+## [2026-11-20] — Visual bugs: double close button, top bar, light-theme corners and window buttons
+
+**Type:** Bug Fix (UI)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `PomoNode/index.tsx`, `styles/window-frame.css`, `ui/LayoutModeToggle.tsx`, `TopBar/index.tsx`, `themes/manifests.ts`, `AnalyticsNode/index.tsx`, `main/ipc/handlers.ts`, `main/preload.ts`, `renderer/env.d.ts`, tests (`windowFrame.test.ts`, `AppChrome.scenarios.test.ts`)
+
+**Summary:**
+- **Timer header:** opening settings closes the spans log, so two × buttons never show; two icon buttons sit closer together.
+- **Top bar:** the window toggles, Station / Free, Fit, Help and Settings use the window standard (reading font, normal letters, filled, no outlines).
+- **Light theme corners:** the Analytics window drew a second border with a larger radius inside the frame, and the Pro light frame had a 90% white inset line; both left a bright crescent in the corner. Removed.
+- **Analytics header:** "Done 0 · Focus 3m" in normal letters.
+- **Window buttons (minimise, maximise, close):** they take the top bar's colours when the theme or style changes (they stayed dark with lime symbols in a light theme).
+
+Typecheck clean; all tests pass. Checked as screenshots in light and dark; the window-button colours can only be seen in the real window.
+
+## [2026-11-20] — Timer clock font and size, the layout switch, a flat Analytics header
+
+**Type:** Bug Fix + Feature (UI)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `PomoNode/ObserveDash.tsx`, `TopBar/index.tsx`, `ui/LayoutModeToggle.tsx`, `styles/window-frame.css`, `AnalyticsNode/index.tsx`, tests (`windowFrame.test.ts`)
+
+**Summary:**
+- **Timer clock:** the time is set in the reading font at weight 500 (chosen from twelve faces: plain zeros, equal-width digits), grows with the window (about a quarter of its width, 64 to 168 px), and its colon is two drawn dots centred on the digits (a typed colon sat low).
+- **Station / Free:** a track with a raised thumb. **Fit** sits before the switch, so the switch no longer shifts when Fit appears in the Free layout.
+- **Analytics:** the header and the window body are flat (its own gradient read as a shadow under the header).
+
+Typecheck clean; all tests pass. Checked as screenshots in light and dark at three window sizes.
+
+## [2026-11-20] — Analytics frame restored; the Timer's clock font
+
+**Type:** Bug Fix + Feature (UI)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `AnalyticsNode/AnalyticsMother.tsx`, `PomoNode/ObserveDash.tsx`, `styles/tokens.css`, `index.html`, tests (`windowFrame.test.ts`)
+
+**Summary:**
+- **Analytics:** its frame was set to transparent because the dashboard used to paint its own background and border; after those were removed the window had no background in the Free layout. It now uses the standard frame like every window.
+- **Timer clock:** a font of its own, `--font-clock` (Azeret Mono 500): monospaced like the rest of the app, with plain zeros. Chosen from 28 faces compared on the app's colours. The time is a little smaller once it shows hours, so it always fits.
+
+Typecheck clean; all tests pass. Checked as screenshots in both layouts, light and dark.
+
+## [2026-11-20] — Switching boards no longer shows the start-up screen
+
+**Type:** Bug Fix
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `main/ipc/handlers.ts`, `renderer/index.html`, `renderer/App.tsx`, `renderer/env.d.ts`, `docs/06-requirements/boards.md` (F9), tests (`windowFrame.test.ts`)
+
+**Summary:**
+- A board switch reloads the window, and every reload played the start-up screen and then the launch dialogs. The main process now marks the reload as a board switch; the page removes the start-up screen before it is painted and skips What's new / Welcome back. A real start is unchanged.
+
+Typecheck clean; all tests pass.
+
+## [2026-11-20] — No hello on a board switch; AI voice volume in Settings
+
+**Type:** Bug Fix + Feature
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `Orb/index.tsx`, `sfx/soundSettings.ts`, `Assistant/VoicePlayer.ts`, `Tour/TourHost.tsx`, `TopBar/SoundSection.tsx`, `sfx/soundCli.ts`, `store/useCliDispatch.ts`, `sys/parser.ts`, `sys/SysFacade.ts`, `shared/cli/commandRegistry.ts`, docs (`ui-sounds.md` F9, `boards.md` F9), tests
+
+**Summary:**
+- **Board switch:** the window reload for a switch replayed the AI's spoken hello. It now stays silent on a switch.
+- **Two volumes in Settings → Sounds:** **App sounds** (the existing slider, renamed) and a new **AI voice** slider (0–100, default 60; the voice was fixed at 85). It covers the hello, the voice's replies and the tour guide; 0 is silent; moving it changes a line already being spoken. CLI: `sound voice <0-100>`.
+
+Typecheck clean; all tests pass.
+
+## [2026-11-20] — Pre-release review of separate boards: fixes
+
+**Type:** Bug Fix
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `main/persistence/boards.ts`, `main/ipc/handlers.ts`, `main/reminders.ts`, `Canvas/commandDispatch.ts`, `sys/commands/pomo.ts`, `PomoNode/DoingPicker.tsx`, `ui/TaskTagPicker.tsx`, `styles/launch.css`, docs (`boards.md` F10, F11), tests (`boards.test.ts`)
+
+**Summary:**
+- **A failed switch is undone completely.** A file that could not be moved (locked, disk full) or a list that could not be written used to be able to leave the folder without its board, and the save guard stayed on, dropping every later save without a word. Every move is now undone in reverse and the guard is always released.
+- **A lost list of boards finds the parked boards again** from the folders on disk, instead of listing only the open one.
+- **One timer at a time, every way to start:** the rule was only checked on three buttons. It is now checked where every start goes through (a task, the calendar, a shortcut) and in `krnl pomo start`.
+- **Reminders from every board:** a plan in a board that is not open now reminds, and the notification names the board.
+- **Copied habits start today:** rest days, pauses and the old start date no longer come along, so no earlier day reads as missed.
+- **The floating timer follows a board switch.**
+- **No underlined links:** "Show done" in the two task pickers and the small actions in the launch dialogs are quiet filled buttons.
+
+Typecheck clean; all tests pass.
+
+## [2026-11-20] — Second pre-release review: data safety
+
+**Type:** Bug Fix
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `main/persistence/boards.ts`, `main/persistence/board.ts`, `main/appState.ts`, `main/ipc/handlers.ts`, `ui/WhenPopover.tsx`, tests (`boards.test.ts`, `boardSwitchSplash.test.ts`)
+
+**Summary:**
+- **A board switch waits out a short file lock** (antivirus, a sync client) like every board write does, instead of failing at once.
+- **The safety copy before an update covers every board**, not only the open one.
+- **Canvases → boards:** content with no canvas stamp goes with the canvas that was open (where the app showed it), not with the first.
+- **A copied habit is a new habit** with its own id.
+- **Each board's time log** gets "app closed" when it is left and "app opened" when it is arrived at.
+- **A plan card keeps what you changed when you click elsewhere.** Before, only Save kept it; a click outside threw the day, time or deadline away without a word. Escape and the close button still cancel.
+- Walked as a user in the preview: add a plan, give it a day and a deadline, tick and untick, add a habit and tick it, start and stop the timer. Each step was checked in the saved board.
+
+Typecheck clean; all tests pass.
+
+## [2026-11-20] — Narrow windows fit their headers; tutorials match the new UI; connectors only on tasks
+
+**Type:** Bug Fix + Feature (UI)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `styles/window-frame.css`, `CalendarNode/WeekView.tsx`, `store/scheduleActions.ts`, `Tour/TourHost.tsx`, `Tour/tours.ts`, `Canvas/rfAdapters.tsx`, docs (`decisions.md` Decision 50), tests
+
+**Summary:**
+- **Narrow windows (four in a row on a laptop).** The standard header did not fit in a window of about 310 to 380 px: the Calendar's name was cut to "Cal…", its views ran over the edge, Habits showed "W.", the Clock's date was clipped. The header now gives way in a fixed order: the fact beside the name goes, the views get tighter, and in the narrowest windows a switch of four views shows first letters. The name is never shortened.
+- **First tutorial, "plan it" step.** In a narrow window the Calendar's Day view turned into its list, so the step pointed at a column that was not there. The step now always shows the hours.
+- **Tutorials checked against the new UI:** every selector, every step of all 14 tours run in Easy and Advanced. One step pointed at a label that was renamed ("Pomo mode" → "Timer mode"); the written button names now match the buttons (Start, Break, Back to work, Stop, Pause, End break, Sessions, Stopwatch). No voice line changed.
+- **Connectors only on task cards** (Decision 50).
+
+Typecheck clean; all tests pass.
+
+## [2026-11-20] — A tutorial for separate boards
+
+**Type:** Feature
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `Tour/tours.ts`, `Tour/voice/` (8 clips, `manifest.json`), `TopBar/BoardSwitcher.tsx`, `shared/cli/commandRegistry.ts`, docs (`boards.md` F12), tests (`tours.test.tsx`)
+
+**Summary:**
+- **Separate boards** tour (`krnl tour start boards`, Advanced): the name in the top bar, opening the menu, what a line shows, rename and delete, New board with its two ways to start, one timer at a time and reminders from every board. Two steps wait for the real press. Voiced.
+- The board menu stays open while the guide's own card is pressed, so a tour step can point inside it.
+
+Typecheck clean; all tests pass. Run once in the preview, step by step, with real presses.
+
+## [2026-11-20] — Release notes for 0.12 written in (approved by the owner)
+
+**Type:** Docs + Feature (launch experience)
+**Branch:** `feat/separate-boards` (PR #258)
+**Files changed:** `shared/whatsnew.ts`, `Launch/WhatsNewDialog.tsx`, `assets/launch/plate-boards.webp`, `plate-windows.webp`, `plate-cards.webp`, `docs/releases/v0.12.0.md`, `CHANGELOG.md`, tests
+
+**Summary:**
+- **What's new for 0.12:** three slides (One board per project; The same place, in every window; A day, a time, a deadline. One card.), each with its picture, and twelve smaller changes. Drafted on the design board (row 15) and approved by the owner on 2026-11-20.
+- "Show me" on the first slide starts the boards tutorial; it is not offered in Easy, where that tutorial does not exist.
+- The release page and the changelog entry are written. **Not done here:** the version bump, the tag and the publish. They belong to the release PR and wait for the owner's OK.
+
+Typecheck clean; all tests pass.

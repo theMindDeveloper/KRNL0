@@ -6,7 +6,7 @@
 
 import { pickerOpen } from '../../ui/Popover';
 import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
-import { CALENDAR_REVEAL_EVENT, showTask, unscheduleTask } from '../../../store/scheduleActions';
+import { CALENDAR_LAYOUT_EVENT, CALENDAR_REVEAL_EVENT, showTask, unscheduleTask } from '../../../store/scheduleActions';
 import { highlightElement } from '../../../store/highlight';
 import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
@@ -2328,6 +2328,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // Narrow day view → agenda. A proportional hour grid can't show parallel
   // or short tasks readably in ~200px; a time-ordered list can.
   const [layoutPref, setLayoutPref] = useState<'auto' | 'list' | 'grid'>('auto');
+  // A tour step that says "drag it onto a time" needs the hours, however narrow the window is.
+  useEffect(() => {
+    const on = (e: Event): void => {
+      const pref = (e as CustomEvent<{ pref?: string }>).detail?.pref;
+      if (pref === 'grid' || pref === 'auto' || pref === 'list') setLayoutPref(pref);
+    };
+    window.addEventListener(CALENDAR_LAYOUT_EVENT, on);
+    return () => window.removeEventListener(CALENDAR_LAYOUT_EVENT, on);
+  }, []);
   const agendaScrolledFor = useRef<string | null>(null);
   const narrowDay = singleDay && gridW > 0 && gridW < 360;
   const useAgenda = singleDay && (layoutPref === 'list' || (layoutPref === 'auto' && narrowDay));

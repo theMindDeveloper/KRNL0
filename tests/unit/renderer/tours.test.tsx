@@ -52,7 +52,7 @@ describe('Easy and Advanced tour — a live demo', () => {
 
 describe('tour catalogue', () => {
   it('has a tour for each part of the app', () => {
-    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'on-track', 'plans-change', 'analytics', 'modes', 'board', 'terminal']);
+    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'on-track', 'plans-change', 'analytics', 'modes', 'board', 'boards', 'terminal']);
     for (const t of TOURS) {
       expect(t.steps.length).toBeGreaterThan(1);
       for (const s of t.steps) expect(s.text.length).toBeGreaterThan(10);
@@ -92,7 +92,7 @@ describe('TourHost', () => {
     // go to the "press WEEK" step
     act(() => { fireEvent.click(screen.getByTestId('tour-next')); });
     act(() => { fireEvent.click(screen.getByTestId('tour-next')); });
-    expect(screen.getByTestId('tour-text').textContent).toMatch(/WEEK/);
+    expect(screen.getByTestId('tour-text').textContent).toMatch(/Week/);
     expect(screen.queryByTestId('tour-next')).toBeNull(); // waiting, no Next
     act(() => { target.click(); vi.advanceTimersByTime(400); });
     expect(screen.getByTestId('tour-text').textContent).toMatch(/Each clock is a day/);
@@ -141,5 +141,21 @@ describe('Habits & Routines tour (routines.md F13)', () => {
     expect(added(boardWith([{ ...routine, kind: undefined }]), boardWith([]))).toBe(false); // a habit is not a routine
     expect(skipped(boardWith([{ ...routine, exceptions: [{ date: '2026-11-09', skip: true }] }]), boardWith([routine]))).toBe(true);
     expect(ended(boardWith([{ ...routine, endsOn: '2026-11-08' }]), boardWith([routine]))).toBe(true);
+  });
+});
+
+describe('Separate boards tour (boards.md F12)', () => {
+  const boards = tourById('boards')!;
+  it('is an Advanced tour that opens the menu and the New board form by doing it', () => {
+    expect(boards.onlyIn).toBe('advanced');
+    const waits = boards.steps.filter((s) => s.waitFor && 'click' in s.waitFor).map((s) => (s.waitFor as { click: string }).click);
+    expect(waits).toEqual(['[data-testid="topbar-canvas-switcher"]', '[data-testid="board-new"]']);
+    expect(boards.steps.some((s) => s.target === '[data-testid="board-new-form"]')).toBe(true);
+  });
+  it('every step has a line for the voice, with no tags', () => {
+    for (const s of boards.steps) {
+      expect(s.say && s.say.length > 10).toBe(true);
+      expect(s.say).not.toMatch(/\[[A-Za-z ]+\]/);
+    }
   });
 });

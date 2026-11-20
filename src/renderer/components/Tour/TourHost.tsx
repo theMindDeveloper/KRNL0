@@ -14,7 +14,7 @@ import type { Board } from '../../../shared/types';
 import type { MotherNodeConfig } from '../../../shared/types/board';
 import { useBoardStore } from '../../store/boardStore';
 import { saveBoard } from '../../store/eventLog';
-import { CALENDAR_REVEAL_EVENT, focusNode } from '../../store/scheduleActions';
+import { CALENDAR_LAYOUT_EVENT, CALENDAR_REVEAL_EVENT, focusNode } from '../../store/scheduleActions';
 import { beginPractice, keepPractice, practiceActive, practiceSummary, removePractice, type PracticeSummary } from '../../store/tourPractice';
 import { addExamples, removeExamples } from '../../store/tourExamples';
 import { isStationHidden } from '../Station/stationVisibility';
@@ -23,6 +23,7 @@ import { stepsFor, tourById, type Tour } from './tours';
 import { setGuideSpeaking, setTourActive, setTourAnchor } from './tourAnchor';
 import { fillTour, spokenText, voiceKey } from './tourVoice';
 import { voicePlayer } from '../Assistant/VoicePlayer';
+import { voiceLevel } from '../../sfx/soundSettings';
 
 // The guide's recorded voice (tourVoice.ts): ./voice/<key>.mp3, bundled by Vite.
 const VOICE_CLIPS = import.meta.glob('./voice/*.mp3', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
@@ -281,11 +282,18 @@ function calendarToToday(): () => void {
     const send = makeCommandHandler(cal.id);
     if (own !== 'day') send('calendar.setView', { view: 'day' });
     send('calendar.setAnchor', { date: todayYMD() });
+    // The hours, not the narrow window's list: the step says "at a time later than now".
+    const layout = (pref: string): void => { window.dispatchEvent(new CustomEvent(CALENDAR_LAYOUT_EVENT, { detail: { pref } })); };
+    layout('grid');
     window.setTimeout(() => {
+      layout('grid');
       window.dispatchEvent(new CustomEvent(CALENDAR_REVEAL_EVENT, { detail: { startISO: new Date().toISOString() } }));
     }, 150);
   });
-  return () => { if (own && own !== 'day') sendTo(own); };
+  return () => {
+    window.dispatchEvent(new CustomEvent(CALENDAR_LAYOUT_EVENT, { detail: { pref: 'auto' } }));
+    if (own && own !== 'day') sendTo(own);
+  };
 }
 
 /** Does the tour ask the user to make or change things (practice)? */
@@ -537,11 +545,11 @@ export function TourHost(): JSX.Element | null {
     if (!voiceReady || !voiceOn || !step) return;
     const mode = (ownMode.current ?? uiMode) === 'easy' ? 'easy' : 'advanced';
     const url = clipFor(voiceKey(spokenText(step.text, mode, step.say, timer)));
-    if (!url) return;
+    if (!url || voiceLevel() <= 0) return;
     // One voice at a time: the orb's own lines (its greeting) stop for the guide.
     voicePlayer.stop();
     const a = new Audio(url);
-    a.volume = 0.9;
+    a.volume = 0.9 * voiceLevel();
     audioRef.current = a;
     // The orb speaks while the guide talks.
     a.addEventListener('playing', () => setGuideSpeaking(true));

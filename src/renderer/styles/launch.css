@@ -30,9 +30,9 @@
 .ln-btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); font-weight: 600; box-shadow: inset 0 0 0 1px var(--btn-primary-ring); }
 .ln-btn--primary:hover { background: var(--btn-primary-bg-hover, var(--btn-primary-bg)); color: var(--btn-primary-fg); }
 .ln-btn--line { box-shadow: inset 0 0 0 1px var(--paper-3); color: var(--ink); }
-.ln-link { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-size: 11.5px; color: var(--ink-3); cursor: pointer;
-  text-decoration: underline; text-underline-offset: 3px; }
-.ln-link:hover { color: var(--ink); }
+/* A small action inside a sentence: a quiet filled button, never an underlined link. */
+.ln-link { appearance: none; border: 0; background: var(--paper-2); padding: 3px 8px; border-radius: 6px; font: inherit; font-size: 11.5px; color: var(--ink-2); cursor: pointer; }
+.ln-link:hover { background: var(--paper-3); color: var(--ink); }
 
 /* What's new */
 .ln-wn { width: 920px; height: 568px; display: flex; }

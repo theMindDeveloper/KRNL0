@@ -30,6 +30,7 @@ import { DoingPicker, type DoingChoice } from './DoingPicker';
 import { SpanLog } from './SpanLog';
 import { useEasyMode } from '../../../store/uiMode';
 import { ObserveDash, TimerClock } from './ObserveDash';
+import { blockedByOtherBoard } from '../../../store/boardsInfo';
 import { CardGroup, cardLabel, cardRow, cardStepBtn, cardStepper } from '../../ui/addCard';
 import { useAwayGap } from './useAwayGap';
 import { Switch } from '../../ui/Switch';
@@ -181,6 +182,8 @@ export function PomoNode({
 
   // Issue #166 — observer-model controls (dispatch the new verbs).
   const handlePrimary = () => {
+    // One timer at a time across boards (Decision 49): the top-bar chip says where it runs.
+    if ((state.status === 'idle' || state.status === 'done') && blockedByOtherBoard()) return;
     if (state.status === 'idle' || state.status === 'done') onCommand('pomo.start');
     else if (state.status === 'running') onCommand('pomo.pause');
     else if (state.status === 'paused') onCommand('pomo.resume');
@@ -434,7 +437,7 @@ export function PomoNode({
           onClick={(e) => {
             e.stopPropagation();
             if (gearOpen) closeGearAndClearActive();
-            else openGear();
+            else { setLogOpen(false); openGear(); }
           }}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -822,7 +825,7 @@ export function PomoNode({
                 <button
                   type="button"
                   data-testid="pomo-new"
-                  onClick={() => { onCommand('pomo.tag', { taskId: null }); onCommand('pomo.start'); }}
+                  onClick={() => { if (blockedByOtherBoard()) return; onCommand('pomo.tag', { taskId: null }); onCommand('pomo.start'); }}
                   className="pomo-btn ghost"
                   style={{ ...ghostBtnStyle, flex: '0 0 auto' }}
                   title="Start something new — you'll be asked what it was when it ends"

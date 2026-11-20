@@ -29,7 +29,7 @@ describe('F1 — packs and defaults', () => {
 
   it('ships snd01, zen and crisp; crisp is the default, sounds on', () => {
     expect([...SOUND_PACK_IDS]).toEqual(['snd01', 'zen', 'crisp']);
-    expect(parseSoundSettings(null)).toEqual({ pack: 'crisp', volume: 70, enabled: true });
+    expect(parseSoundSettings(null)).toEqual({ pack: 'crisp', volume: 70, enabled: true, voiceVolume: 60 });
   });
 
   it('every pack has a bundled sound for every moment', () => {
@@ -117,12 +117,12 @@ describe('F5 — settings persist', () => {
     useSoundSettings.getState().setPack('crisp');
     useSoundSettings.getState().setVolume(40);
     useSoundSettings.getState().setEnabled(false);
-    expect(parseSoundSettings(localStorage.getItem(SOUND_SETTINGS_KEY))).toEqual({ pack: 'crisp', volume: 40, enabled: false });
+    expect(parseSoundSettings(localStorage.getItem(SOUND_SETTINGS_KEY))).toEqual({ pack: 'crisp', volume: 40, enabled: false, voiceVolume: 60 });
   });
 
   it('bad stored values fall back to defaults; volume is clamped', () => {
     expect(parseSoundSettings('not json')).toEqual(DEFAULT_SOUND_SETTINGS);
-    expect(parseSoundSettings('{"pack":"nope","volume":250,"enabled":"yes"}')).toEqual({ pack: 'crisp', volume: 100, enabled: true });
+    expect(parseSoundSettings('{"pack":"nope","volume":250,"enabled":"yes"}')).toEqual({ pack: 'crisp', volume: 100, enabled: true, voiceVolume: 60 });
   });
 });
 
@@ -238,12 +238,27 @@ describe('F7 — sys sound', () => {
     expect(runSoundCommand('sound.off', {}).ok).toBe(true);
     const s = useSoundSettings.getState();
     expect([s.pack, s.volume, s.enabled]).toEqual(['zen', 30, false]);
-    expect(runSoundCommand('sound.status', {}).message).toBe('sound: off · pack zen (Zen) · volume 30');
+    expect(runSoundCommand('sound.status', {}).message).toBe('sound: off · pack zen (Zen) · volume 30 · voice 60');
   });
 
   it('rejects unknown packs, moments and bad volumes', () => {
     expect(runSoundCommand('sound.pack', { pack: 'industrial' }).ok).toBe(false);
     expect(runSoundCommand('sound.play', { moment: 'explode' }).ok).toBe(false);
     expect(runSoundCommand('sound.volume', { volume: 101 }).ok).toBe(false);
+  });
+});
+
+describe('AI voice volume (ui-sounds.md F9)', () => {
+  it('is stored with the other sound settings, clamped, default 60', () => {
+    expect(parseSoundSettings('{"voiceVolume":25}').voiceVolume).toBe(25);
+    expect(parseSoundSettings('{"voiceVolume":900}').voiceVolume).toBe(100);
+    expect(parseSoundSettings('{"voiceVolume":"loud"}').voiceVolume).toBe(60);
+  });
+  it('CLI: sound voice <0-100>', () => {
+    expect(SysParser.parse(['sound', 'voice', '20'])).toEqual({ kind: 'sound', sub: 'voice', volume: 20 });
+    expect(runSoundCommand('sound.voice', { volume: 20 }).ok).toBe(true);
+    expect(useSoundSettings.getState().voiceVolume).toBe(20);
+    expect(runSoundCommand('sound.voice', { volume: 140 }).ok).toBe(false);
+    expect(runSoundCommand('sound.status', {}).message).toContain('voice 20');
   });
 });

@@ -272,6 +272,22 @@ export function installPreviewBridge(): void {
     assetRead: async () => null,
     assetDelete: noop,
     onBoardChanged: () => () => {},
+    // Separate boards (Decision 49): a fixed list for render checks; `?rec=1` adds a timer running elsewhere.
+    boardsList: async () => ({
+      activeId: 'b-uni',
+      boards: [
+        { id: 'b-main', name: 'Main', active: false, plans: 18, habits: 5 },
+        { id: 'b-uni', name: 'Uni', active: true, plans: 6, habits: 2 },
+        { id: 'b-side', name: 'Side project', active: false, plans: 0, habits: 0 },
+      ],
+      recording: new URLSearchParams(location.search).get('rec') ? { boardId: 'b-main', startedAt: new Date(Date.now() - 760_000).toISOString(), label: '' } : null,
+      notice: new URLSearchParams(location.search).get('notice') ? { kept: 'Main', others: ['Research', 'Ideas'] } : null,
+    }),
+    boardsCreate: async (name: string) => ({ ok: true, message: '', board: { id: 'b-new', name } }),
+    boardsRename: async (_ref: string, name: string) => ({ ok: true, message: '', board: { id: 'b-x', name } }),
+    boardsDelete: async () => ({ ok: true, message: '' }),
+    boardsSwitch: async () => ({ ok: true, message: '' }),
+    boardsAckNotice: async () => {},
     clipboardReadText: async () => '',
     clipboardWriteText: noop,
     sysRun: async () => ({ ok: false, message: 'preview mode — no krnl' }),

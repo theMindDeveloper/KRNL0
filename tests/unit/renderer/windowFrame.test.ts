@@ -315,3 +315,81 @@ describe('Two styles, one clock, no small extras (owner, 2026-11-20)', () => {
     expect(read('components/ui/SpanEditor.tsx')).not.toContain('<LogTimeGaps');
   });
 });
+
+describe('Separate boards (Decision 49, boards.md)', () => {
+  const root = join(process.cwd(), 'src');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('the top bar shows the board menu, not the canvas menu', () => {
+    const bar = read('renderer/components/TopBar/index.tsx');
+    expect(bar).toContain('<BoardSwitcher quiet={easyMode} />');
+    expect(bar).not.toContain('<CanvasSwitcher');
+  });
+  it('the menu has no explanatory note, and a new board asks: empty, or copy my habits', () => {
+    const m = read('renderer/components/TopBar/BoardSwitcher.tsx');
+    expect(m).toContain("'Start empty'");
+    expect(m).toContain("'Copy my habits'");
+    expect(m).not.toMatch(/on every (canvas|board)/i);
+  });
+  it('one timer at a time: the Timer checks the other boards before it starts', () => {
+    expect(read('renderer/components/nodes/PomoNode/index.tsx')).toContain("(state.status === 'idle' || state.status === 'done') && blockedByOtherBoard()");
+    expect(read('renderer/components/TopBar/BoardSwitcher.tsx')).toContain('data-testid="board-recording-chip"');
+  });
+  it('the window cannot save its old board over the new one while a switch is in flight', () => {
+    const h = read('main/ipc/handlers.ts');
+    expect(h).toContain("if (boardsSwitching) return; // the window is about to reload onto another board");
+    expect(h).toContain('boardsSwitching = false;');
+  });
+  it('krnl has the board commands', () => {
+    const reg = read('shared/cli/commandRegistry.ts');
+    for (const u of ['board list [--json]', 'board new <name> [--copy-habits]', 'board switch <id|name>', 'board rename <id|name> <new name>', 'board delete <id|name>']) expect(reg).toContain(u);
+  });
+});
+
+describe('Visual bugs fixed (owner list, 2026-11-20)', () => {
+  const root = join(process.cwd(), 'src');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('Timer header: opening settings closes the spans log, so there is never a second ×', () => {
+    expect(read('renderer/components/nodes/PomoNode/index.tsx')).toContain('else { setLogOpen(false); openGear(); }');
+  });
+  it('the top bar follows the window standard: reading font, normal letters, no outlines', () => {
+    const css = read('renderer/styles/window-frame.css');
+    expect(css).toContain('[data-testid="topbar"] .krnl-topbar-btn {');
+    expect(css).toContain('[data-testid="topbar-panel-toggles"] .krnl-panel-toggle {');
+    const t = read('renderer/components/ui/LayoutModeToggle.tsx');
+    expect(t).toContain('label="Station"');
+    expect(t).toContain('label="Free"');
+  });
+  it('no second frame inside a window: Analytics draws no border of its own, Pro light has no inset highlight', () => {
+    expect(read('renderer/components/nodes/AnalyticsNode/index.tsx')).toContain("borderRadius: 'calc(var(--k-mother-radius, 8px) - 1px)'");
+    expect(read('renderer/themes/manifests.ts')).toContain("'--k-mother-shadow': '0 0 0 1px #cfcfca, 0 18px 36px rgba(0,0,0,0.10)',");
+  });
+  it('the window buttons take the top bar colours (no dark block in a light theme)', () => {
+    expect(read('main/ipc/handlers.ts')).toContain("ipcMain.handle('window:titleBarColors'");
+    expect(read('renderer/components/TopBar/index.tsx')).toContain('window.krnl.titleBarColors(bg, ink)');
+  });
+});
+
+describe('The Timer clock, the layout switch and a flat Analytics header (owner, 2026-11-20)', () => {
+  const root = join(process.cwd(), 'src/renderer');
+  const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+  it('the time is set in the clock font, grows with the window, and its colon is two drawn dots centred on the digits', () => {
+    const d = read('components/nodes/PomoNode/ObserveDash.tsx');
+    expect(d).toContain("text.length > 5 ? 'clamp(44px, 14cqw, 112px)' : 'clamp(60px, 20cqw, 152px)'");
+    expect(d).toContain("alignItems: 'center', fontFamily: 'var(--font-clock)'");
+    expect(d).toContain('data-testid="pomo-colon" role="presentation"');
+  });
+  it('Fit sits before the Station / Free switch, so the switch never moves when Fit appears', () => {
+    const bar = read('components/TopBar/index.tsx');
+    expect(bar.indexOf('testId="topbar-fit"')).toBeGreaterThan(0);
+    expect(bar.indexOf('testId="topbar-fit"')).toBeLessThan(bar.indexOf('<LayoutModeToggle />'));
+  });
+  it('the switch is a track with a raised thumb', () => {
+    expect(read('styles/window-frame.css')).toContain('[data-testid="layout-mode-toggle"] > button[aria-pressed="true"] {');
+    expect(read('components/ui/LayoutModeToggle.tsx')).toContain('aria-pressed={active}');
+  });
+  it('the Analytics header is flat: no gradient, no shadow', () => {
+    const a = read('components/nodes/AnalyticsNode/index.tsx');
+    expect(a).toContain('The same flat header as every window: no gradient, no shadow');
+    expect(a).not.toContain('inset 0 -1px 0 rgba(255,255,255,0.03)');
+  });
+});

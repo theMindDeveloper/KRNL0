@@ -1,5 +1,7 @@
 # Canvases (free content per canvas, shared mother data)
 
+> **Superseded in the app's UI by [boards.md](boards.md) (Decision 49, 2026-11-20).** The top bar now lists separate boards; a board has one canvas. The model below still describes `krnl canvas …` and the data inside one board.
+
 *ADR: [Decision 33](../03-architecture/decisions.md)*
 
 ## Functional Requirements

@@ -94,7 +94,9 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   const [vLocal, setVLocal] = useState<WhenValue>(value);
   // Controlled (adding a plan): the parent's value is the card's value.
   const v = onChange ? value : vLocal;
-  const setV = (f: (p: WhenValue) => WhenValue) => { const next = f(v); if (onChange) onChange(next); else setVLocal(next); };
+  // Something was changed in this card: a click elsewhere keeps it (only Escape and × cancel).
+  const touched = useRef(false);
+  const setV = (f: (p: WhenValue) => WhenValue) => { const next = f(v); touched.current = true; if (onChange) onChange(next); else setVLocal(next); };
   const [timeText, setTimeText] = useState(value.time ?? '');
   const [timeTouched, setTimeTouched] = useState(false);
   // While adding, a time typed in the words shows here until the card's own field is used.
@@ -102,6 +104,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   const setTime = (t: string) => {
     setTimeText(t);
     setTimeTouched(true);
+    touched.current = true;
     if (onChange) { const pt = t.trim() ? parseTime(t) : null; onChange({ ...v, day: v.day ?? (pt ? today : null), time: pt ?? null }); }
   };
   const [weekOffset, setWeekOffset] = useState(0);
@@ -211,7 +214,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
 
   return createPortal(
     <>
-      {!anchorAbove && <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />}
+      {!anchorAbove && <div data-testid="when-backdrop" onMouseDown={(e) => { e.stopPropagation(); if (touched.current && !onChange) apply(); else onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />}
       <div
         ref={cardRef}
         data-testid="when-popover"

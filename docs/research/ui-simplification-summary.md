@@ -255,6 +255,24 @@ I went through Advanced and Easy again, window by window, and fixed what stood o
 
 **Costs:** the six hidden styles and the eight other clock faces are still in the code, unused; removing them properly is a clean-up for later. Making a repeating event from the habit card is no longer one press (use the Calendar's +, Repeats).
 
+## 21. Separate boards (you said Build)
+
+**What:** the menu at the top left now lists **boards**. Each board is complete on its own: its own todos, habits, calendar, timer history, analytics and notes. Nothing is shared between them, so the menu has no explanatory text.
+
+**Where:** the top bar, left. Press the name to see your boards, each with one fact ("18 plans · 5 habits"). **New board** asks for a name and whether to start empty or copy your habits.
+
+**The timer:** one at a time. If you leave a board while its timer runs, the other boards show "Recording in Main 12:40" in the top bar; press it to go back. Starting a second timer is refused.
+
+**Your existing canvases:** on the first start after this change, the app turns them into boards once and tells you. The first canvas keeps all your plans, habits and recorded time; the others keep their notes and drawings and start with empty lists. A copy of the file as it was is saved beside it (`board.json.before-boards-…`).
+
+**Commands:** `krnl board list`, `board new <name> [--copy-habits]`, `board switch`, `board rename`, `board delete`.
+
+**Why this way:** the open board keeps its files exactly where they were and the other boards wait in their own folders, so nothing else in the app had to change how it reads your data. That made it safe to build quickly.
+
+**Not verified by me:** I tested the storage and the commands (16 tests, and a full run of the commands on a copy), and the menu in the browser preview. I could not press the menu inside the real app window, so the first real switch is yours to try.
+
+**Limits:** reminders fire only for the open board; the chip opens the recording board but does not stop its timer from afar; deleted boards are kept in a folder and not cleaned up.
+
 ## Your three answers
 
 **Chains: yes.** Done (section 7).
