@@ -103,7 +103,8 @@ export const useServerUpdateStore = create<ServerUpdateStore>(() => ({ update: n
 /** Reads the server's update state (`check` asks GitHub again on the server). */
 export async function refreshServerUpdate(check = false): Promise<ServerUpdate | null> {
   const raw = await window.krnl?.syncServer?.(check).catch(() => null);
-  const update = raw && typeof raw === 'object' && 'current' in raw ? readServerUpdate(raw) : (raw as ServerUpdate | null) ?? null;
+  // Desktop and web already normalise it (readServerUpdate); doing it twice would drop the Linux command.
+  const update = raw && typeof raw === 'object' && 'channel' in raw && 'commandLinux' in raw ? (raw as ServerUpdate) : readServerUpdate(raw);
   useServerUpdateStore.setState({ update });
   return update;
 }
@@ -119,10 +120,12 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
  * Follows a running update until it is done, failed or rolled back. The server
  * restarts meanwhile, so failed reads are expected; gives up after `maxMs`.
  */
-export async function followServerUpdate(maxMs = 4 * 60_000, everyMs = 2000): Promise<ServerUpdate | null> {
+export async function followServerUpdate(maxMs = 20 * 60_000, everyMs = 2000): Promise<ServerUpdate | null> {
   useServerUpdateStore.setState({ following: true });
-  const startedAt = Date.now();
-  const until = startedAt + maxMs;
+  // The job before this request: a job is this update's once it differs (the server's own
+  // timestamps, so the two clocks never have to agree).
+  const before = useServerUpdateStore.getState().update?.job?.at ?? null;
+  const until = Date.now() + maxMs;
   let last: ServerUpdate | null = null;
   let sawRunning = false;
   try {
@@ -135,7 +138,7 @@ export async function followServerUpdate(maxMs = 4 * 60_000, everyMs = 2000): Pr
       if (state === 'running') { sawRunning = true; continue; }
       // The request is picked up within a minute (Docker) or at once (Linux); until
       // then the job shown is the last one, from before this request.
-      const fresh = !!u.job && Date.parse(u.job.at) >= startedAt - 5000;
+      const fresh = !!u.job && u.job.at !== before;
       if (state === 'idle' || (!sawRunning && !fresh)) continue;
       return u;
     }
