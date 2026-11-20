@@ -50,6 +50,8 @@ import type { Node } from '../../../shared/types/node';
 import { dividers, snapPercent, snapRow, type RowLayout } from './softSnap';
 import { restoredSizes, restoredSizesAround } from './restoredSizes';
 import { bottomUnchanged, columnsUnchanged, rowUnchanged, useSnapshot } from './layoutGeometry';
+import { GridStationLayout } from './GridStationLayout';
+import { CellWrapper, EmptyShellHint } from './StationShell';
 
 const PANEL_IDS = {
   outerTop:    'station-top-row',
@@ -104,7 +106,13 @@ const TOP_ROW_DEFS: ReadonlyArray<{
 // isStationHidden moved to ./stationVisibility; re-exported for existing callers.
 export { isStationHidden } from './stationVisibility';
 
+/** Decision 52 — the Station picks its arrangement from the saved preset. */
 export function StationLayout() {
+  const preset = useBoardStore((s) => s.board?.layoutGeometry?.station?.preset);
+  return preset === 'grid' ? <GridStationLayout /> : <ClassicStationLayout />;
+}
+
+function ClassicStationLayout() {
   const panelSlot = useFrameTheme().manifest.slots.panelToggles;
   const setLayoutGeometry = useBoardStore((s) => s.setLayoutGeometry);
   const storedGeometry = useBoardStore((s) => s.board?.layoutGeometry?.station);
@@ -171,6 +179,7 @@ export function StationLayout() {
     if (rowUnchanged(current, rowFraction)) return;
     setLayoutGeometry({
       station: {
+        ...current,
         rowFraction,
         columnFractions: current?.columnFractions ?? [],
         rightColumnSplit: current?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
@@ -189,6 +198,7 @@ export function StationLayout() {
     if (columnsUnchanged(current, columnFractions)) return;
     setLayoutGeometry({
       station: {
+        ...current,
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
         columnFractions,
         rightColumnSplit: current?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
@@ -207,6 +217,7 @@ export function StationLayout() {
     for (const [id, size] of Object.entries(layout)) bottomFractions[id] = size / 100;
     setLayoutGeometry({
       station: {
+        ...current,
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
         columnFractions: current?.columnFractions ?? [],
         rightColumnSplit,
@@ -399,46 +410,6 @@ export function StationLayout() {
           </Group>
         )}
       </div>
-    </div>
-  );
-}
-
-/** Thin wrapper that sizes a station cell to fill its panel. Transparent so
- *  the dock chrome's themed background shows between cards. */
-function CellWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        overflow: 'hidden',
-        background: 'transparent',
-        padding: 'var(--k-cell-gap, 3px)',
-        boxSizing: 'border-box',
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function EmptyShellHint() {
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--ink-3)',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 11,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        opacity: 0.6,
-      }}
-    >
-      every panel is hidden — toggle one back on
     </div>
   );
 }

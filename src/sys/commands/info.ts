@@ -151,6 +151,38 @@ export function settingsGrid(
 }
 
 /**
+ * `krnl settings station-layout [classic|grid]` (Decision 52) — how the
+ * Station arranges its windows. Same as the Classic / Grid switch in the
+ * Station toolbar. Each preset keeps its own panel sizes.
+ */
+export function settingsStationLayout(
+  ctx: { boardPath: string; onBoardChanged?: () => void },
+  preset: string | undefined,
+): SysResult {
+  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { layoutGeometry?: { station?: Record<string, unknown> } }) | null;
+  if (!raw) return { ok: false, message: 'No board found' };
+  const station = raw.layoutGeometry?.station;
+  const current = station?.['preset'] === 'grid' ? 'grid' : 'classic';
+  if (preset === undefined) return { ok: true, message: `station layout: ${current}`, data: { preset: current } };
+  if (preset !== 'classic' && preset !== 'grid') {
+    return { ok: false, message: `settings station-layout: expected classic or grid, got "${preset}"` };
+  }
+  if (preset !== current) {
+    const nextStation = {
+      rowFraction: 0.35,
+      columnFractions: [],
+      rightColumnSplit: 0.6,
+      ...station,
+      preset,
+    };
+    saveBoardTo(ctx.boardPath, { ...raw, layoutGeometry: { ...raw.layoutGeometry, station: nextStation }, savedAt: new Date().toISOString() });
+    ctx.onBoardChanged?.();
+  }
+  const note = raw['layoutMode'] === 'station' ? '' : ' (shows when the layout is Station: krnl settings layout station)';
+  return { ok: true, message: `station layout: ${preset}${note}`, data: { preset } };
+}
+
+/**
  * `krnl settings layout [station|canvas]` — show or set the layout (ADR 0008):
  * Station docks the windows beside the terminal, Canvas is the free board.
  * The top-bar pill and ⌘⇧L set the same board field.

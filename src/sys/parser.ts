@@ -113,6 +113,7 @@ export type SysCommand =
   | { kind: 'settings'; sub: 'show'; json: boolean }
   | { kind: 'settings'; sub: 'mode'; mode: string | undefined }
   | { kind: 'settings'; sub: 'layout'; layout: string | undefined }
+  | { kind: 'settings'; sub: 'station-layout'; preset: string | undefined }
   | { kind: 'settings'; sub: 'grid'; value: string | undefined }
   | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
@@ -471,6 +472,7 @@ export class SysParser {
       }
       if (sub === 'mode') return { kind: 'settings', sub: 'mode', mode: rest[0] };
       if (sub === 'layout') return { kind: 'settings', sub: 'layout', layout: rest[0] };
+      if (sub === 'station-layout') return { kind: 'settings', sub: 'station-layout', preset: rest[0] };
       if (sub === 'grid') return { kind: 'settings', sub: 'grid', value: rest[0] };
     }
 

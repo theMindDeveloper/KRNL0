@@ -54,6 +54,15 @@ export const BoardSchema = z.object({
           rightColumnSplit: z.number(),
           canvasHidden: z.boolean().optional(),
           bottomFractions: z.record(z.number()).optional(),
+          // Decision 52 — Station preset and the Grid preset's own panel sizes.
+          preset: z.enum(['classic', 'grid']).optional(),
+          grid: z
+            .object({
+              rowFraction: z.number().optional(),
+              top: z.array(z.number()).optional(),
+              bottom: z.array(z.number()).optional(),
+            })
+            .optional(),
         })
         .optional(),
     })

@@ -32,6 +32,18 @@ export type StationSlot =
   | 'bottom-strip'
   | 'bottom-right-pre';
 
+/** Decision 52 — Classic: four windows over canvas, terminal, analytics, clock. Grid: Timer, Todos, Habits over Calendar and Clock. */
+export type StationPreset = 'classic' | 'grid';
+
+export interface StationGridGeometry {
+  /** Top row height as a fraction. */
+  rowFraction?: number;
+  /** Timer, Todos, Habits widths as fractions. */
+  top?: number[];
+  /** Calendar, Clock widths as fractions. */
+  bottom?: number[];
+}
+
 // ADR 0008 § 2.4 — station geometry (rowFraction, columnFractions,
 // rightColumnSplit) persisted per-board only when user resizes panels.
 // Defaults are applied at render-time if absent.
@@ -46,6 +58,10 @@ export interface StationGeometry {
   // Bottom-row panel widths by panel id, as fractions — canvas, terminal,
   // analytics and clock each keep the width the user dragged them to.
   bottomFractions?: Record<string, number>;
+  // Decision 52 — which arrangement the Station uses; absent = classic.
+  preset?: StationPreset;
+  // Panel sizes of the Grid preset, kept apart so switching never disturbs Classic.
+  grid?: StationGridGeometry;
 }
 
 // Structural mixin for mother-node config objects.

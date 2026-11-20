@@ -310,6 +310,12 @@ export class SysFacade {
         ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
       }, command.value);
     }
+    if (command.kind === 'settings' && command.sub === 'station-layout') {
+      return infoCmd.settingsStationLayout({
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      }, command.preset);
+    }
     if (command.kind === 'settings' && command.sub === 'layout') {
       return infoCmd.settingsLayout({
         boardPath: this.deps.boardPath,

@@ -27,6 +27,54 @@ interface MotherEntry {
 }
 
 // Order matches the layout: top-row mothers left → right, then bottom-row.
+/** Decision 52 — the windows the Grid preset shows. */
+const GRID_KINDS = new Set<string>(['pomo', 'todo', 'habit', 'calendar', 'clock']);
+
+/** Classic / Grid: the Station's two arrangements. */
+function PresetSwitch({ preset, onPick }: { preset: 'classic' | 'grid'; onPick: (p: 'classic' | 'grid') => void }) {
+  const item = (p: 'classic' | 'grid', label: string, glyph: React.ReactNode) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={preset === p}
+      title={p === 'grid' ? 'Grid: Timer, Todos and Habits over Calendar and Clock' : 'Classic: four windows over the canvas, terminal, analytics and clock'}
+      onClick={() => onPick(p)}
+      className="krnl-preset-btn"
+      data-on={preset === p ? 'true' : 'false'}
+      style={{
+        height: 22,
+        padding: '0 8px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        border: 0,
+        borderRadius: 5,
+        cursor: 'pointer',
+        fontFamily: 'var(--font-mono)',
+        fontSize: 10.5,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        background: preset === p ? 'var(--paper-3)' : 'transparent',
+        color: preset === p ? 'var(--ink)' : 'var(--ink-3)',
+      }}
+    >
+      {glyph}
+      {label}
+    </button>
+  );
+  const box = (rects: Array<[number, number, number, number]>) => (
+    <svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true">
+      {rects.map(([x, y, w, h], i) => <rect key={i} x={x} y={y} width={w} height={h} rx={1} fill="none" stroke="currentColor" strokeWidth={1.2} />)}
+    </svg>
+  );
+  return (
+    <span role="radiogroup" aria-label="Station layout" style={{ marginLeft: 'auto', display: 'inline-flex', gap: 2, padding: 2, borderRadius: 7, background: 'var(--paper-2, rgba(0,0,0,0.2))' }}>
+      {item('classic', 'Classic', box([[0.6, 0.6, 2.8, 5], [3.9, 0.6, 2.8, 5], [7.2, 0.6, 2.8, 5], [10.5, 0.6, 2.9, 5], [0.6, 6.4, 12.8, 5]]))}
+      {item('grid', 'Grid', box([[0.6, 0.6, 3.9, 5], [5, 0.6, 3.9, 5], [9.4, 0.6, 4, 5], [0.6, 6.4, 8.3, 5], [9.4, 6.4, 4, 5]]))}
+    </span>
+  );
+}
+
 const MOTHER_ORDER: MotherEntry[] = [
   { kind: 'pomo',     label: 'Timer' },
   { kind: 'todo',     label: 'Todos' },
@@ -192,9 +240,24 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
   };
 
   const canvasShown = !canvasHidden;
+  // Decision 52 — the Station's arrangement.
+  const preset = stationGeo?.preset ?? 'classic';
+  const setPreset = (p: 'classic' | 'grid') => {
+    if (p === preset) return;
+    setLayoutGeometry({
+      station: {
+        ...stationGeo,
+        rowFraction: stationGeo?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
+        columnFractions: stationGeo?.columnFractions ?? [],
+        rightColumnSplit: stationGeo?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
+        preset: p,
+      },
+    });
+  };
 
   const toggleCanvas = () => {
     const next: StationGeometry = {
+      ...stationGeo,
       rowFraction: stationGeo?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
       columnFractions: stationGeo?.columnFractions ?? [],
       rightColumnSplit: stationGeo?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
@@ -236,7 +299,7 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           panels
         </span>
       )}
-      {MOTHER_ORDER.filter((m) => !((easy || IS_WEB) && m.kind === 'term')).map((m) => {
+      {MOTHER_ORDER.filter((m) => !((easy || IS_WEB) && m.kind === 'term') && (preset !== 'grid' || GRID_KINDS.has(m.kind))).map((m) => {
         const node = motherByKind.get(m.kind);
         const active = !!node && !isStationHidden(node);
         return (
@@ -251,13 +314,14 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
         );
       })}
       {/* The canvas only has a panel to hide in Station mode. */}
-      {board.layoutMode === 'station' && <ToolbarBtn
+      {board.layoutMode === 'station' && preset !== 'grid' && <ToolbarBtn
         active={canvasShown}
         label="Canvas"
         onClick={toggleCanvas}
       >
         <Glyph kind="canvas" active={canvasShown} />
       </ToolbarBtn>}
+      {board.layoutMode === 'station' && <PresetSwitch preset={preset} onPick={setPreset} />}
     </div>
   );
 }

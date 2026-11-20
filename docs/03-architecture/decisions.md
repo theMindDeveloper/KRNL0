@@ -2734,3 +2734,11 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
 **Not chosen.** A CRDT (Decision 51's reasons still hold). Raw device clocks (a laptop an hour fast would win every clash). One stamp per item (an edit to one field would carry another field's old value along). A visible clash notice (the owner, 2026-11-21: not helpful for people who are not technical).
 
 **Consequences.** Every board upload carries its stamp table (one entry per value changed in the last 30 days; gzip keeps it small). Automatic changes count as edits, so a plan being timed on one device is not lost to a delete on another. Order of documents still comes from server revisions; clocks only break a tie between two changes to the same value.
+
+## Decision 54 — The Station has two presets: Classic and Grid (2026-11-20)
+
+**Context.** The owner liked the desktop-browser Station drawn for the KRNL0 server (Timer, Todos, Habits over Calendar and Clock) and asked for it in the Windows app as a layout to choose. Requirements: `docs/06-requirements/station-layouts.md`.
+
+**Decision.** `layoutGeometry.station.preset` is `classic` (default, absent) or `grid`. `StationLayout` picks `ClassicStationLayout` (unchanged) or `GridStationLayout` (new). Grid saves its own sizes in `layoutGeometry.station.grid`, so the presets never disturb each other. The Station toolbar has a Classic / Grid switch; `krnl settings station-layout` sets the same field. All Station geometry writes now keep the fields they do not change.
+
+**Consequences.** No migration (absent = Classic). In Grid the canvas, terminal and analytics have no Station panel; the canvas stays on the top bar's CANVAS view. `layoutGeometry` is per device, so with sync each computer keeps its own preset (Decision 51).
