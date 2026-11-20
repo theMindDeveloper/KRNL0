@@ -850,5 +850,35 @@
     "tours": [
       "terminal"
     ]
+  },
+  "38ffecf2": {
+    "text": "This badge says your board is saved. It saves itself as you go, so there is nothing to save by hand.",
+    "tours": [
+      "sync"
+    ]
+  },
+  "b856d48a": {
+    "text": "Press the badge.",
+    "tours": [
+      "sync"
+    ]
+  },
+  "8bdef7e2": {
+    "text": "With a server of your own, your boards follow you: to your other computers, and to your phone's browser. On a computer without a server yet, Connect server sets it up: its address, the fingerprint the server shows, and your password, once.",
+    "tours": [
+      "sync"
+    ]
+  },
+  "9a1a6408": {
+    "text": "Connected, the badge says saved and synced. Offline, it keeps your changes here and sends them when the server is back. Edit on two devices at once, and both edits are kept.",
+    "tours": [
+      "sync"
+    ]
+  },
+  "96b07a92": {
+    "text": "On your phone, open your server's address and log in. Today, the timer, your calendar, habits and the canvas, laid out for the phone. The terminal and the AI stay in this app.",
+    "tours": [
+      "sync"
+    ]
   }
 }
