@@ -3156,7 +3156,7 @@ Typecheck clean; all tests pass.
 ## [2026-11-20] — Sync with your own KRNL0 server, and the KRNL0 website
 
 **Type:** Feature
-**Branch:** `feat/server-sync` (server side: `theMindDeveloper/krnl0-server` `feat/realtime-sync`)
+**Branch:** `feat/server-sync`, merged in #262 (closes #261) (server side: `theMindDeveloper/krnl0-server` `feat/realtime-sync`)
 **Files changed:** `src/shared/sync/*`, `src/shared/boardMigrate.ts`, `src/main/sync/*`, `src/main/persistence/board.ts`, `src/sys/commands/sync.ts`, `src/web/*`, `vite.web.config.ts`, `src/renderer/components/Sync/*`, `src/renderer/components/Mobile/*`, `src/renderer/utils/assetUrl.ts`, `src/renderer/platform.ts`, `TopBar/index.tsx`, `Canvas/CanvasFlow.tsx`, `Station/*`, `Tour/tours.ts`, `ui/Popover.tsx`, `.github/workflows/release.yml`, docs, tests
 
 **Summary:**
@@ -3167,5 +3167,19 @@ Typecheck clean; all tests pass.
 - **Release pipeline:** the KRNL0 release also attaches `krnl0-web-<version>.tar.gz` and its `.sha256` for KRNL0 servers.
 - **Edge cases** (server-sync.md table): versions that differ (protocol, a page from before a server update reloads itself, boards from a newer app), a board or file too large for the server (paused or kept local with the reason, never a retry loop), a changed server certificate (stops, connect again), a server restored from a backup, an ended web session (its edits are sent after the next login), logging out with unsent changes (sent first, or asked), a browser that keeps no copy, a changed server address.
 - Tested against the real server: 7 desktop, 10 web+desktop and 5 edge-case sync scenarios (crash mid-burst, offline, concurrent edits, stale saves, a blocked socket), plus headless-Chrome walks: login, a phone day by touch, pictures across two browsers, boards, the tour.
+
+Typecheck clean; all tests pass.
+
+## [2026-11-20] — Release v0.13.0
+
+**Type:** Release
+**PRs/Commits:** #262 (merged to `main`), release PR on `chore/release-v0.13.0`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Feature release: your board on every device. Connect KRNL0 to a KRNL0 server you run yourself (Docker or one command on Linux); every connected computer keeps the same boards, and the server opens KRNL0 in a browser with phone and iPad layouts. The saved badge shows sync. A tutorial with voice shows it.
+- Version `0.12.0 → 0.13.0`. What's new (`src/shared/whatsnew.ts`) and `docs/releases/v0.13.0.md` were approved by the owner on 2026-11-20.
+- The release also attaches `krnl0-web-0.13.0.tar.gz` and its `.sha256`; the KRNL0 server 0.1.0 release pins and checks it.
+- Not part of this PR: the tag `v0.13.0` and the Publish click.
 
 Typecheck clean; all tests pass.
