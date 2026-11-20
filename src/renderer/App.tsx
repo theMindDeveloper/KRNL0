@@ -17,6 +17,8 @@ import { StationLayout } from './components/Station/StationLayout';
 import { useStationViewportGate } from './components/Station/useStationViewportGate';
 import { Orb } from './components/Orb';
 import { IS_WEB } from './platform';
+import { MobileShell } from './components/Mobile/MobileShell';
+import { useFormFactor } from './components/Mobile/useFormFactor';
 import { AmbientRadio } from './components/AmbientRadio';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
@@ -104,6 +106,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 // can safely read boardStore after board is loaded.
 function AppInner() {
   const { effectiveMode, isFallingBack } = useStationViewportGate();
+  // Web on a phone or an iPad: the mobile shell (Decision 51). Desktop app: always the Station / Canvas.
+  const formFactor = useFormFactor();
   const { fitView } = useReactFlow();
 
   // Centre the viewport on the mother row whenever the layout mode changes,
@@ -159,6 +163,20 @@ function AppInner() {
     const failsafe = window.setTimeout(removeNow, 15_000);
     return () => { cancelAnimationFrame(raf); unsubBoard?.(); unsubInfo?.(); window.clearTimeout(failsafe); };
   }, []);
+
+  if (formFactor !== 'desktop') {
+    return (
+      <>
+        <MobileShell ff={formFactor} />
+        <RadialChooserHost />
+        <LogTimeHost />
+        <RetagPickerHost />
+        <DayMoments />
+        <UndoNoticeBar />
+        <LaunchHost />
+      </>
+    );
+  }
 
   return (
     <div
