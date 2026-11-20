@@ -190,6 +190,9 @@ const ORB = '[aria-label^="AI assistant"]';
 const GEAR = '[data-testid="topbar-settings"]';
 const BOARDS = '[data-testid="topbar-canvas-switcher"]';
 const CARD = '[data-testid="task-node-root"]';
+// Decision 51 — the saved badge (it also tells how sync is doing) and its sheet.
+const SAVED = '[data-testid="topbar-live-badge"]';
+const SYNC_SHEET = '[data-testid="sync-status"]';
 // The names of the examples a tour adds (store/tourExamples.ts), so a step can ring that card.
 const EXAMPLE_MISSED_TEXT = 'Example: Read chapter 2';
 const EXAMPLE_PLAN_TEXT = 'Example: Read chapter 3';
@@ -453,6 +456,19 @@ export const TOURS: readonly Tour[] = [
       { say: "Give it a name, then choose. \"Start empty\" gives you a clean space. \"Copy my habits\" brings your habits along, starting from zero. Creating it takes you straight there, so this tour ends. Or press Next to keep looking.", target: '[data-testid="board-new-form"]', badge: 'TWO WAYS', text: 'Name it, then choose: **Start empty**, or **Copy my habits** (the same habits, starting from zero). Creating it takes you straight there and ends this tour. Or press **Next** to keep looking.' },
       { say: "One timer runs at a time. If it's still running in another board, a note appears up here, and one press takes you back to it. Reminders reach you from every board, with the board's name.", target: BOARDS, badge: 'ONE TIMER', text: '**One timer at a time.** If it is still running in another board, a note appears up here; one press takes you back. **Reminders** reach you from every board, with the board’s name.' },
       { say: "That's boards! One per project, or one for work and one for home. You can also ask me to make one.", target: ORB, badge: 'ASK ME', text: 'That’s boards: one per project, or one for work and one for home. You can also **ask me** to make one.' },
+    ],
+  },
+  // Decision 51 — your own KRNL0 server: saved here, synced, on your phone.
+  {
+    id: 'sync',
+    title: 'Saved and synced',
+    summary: 'Your board on your other computers and your phone, through your own server',
+    steps: [
+      { say: "This badge says your board is saved. It saves itself as you go, so there is nothing to save by hand.", target: SAVED, badge: 'SAVED', text: 'This badge says your board is **saved**. It saves itself as you go: nothing to save by hand.' },
+      { say: "Press the badge.", target: SAVED, badge: 'PRESS', text: 'Press the **badge**.', waitFor: { click: SAVED }, hint: 'Waiting for a press on the badge…' },
+      { say: "With a server of your own, your boards follow you: to your other computers, and to your phone's browser. On a computer without a server yet, Connect server sets it up: its address, the fingerprint the server shows, and your password, once.", target: SYNC_SHEET, badge: 'YOUR SERVER', text: 'With your own **KRNL0 server**, your boards follow you: to your **other computers** and your **phone**. Without one yet, **Connect server** sets it up: its address, the **fingerprint** the server shows, your password, once.' },
+      { say: "Connected, the badge says saved and synced. Offline, it keeps your changes here and sends them when the server is back. Edit on two devices at once, and both edits are kept.", target: SAVED, badge: 'SAVED · SYNCED', text: 'Connected, it says **saved · synced**. **Offline**, your changes are kept here and sent when the server is back. **Two devices at once**: both edits are kept.' },
+      { say: "On your phone, open your server's address and log in. Today, the timer, your calendar, habits and the canvas, laid out for the phone. The terminal and the AI stay in this app.", target: SAVED, badge: 'ON YOUR PHONE', text: 'On your phone, open your server\'s address and **log in**: Today, the timer, calendar, habits and the canvas, laid out for the phone. The **terminal and AI** stay in this app.' },
     ],
   },
   {
