@@ -67,6 +67,18 @@ function firstSync(engine: SyncEngine, subscribe: (cb: (s: SyncStatus) => void) 
   });
 }
 
+// After the server was updated, a page loaded before it asks for parts that
+// are gone (new file names). Reload once onto the new version instead of failing.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  try {
+    if (sessionStorage.getItem('krnl0-reloaded-for-update') === '1') return;
+    sessionStorage.setItem('krnl0-reloaded-for-update', '1');
+  } catch { /* private window: reload anyway, once per page */ }
+  location.reload();
+});
+window.setTimeout(() => { try { sessionStorage.removeItem('krnl0-reloaded-for-update'); } catch { /* none */ } }, 30_000);
+
 async function boot(): Promise<void> {
   // Touch screens: a long-press opens the right-click menus of the board's windows.
   if (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) installLongPressMenu();
@@ -103,10 +115,12 @@ async function boot(): Promise<void> {
     onStatus: (st) => {
       for (const cb of statusSubs) cb(st);
       if (onBoardsArrived && host.hasBoards()) onBoardsArrived();
-      if (bridgeRef) bridgeRef.notifyStatus({ configured: true, origin: location.origin, fingerprint: null, deviceName: 'This browser', ...st });
+      bridgeRef?.notifyStatus();
       if (st.state === 'signed-out') { void kv.flush().then(toLogin); }
     },
     log: (m, f) => console.info(`[sync] ${m}`, f ?? ''),
+    // On the web the app is the server's: a board from a newer KRNL0 means the server needs updating.
+    newerAppMessage: 'This website is older than the KRNL0 app that saved a board. Update your KRNL0 server to keep syncing it.',
   });
 
   const logout = async (): Promise<void> => {
@@ -121,6 +135,7 @@ async function boot(): Promise<void> {
   const bridge = createWebBridge({
     host, engine, store, transport, appVersion: APP_VERSION, origin: location.origin,
     flush: () => kv.flush(), reload: () => location.reload(), logout,
+    storageNote: () => (kv.persistent ? kv.problem() : 'This browser keeps no copy of its own here (a private window?). Keep the page open until the badge shows saved · synced.'),
   });
   bridgeRef = bridge;
   window.krnl = bridge;

@@ -41,7 +41,12 @@ export interface TimelogItem {
 }
 
 /** Why the transport could not do something. */
-export type SyncErrorKind = 'network' | 'auth' | 'protocol' | 'server';
+/**
+ * Why the transport could not do something.
+ *   refused      the server will never take this (too large): stop retrying it, say why
+ *   certificate  the server's certificate is not the one paired with: stop, connect again
+ */
+export type SyncErrorKind = 'network' | 'auth' | 'protocol' | 'server' | 'refused' | 'certificate';
 
 export class SyncError extends Error {
   constructor(readonly kind: SyncErrorKind, message: string) {

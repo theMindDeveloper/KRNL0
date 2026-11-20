@@ -133,7 +133,12 @@ export function SaveSyncBadge() {
 
           {configured && (
             <>
-              {info.message && <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{info.message}</span>}
+              {info.message && <span style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--ink-2)' }}>{info.message}</span>}
+              {info.state === 'offline' && !IS_WEB && (
+                <span data-testid="sync-offline-hint" style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--ink-3)' }}>
+                  Can't reach {hostOf(info.origin)}. Your changes are kept here. If the server's address changed, Disconnect and connect again.
+                </span>
+              )}
               {info.clockOffsetMs !== null && Math.abs(info.clockOffsetMs) > 5000 && (
                 <span style={{ fontSize: 12, color: 'var(--rust-deep)' }}>This device's clock is off by {Math.round(info.clockOffsetMs / 1000)} s.</span>
               )}

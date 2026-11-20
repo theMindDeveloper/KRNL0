@@ -108,6 +108,7 @@ export class WebTransport implements SyncTransport {
     const j = await r.json();
     if (r.status === 200) return { ok: true, rev: j.rev as number };
     const err = (j.error ?? {}) as { code?: string; rev?: number; body?: Json; deleted?: boolean; storedSchemaVersion?: number; message?: string };
+    if (r.status === 413 || (r.status === 400 && err.code === 'invalid')) throw new SyncError('refused', 'This board is too large for the server (20 MB). It stays in this browser; everything else keeps syncing.');
     if (r.status === 409 && err.code === 'schema') return { ok: false, reason: 'schema', storedSchemaVersion: err.storedSchemaVersion ?? 0 };
     if (r.status === 409) return { ok: false, reason: 'conflict', rev: err.rev ?? 0, body: err.body ?? null, deleted: !!err.deleted };
     throw new SyncError('server', `put ${name}: ${r.status} ${err.message ?? ''}`);
@@ -146,6 +147,7 @@ export class WebTransport implements SyncTransport {
 
   async putAsset(id: string, ext: string, bytes: Uint8Array): Promise<void> {
     const r = await this.call('PUT', `/api/v1/assets/${encodeURIComponent(id)}.${encodeURIComponent(ext)}`, { raw: bytes });
+    if (r.status === 413 || r.status === 400) throw new SyncError('refused', `asset ${id}: too large for the server`);
     if (r.status !== 201) throw new SyncError('server', `asset ${id}: ${r.status}`);
   }
 
@@ -264,7 +266,9 @@ export class WebTransport implements SyncTransport {
         } else if (msg.type === 'pong') {
           handlers.onPong?.({ serverTime: Number(msg.at), sentAt: lastPing, receivedAt: Date.now() });
         } else if (msg.type === 'error' && msg.code === 'protocol') {
-          end(false, 'protocol', String(msg.message ?? 'Reload the page: the server was updated.'));
+          // The server serves the matching website: in a browser the fix is always a reload
+          // (the server's own words are for the desktop app).
+          end(false, 'protocol', 'This page is from another version of your KRNL0 server. Reload the page.');
         }
       };
       sock.onclose = (ev: CloseEvent) => {

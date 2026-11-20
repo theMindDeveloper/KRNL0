@@ -35,6 +35,12 @@ export function tlsOptions(caPem: string | null): https.RequestOptions {
   return caPem ? { ca: caPem, checkServerIdentity: () => undefined } : {};
 }
 
+/** TLS errors that mean: this is not the server we paired with (its certificate changed). */
+const CERT_CODES = new Set(['UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'SELF_SIGNED_CERT_IN_CHAIN', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'CERT_SIGNATURE_FAILURE', 'CERT_UNTRUSTED', 'UNABLE_TO_GET_ISSUER_CERT', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'CERT_REJECTED']);
+export const CERT_CHANGED = 'The server\'s certificate is not the one this computer paired with. Connect again and compare the fingerprint with `krnl0 fingerprint` on the server.';
+const netError = (e: Error & { code?: string }): SyncError =>
+  e.code && CERT_CODES.has(e.code) ? new SyncError('certificate', CERT_CHANGED) : new SyncError('network', e.message);
+
 interface Reply { status: number; body: Buffer; /** X-KRNL0-Asset: <id>.<ext> */ name?: string }
 
 /** One https request; network failures become SyncError('network'). */
@@ -72,7 +78,7 @@ export function request(origin: string, method: string, path: string, opts: { ca
       res.on('error', (e) => reject(new SyncError('network', e.message)));
     });
     req.on('timeout', () => req.destroy(new Error('timed out')));
-    req.on('error', (e) => reject(new SyncError('network', e.message)));
+    req.on('error', (e) => reject(netError(e)));
     if (payload) req.write(payload);
     req.end();
   });
@@ -119,6 +125,7 @@ export class NodeTransport implements SyncTransport {
     const j = jsonOf(r);
     if (r.status === 200) return { ok: true, rev: j.rev as number };
     const err = (j.error ?? {}) as { code?: string; rev?: number; body?: Json; deleted?: boolean; storedSchemaVersion?: number; message?: string };
+    if (r.status === 413 || (r.status === 400 && err.code === 'invalid')) throw new SyncError('refused', `This board is too large for the server (20 MB). It stays on this device; everything else keeps syncing.`);
     if (r.status === 409 && err.code === 'schema') return { ok: false, reason: 'schema', storedSchemaVersion: err.storedSchemaVersion ?? 0 };
     if (r.status === 409) return { ok: false, reason: 'conflict', rev: err.rev ?? 0, body: err.body ?? null, deleted: !!err.deleted };
     throw new SyncError('server', `put ${name}: ${r.status} ${err.message ?? ''}`);
@@ -157,6 +164,7 @@ export class NodeTransport implements SyncTransport {
 
   async putAsset(id: string, ext: string, bytes: Uint8Array): Promise<void> {
     const r = await this.call('PUT', `/api/v1/assets/${encodeURIComponent(id)}.${encodeURIComponent(ext)}`, { raw: bytes });
+    if (r.status === 413 || r.status === 400) throw new SyncError('refused', `asset ${id}: too large for the server`);
     if (r.status !== 201) throw new SyncError('server', `asset ${id}: ${r.status}`);
   }
 
@@ -181,7 +189,7 @@ export class NodeTransport implements SyncTransport {
       const sock = new WebSocket(url, { headers: { Authorization: `Bearer ${this.link.token}` }, perMessageDeflate: false, handshakeTimeout: TIMEOUT_MS, ...tlsOptions(this.link.caPem) });
       ws = sock;
       let ended = false;
-      const end = (retrying: boolean, kind: 'network' | 'auth' | 'protocol', message: string): void => {
+      const end = (retrying: boolean, kind: 'network' | 'auth' | 'protocol' | 'certificate', message: string): void => {
         if (ended) return;
         ended = true;
         if (pingTimer) clearInterval(pingTimer);
@@ -222,7 +230,10 @@ export class NodeTransport implements SyncTransport {
         else if (code === 4000) end(false, 'protocol', 'Update KRNL0 or the server.');
         else end(true, 'network', 'connection closed');
       });
-      sock.on('error', (e) => end(true, 'network', e.message));
+      sock.on('error', (e: Error & { code?: string }) => {
+        if (e.code && CERT_CODES.has(e.code)) end(false, 'certificate', CERT_CHANGED);
+        else end(true, 'network', e.message);
+      });
     };
 
     open();

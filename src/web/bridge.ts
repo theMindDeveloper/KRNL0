@@ -37,6 +37,8 @@ export interface WebBridgeDeps {
   logout: () => Promise<void>;
   /** The server's own address, for the status sheet. */
   origin: string;
+  /** A warning about this browser's own copy (none kept, a write failed), or null. */
+  storageNote?: () => string | null;
 }
 
 // The app's own per-device state (What's new seen, Celebrations, milestones,
@@ -76,7 +78,7 @@ export function unsentChanges(host: WebHost, store: WebSyncStore): number {
   return n;
 }
 
-export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: (info: SyncInfo) => void } {
+export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: () => void } {
   const { host, engine } = d;
 
   // Launch (Decision 38) as the desktop computes it, once per page load.
@@ -130,16 +132,20 @@ export function createWebBridge(d: WebBridgeDeps): KrnlBridge & { notifyStatus: 
   };
   const changed = (id: string): void => engine.changed(docName.board(id));
 
-  const info = (): SyncInfo => ({
-    configured: true,
-    origin: d.origin,
-    fingerprint: null,
-    deviceName: 'This browser',
-    ...engine.getStatus(),
-  });
+  const info = (): SyncInfo => {
+    const st = engine.getStatus();
+    return {
+      configured: true,
+      origin: d.origin,
+      fingerprint: null,
+      deviceName: 'This browser',
+      ...st,
+      message: st.message ?? d.storageNote?.() ?? null,
+    };
+  };
 
-  const bridge: KrnlBridge & { notifyStatus: (info: SyncInfo) => void } = {
-    notifyStatus: (i) => { for (const cb of statusListeners) cb(i); },
+  const bridge: KrnlBridge & { notifyStatus: () => void } = {
+    notifyStatus: () => { const i = info(); for (const cb of statusListeners) cb(i); },
 
     // ── The board ───────────────────────────────────────────────────────
     boardLoad: async () => {

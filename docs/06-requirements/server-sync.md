@@ -43,6 +43,50 @@ The owner runs a KRNL0 server at home. The desktop app on every computer and the
 | NF9 | Desktop parity on the web is checked in a real browser: login, a day by touch on a phone, pictures across two browsers, boards, the tour (headless Chrome, `tests/integration/sync.web.sim.test.ts` for the sync core). |
 | NF7 | A simulation suite runs N clients against a real server with dropped connections, delays, concurrent edits, long offline edits, a server restart mid-write and clock skew, and asserts that every client ends with the same board. |
 
+## Edge cases
+
+Each line says what happens and which test proves it (`unit` = `tests/unit/shared/sync/engine*.test.ts` with a fake server; `sim` = against the real server: `sync.sim`, `sync.web.sim`, `sync.edges.sim` in `tests/integration/`; `chrome` = the web app in headless Chrome).
+
+**Versions**
+
+| Situation | What happens | Proof |
+|---|---|---|
+| App and server speak different protocols (one side much newer) | Pairing refuses with "This server speaks protocol N; this app speaks M. Update the older one." A running app stops and says *update KRNL0*. | server tests (F14); engine onClose |
+| A website from another server version is still open (server updated meanwhile) | The live channel is refused: badge *update needed*, "This page is from another version of your KRNL0 server. Reload the page." A part of the page that no longer exists makes the page reload itself once. | sim (`sync.edges`: protocol 99) |
+| A board saved by a newer desktop app, opened by an older one | That board is not uploaded and not overwritten; *update KRNL0*. Other boards keep syncing. | unit (F11) |
+| The same on the website (the server's website is older than the desktop app) | *update needed*: "This website is older than the KRNL0 app that saved a board. Update your KRNL0 server." | unit (`engine.edges`) |
+| An older app sends a board shape older than the server holds | The server refuses (409 schema): a board is never downgraded. | server tests (F9) |
+
+**Limits**
+
+| Situation | What happens | Proof |
+|---|---|---|
+| A board larger than the server takes (20 MB) | That board pauses with "This board is too large for the server (20 MB). It stays on this device; everything else keeps syncing." No retry loop. | unit, sim |
+| A file larger than the server takes (images 25 MB, other files 500 MB; the desktop accepts up to 8 GB) | It stays on this device, is not tried again, and the sheet says so once. | unit |
+| Many quick edits | Debounced; one upload per board in flight. | unit (fuzz) |
+
+**Network and server**
+
+| Situation | What happens | Proof |
+|---|---|---|
+| Server down, edits on every device | Kept on each device, sent and merged when it is back. | sim (crash mid-burst) |
+| Server's address changed | *saved · offline*; the sheet says to Disconnect and connect again with the new address. | — (wording) |
+| Server's certificate changed (new install, lost data folder — or someone in between) | The desktop stops and asks to connect again and compare the fingerprint; nothing is sent to the unknown server. | sim (`sync.edges`: new CA) |
+| Server restored from a backup | Every device takes the restored boards on reconnect; edits made while it was down are merged on top; what was added after the backup is gone (that is what a restore means). | sim (`sync.edges`) |
+| A phone refuses the live channel (self-signed certificate) | The page checks for changes every 4 seconds instead. | sim (blocked socket) |
+
+**Sessions, devices and storage**
+
+| Situation | What happens | Proof |
+|---|---|---|
+| Web session ends (logged out elsewhere, expired, password changed) | Sync stops, the page goes to login; its unsent edits stay in this browser and are sent after the next login. | sim (`sync.edges`) |
+| Log out with changes the server does not have yet | It sends them first; if it cannot, it says how many and asks: Stay or Log out anyway. | sim, unit (badge) |
+| Desktop device revoked | Sync stops; local data stays; *saved · signed out*, Connect again. | unit (auth) |
+| The browser keeps no copy (some private windows) or its storage is full | The sheet says so: changes are safe once the badge shows *saved · synced*. | — (wording) |
+| Two tabs of the same browser | Each syncs on its own connection; both end the same. Logging out in one signs the other out too. | — (by design) |
+| Two devices create a board with the same name before connecting | Both boards are kept (by id); rename one. | unit (boards merge by id) |
+| Device clocks differ | Merges never use clocks; a difference over 5 s is shown. | unit |
+
 ## Use Cases
 
 - **UC-S1:** The owner connects the desktop app at home to the server; the board appears on their phone's browser a second later.

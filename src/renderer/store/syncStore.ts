@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import type { SyncDevice, SyncInfo } from '../../shared/sync/port';
+import { IS_WEB } from '../platform';
 
 interface SyncStore {
   info: SyncInfo | null;
@@ -46,7 +47,7 @@ export function chipLook(info: SyncInfo | null): ChipLook {
     case 'connecting': return { label: 'syncing', tone: 'cyan' };
     case 'offline': return { label: 'saved · offline', tone: 'amber' };
     case 'paused': return { label: 'sync paused', tone: 'rust' };
-    case 'update': return { label: 'update KRNL0', tone: 'rust' };
+    case 'update': return { label: IS_WEB ? 'update needed' : 'update KRNL0', tone: 'rust' };
     case 'signed-out': return { label: 'saved · signed out', tone: 'quiet' };
     default: return { label: 'saved', tone: 'acid' };
   }

@@ -4,6 +4,10 @@
 // and IndexedDB is what survives a reload or going offline.
 
 export interface Kv {
+  /** False when the browser keeps nothing (no IndexedDB, e.g. some private windows). */
+  readonly persistent: boolean;
+  /** Why the last write failed (storage full…), or null. */
+  problem(): string | null;
   /** Every stored key and value (called once at start). */
   loadAll(): Promise<Map<string, unknown>>;
   /** Queued: written within a moment, in order. */
@@ -20,6 +24,8 @@ export function memoryKv(seed?: Map<string, unknown>): Kv & { data: Map<string, 
   const data = new Map<string, unknown>(seed);
   return {
     data,
+    persistent: false,
+    problem: () => null,
     loadAll: async () => new Map(data),
     set: (k, v) => { data.set(k, v); },
     del: (k) => { data.delete(k); },
@@ -59,6 +65,7 @@ export async function openKv(name = 'krnl0'): Promise<Kv> {
   }
 
   const queue = new Map<string, unknown>();
+  let problem: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let writing: Promise<void> = Promise.resolve();
 
@@ -74,7 +81,9 @@ export async function openKv(name = 'krnl0'): Promise<Kv> {
         if (v === DELETE) s.delete(k); else s.put(v, k);
       }
       await done(tx);
+      problem = null;
     }).catch((err: unknown) => {
+      problem = 'This browser could not save its copy (is its storage full?). Your changes are safe once the badge shows saved · synced.';
       console.warn('[web] could not save to this browser:', err instanceof Error ? err.message : err);
     });
     return writing;
@@ -84,6 +93,8 @@ export async function openKv(name = 'krnl0'): Promise<Kv> {
   if (typeof window !== 'undefined') window.addEventListener('pagehide', () => { void write(); });
 
   return {
+    persistent: true,
+    problem: () => problem,
     async loadAll() {
       const tx = db.transaction(STORE, 'readonly');
       const s = tx.objectStore(STORE);

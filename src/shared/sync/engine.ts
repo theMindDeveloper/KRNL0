@@ -25,6 +25,8 @@ export interface EngineOptions {
   /** Merges in a row on one document before sync pauses it (NF4). */
   maxConflicts?: number;
   onStatus?: (s: SyncStatus) => void;
+  /** Said when a board was saved by a newer KRNL0 than this one (the web says: update the server). */
+  newerAppMessage?: string;
   log?: (msg: string, fields?: Record<string, unknown>) => void;
   now?: () => number;
 }
@@ -48,6 +50,10 @@ export class SyncEngine {
   private busy = 0;
   private conflictsInRow = new Map<string, number>();
   private paused = new Set<string>();
+  /** Why a document is paused, when it is not "too many conflicts" (e.g. too large). */
+  private pauseReasons = new Map<string, string>();
+  /** Files the server will not take (too large): they stay on this device. */
+  private refusedAssets = new Set<string>();
   private readOnly = new Set<string>();
   private connected = false;
   private running = false;
@@ -92,7 +98,7 @@ export class SyncEngine {
         this.t.setConnectionId(null);
         if (!retrying) {
           this.stopTimers();
-          this.setState(kind === 'auth' ? 'signed-out' : 'update', message);
+          this.setState(kind === 'auth' || kind === 'certificate' ? 'signed-out' : 'update', message);
           return;
         }
         this.refresh();
@@ -120,6 +126,7 @@ export class SyncEngine {
   changed(name: string): void {
     if (!this.running) return;
     this.paused.delete(name);
+    this.pauseReasons.delete(name);
     this.conflictsInRow.delete(name);
     this.debounce(`doc:${name}`, () => this.enqueue(name, () => this.reconcile(name)));
   }
@@ -151,6 +158,7 @@ export class SyncEngine {
   /** Everything again: after a reconnect, or from "tap to retry". */
   async syncNow(): Promise<void> {
     this.paused.clear();
+    this.pauseReasons.clear();
     this.conflictsInRow.clear();
     await this.catchUp();
   }
@@ -179,6 +187,19 @@ export class SyncEngine {
   }
 
   private onJobError(key: string, err: unknown): void {
+    if (err instanceof SyncError && err.kind === 'certificate') {
+      this.stop();
+      this.setState('signed-out', err.message);
+      return;
+    }
+    if (err instanceof SyncError && err.kind === 'refused') {
+      // The server will never take it: no retry storm. A document pauses with
+      // the reason; the rest keeps syncing.
+      if (key === 'boards' || key.startsWith('board:')) { this.pause(key, err.message); return; }
+      this.opts.log?.('sync refused', { key, error: err.message });
+      this.refresh();
+      return;
+    }
     if (err instanceof SyncError && err.kind === 'auth') {
       this.stop();
       this.setState('signed-out', 'This device is no longer paired. Connect again.');
@@ -303,7 +324,7 @@ export class SyncEngine {
       if (r.reason === 'schema') {
         this.readOnly.add(name);
         this.status = { ...this.status, readOnly: [...this.readOnly] };
-        this.setState('update', 'A newer KRNL0 saved this board. Update KRNL0 to keep syncing it.');
+        this.setState('update', this.opts.newerAppMessage ?? 'A newer KRNL0 saved this board. Update KRNL0 to keep syncing it.');
         return;
       }
       // Conflict: someone else wrote since our base.
@@ -345,7 +366,7 @@ export class SyncEngine {
     if (sv !== null && sv > this.host.schemaVersion) {
       this.readOnly.add(name);
       this.status = { ...this.status, readOnly: [...this.readOnly] };
-      this.setState('update', 'A newer KRNL0 saved this board. Update KRNL0 to keep syncing it.');
+      this.setState('update', this.opts.newerAppMessage ?? 'A newer KRNL0 saved this board. Update KRNL0 to keep syncing it.');
       return;
     }
     const theirs = stripDevice(name, this.host.normalize(name, r.body));
@@ -364,10 +385,11 @@ export class SyncEngine {
     this.store.setBase(name, { rev: r.rev, body: theirs });
   }
 
-  private pause(name: string): void {
+  private pause(name: string, reason?: string): void {
     this.paused.add(name);
-    this.opts.log?.('sync paused after repeated conflicts', { doc: name });
-    this.setState('paused', 'Sync paused — tap to retry.');
+    if (reason) this.pauseReasons.set(name, reason);
+    this.opts.log?.(reason ? 'sync paused' : 'sync paused after repeated conflicts', { doc: name, ...(reason ? { reason } : {}) });
+    this.setState('paused', reason ?? 'Sync paused — tap to retry.');
   }
 
   // ── Time log ────────────────────────────────────────────────────────────
@@ -421,14 +443,23 @@ export class SyncEngine {
     const remoteIds = new Set(remote.map((a) => a.id));
     const local = this.host.assets();
     const localIds = new Set(local.map((a) => a.id));
-    for (const a of local) if (!remoteIds.has(a.id)) await this.uploadAsset(a.id);
+    for (const a of local) if (!remoteIds.has(a.id) && !this.store.flag(`asset-refused:${a.id}`)) await this.uploadAsset(a.id);
     for (const a of remote) if (!localIds.has(a.id) && a.size <= MAX_EAGER_ASSET_BYTES) await this.downloadAsset(a.id);
   }
 
   private async uploadAsset(id: string): Promise<void> {
+    if (this.store.flag(`asset-refused:${id}`)) { this.refusedAssets.add(id); return; }
     const a = this.host.readAsset(id);
     if (!a) return;
-    await this.t.putAsset(id, a.ext, a.bytes);
+    try {
+      await this.t.putAsset(id, a.ext, a.bytes);
+    } catch (err) {
+      if (!(err instanceof SyncError && err.kind === 'refused')) throw err;
+      // Too large for the server: it stays here, and is not tried again.
+      this.store.setFlag(`asset-refused:${id}`, true);
+      this.refusedAssets.add(id);
+      this.opts.log?.('asset refused', { id, error: err.message });
+    }
   }
 
   private async downloadAsset(id: string): Promise<void> {
@@ -450,11 +481,15 @@ export class SyncEngine {
     if (s === 'signed-out') return;
     let next: SyncStatus['state'];
     let message: string | null = null;
-    if (this.readOnly.size > 0) { next = 'update'; message = 'A newer KRNL0 saved a board. Update KRNL0 to keep syncing it.'; }
-    else if (this.paused.size > 0) { next = 'paused'; message = 'Sync paused — tap to retry.'; }
+    if (this.readOnly.size > 0) { next = 'update'; message = this.opts.newerAppMessage ?? 'A newer KRNL0 saved a board. Update KRNL0 to keep syncing it.'; }
+    else if (this.paused.size > 0) { next = 'paused'; message = [...this.pauseReasons.values()][0] ?? 'Sync paused — tap to retry.'; }
     else if (!this.connected) next = s === 'connecting' ? 'connecting' : 'offline';
     else if (this.busy > 0 || this.timers.size > 0) next = 'syncing';
     else next = this.hadNetworkError ? 'offline' : 'synced';
+    if (next === 'synced' && this.refusedAssets.size > 0) {
+      const n = this.refusedAssets.size;
+      message = `${n === 1 ? 'A file is' : `${n} files are`} too large for the server (images 25 MB, other files 500 MB) and stay${n === 1 ? 's' : ''} on this device.`;
+    }
     if (next === 'synced' && s !== 'synced') this.status = { ...this.status, lastSyncedAt: this.now() };
     if (next !== s || message !== this.status.message) this.setState(next, message);
   }
