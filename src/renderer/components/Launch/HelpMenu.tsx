@@ -3,6 +3,7 @@
 // source on GitHub.
 
 import { useRef, useState } from 'react';
+import { IS_WEB } from '../../platform';
 import { Popover } from '../ui/Popover';
 import { startTour } from '../Tour/TourHost';
 import { toursIn } from '../Tour/tours';
@@ -90,6 +91,7 @@ export function HelpMenu() {
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { void window.krnl?.appOpenExternal?.(REPO_URL); })}>
             <span>Source on GitHub</span><span>↗</span>
           </button>
+          {!IS_WEB && (<>
           <div className="ln-menu__rule" />
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { void checkForUpdates(); window.dispatchEvent(new CustomEvent('krnl:open-settings', { detail: { section: 'updates' } })); })}>
             <span>Check for updates</span><span />
@@ -97,6 +99,7 @@ export function HelpMenu() {
           <button type="button" role="menuitem" className="ln-menu__item" onClick={run(() => { void window.krnl?.appBackupsOpen?.(); })}>
             <span>Board backups</span><span>folder</span>
           </button>
+          </>)}
           <div className="ln-menu__rule" />
           <div className="ln-menu__item" style={{ cursor: 'default' }} aria-disabled>
             <span style={{ color: 'var(--ink-3)' }}>KRNL0 {version}</span><span>krnl feedback</span>

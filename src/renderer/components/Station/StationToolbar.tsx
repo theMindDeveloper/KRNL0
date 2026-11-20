@@ -14,6 +14,7 @@
  */
 
 import { useBoardStore } from '../../store/boardStore';
+import { IS_WEB } from '../../platform';
 import type { NodeKind, Node } from '../../../shared/types/node';
 import type { MotherNodeConfig, StationGeometry } from '../../../shared/types';
 import { SLOT_DEFAULTS } from './SlotResolver';
@@ -235,7 +236,7 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           panels
         </span>
       )}
-      {MOTHER_ORDER.filter((m) => !(easy && m.kind === 'term')).map((m) => {
+      {MOTHER_ORDER.filter((m) => !((easy || IS_WEB) && m.kind === 'term')).map((m) => {
         const node = motherByKind.get(m.kind);
         const active = !!node && !isStationHidden(node);
         return (

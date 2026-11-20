@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Popover } from '../ui/Popover';
 import { agoText, chipLook, disconnectSync, fetchDevices, syncNow, useSyncBridge, useSyncStore } from '../../store/syncStore';
 import { ConnectSheet } from './ConnectSheet';
+import { IS_WEB } from '../../platform';
 import type { SyncDevice } from '../../../shared/sync/port';
 
 const TONE: Record<string, string> = {
@@ -110,10 +111,10 @@ export function SyncChip() {
               ))}
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${IS_WEB ? 2 : 3}, minmax(0, 1fr))`, gap: 8 }}>
             <SheetButton disabled={busy} onClick={() => { setBusy(true); void syncNow().finally(() => setBusy(false)); }}>{busy ? 'Syncing…' : 'Sync now'}</SheetButton>
-            <SheetButton onClick={() => { if (info.origin) void window.krnl?.appOpenExternal?.(info.origin); }}>Open website</SheetButton>
-            <SheetButton danger onClick={() => { setOpen(false); void disconnectSync(); }}>Disconnect</SheetButton>
+            {!IS_WEB && <SheetButton onClick={() => { if (info.origin) void window.krnl?.appOpenExternal?.(info.origin); }}>Open website</SheetButton>}
+            <SheetButton danger onClick={() => { setOpen(false); void disconnectSync(); }}>{IS_WEB ? 'Log out' : 'Disconnect'}</SheetButton>
           </div>
         </div>
       </Popover>

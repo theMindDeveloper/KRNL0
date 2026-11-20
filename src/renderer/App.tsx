@@ -16,6 +16,7 @@ import { CanvasFlow as Canvas } from './components/Canvas/CanvasFlow';
 import { StationLayout } from './components/Station/StationLayout';
 import { useStationViewportGate } from './components/Station/useStationViewportGate';
 import { Orb } from './components/Orb';
+import { IS_WEB } from './platform';
 import { AmbientRadio } from './components/AmbientRadio';
 import { TopBar } from './components/TopBar';
 import { StatusBar } from './components/StatusBar';
@@ -176,7 +177,7 @@ function AppInner() {
         {/* Orb (AI bubble) is available in both modes — tutorials and chat
             work the same. ScriptRunner gates camera moves so station mode
             doesn't yank the embedded canvas around. */}
-        <Orb />
+        {!IS_WEB && <Orb />}
         <AmbientRadio />
       </div>
       <StatusBar fallbackNotice={isFallingBack} />
@@ -187,7 +188,7 @@ function AppInner() {
       <DayMoments />
       <PlanGuide />
       <UndoNoticeBar />
-      <UpdateNoticeBar />
+      {!IS_WEB && <UpdateNoticeBar />}
       <LaunchHost />
     </div>
   );
