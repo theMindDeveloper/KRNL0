@@ -11,6 +11,8 @@ import { Z } from '../ui/layers';
 import { useEasyMode } from '../../store/uiMode';
 import { useBoardStore } from '../../store/boardStore';
 import { UpdatesSection } from './UpdatesSection';
+import { ServerUpdateCard } from '../Sync/ServerUpdate';
+import { useSyncStore } from '../../store/syncStore';
 import { PocketSection } from './PocketSection';
 import { BackupsSection, CelebrationsSection } from './LaunchSettings';
 import { SoundSection } from './SoundSection';
@@ -64,8 +66,11 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const meta = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]!;
+  const found = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]!;
+  // The website has no app to update: its Updates page is the server's (server-updates F1, draft B).
+  const meta = IS_WEB && found.id === 'updates' ? { ...found, title: 'Updates', blurb: 'Your KRNL0 server: its version, and updates in one click.' } : found;
   const easyMode = useEasyMode();
+  const serverConnected = useSyncStore((s) => !!s.info?.configured);
 
   return createPortal(
     <div
@@ -81,7 +86,7 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
         <nav className="st-nav" aria-label="Settings sections">
           <div className="st-nav__title"><SettingsIcon name="settings" />Settings</div>
           {/* easy-mode D25 — Finished cards (how done cards clear off the canvas) is Advanced. */}
-          {SECTIONS.filter((s) => !(easyMode && s.id === 'finished') && !(IS_WEB && (s.id === 'timer' || s.id === 'updates'))).map((s) => (
+          {SECTIONS.filter((s) => !(easyMode && s.id === 'finished') && !(IS_WEB && s.id === 'timer') && !(IS_WEB && s.id === 'updates' && !serverConnected)).map((s) => (
             <button
               key={s.id}
               type="button"
@@ -113,8 +118,9 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
             {section === 'celebrations' && <Card><CelebrationsSection /></Card>}
             {section === 'updates' && (
               <>
-                <Card><UpdatesSection /></Card>
-                <Card><BackupsSection /></Card>
+                {!IS_WEB && <Card><UpdatesSection /></Card>}
+                {serverConnected && <Card><ServerUpdateCard /></Card>}
+                {!IS_WEB && <Card><BackupsSection /></Card>}
               </>
             )}
             {section === 'reset' && <Reset onClose={onClose} />}
