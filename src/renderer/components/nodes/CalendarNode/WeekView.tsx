@@ -442,7 +442,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   };
   // Decision 61 — the plan's ghost at a slot (DropGhost.tsx: moved without
   // re-drawing the week, so it glides instead of stuttering).
-  const showPlanGhost = (day: string, minute: number, ref: { taskId?: string; itemId?: string; durationMin?: number } | null = taskDragInfo()) => {
+  const showPlanGhost = (day: string, pointerMin: number, ref: { taskId?: string; itemId?: string; durationMin?: number; grabMin?: number } | null = taskDragInfo()) => {
+    const minute = Math.max(0, pointerMin - (ref?.grabMin ?? 0));
     const cur = calendarGhost();
     if (cur && cur.testId === 'calendar-snap-band' && cur.day === day && cur.startMin === minute) return;
     const p = previewOf(ref);
@@ -810,9 +811,14 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     setTaskPopup(null);
     // The payload carries WORK time (plannedMin), not block height: the
     // selector adds breaks on top, so the block height would grow every nudge.
-    e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: task.id, durationMin: task.plannedMin }));
+    // Decision 61 — the spot it was grabbed by stays under the pointer (as
+    // when an event is moved): the landing start is the pointer's slot minus it.
+    const r = e.currentTarget.getBoundingClientRect();
+    const grabRaw = ((e.clientY - r.top) / screenScale(e.currentTarget) / rowHeight) * 60;
+    const grabMin = Number.isFinite(grabRaw) ? Math.max(0, Math.min(Math.max(0, task.plannedMin - gran), Math.floor(grabRaw / gran) * gran)) : 0;
+    e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: task.id, durationMin: task.plannedMin, grabMin }));
     e.dataTransfer.effectAllowed = 'move';
-    beginTaskDragInfo({ taskId: task.id, durationMin: task.plannedMin });
+    beginTaskDragInfo({ taskId: task.id, durationMin: task.plannedMin, grabMin });
     // Decision 61 — no browser picture: the block steps back and the ghost
     // shows where it lands; off the hours, the small box carries it.
     startCarry(e, toneVarForTask(task.id), 'offCalendar');
@@ -1591,6 +1597,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           taskId?: string;
           itemId?: string;
           durationMin: number;
+          grabMin?: number;
         };
         if (!payload.taskId && !payload.itemId) return;
         // #11 — snap to the zoom-driven granularity (60/30/15/5), not a fixed 15.
@@ -1604,7 +1611,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         const minuteRaw = Math.floor((relY / rectH) * 60);
         const safeMinute = Number.isFinite(minuteRaw) ? minuteRaw : 0;
         const snappedMinute = Math.max(0, Math.min(60 - gran, Math.floor(safeMinute / gran) * gran));
-        const scheduledFor = `${dayYMD}T${String(hour).padStart(2, '0')}:${String(snappedMinute).padStart(2, '0')}`;
+        // Where it was grabbed stays under the pointer (Decision 61).
+        const startAbs = Math.max(0, hour * 60 + snappedMinute - (Number.isFinite(payload.grabMin) ? payload.grabMin! : 0));
+        const scheduledFor = `${dayYMD}T${String(Math.floor(startAbs / 60)).padStart(2, '0')}:${String(startAbs % 60).padStart(2, '0')}`;
         if (payload.taskId) scheduleTask(payload.taskId, scheduledFor, payload.durationMin);
         // A Todo row with no task node yet: the dispatcher creates and links
         // one, then schedules it (so both Todo rows and canvas tasks drop here).
@@ -1929,7 +1938,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         e.stopPropagation();
         const raw = e.dataTransfer.getData('application/krnl-task');
         if (!raw) return;
-        const payload = JSON.parse(raw) as { taskId?: string; durationMin: number };
+        const payload = JSON.parse(raw) as { taskId?: string; durationMin: number; grabMin?: number };
         if (!payload.taskId) return;
 
         // Snap to the 15-min slot under the cursor within THIS block.
@@ -1947,7 +1956,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         // Lands on the slot under the cursor. Another task dropped here also
         // leaves the chain that would push it behind this one (parallelWith),
         // so it stays exactly where it was dropped, overlapping this block.
-        const snappedMin = Math.max(0, Math.min(1440 - gran, Math.floor(absMinute / gran) * gran));
+        const grab = Number.isFinite(payload.grabMin) ? payload.grabMin! : 0;
+        const snappedMin = Math.max(0, Math.min(1440 - gran, Math.floor(absMinute / gran) * gran - grab));
         const hour = Math.floor(snappedMin / 60);
         const minute = snappedMin % 60;
         scheduleTask(

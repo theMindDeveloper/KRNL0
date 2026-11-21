@@ -75,6 +75,7 @@
 | F66 | (Decision 61) **Per device:** window places, visibility and canvas size never sync. No fade masks anywhere; the Year view fills its window. |
 | F67 | (Decision 61) **Carried from outside:** a small box in the plan's colour follows just below-right of the pointer; a canvas card shrinks into it while over the Calendar, so the hours stay in view. |
 | F68 | (Decision 61) **Pulling an edge** (plan or event) shows the new length as the ghost; the block steps back, with no tint or highlight on it. |
+| F69 | (Decision 61) **A moved plan keeps the spot it was grabbed by** under the pointer (like an event); off the hours the ghost hides and the box shows. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin

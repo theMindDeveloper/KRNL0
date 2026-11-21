@@ -176,11 +176,13 @@ function emptyImage(): HTMLImageElement | null {
   }
   return emptyImg;
 }
-// Decoded long before the first drag.
+// Decoded, and the box in the page, long before the first drag (nothing is
+// added to the page while a drag starts).
 emptyImage();
+boxEl();
 
 function boxEl(): HTMLDivElement | null {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || !document.body) return null;
   if (!box || !box.isConnected) {
     box = document.createElement('div');
     box.className = 'krnl-carry-box';
@@ -189,11 +191,6 @@ function boxEl(): HTMLDivElement | null {
     document.body.appendChild(box);
   }
   return box;
-}
-
-/** Is this point over a Calendar's hours or its ANY TIME strip? */
-export function overCalendarAt(target: EventTarget | null): boolean {
-  return target instanceof Element && !!target.closest('[data-cal-day], [data-cal-anytime]');
 }
 
 function paintBox(): void {
@@ -213,10 +210,20 @@ export function moveCarry(x: number, y: number, overCalendar: boolean): void {
   if (!boxRaf) boxRaf = frame(paintBox);
 }
 
+/** Is this point over a Calendar's hours (where the ghost shows)? */
+export function overHoursAt(target: EventTarget | null): boolean {
+  return target instanceof Element && !!target.closest('[data-cal-day]');
+}
+
 function onWindowDragOver(e: DragEvent): void {
   // Some browsers report 0,0 on the last event of a drag.
   if (e.clientX === 0 && e.clientY === 0) return;
-  moveCarry(e.clientX, e.clientY, overCalendarAt(e.target));
+  const hours = overHoursAt(e.target);
+  // Off the hours a plan's ghost never stays behind on a slot it would not
+  // land on (the hours set it again; this runs first, in the capture phase).
+  if (!hours && ghost?.testId === 'calendar-snap-band') setCalendarGhost(null);
+  // The box stands in for the ghost wherever there is none (ANY TIME too).
+  moveCarry(e.clientX, e.clientY, hours);
 }
 
 /**

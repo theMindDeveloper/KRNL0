@@ -8,6 +8,8 @@ export interface TaskDragInfo {
   taskId?: string;
   itemId?: string;
   durationMin?: number;
+  /** Decision 61 — minutes from the plan's start to where it was grabbed (a block moved on the Calendar keeps that spot under the pointer, like an event). */
+  grabMin?: number;
 }
 
 let current: TaskDragInfo | null = null;

@@ -137,3 +137,28 @@ describe('one ghost, no browser picture (Decision 61)', () => {
     expect(g.style.visibility).toBe('hidden');
   });
 });
+
+describe('a plan keeps the spot it was grabbed by (Decision 61, like an event)', () => {
+  const dtWith = (payload: object) => {
+    const data: Record<string, string> = { 'application/krnl-task': JSON.stringify(payload) };
+    return { data, setData: () => undefined, getData: (k: string) => data[k] ?? '', get types() { return Object.keys(data); }, setDragImage: () => undefined, effectAllowed: 'move', dropEffect: 'move' };
+  };
+
+  it('grabbed 30 minutes into it and let go on 10:00: it starts at 09:30', () => {
+    seed([task('t-plan', 'Read chapter', '2026-05-14T15:00', 60)]);
+    const onCommand = vi.fn();
+    render(<WeekView state={state} config={config} onCommand={onCommand} />);
+    const cell = document.querySelector('[data-testid="week-cell-2026-05-14-10"]')!;
+    fireEvent.drop(cell, { dataTransfer: dtWith({ taskId: 't-plan', durationMin: 60, grabMin: 30 }) });
+    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't-plan', scheduledFor: '2026-05-14T09:30', scheduledDurationMin: 60 });
+  });
+
+  it('from Todo (no grab spot): it starts where it is let go', () => {
+    seed([task('t-plan', 'Read chapter', '2026-05-14T15:00', 60)]);
+    const onCommand = vi.fn();
+    render(<WeekView state={state} config={config} onCommand={onCommand} />);
+    const cell = document.querySelector('[data-testid="week-cell-2026-05-14-10"]')!;
+    fireEvent.drop(cell, { dataTransfer: dtWith({ taskId: 't-plan', durationMin: 60 }) });
+    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't-plan', scheduledFor: '2026-05-14T10:00', scheduledDurationMin: 60 });
+  });
+});

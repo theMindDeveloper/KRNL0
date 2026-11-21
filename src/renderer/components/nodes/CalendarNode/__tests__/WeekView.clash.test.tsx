@@ -89,7 +89,7 @@ describe('WeekView — clashing plans as letter bars (F28)', () => {
     expect(row.getAttribute('draggable')).toBe('true');
     const d = dt();
     fireEvent.dragStart(row, { dataTransfer: d });
-    expect(JSON.parse(d.data['application/krnl-task']!)).toEqual({ taskId: 't-c', durationMin: 90 });
+    expect(JSON.parse(d.data['application/krnl-task']!)).toEqual({ taskId: 't-c', durationMin: 90, grabMin: 0 });
     await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
     expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeNull();
     expect(document.querySelector('.cal-anytime.is-target')).toBeNull();
