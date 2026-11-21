@@ -65,6 +65,8 @@
 | F56 | (Decision 60) **Overlaps stay as placed.** No "Fix overlap" tab over overlapping plans. |
 | F57 | (Decision 60) **One look at every size.** A block 40 px or taller shows its name (up to three lines), then its time small (mono 10 px) — for an event with how often ("every week") — wrapping when narrow, then the rest of the name and the place. |
 | F58 | (Decision 60) **Cards behave alike.** The Calendar's add card hides on a click away; a plan's Details card renames it on a double-click of its name; only one card or menu shows at a time; the info card shows name, when, category, planned, recorded and its buttons, nothing more. |
+| F59 | (Decision 60) **Steady edits.** A resized plan or a dragged event never flashes back to its old place before it lands; letting go is not a click; the plan being resized keeps its tint; events light up under the pointer. |
+| F60 | (Decision 60) **A resizable Calendar on the Free canvas.** Its right edge, bottom edge and corner resize it (420 × 360 to 1800 × 1400); the windows beside it move along and notes under it move down, so nothing overlaps, also after a swap; `krnl window size calendar <width> <height>`. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin
