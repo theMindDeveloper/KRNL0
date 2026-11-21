@@ -76,6 +76,9 @@
 | F67 | (Decision 61) **Carried from outside:** a small box in the plan's colour follows just below-right of the pointer; a canvas card shrinks into it while over the Calendar, so the hours stay in view. |
 | F68 | (Decision 61) **Pulling an edge** (plan or event) shows the new length as the ghost; the block steps back, with no tint or highlight on it. |
 | F69 | (Decision 61) **A moved plan keeps the spot it was grabbed by** under the pointer (like an event); off the hours the ghost hides and the box shows. |
+| F70 | (Decision 61) **Resizing the canvas Calendar keeps up:** the inside follows the edge in the same frame (scaled while moving, laid out on a pause and on release); the windows to its right never jump on release. |
+| F71 | (Decision 61) **The wheel on the Free canvas:** over a Calendar whose day fits, the wheel zooms or moves the canvas; zoomed into the hours, it scrolls them; Ctrl + wheel and a pinch always zoom the hours. |
+| F72 | (Decision 61) **Readable hour numbers** in My layout and on the canvas: at least 22 px apart, each on its line; the time now hides only the number under it. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin

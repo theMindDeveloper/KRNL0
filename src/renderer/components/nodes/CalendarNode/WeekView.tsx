@@ -407,6 +407,14 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   const rowFor = (z: number): number => (fillRow > 0 ? fillRow * Math.max(1, z / ZOOM_FIT) : MIN_ROW_HEIGHT * z);
   const zoomFloor = fillRow > 0 ? ZOOM_FIT : CAL_ZOOM_MIN;
   const rowHeight = rowFor(shownZoom);
+  // Decision 61 — on the Free canvas, a Calendar whose day fits has nothing to
+  // scroll: the plain wheel over it zooms (mouse) or moves (trackpad) the
+  // canvas, like anywhere else on it (owner, 2026-11-21). Once the hours are
+  // zoomed in, the wheel scrolls them. Ctrl + wheel and a pinch always zoom
+  // the hours. In My layout the Calendar is not on a canvas and keeps the wheel.
+  const [onCanvas, setOnCanvas] = useState(false);
+  useLayoutEffect(() => { setOnCanvas(!!gridBodyRef.current?.closest('.react-flow__node')); }, []);
+  const wheelToCanvas = onCanvas && fillRow > 0 && rowHeight <= fillRow + 0.01;
   // #11/#8 — one granularity drives gridlines, gutter labels, AND snapping.
   // Decision 60 — the marks follow the hours' drawn height, not the zoom
   // number: small hours (a fitted day in a small window) get no half-hour
@@ -3156,9 +3164,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           scrolls smoothly (Decision 58). */}
       <div
         ref={gridBodyRef}
-        className="krnl-week-grid nowheel"
+        className={`krnl-week-grid${wheelToCanvas ? '' : ' nowheel'}`}
         data-testid="calendar-grid-body"
-        onWheel={(e) => { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }}
+        data-wheel={wheelToCanvas ? 'canvas' : 'calendar'}
+        onWheel={(e) => { if (!wheelToCanvas && !e.ctrlKey && !e.metaKey) e.stopPropagation(); }}
         onScroll={(e) => { const t = e.currentTarget.scrollTop; window.requestAnimationFrame(() => setGridTop(t)); }}
         onDragOver={(e) => {
           // Held near the top or bottom edge while dragging: the hours glide on.
@@ -3196,6 +3205,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         >
           {Array.from({ length: rowCount }, (_, i) => {
             const hour = hourRange.start + i;
+            // Decision 61 — readable hours at any size: labels stay at least
+            // 22 px apart (every 1, 2, 3, 4 or 6 hours, on whole steps from
+            // midnight), each on its own hour's line; the time now hides only
+            // a label it really covers (it hid four hours on small rows).
+            const labelStep = [1, 2, 3, 4, 6].find((step) => step * rowHeight >= 22) ?? 6;
+            const labelled = hour % labelStep === 0;
+            const underNow = todayColIndex >= 0 && Math.abs(((hour * 60 - nowMin) / 60) * rowHeight) < 15;
             return (
               <div
                 key={hour}
@@ -3215,7 +3231,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                     top: -6,
                     right: 8,
                     // The "now" time takes this label's place when it would sit on it.
-                    visibility: todayColIndex >= 0 && Math.abs(hour * 60 - nowMin) < 22 * (60 / rowHeight) ? 'hidden' : undefined,
+                    visibility: underNow ? 'hidden' : undefined,
                     fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     fontVariantNumeric: 'tabular-nums',
@@ -3224,8 +3240,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                     pointerEvents: 'none',
                   }}
                 >
-                  {/* Very small hours: every other label, so they never touch. */}
-                  {rowHeight >= 13 || hour % 2 === 0 ? String(hour).padStart(2, '0') : ''}
+                  {labelled ? String(hour).padStart(2, '0') : ''}
                 </span>
                 {/* Only the hours are labelled (owner, 2026-11-21: the ":30" under
                     every hour was clutter). Half hours are a faint line in the grid. */}

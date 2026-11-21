@@ -99,6 +99,9 @@ export function MotherFrame({
   // canvas stacking context: it still escapes the node's clipping, but the
   // dock and other canvas panels draw on top of it.
   const frameRef = useRef<HTMLDivElement>(null);
+  // Decision 61 — what a resizable window shows, scaled with the frame while
+  // you resize it (laid out again when you pause and when you let go).
+  const contentRef = useRef<HTMLDivElement>(null);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => {
     setPortalTarget((frameRef.current?.closest('.react-flow') as HTMLElement | null) ?? document.body);
@@ -181,11 +184,40 @@ export function MotherFrame({
     const neighbours = Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node.krnl-mother'))
       .filter((el) => el !== ownWrap && el.getBoundingClientRect().left > ownLeft + 1)
       .map((el) => ({ el, transform: el.style.transform }));
+    // Decision 61 — the inside keeps up: while the pointer moves, what is
+    // inside keeps its last layout and is scaled with the frame (same shape,
+    // so nothing is stretched), drawn in the same frame as the edge. Laying the
+    // week out again on every move made it trail behind the edge; it is laid
+    // out again when the pointer rests, and when you let go.
+    const content = contentRef.current;
+    let base: { w: number; h: number; frameW: number } | null = null;
+    const freeze = () => {
+      if (!content || base) return;
+      base = { w: content.offsetWidth, h: content.offsetHeight, frameW: frame?.offsetWidth || w0 };
+      content.style.flex = 'none';
+      content.style.width = `${base.w}px`;
+      content.style.height = `${base.h}px`;
+      content.style.transformOrigin = '0 0';
+    };
+    const unfreeze = () => {
+      if (!content || !base) return;
+      base = null;
+      content.style.flex = '';
+      content.style.width = '';
+      content.style.height = '';
+      content.style.transform = '';
+      content.style.transformOrigin = '';
+    };
+    let rest = 0;
     let raf = 0;
     const paint = () => {
       raf = 0;
       if (frame) { frame.style.width = `${last.width}px`; frame.style.height = `${last.height}px`; }
       for (const n of neighbours) n.el.style.translate = `${last.width - w0}px 0px`;
+      if (content && base) {
+        const s = (last.width - (base.frameW - base.w)) / Math.max(1, base.w);
+        content.style.transform = Math.abs(s - 1) < 0.001 ? '' : `scale(${s})`;
+      }
     };
     // It grows like a picture (same shape), never below the standard size,
     // and snaps to the smallest and largest sizes when you come close.
@@ -200,29 +232,52 @@ export function MotherFrame({
       if (next.width === last.width && next.height === last.height) return;
       last = next;
       started = true;
+      freeze();
       if (!raf) raf = requestAnimationFrame(paint);
+      // Resting for a moment: lay it out for real at this size.
+      window.clearTimeout(rest);
+      rest = window.setTimeout(() => { if (raf) { cancelAnimationFrame(raf); paint(); } unfreeze(); }, 160);
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
+      window.clearTimeout(rest);
       if (raf) { cancelAnimationFrame(raf); paint(); }
+      unfreeze();
       if (!started) return;
       // One write (one undo step); the neighbours' slide is handed to the
-      // canvas once it has moved them (no jump back for a frame).
-      resizable.onResize(last.width, last.height, true);
-      let frames = 0;
-      const handOff = () => {
-        frames += 1;
-        let pending = false;
-        for (const n of neighbours) {
-          if (!n.el.style.translate) continue;
-          if (n.el.style.transform !== n.transform || frames > 30) n.el.style.translate = '';
-          else pending = true;
-        }
-        if (pending) requestAnimationFrame(handOff);
+      // canvas once it has moved them. Their 280 ms glide is off for that
+      // hand-off: with it, the new place glided in while the slide was taken
+      // away, so a window jumped back and came forward again (owner).
+      // The slide comes off in the very moment the canvas moves a window
+      // (a style change is seen before the screen is drawn; checking once a
+      // frame missed it by one frame: the window jumped and came back).
+      for (const n of neighbours) n.el.style.transition = 'none';
+      let done = false;
+      const finish = (mo: MutationObserver | null) => {
+        if (done) return;
+        done = true;
+        mo?.disconnect();
+        for (const n of neighbours) n.el.style.translate = '';
+        // The glide back on for later moves (swaps), once this is drawn.
+        requestAnimationFrame(() => requestAnimationFrame(() => { for (const n of neighbours) n.el.style.transition = ''; }));
       };
-      requestAnimationFrame(handOff);
+      const mo = typeof MutationObserver === 'function'
+        ? new MutationObserver(() => {
+          let pending = false;
+          for (const n of neighbours) {
+            if (!n.el.style.translate) continue;
+            if (n.el.style.transform !== n.transform) n.el.style.translate = '';
+            else pending = true;
+          }
+          if (!pending) finish(mo);
+        })
+        : null;
+      for (const n of neighbours) mo?.observe(n.el, { attributes: true, attributeFilter: ['style'] });
+      resizable.onResize(last.width, last.height, true);
+      // Never stuck: whatever the canvas shows after a moment stands.
+      window.setTimeout(() => finish(mo), 600);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -305,7 +360,11 @@ export function MotherFrame({
         </>
       )}
 
-      {children}
+      {!isStation && resizable ? (
+        <div ref={contentRef} className="mother-frame__content" style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {children}
+        </div>
+      ) : children}
 
       {/* Slot badge — canvas variant only.
           Station mode panels are named by position (top-row column, bottom
