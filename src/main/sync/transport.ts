@@ -209,7 +209,7 @@ export class NodeTransport implements SyncTransport {
         try { msg = JSON.parse(String(data)) as Record<string, unknown>; } catch { return; }
         if (msg.type === 'hello') {
           delay = 1000;
-          handlers.onOpen({ connectionId: String(msg.connectionId), serverTime: Number(msg.serverTime ?? Date.now()), receivedAt: Date.now() });
+          handlers.onOpen({ connectionId: String(msg.connectionId), serverTime: Number(msg.serverTime ?? Number.NaN), receivedAt: Date.now() });
           pingTimer = setInterval(() => { lastPing = Date.now(); if (sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify({ type: 'ping' })); }, 25_000);
         } else if (msg.type === 'change') {
           handlers.onNotice(msg as unknown as Notice);

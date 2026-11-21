@@ -3230,3 +3230,18 @@ Typecheck clean; all tests pass.
 **Summary:**
 - `npm run release -- tag` asked GitHub for "the newest release build" right after pushing the tag. GitHub lists the new run a few seconds later, so during v0.14.0 it found v0.13.0's finished build and said the draft was ready. It now asks for the build of this tag by name, for up to 3 minutes.
 - `npm run release -- check` without a draft yet now says whether the tag exists and how its build is doing, instead of telling you to tag again.
+
+## [2026-11-21] — Sync clashes: the latest edit wins, an edit beats a delete
+
+**Type:** Feature (sync behaviour)
+**PRs/Commits:** `feat/sync-latest-edit-wins` (issue #269)
+**Files changed:** `src/shared/sync/stamps.ts` (new), `src/shared/boardMerge.ts`, `src/shared/sync/engine.ts`, `src/shared/sync/types.ts`, `src/main/sync/store.ts`, `src/main/sync/service.ts`, `src/main/sync/transport.ts`, `src/web/sync/store.ts`, `src/web/sync/transport.ts`, `tests/unit/shared/sync/{clashStamps,engine.clash}.test.ts` (new), `tests/unit/shared/sync/fakes.ts`, `tests/integration/sync.sim.test.ts`, `docs/06-requirements/server-sync.md`, `docs/03-architecture/decisions.md`, `CHANGELOG.md`
+
+**Summary:**
+- Before: when two devices changed the same value while apart, the first device back online won; an item deleted on one device and changed on another survived or not depending on who came back first. Felt random to the owner, who also did not want a "clash" message.
+- Now (Decision 53): each changed value gets a stamp (server time + a fingerprint of the value) that travels with the board as `syncStamps`, never in `board.json`. On a clash the later edit wins; a device's clock is corrected by its measured offset (kept on disk for an offline start). Missing, untrusted, stale (an older KRNL0 changed the value) or near-equal times keep the server's version, as before. An edit beats a delete (sync only; the CLI keeps "the file wins").
+- A phone that polls now takes the server's time from the `Date` header instead of its own clock.
+- No server, protocol or board-schema change: the server stores the table as part of the body; older apps carry it along and its fingerprints make it harmless.
+- Tests: 23 unit tests for stamps and merge options, 11 engine tests with a hand-moved clock (both arrival orders, an hour-fast clock, an offline restart, a device that never measured its clock, a stale stamp, edit vs delete both ways, no re-upload loop), and a real-server simulation (UC-S10). Mutation checks: the old rule, raw clocks and trusting stale stamps each fail the engine tests.
+
+Typecheck clean; all tests pass.

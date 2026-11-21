@@ -4,6 +4,9 @@
 
 export type Json = unknown;
 
+/** [server-time ms, value fingerprint] or, before any clock measurement, [ms, fingerprint, 1] (stamps.ts). */
+export type Stamps = Record<string, [number, string] | [number, string, 1]>;
+
 export const PROTOCOL = 1;
 
 /** A document as the server holds it. */
@@ -73,6 +76,7 @@ export interface SyncTransport {
 }
 
 export interface ConnectHandlers {
+  /** `serverTime` is NaN when the transport could not learn it. */
   onOpen(info: { connectionId: string; serverTime: number; receivedAt: number }): void;
   onNotice(n: Notice): void;
   onPong?(info: { serverTime: number; sentAt: number; receivedAt: number }): void;
@@ -124,6 +128,12 @@ export interface SyncStore {
   dropPendingTimelog(ids: Set<string>): void;
   flag(key: string): boolean;
   setFlag(key: string, on: boolean): void;
+  /** When this device's values of a document were last changed (stamps.ts, Decision 53). */
+  getStamps(name: string): Stamps | null;
+  setStamps(name: string, stamps: Stamps | null): void;
+  /** The last measured offset to the server's clock, for a start without the server. */
+  clockOffset(): number | null;
+  setClockOffset(ms: number): void;
 }
 
 export type SyncState =

@@ -32,6 +32,8 @@ export interface SyncServiceDeps {
   switchToBoard: (id: string) => boolean;
   onStatus: (info: SyncInfo) => void;
   log?: (msg: string, fields?: Record<string, unknown>) => void;
+  /** The device's clock (tests give one that is off). */
+  now?: () => number;
 }
 
 interface SyncConfig {
@@ -103,6 +105,7 @@ export class SyncService implements SyncPort {
       store: this.store,
       onStatus: () => this.emit(),
       ...(this.deps.log ? { log: this.deps.log } : {}),
+      ...(this.deps.now ? { now: this.deps.now } : {}),
     });
     this.engine = engine;
     this.unsubscribe = [

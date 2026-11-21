@@ -11,13 +11,13 @@ The owner runs a KRNL0 server at home. The desktop app on every computer and the
 | F1 | **Connect.** The top bar's **saved** badge › **Connect server** (Easy mode too): the address, then the server's fingerprint shown in full ("Does it match `krnl0 fingerprint` on your server?"), then the owner password (and 2FA code). The app pairs, stores its device token in the OS keychain (Electron `safeStorage`), and pins the server's CA. CLI: `krnl sync connect <address>`, `krnl sync status`, `krnl sync disconnect`. |
 | F2 | **What syncs.** Every board (its plans, habits, calendar, timer, notes, drawings), the list of boards, the time log and images/media. **Not** synced, because they belong to one device: the viewport (pan and zoom), Station/Canvas layout and window sizes, which board is open, and app preferences. |
 | F3 | **Near real time.** A change reaches every other connected device in under a second on a home network: uploads 300 ms after the last edit, other devices are told over the WebSocket at once. |
-| F4 | **Never lose an edit.** Edits made at the same time on two devices both survive when they touch different things (merge per item and per field, the app's `boardMerge`). When both changed the very same value, the first to reach the server wins and the other device's value stays one undo step away. |
+| F4 | **Never lose an edit.** Edits made at the same time on two devices both survive when they touch different things (merge per item and per field, the app's `boardMerge`). When both changed the very same value, the **later edit wins** (F21); when one deleted an item the other changed, the **changed item stays** (F22). Nothing is shown about it; in an open window the other value stays one undo step away. |
 | F5 | **Offline.** Without the server everything keeps working. Changes are kept (on disk on desktop, in the browser's storage on the web) and sent when the server is back. Changes made with the `krnl` CLI while the app was closed are sent on the next start. |
 | F6 | **Status.** The top bar's own **saved** badge says it — no second chip: *saved* (no server) · *saved · synced* · *syncing* · *saved · offline* · *sync paused* · *update KRNL0* · *saved · signed out*. A click shows the server, the last sync, the devices (this one marked), **Sync now**, **Open website** and **Disconnect** (on the web: **Log out**). `krnl sync status` prints the same. |
 | F7 | **Board list.** Creating, renaming or deleting a board on one device reaches the others. A board deleted elsewhere is moved to `boards/.deleted/` here (kept, never destroyed); if it was open, this device first switches to another board. |
 | F8 | **Time log.** Every entry reaches every device once (UUID dedupe); analytics show the same numbers everywhere. |
 | F9 | **Images and media.** New files upload before the board that uses them; files from other devices download on first display. |
-| F10 | **Clocks.** Each device measures its clock against the server's. A difference over 5 seconds shows "This device's clock is off by N s" in Settings › Sync (timers use wall time). Merges never depend on clocks. |
+| F10 | **Clocks.** Each device measures its clock against the server's (the live channel's hello and pong; when it polls, the server's `Date` header) and keeps the last measurement for when it starts offline. A difference over 5 seconds shows "This device's clock is off by N s" in Settings › Sync (timers use wall time). A merge compares edit times only in server time (F21), never a device's own clock. |
 | F11 | **Too old.** If a board was saved by a newer KRNL0, this device stops uploading it and says "Update KRNL0 to keep syncing this board". |
 | F12 | **Revoked.** If the device is revoked or the password changes, sync stops, local data stays, and the app asks to connect again. |
 | F13 | **Website.** The KRNL0 web build (served by the server) runs the same sync core and the same windows in the browser. Phone (narrower than 700 px): a header (logo, board, saved badge, settings) and five tabs — **Today** (Timer, Plans, Habits), **Calendar** (with Clock; the phone's own Day/Week choice), **Habits**, **Insights**, **Canvas** (free cards only, one finger pans, pinch zooms) — and **Focus**, the Timer full size while it runs. iPad (700–1199 px): the same five in a side rail, Today in two columns. 1200 px and up: the Station and Canvas. Terminal, AI orb, floating timer, app updates and the backups folder are desktop-only and hidden on the web, with the tour steps about them. |
@@ -28,6 +28,8 @@ The owner runs a KRNL0 server at home. The desktop app on every computer and the
 | F18 | **Per browser.** The open view, the phone's calendar view, the layout, the viewport and the app's preferences (What's new seen, Celebrations, milestones, last use) belong to the browser, like the desktop's own. |
 | F19 | **First time on the web.** A server with no boards shows "Your server is empty": connect the desktop app (its boards appear, the app opens by itself) or start a board in the browser. |
 | F20 | **Blocked live channel.** When a phone refuses the WebSocket (some do with a self-signed certificate) but the server answers, the page checks for changes every 4 seconds instead. |
+| F21 | **The latest edit wins.** Each change a device makes to a value gets a stamp: when it was made, in server time (the device's clock plus its measured offset), and a short fingerprint of the new value. The stamps travel with the board as `syncStamps` and are never written to `board.json`. When two devices changed the same value while apart, the later stamp wins, whichever device comes back first. The version already on the server stays (the rule before) when a stamp is missing, belongs to another value (an older KRNL0 changed it), was made before this device ever measured its clock, or the two are less than 3 seconds apart. A board's first sync with a server uses that rule too. Stamps older than 30 days are dropped. |
+| F22 | **An edit beats a delete.** When one device deleted an item (a plan, a window, a habit, an event, anything with an id) and another device changed it while apart, the item stays with the change, whichever comes back first. Automatic changes count as changes (a plan being timed is in use). A whole board deleted on one device still goes and is kept aside (F7). The CLI's own merge keeps its rule (the file wins), because `krnl` already reported success. |
 
 ## Non-Functional Requirements
 
@@ -85,7 +87,11 @@ Each line says what happens and which test proves it (`unit` = `tests/unit/share
 | The browser keeps no copy (some private windows) or its storage is full | The sheet says so: changes are safe once the badge shows *saved · synced*. | — (wording) |
 | Two tabs of the same browser | Each syncs on its own connection; both end the same. Logging out in one signs the other out too. | — (by design) |
 | Two devices create a board with the same name before connecting | Both boards are kept (by id); rename one. | unit (boards merge by id) |
-| Device clocks differ | Merges never use clocks; a difference over 5 s is shown. | unit |
+| Device clocks differ | Edit times are corrected by each device's measured offset before they are compared; a difference over 5 s is shown. | unit (`engine.clash`), sim |
+| A device whose clock is an hour off edits first, then a correct one | The correct device's later edit wins: the wrong clock is corrected. | unit (`engine.clash`) |
+| A phone that polls (no live channel) | Its offset comes from the server's `Date` header, not its own clock. | unit (`clashStamps`) |
+| One device still runs an older KRNL0 | Its changes carry no new stamps; a stamp that no longer matches its value is ignored, so the version on the server stays. Nothing breaks. | unit (`clashStamps`) |
+| A device starts offline and has never measured its clock | Its edits are stamped but not trusted: on a clash the server's version stays. | unit (`engine.clash`) |
 
 ## Use Cases
 
@@ -98,6 +104,8 @@ Each line says what happens and which test proves it (`unit` = `tests/unit/share
 - **UC-S7:** On the bus they long-press "Call mom" on the phone and choose Delete; the plan is gone on the desktop too.
 - **UC-S8:** The first time on the website, the server is empty; they connect the desktop app and the page opens their board without a reload.
 - **UC-S9:** They pick a photo on the iPad's canvas; it shows at once, and on the desktop a moment later.
+- **UC-S10:** On the train, offline, they rename "Call mom" to "Call mom 19:00" on the laptop; an hour later, still offline, they change it to "Call mom 20:00" on the phone. The laptop happens to reconnect first. Every device ends with "Call mom 20:00".
+- **UC-S11:** They delete "Gym" on the phone while the laptop, offline, adds a note to it. When both are back, "Gym" is there with the note.
 
 ## User Stories
 
@@ -113,10 +121,39 @@ Feature: Different edits on two devices (F4)
   When A ticks "Gym" and B renames "Read chapter 4" before either syncs
   Then both reach the server and both devices show "Gym" ticked and the new name
 
-Feature: Same value on two devices (F4)
-  Given devices A and B are synced
-  When A sets the task title to "X" and B to "Y", and A reaches the server first
-  Then every device shows "X"
+Feature: The latest edit wins (F21)
+  Scenario: The later edit reaches the server second
+    Given devices A and B are synced and both go offline
+    When A sets the task title to "X" at 9:00 and B sets it to "Y" at 10:00
+    And A reaches the server first
+    Then every device shows "Y"
+
+  Scenario: The later edit reaches the server first
+    Given devices A and B are synced and both go offline
+    When A sets the task title to "X" at 9:00 and B sets it to "Y" at 10:00
+    And B reaches the server first
+    Then every device shows "Y"
+
+  Scenario: A wrong clock does not win
+    Given B's clock is one hour fast and B has measured it against the server
+    When B sets the title to "Y" at 9:00 real time (its clock says 10:00) and A sets it to "X" at 9:30
+    Then every device shows "X"
+
+  Scenario: No usable time
+    Given A's stamp for the title belongs to another value (an older KRNL0 changed it)
+    When A and B both changed the title and B reached the server first
+    Then every device shows B's title
+
+Feature: An edit beats a delete (F22)
+  Scenario Outline: Either order
+    Given devices A and B are synced and both go offline
+    When A deletes "Gym" and B renames it to "Gym 18:00"
+    And <first> reaches the server first
+    Then every device shows "Gym 18:00"
+    Examples:
+      | first |
+      | A     |
+      | B     |
 
 Feature: Offline (F5)
   Given device A is offline with two local changes

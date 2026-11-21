@@ -2,11 +2,13 @@
 //   <board dir>/sync/base/<doc>.json     { rev, body }
 //   <board dir>/sync/pending-timelog.json
 //   <board dir>/sync/flags.json
+//   <board dir>/sync/stamps/<doc>.json   when each value was last changed (Decision 53)
+//   <board dir>/sync/clock.json          the last measured offset to the server's clock
 // Atomic writes (temp + rename), so a crash never leaves a torn base.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { DocBase, Json, SyncStore } from '../../shared/sync/types';
+import type { DocBase, Json, Stamps, SyncStore } from '../../shared/sync/types';
 
 const fileOf = (name: string): string => encodeURIComponent(name);
 
@@ -27,9 +29,15 @@ export class FileSyncStore implements SyncStore {
   private bases = new Map<string, DocBase | null>();
   private pending: Array<{ boardId: string; month: string; entry: Json }> | null = null;
   private flags: Record<string, boolean> | null = null;
+  private readonly stampDir: string;
+  private readonly clockPath: string;
+  private stamps = new Map<string, Stamps | null>();
+  private clock: number | null | undefined = undefined;
 
   constructor(readonly dir: string) {
     this.baseDir = join(dir, 'base');
+    this.stampDir = join(dir, 'stamps');
+    this.clockPath = join(dir, 'clock.json');
     this.pendingPath = join(dir, 'pending-timelog.json');
     this.flagsPath = join(dir, 'flags.json');
     mkdirSync(this.baseDir, { recursive: true });
@@ -82,13 +90,46 @@ export class FileSyncStore implements SyncStore {
     writeAtomic(this.flagsPath, JSON.stringify(this.flags));
   }
 
+  getStamps(name: string): Stamps | null {
+    if (!this.stamps.has(name)) this.stamps.set(name, readJson<Stamps | null>(join(this.stampDir, `${fileOf(name)}.json`), null));
+    const s = this.stamps.get(name) ?? null;
+    return s ? { ...s } : null;
+  }
+
+  setStamps(name: string, stamps: Stamps | null): void {
+    const path = join(this.stampDir, `${fileOf(name)}.json`);
+    if (stamps && Object.keys(stamps).length > 0) { mkdirSync(this.stampDir, { recursive: true }); writeAtomic(path, JSON.stringify(stamps)); }
+    else rmSync(path, { force: true });
+    this.stamps.set(name, stamps ? { ...stamps } : null);
+  }
+
+  clockOffset(): number | null {
+    if (this.clock === undefined) {
+      const v = readJson<{ offsetMs?: unknown }>(this.clockPath, {}).offsetMs;
+      this.clock = typeof v === 'number' && Number.isFinite(v) ? v : null;
+    }
+    return this.clock;
+  }
+
+  setClockOffset(ms: number): void {
+    // Measured every half minute: written only when it moved noticeably.
+    const prev = this.clockOffset();
+    if (prev !== null && Math.abs(prev - ms) < 500) return;
+    this.clock = ms;
+    writeAtomic(this.clockPath, JSON.stringify({ offsetMs: ms }));
+  }
+
   /** Forget everything (disconnect). Local boards are untouched. */
   clear(): void {
     for (const f of existsSync(this.baseDir) ? readdirSync(this.baseDir) : []) rmSync(join(this.baseDir, f), { force: true });
+    rmSync(this.stampDir, { recursive: true, force: true });
     rmSync(this.pendingPath, { force: true });
     rmSync(this.flagsPath, { force: true });
+    rmSync(this.clockPath, { force: true });
     this.bases.clear();
+    this.stamps.clear();
     this.pending = null;
     this.flags = null;
+    this.clock = undefined;
   }
 }
