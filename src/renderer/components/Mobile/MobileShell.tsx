@@ -340,7 +340,7 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
               <p>{todayLine}</p>
             </div>
           )}
-          <BoardSwitcher quiet={easy} />
+          <BoardSwitcher />
           {/* The app's own saved badge, on the left as in the top bar: saved and synced. */}
           <SaveSyncBadge />
           <span className="m-spacer" />

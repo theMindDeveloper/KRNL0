@@ -8,7 +8,7 @@ A board is a separate space: its own todos, habits, calendar, timer history, ana
 
 | # | Requirement |
 |---|---|
-| F1 | The top bar has a board menu. It lists the boards, each with one fact ("18 plans · 5 habits", "nothing yet"), the open one marked. In Easy mode the menu shows only once there is more than one board. |
+| F1 | The top bar has a board menu. It lists the boards, each with one fact ("18 plans · 5 habits", "nothing yet"), the open one marked. The menu shows in Easy and Advanced alike, also with a single board, and follows changes by itself: a board made on the website or another device appears without a reload (owner, 2026-11-21: in Easy a board that came by sync was out of reach). |
 | F2 | **New board** asks for a name and one choice: **Start empty**, or **Copy my habits** (the open board's habits, their history at zero; plans and history are never copied). The new board opens. Names are unique. |
 | F3 | Opening a board swaps the whole app to it: the window reloads onto that board. Easy / Advanced and the layout come along to a new board; settings, style and light / dark are one for the app. |
 | F4 | **One timer at a time.** A timer left running (or paused, or on a break) keeps running in its board. In any other board a chip in the top bar says "Recording in *board* 12:40"; pressing it opens that board. Starting the Timer while another board is recording is refused, and the chip says "Stop the timer in *board* first". |

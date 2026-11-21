@@ -321,7 +321,9 @@ describe('Separate boards (Decision 49, boards.md)', () => {
   const read = (f: string): string => readFileSync(join(root, f), 'utf8');
   it('the top bar shows the board menu, not the canvas menu', () => {
     const bar = read('renderer/components/TopBar/index.tsx');
-    expect(bar).toContain('<BoardSwitcher quiet={easyMode} />');
+    // In Easy and Advanced alike (owner, 2026-11-21): no mode hides it.
+    expect(bar).toContain('<BoardSwitcher />');
+    expect(bar).not.toContain('<BoardSwitcher quiet');
     expect(bar).not.toContain('<CanvasSwitcher');
   });
   it('the menu has no explanatory note, and a new board asks: empty, or copy my habits', () => {
