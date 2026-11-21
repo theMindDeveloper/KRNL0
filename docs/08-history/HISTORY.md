@@ -3290,3 +3290,11 @@ Typecheck clean; all tests pass.
 - KRNL0 0.14.1 published at 01:35 UTC: between devices the change made last wins, an edit beats a delete, wrong clocks are corrected (Decision 53). The release script's fixed tag step waited for the v0.14.1 build itself.
 - Server 0.2.2 (website = KRNL0 0.14.1) came from the follow workflow. Its draft was verified (signature, 9 files, image runs 0.2.2; the website's code includes the edit stamps) and published at 01:41 UTC. `:latest` was checked against `release.json`.
 - The website's fallback version is 0.14.1.
+
+## [2026-11-21] — The board menu in Easy mode too, and it follows sync
+
+**Type:** Bug Fix
+**PRs/Commits:** `fix/board-menu-everywhere`
+**Files changed:** `src/renderer/components/TopBar/BoardSwitcher.tsx`, `src/renderer/components/TopBar/index.tsx`, `src/renderer/components/Mobile/MobileShell.tsx`, `tests/unit/renderer/BoardSwitcher.everywhere.test.tsx` (new), `docs/06-requirements/boards.md`, `docs/releases/v0.14.2.md`, `CHANGELOG.md`
+
+**Summary:** The owner started a board on the website of a new server, then connected the desktop app; in Easy mode the board menu was hidden while a window believed it had one board, and it read the list only when it opened, so the synced boards were out of reach on both sides. The menu now shows in Easy and Advanced alike (also on the phone) and reads the list again on every sync report, board change and window focus. Release notes for 0.14.2 written (owner asked for a release without per-step questions).

@@ -201,8 +201,8 @@ export function TopBar() {
 
         {/* Decision 33 — canvas switcher (the breadcrumb's last segment).
             easy-mode D24: one canvas in Easy. */}
-        {/* Decision 49 — separate boards. In Easy the menu shows once there is more than one board. */}
-        <BoardSwitcher quiet={easyMode} />
+        {/* Decision 49 — separate boards. The menu shows in Easy too, so every synced board is reachable. */}
+        <BoardSwitcher />
 
         {/* Live badge — New-user review 1.7: says what a new user wants to know
             (nothing to save by hand); with a KRNL0 server it also says how

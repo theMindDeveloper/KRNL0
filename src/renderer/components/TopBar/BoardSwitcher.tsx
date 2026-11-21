@@ -36,8 +36,12 @@ const fact = (b: KrnlBoardRow): string => {
   return parts.join(' · ');
 };
 
-/** `quiet`: Easy mode — the menu shows only once there is more than one board. */
-export function BoardSwitcher({ quiet = false }: { quiet?: boolean }) {
+/**
+ * In Easy and Advanced alike (boards.md F1, owner 2026-11-21): a board that
+ * arrives from the server, or one made on the website, must always be
+ * reachable. The list follows changes by itself (sync, another window).
+ */
+export function BoardSwitcher() {
   const [list, setList] = useState<KrnlBoardsList | null>(null);
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -58,6 +62,15 @@ export function BoardSwitcher({ quiet = false }: { quiet?: boolean }) {
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { if (open) void refresh(); }, [open, refresh]);
+  // A board created, renamed or deleted on another device comes in by sync:
+  // read the list again whenever sync reports or the board changes underneath.
+  useEffect(() => {
+    const offSync = window.krnl?.onSyncStatus?.(() => { void refresh(); });
+    const offBoard = window.krnl?.onBoardChanged?.(() => { void refresh(); });
+    const onFocus = () => { void refresh(); };
+    window.addEventListener('focus', onFocus);
+    return () => { offSync?.(); offBoard?.(); window.removeEventListener('focus', onFocus); };
+  }, [refresh]);
 
   // Close on a click elsewhere or Escape.
   useEffect(() => {
@@ -120,12 +133,11 @@ export function BoardSwitcher({ quiet = false }: { quiet?: boolean }) {
     setConfirmDel(null); setError(null); void refresh();
   };
 
-  const showMenu = !quiet || list.boards.length > 1;
   const rowBtn: React.CSSProperties = { width: 28, height: 28, flexShrink: 0, border: 'none', borderRadius: 8, background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
 
   return (
     <span ref={wrap} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: READ }}>
-      {showMenu && (
+      {(
         <button
           type="button"
           data-testid="topbar-canvas-switcher"
@@ -156,7 +168,7 @@ export function BoardSwitcher({ quiet = false }: { quiet?: boolean }) {
         </button>
       )}
 
-      {open && showMenu && (
+      {open && (
         <div
           role="menu"
           data-testid="board-menu"

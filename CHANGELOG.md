@@ -5,6 +5,12 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.2] — unreleased
+
+### Fixed
+- The board menu shows in Easy mode too, on the computer and the phone, so every board is always reachable. Before, Easy hid it while there was one board, and a board that came from your server (one made on the website, say) could not be opened.
+- The board menu follows changes by itself: a board created, renamed or deleted on another device appears without a reload.
+
 ## [0.14.1] — 2026-11-21
 
 ### Changed
