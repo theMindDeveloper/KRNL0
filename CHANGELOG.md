@@ -5,7 +5,7 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.0] — unreleased
+## [0.14.0] — 2026-11-21
 
 ### Added
 - Server updates from the app: a dot on the saved badge and a row in its menu, one sheet with the password, the steps and the result (or the command to run), and the server in Settings › Updates with "Update by itself at night" (Decision 52, server-updates.md).
