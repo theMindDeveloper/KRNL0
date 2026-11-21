@@ -17,9 +17,10 @@ function touch(target: Element, type: 'touchstart' | 'touchmove' | 'touchend' | 
   return ev;
 }
 
-/** A trusted-looking event (what the phone itself sends). */
+/** An event the phone itself sends (jsdom cannot fake isTrusted: the test marks it). */
+const NATIVE = new WeakSet<Event>();
 function native<T extends Event>(target: Element, ev: T): T {
-  Object.defineProperty(ev, 'isTrusted', { value: true });
+  NATIVE.add(ev);
   target.dispatchEvent(ev);
   return ev;
 }
@@ -27,16 +28,17 @@ function native<T extends Event>(target: Element, ev: T): T {
 let off: () => void;
 let dial: HTMLElement;
 let menus: MouseEvent[];
+const count = (e: Event): void => { if (!e.defaultPrevented) menus.push(e as MouseEvent); };
 
 beforeEach(() => {
   vi.useFakeTimers();
   document.body.innerHTML = '<div id="clock"><span id="num">12</span></div><input id="field" value="hello" /><button id="row">Row</button>';
   dial = document.getElementById('num')!;
   menus = [];
-  document.addEventListener('contextmenu', (e) => { if (!e.defaultPrevented) menus.push(e as MouseEvent); });
-  off = installLongPressMenu(document);
+  document.addEventListener('contextmenu', count);
+  off = installLongPressMenu(document, { isNative: (e) => NATIVE.has(e) });
 });
-afterEach(() => { off(); vi.useRealTimers(); document.body.innerHTML = ''; });
+afterEach(() => { off(); document.removeEventListener('contextmenu', count); vi.useRealTimers(); document.body.innerHTML = ''; });
 
 describe('long-press on a touch screen', () => {
   it('opens one right-click menu at the finger after the hold', () => {

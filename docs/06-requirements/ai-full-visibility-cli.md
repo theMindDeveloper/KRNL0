@@ -132,7 +132,7 @@ These are read-only views — they do not mutate.
 - `krnl settings show [--json]` — `{ theme, viewport: {x, y, zoom}, boardPath, version }`.
 - `krnl theme show` — current theme.
 - `krnl viewport show [--json]` — current viewport.
-- `krnl settings mode [easy|advanced]` / `krnl settings layout [station|canvas]` — show or set the UI mode and the layout (the top-bar pills; headless, they write the board).
+- `krnl settings mode [easy|advanced]` / `krnl settings layout [classic|grid|planner|free]` — show or set the UI mode and the layout (the top bar's mode pill and layout menu; `station` and `canvas` still work; headless, they write the board). `krnl settings station-layout [classic|grid|planner]` sets the Station's preset without leaving Free (Decision 54).
 - `krnl finished status|overnight|hour|keep|show|hide` — when finished task cards leave the canvas (Settings → Finished cards). `krnl recap [today]|yesterday|week|show` — the day recap, yesterday and last week; `show` opens the card. Both need an open window. See [engagement.md](engagement.md).
 - `krnl sound status|list|pack <snd01|zen|crisp>|volume <0-100>|on|off|play <moment>` — UI sounds, the same settings as Settings → Sounds (exit 2 without an open window). See [ui-sounds.md](ui-sounds.md).
 - `krnl radio list|status|play [<preset>]|remove <preset>|stop|volume <0-100>` — the Ambient Radio mix in the open window (exit 2 without one). It drives the panel's own handlers, so the panel shows what the CLI did; YouTube needs a pasted link and stays UI-only.

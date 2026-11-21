@@ -37,6 +37,10 @@
 | F29 | **Tracked time is the Clock rail** ("Clock rail · refined", version A4). Each day has a track at its left, 4 px inside its own day line (3 px in a Station-width day), drawn like the Clock's ring track: one shade lighter than the day (`--paper-3`; halved on light paper), rounded at both ends, 5 px wide (6 px day view, 4 px Station). The track only covers time that has passed: the whole day before today, up to now today, nothing on days still ahead, and nothing on a past day with no recorded time (a week of bare tracks read as scrollbars) — it fills up as the day goes, and the grey left is time you did not record. Each focus span fills the track at its full width with round caps, in its tag or task colour (untagged lime uses a deeper mix on light paper); a span still running has crawling stripes (still under reduced motion); a break is the empty track. Today's "now" is a knob on the track in the now line's red; the now line then draws no dot of its own. Plans start 5 px after the track (3 px Station) and never sit on it. The day header shows the day's tracked total when the column has room (>= 110 px). The other versions stay one constant away (`RAIL_STYLE` in WeekView: A1 full ring track, A2 with hour marks, A3 thin 4 px). In a day too narrow for a one-line name (under 64 px), a block alone in its column wraps its name (F31); plans that clash stay letter bars (F28). |
 | F30 | (UX review pick 5A, 2026-11-18) **Chains are named on the calendar.** A planned block that follows another task in its chain shows a small "after <task>" line under its name when the block has room (always in its tooltip), and the plan popup of a chained plan says "after <task>" too. In both modes (Easy keeps chains, easy-mode D14). Drawn connectors between blocks are out of scope. |
 | F31 | (Owner pick A, 2026-11-19) **A narrow block alone in its column wraps its name.** In a day column too narrow for a one-line name (under 64 px, `MIN_LANE_PX`: the week in a Station-width Calendar), a block that is not part of a clash shows its name in 10 px mono (`.cal-wrap`), wrapped down the block: words first, a long word breaks where it must, and only whole 11 px lines are drawn, so a short block shows its first line and a tall one the whole name. A done block keeps its tick under the name when there is room. It falls back to the first character only when fewer than three letters fit across. Plans that clash keep their letters (F28): a slim bar holds no word. The full name stays in the tooltip and the plan card. It was the first character alone ("S", "P"), which showed that a day had plans but not which. |
+| F32 | (Owner, 2026-11-21 — Decision 55) **Readable events.** A repeating event is a calm tinted card (its colour at about 15 % over the paper, a thin border in its colour, rounded) — no hatching. Its whole name wraps over as many lines as the block has, in the reading font at 12 px; then its time ("16:00–17:30"), then its place when it has one ("WH C 442": the part after a long dash with a digit in it, or the first short line of its note). The name gets the first lines (up to two), then the time, then the rest of the name, then the place; nothing is cut in half (`eventText.ts`). A lane too thin for words writes the name sideways. Plans name themselves in the same reading font and use every line a tall block has. |
+| F33 | (Decision 55) **A calm grid.** The gutter labels the hours only (no ":30"); a half hour is a faint dashed line. Hour and day lines are drawn at ink 11 % (frame styles may set `--k-cal-grid`; Pro dark is #2c2c2c). |
+| F34 | (Decision 55) **Today is clear.** The day header shows the weekday small and the date large; today's date sits in an accent circle, days gone by step back to grey, weekend names are quieter. Today's column is a neutral lift (no olive wash; none in the day view). The now line is solid and 2 px across today only, a faint trace across the other days, with no glow; the time now ("04:53") sits in the gutter on the line and the hour label under it gives way. |
+| F35 | (Decision 55) **The Orb stays off the windows.** In a Station layout the Orb rests in the top bar, at half size, after the Settings button (`[data-orb-dock]`): a click opens it as before, it does not drag there, and its full-size box never takes clicks from the windows under the bar. In Free it keeps its own place. |
 
 ## Gherkin Scenarios (ATDD)
 
@@ -142,4 +146,17 @@ Feature: No scrolling in Calendar and Clock
     Given a Calendar panel that fits 6 hours
     When I scroll down once over the grid
     Then the grid shows the next 6 whole hours and the pager reads the new range
+```
+
+```gherkin
+Feature: Readable events (F32)
+  Given a class "B112 Front-End Development (PÜ) – WH C 442" on Thursday 14:00–15:30
+  When I look at the week at the default zoom
+  Then its block reads "B112 Front-End Development (PÜ)", "14:00–15:30" and "WH C 442"
+  And the block is a flat tint with no hatching
+
+Feature: Calm grid and clear today (F33, F34)
+  Then the gutter shows "13", "14" and no ":30"
+  And today's date is in the accent circle
+  And the time now is in the gutter on the now line
 ```

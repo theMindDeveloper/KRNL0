@@ -144,11 +144,21 @@ describe('NowLine — cleanup on unmount', () => {
 });
 
 describe('NowLine — day view', () => {
-  it('centres the dot in the single day column', () => {
+  // Decision 55 — today's line starts at its column's left edge with the dot and spans it.
+  it("starts the dot at the day column and runs today's line across it", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-14T10:30:00'));
     const { container } = render(<NowLine {...makeProps({ weekStartDate: '2026-05-14', days: 1, gutterWidth: 0 })} />);
     const dot = container.querySelector('[data-testid="now-line-dot"]') as HTMLElement;
-    expect(dot.style.left).toContain('50%');
+    expect(dot.style.left).toContain('0%');
+    expect((container.querySelector('[data-testid="now-line-today"]') as HTMLElement).style.width).toBe('100%');
+  });
+
+  it("in a week, only today's column gets the solid line", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-14T10:30:00'));
+    const { container } = render(<NowLine {...makeProps()} />);
+    const today = container.querySelector('[data-testid="now-line-today"]') as HTMLElement;
+    expect(today.style.width).toContain('14.28');
   });
 });

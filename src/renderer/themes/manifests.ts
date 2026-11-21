@@ -18,7 +18,8 @@ export const CLASSIC_CLOCK: ClockSkin = { bezel: 'none', hand: 'line', readoutWi
 
 export const CLASSIC_K: TokenMap = {
   '--k-now': '#ef4444',
-  '--k-cal-grid': 'rgba(154, 145, 128, 0.25)',
+  // Decision 55 — hour and day lines you can read, in every theme.
+  '--k-cal-grid': 'color-mix(in srgb, var(--ink) 11%, transparent)',
   // Decision 55 — today's column is a neutral lift, not an olive wash.
   '--k-cal-today': 'color-mix(in srgb, var(--ink) 3.5%, transparent)',
   '--k-pointer-core': '#fff5ec',

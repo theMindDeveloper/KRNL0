@@ -2735,10 +2735,49 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
 
 **Consequences.** Every board upload carries its stamp table (one entry per value changed in the last 30 days; gzip keeps it small). Automatic changes count as edits, so a plan being timed on one device is not lost to a delete on another. Order of documents still comes from server revisions; clocks only break a tie between two changes to the same value.
 
-## Decision 54 — The Station has two presets: Classic and Grid (2026-11-20)
+## Decision 54 — One layout menu: Classic, Grid, Planner and Free (2026-11-21)
 
-**Context.** The owner liked the desktop-browser Station drawn for the KRNL0 server (Timer, Todos, Habits over Calendar and Clock) and asked for it in the Windows app as a layout to choose. Requirements: `docs/06-requirements/station-layouts.md`.
+**Context.** The owner liked the desktop-browser Station drawn for the KRNL0 server (Timer, Todos, Habits over Calendar and Clock) and asked for it as a layout to choose (the Grid preset, 2026-11-20, never merged). On 2026-11-21 they asked for one dropdown listing every layout instead of the Station / Free switch, with the arrangement from their screenshot (Timer, Todos and Clock on top, a full-width Calendar below) as one option. Their screenshot was Classic with Clock and Calendar swapped and Habits hidden, so a preset built on Classic's places would not reliably give it. Requirements: `docs/06-requirements/station-layouts.md`.
 
-**Decision.** `layoutGeometry.station.preset` is `classic` (default, absent) or `grid`. `StationLayout` picks `ClassicStationLayout` (unchanged) or `GridStationLayout` (new). Grid saves its own sizes in `layoutGeometry.station.grid`, so the presets never disturb each other. The Station toolbar has a Classic / Grid switch; `krnl settings station-layout` sets the same field. All Station geometry writes now keep the fields they do not change.
+**Decision.**
+1. `layoutGeometry.station.preset` is `classic` (default, absent, or unknown), `grid` or `planner`. The names, drawings and parsing live in `src/shared/stationLayouts.ts`, shared by the renderer and the CLI.
+2. `StationLayout` renders `ClassicStationLayout` (unchanged) or `RowsStationLayout` (Grid, Planner), which places windows **by kind** in a fixed order; only Classic places them by slot and offers drag-to-swap. Each preset saves its own sizes (`station.grid`, `station.planner`). All Station geometry writes keep the fields they do not change.
+3. The top bar's `LayoutMenu` replaces `LayoutModeToggle`: Classic, Grid, Planner (the Station) and Free (the canvas). Ctrl+Shift+L still flips Station and Free. The Station toolbar's own preset switch from the Grid draft is removed (one control for one setting).
+4. CLI: `krnl settings layout [classic|grid|planner|free]` (also `station`, `canvas`); `krnl settings station-layout [classic|grid|planner]`. `krnl window swap` says when the swap shows only in Classic.
 
-**Consequences.** No migration (absent = Classic). In Grid the canvas, terminal and analytics have no Station panel; the canvas stays on the top bar's CANVAS view. `layoutGeometry` is per device, so with sync each computer keeps its own preset (Decision 51).
+**Consequences.** No migration. In Grid and Planner the canvas, terminal and analytics have no Station panel (the canvas is one pick away: Free). `layoutGeometry` is per device, so each computer keeps its own layout (Decision 51). An older app opens `planner` as Classic.
+
+## Decision 55 — A readable Calendar; the Orb off the windows (2026-11-21)
+
+**Context.** The owner called the Week view "really ugly and bad": classes were yellow-green hatched bands with one line of small text cut with "…", every hour had a ":30" label, the grid lines and today were hard to read, and the Orb sat on the hour labels. Decision 40 had made events hatched so they never read as plans. Requirements: `calendar-clock-visuals.md` F32–F35, `routines.md` F6.
+
+**Decision.**
+1. A repeating event is a calm tinted card with a thin border (no hatching). It shows its whole name over the lines it has, then its time, then its place (`eventText.ts`: a room written after a long dash, or a short note). It stays distinct from a plan by its lighter tint, its missing shadow and its repeat icon.
+2. The gutter labels hours only; half hours are a faint dashed line; hour and day lines are readable (ink 11 %, Pro dark #2c2c2c).
+3. Day headers show the date large, today in an accent circle, past days grey. Today's column is a neutral lift. The now line is solid on today only, faint elsewhere, with no glow; the time now sits in the gutter.
+4. Plans name themselves in the reading font and use every line a tall block has; they press in on pointer-down.
+5. In a Station layout the Orb rests in the top bar at half size (`[data-orb-dock]`), not dragged there, with its full box ignoring clicks; in Free it keeps its saved place.
+
+**Consequences.** Decision 40's "hatched = event" is replaced by the tint, border and icon. A narrow Station week still uses F28/F31 for plans. The Orb's saved position is untouched (used again in Free).
+
+## Decision 56 — The phone website: Today first, touch that behaves (2026-11-21)
+
+**Context.** On the phone the owner wanted big changes: a better structure, touch everywhere (the canvas above all), and no more long-press that opens the menu and also selects text. Requirements: `phone-web.md`.
+
+**Decision.**
+1. Today shows the date, a one-line summary and **Your day** (`dayAgenda.ts`, pure): today's timed plans, repeating events and habits in order, a now line, and the current or next item opened out with its action (Focus on it / Track it now). Then Timer, Plans, Habits and the Clock. The Calendar tab is the Calendar alone, full screen (an iPad keeps the Clock beside it). The canvas runs edge to edge.
+2. Touch (`touch.ts`, `web.css`): a long-press dispatches one right-click at the finger; while a finger is down the phone's own right-click and any selection start are dropped, the selection is cleared when the menu opens, the lift's touchend is cancelled and a click at the lifted finger is dropped. On touch screens UI text is not selectable (fields, editable text and `data-selectable` are), and menu rows are 44 px. The shared ContextMenu gets `role="menu"`.
+3. The tab bar marks the open view with a filled pill; controls press in; views fade in (none with reduced motion).
+
+**Consequences.** Copying words from read-only UI text on a phone is no longer possible (fields and notes being edited still are). Checked with real touch events in headless Chromium: pan, pinch, card drag, long-press on a card, the canvas and a Clock number.
+
+## Decision 57 — Analytics in plain charts that follow the theme (2026-11-21)
+
+**Context.** The owner asked for Analytics to be heavily improved. It kept a fixed dark slate in Classic (even in the light theme), used gradient cards, tracked uppercase mono labels, a sparkline, rainbow palettes with violet, a radar, pies and a cramped scatter, and showed "+754 %" against a nearly empty month. Requirements: `analytics-window.md` F10–F12.
+
+**Decision.**
+1. Analytics takes the theme in every style (Classic gets the themed `--k-an-*` set). Card titles are words in the reading font. One hue per chart (the accent); unknown sources take neutral steps.
+2. Summary: the headline, one divided KPI band with the change in its own unit ("+7 on the 30 days before", `SummaryStat.change`), Focus per day as a real chart (round-hour gridlines, dates, the average dashed and in words, weeks when the range is long), then the sentences, whose trends also use units.
+3. The radar becomes a this-period-and-before list; the pies, the stacked mix, the cumulative lines and the scatter become labelled bar lists (where activity came from, best days, focus-span lengths, focus on days you finished something, each habit's check-ins); focus by weekday is seven bars; counts per day are bars.
+
+**Consequences.** `krnl analytics summary` prints the same sentences with unit trends. The unused KPI tiles lose their left accent bar. The card catalogue and page layout (`guide.ts`) are unchanged, so saved hidden/pinned cards still apply.

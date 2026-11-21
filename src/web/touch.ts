@@ -22,7 +22,13 @@ const AFTER_MS = 900;
 
 const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], [data-selectable], .xterm';
 
-export function installLongPressMenu(doc: Document = document): () => void {
+export interface LongPressOptions {
+  /** Whether an event came from the phone itself (tests stand in for `isTrusted`). */
+  isNative?: (e: Event) => boolean;
+}
+
+export function installLongPressMenu(doc: Document = document, opts: LongPressOptions = {}): () => void {
+  const isNative = opts.isNative ?? ((e: Event): boolean => e.isTrusted);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let start: { x: number; y: number; target: EventTarget } | null = null;
   let fingerDown = false;
@@ -58,7 +64,7 @@ export function installLongPressMenu(doc: Document = document): () => void {
       fired = true;
       swallowUntil = now() + AFTER_MS;
       clearSelection();
-      const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: start.x, clientY: start.y, button: 2, buttons: 2, view: doc.defaultView });
+      const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: start.x, clientY: start.y, button: 2, buttons: 2 });
       start.target.dispatchEvent(ev);
       timer = null;
     }, HOLD_MS);
@@ -93,7 +99,7 @@ export function installLongPressMenu(doc: Document = document): () => void {
   // before ours): dropped while a finger is down and just after ours. Ours is
   // synthetic (not trusted) and always goes through.
   const onNativeMenu = (e: MouseEvent): void => {
-    if (!e.isTrusted || inField(e.target)) return;
+    if (!isNative(e) || inField(e.target)) return;
     if (fingerDown || now() < swallowUntil) { e.preventDefault(); e.stopImmediatePropagation(); }
   };
 
@@ -101,7 +107,7 @@ export function installLongPressMenu(doc: Document = document): () => void {
   // (it would pick the menu row that just opened under it). A tap anywhere
   // else, even right away, goes through.
   const onClick = (e: MouseEvent): void => {
-    if (!e.isTrusted || !lift) return;
+    if (!isNative(e) || !lift) return;
     const near = Math.hypot(e.clientX - lift.x, e.clientY - lift.y) <= 2 * SLOP_PX;
     if (now() < lift.until && near) { e.preventDefault(); e.stopImmediatePropagation(); }
     lift = null;
@@ -112,19 +118,19 @@ export function installLongPressMenu(doc: Document = document): () => void {
     if ((fingerDown || now() < swallowUntil) && !inField(e.target instanceof Node ? (e.target instanceof Element ? e.target : e.target.parentElement) : null)) e.preventDefault();
   };
 
-  const opts: AddEventListenerOptions = { capture: true, passive: true };
-  doc.addEventListener('touchstart', onStart, opts);
-  doc.addEventListener('touchmove', onMove, opts);
-  doc.addEventListener('touchcancel', onCancel, opts);
+  const listen: AddEventListenerOptions = { capture: true, passive: true };
+  doc.addEventListener('touchstart', onStart, listen);
+  doc.addEventListener('touchmove', onMove, listen);
+  doc.addEventListener('touchcancel', onCancel, listen);
   doc.addEventListener('touchend', onEnd, { capture: true, passive: false });
   doc.addEventListener('contextmenu', onNativeMenu, true);
   doc.addEventListener('click', onClick, true);
   doc.addEventListener('selectstart', onSelectStart, true);
   return () => {
     clear();
-    doc.removeEventListener('touchstart', onStart, opts);
-    doc.removeEventListener('touchmove', onMove, opts);
-    doc.removeEventListener('touchcancel', onCancel, opts);
+    doc.removeEventListener('touchstart', onStart, listen);
+    doc.removeEventListener('touchmove', onMove, listen);
+    doc.removeEventListener('touchcancel', onCancel, listen);
     doc.removeEventListener('touchend', onEnd, { capture: true });
     doc.removeEventListener('contextmenu', onNativeMenu, true);
     doc.removeEventListener('click', onClick, true);
