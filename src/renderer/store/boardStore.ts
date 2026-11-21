@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { presetOf, presetRows, swapInRows, withPreset } from '../../shared/stationLayouts';
 import { saveBoard, setLiveViewportSource } from './eventLog';
 import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig, CompletionRecord } from '../../shared/types';
 import type { DrawStroke } from '../../shared/types/board';
@@ -302,6 +303,17 @@ export const useBoardStore = create<BoardStore>((set) => ({
       // in station mode visibly rearranges the panels (ADR 0008 § 4.2).
       const cfgA = (nodeA.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
       const cfgB = (nodeB.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
+      // Decision 58 — in Grid and Planner the preset keeps its own order: the
+      // two windows trade places there, and Classic's places stay as they are.
+      const geo = s.board.layoutGeometry?.station;
+      const preset = presetOf(geo);
+      if (s.board.layoutMode === 'station' && preset !== 'classic') {
+        const order = swapInRows(presetRows(preset, geo?.[preset]?.order), nodeA.kind, nodeB.kind);
+        return {
+          ...pushHistory(s),
+          board: { ...s.board, layoutGeometry: { ...s.board.layoutGeometry, station: { ...withPreset(geo, preset), [preset]: { ...geo?.[preset], order } } } },
+        };
+      }
       const slotA = cfgA.stationSlot;
       const slotB = cfgB.stationSlot;
       return {

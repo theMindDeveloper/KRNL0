@@ -257,8 +257,8 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           </ToolbarBtn>
         );
       })}
-      {/* The canvas only has a panel to hide in the Classic Station. */}
-      {inStation && preset === 'classic' && <ToolbarBtn
+      {/* The canvas has a panel to show or hide in every Station layout (Decision 58). */}
+      {inStation && <ToolbarBtn
         active={canvasShown}
         label="Canvas"
         onClick={toggleCanvas}

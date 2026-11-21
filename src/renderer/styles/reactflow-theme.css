@@ -289,7 +289,7 @@
   line-height: 14px; color: var(--ink); letter-spacing: 0; pointer-events: none; white-space: nowrap;
 }
 /* F31 — a narrow block alone in its column: the name, wrapped down the block. */
-.cal-wrap { font-family: var(--font-mono); font-size: 10px; line-height: 11px; letter-spacing: -0.06em; color: var(--ink); overflow: hidden; overflow-wrap: anywhere; white-space: normal; flex-shrink: 0; pointer-events: none; position: relative; z-index: 1; }
+.cal-wrap { font-family: var(--font-read, var(--font-sans)); font-weight: 600; font-size: 10.5px; line-height: 12px; letter-spacing: -0.01em; color: var(--ink); overflow: hidden; overflow-wrap: anywhere; white-space: normal; flex-shrink: 0; pointer-events: none; position: relative; z-index: 1; }
 .cal-block[data-plan-state="missed"] .cal-wrap { color: color-mix(in srgb, var(--rust) 70%, var(--ink)); }
 .cal-block[data-plan-state="done"] .cal-wrap { color: var(--ink-2); }
 .cal-letter--stack { writing-mode: horizontal-tb; width: 1ch; white-space: normal; word-break: break-all; line-height: 11px; text-align: center; }
@@ -362,3 +362,19 @@
   .react-flow__node[data-settling] { transition: none; }
 }
 [data-motion="reduced"] .react-flow__node[data-settling] { transition: none; }
+
+/* Decision 58 — a plan is a task: a small tick box before its name tells it
+   from a repeating event (which has none and lies flat). */
+.cal-task-box {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: -1px;
+  width: 10px; height: 10px; margin-right: 5px; box-sizing: border-box; border-radius: 3px;
+  border: 1.5px solid currentColor; color: var(--ink-on-bright); flex-shrink: 0;
+}
+.cal-task-box.is-done { border-width: 0; }
+.cal-block[data-plan-state='done'] { filter: saturate(0.6); }
+/* The hours: a thin scrollbar that appears on use, never a heavy track. */
+.krnl-week-grid { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent; }
+/* Habits: the box answers the hand. */
+.cal-habit { transition: transform 120ms ease-out; }
+.cal-habit:not(:disabled):active { transform: scale(0.94); }
+@media (prefers-reduced-motion: reduce) { .cal-habit { transition: none; } .cal-habit:active { transform: none; } }

@@ -28,7 +28,6 @@ import { AppSelect } from '../../ui/AppSelect';
 import { SpanTimeEditor, CountsToward, openLogTime, logTimeDefaults } from '../../ui/SpanEditor';
 import { SPACE, popupColumn } from '../../ui/spacing';
 import { useAppMarkers } from '../../../store/appSessions';
-import { HabitIcon } from '../HabitNode/HabitIcon';
 import { trackedSecondsByTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { selectPomoReality, pomoIsLive } from '../../../store/pomoReality';
 import { colorForTask, TASK_TONE_VAR } from '../../../utils/taskColor';
@@ -57,7 +56,9 @@ import { PagedView } from '../../ui/PagedView';
 import { TaskPopup } from './TaskPopup';
 import { showPlanGuide } from '../../PlanGuide';
 import { hourWindow, stepHourWindow } from './hourWindow';
+import { useLayoutEffect, type PointerEvent as ReactPointerEvent } from 'react';
 import { EVENT_TEXT, eventLines, eventTitleAndPlace } from './eventText';
+import { parseQuickAdd } from '../../../../shared/quickAdd';
 import { Z } from '../../ui/layers';
 import { MenuIcon } from '../../ui/menuIcons';
 import { RemindPicker } from '../../ui/RemindPicker';
@@ -232,12 +233,16 @@ interface WeekViewProps {
 
 /** Window event: scroll the hour window to this week's first routine (routines tour). */
 export const SHOW_ROUTINES_EVENT = 'krnl:calendar-show-routines';
-const GUTTER_WIDTH = 40; // px — time gutter width (the hours only; half hours are a line in the grid)
+const GUTTER_WIDTH = 48; // px — time gutter: the hours on their lines, and the time now (owner, 2026-11-21: "06:13" touched the edge at 40)
+// Room above 00:00 and below 24:00, so the first and last hour labels sit on
+// their lines without touching the ANY TIME row or the footer.
+const GRID_PAD = 10;
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
 // Grid lines (owner, 2026-11-21: they were too faint to read). Frame styles
 // can still set --k-cal-grid; the half hour stays a quiet dashed line.
 const CAL_HOUR_LINE = 'var(--k-cal-grid, color-mix(in srgb, var(--ink) 11%, transparent))';
 const CAL_DAY_LINE = 'var(--k-cal-grid, color-mix(in srgb, var(--ink) 11%, transparent))';
+const CAL_HOUR_BAND = 'color-mix(in srgb, var(--ink) 2.6%, transparent)';
 const CAL_HALF_LINE = 'linear-gradient(to right, color-mix(in srgb, var(--ink) 10%, transparent) 50%, transparent 0)';
 /** F31 — the wrapped name in a narrow block: 10 px mono, one letter about 5.5 px wide, 11 px a line. */
 const WRAP_CH_PX = 5.5;
@@ -357,9 +362,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // Default 2× (56px per hour): at 1× a 20-minute task is a ~10px sliver.
   // The whole day doesn't need to fit — the grid scrolls (see below).
   const zoom = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, state.zoom ?? 2));
-  const rowHeight = MIN_ROW_HEIGHT * zoom;
+  // Decision 58 — zoom is a gesture, not a button: pinch on a trackpad,
+  // Ctrl/⌘ + wheel, two fingers on a touch screen, or dragging the hour
+  // gutter. While the gesture runs the zoom is live (no save per frame); it is
+  // saved once it rests.
+  const [liveZoom, setLiveZoom] = useState<number | null>(null);
+  const shownZoom = liveZoom ?? zoom;
+  const rowHeight = MIN_ROW_HEIGHT * shownZoom;
   // #11/#8 — one granularity drives gridlines, gutter labels, AND snapping.
-  const gran = granularityFor(zoom);
+  const gran = granularityFor(shownZoom);
   // Sub-hour marks at every granularity step inside the hour (skip :00).
   const subMarks: number[] = gran >= 60
     ? []
@@ -850,6 +861,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   const [eventRemind, setEventRemind] = useState<{ id: string; x: number; y: number; value: number | null } | null>(null);
   const DAY_LETTER = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const daysOf = (h: Habit): number[] => !h.schedule || h.schedule.kind === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : h.schedule.kind === 'weekdays' ? [1, 2, 3, 4, 5] : [...h.schedule.days];
+  const [calAdding, setCalAdding] = useState(false);
+  const [calAddText, setCalAddText] = useState('');
+  const calAddRowRef = useRef<HTMLDivElement>(null);
+  const calAddInputRef = useRef<HTMLInputElement>(null);
   const openNewAt = (dayYMD: string, minute: number, x: number, y: number) => {
     const snapMin = Math.max(0, Math.min(1425, Math.floor(minute / 15) * 15));
     const at = `${String(Math.floor(snapMin / 60)).padStart(2, '0')}:${String(snapMin % 60).padStart(2, '0')}`;
@@ -1002,16 +1017,97 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     setGridH(el.clientHeight);
     return () => ro.disconnect();
   }, []);
-  const lastFlip = useRef(0);
+  // Decision 58 — the hours scroll smoothly (the wheel, a trackpad, a finger);
+  // the arrows glide by most of a screen.
   const flipHours = (dir: 1 | -1) => {
     const el = gridBodyRef.current;
     if (!el) return;
-    const now = Date.now();
-    if (now - lastFlip.current < 320) return;
-    lastFlip.current = now;
-    const startHour = stepHourWindow(el.scrollTop, el.clientHeight, rowHeight, rowCount, dir);
-    el.scrollTop = startHour * rowHeight;
-    setGridTop(el.scrollTop);
+    el.scrollBy({ top: dir * Math.max(rowHeight, el.clientHeight * 0.8), behavior: 'smooth' });
+  };
+  void stepHourWindow;
+
+  // ── Zoom gestures (Decision 58) ─────────────────────────────────────────
+  // The hour under the pointer stays under the pointer while the zoom changes.
+  const zoomAnchor = useRef<{ min: number; offset: number } | null>(null);
+  const zoomCommit = useRef<number | null>(null);
+  const liveZoomRef = useRef<number | null>(null);
+  const zoomTo = useCallback((next: number, clientY: number | null) => {
+    const el = gridBodyRef.current;
+    const z = Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, next));
+    const cur = liveZoomRef.current ?? Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, state.zoom ?? 2));
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      const offset = clientY === null ? el.clientHeight / 2 : Math.max(0, Math.min(el.clientHeight, clientY - rect.top));
+      const min = ((el.scrollTop + offset - GRID_PAD) / (MIN_ROW_HEIGHT * cur)) * 60;
+      zoomAnchor.current = { min, offset };
+    }
+    liveZoomRef.current = z;
+    setLiveZoom(z);
+    if (zoomCommit.current !== null) window.clearTimeout(zoomCommit.current);
+    zoomCommit.current = window.setTimeout(() => {
+      zoomCommit.current = null;
+      onCommand('calendar.setZoom', { zoom: Math.round(z * 20) / 20 });
+    }, 320);
+  }, [onCommand, state.zoom]);
+  // Once the saved zoom has caught up, the live one steps aside.
+  useEffect(() => {
+    if (liveZoom !== null && zoomCommit.current === null && Math.abs((state.zoom ?? 2) - liveZoom) < 0.06) { liveZoomRef.current = null; setLiveZoom(null); }
+  }, [state.zoom, liveZoom]);
+  useLayoutEffect(() => {
+    const el = gridBodyRef.current;
+    const a = zoomAnchor.current;
+    if (!el || !a) return;
+    zoomAnchor.current = null;
+    el.scrollTop = Math.max(0, (a.min / 60) * rowHeight + GRID_PAD - a.offset);
+  }, [rowHeight]);
+  useEffect(() => {
+    const el = gridBodyRef.current;
+    if (!el) return;
+    // Pinch on a trackpad arrives as Ctrl + wheel; Ctrl/⌘ + a mouse wheel too.
+    const onWheel = (e: WheelEvent): void => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const base = liveZoomRef.current ?? Math.min(CAL_ZOOM_MAX, Math.max(CAL_ZOOM_MIN, state.zoom ?? 2));
+      zoomTo(base * Math.exp(-e.deltaY * 0.004), e.clientY);
+    };
+    // Two fingers on a touch screen.
+    let pinch: { d: number; z: number } | null = null;
+    const dist = (t: TouchList): number => Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY);
+    const onTouchStart = (e: TouchEvent): void => {
+      if (e.touches.length === 2) pinch = { d: dist(e.touches), z: liveZoomRef.current ?? (state.zoom ?? 2) };
+    };
+    const onTouchMove = (e: TouchEvent): void => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      zoomTo(pinch.z * (dist(e.touches) / Math.max(1, pinch.d)), (e.touches[0]!.clientY + e.touches[1]!.clientY) / 2);
+    };
+    const onTouchEnd = (e: TouchEvent): void => { if (e.touches.length < 2) pinch = null; };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [zoomTo, state.zoom]);
+  // Dragging the hour gutter up or down stretches the hours, like a ruler.
+  const gutterDrag = (e: ReactPointerEvent<HTMLDivElement>): void => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const z0 = liveZoomRef.current ?? zoom;
+    const target = e.currentTarget;
+    target.setPointerCapture?.(e.pointerId);
+    const move = (ev: PointerEvent): void => zoomTo(z0 * Math.exp((ev.clientY - startY) / 180), startY);
+    const up = (): void => { target.removeEventListener('pointermove', move); target.removeEventListener('pointerup', up); target.removeEventListener('pointercancel', up); };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
   };
   const win = hourWindow(gridTop, gridH, rowHeight, rowCount);
 
@@ -1312,10 +1408,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   /** Room kept at a day's left for its recorded-time track — only on days
    *  that draw one (recorded time that day, or today with the Recorded layer
    *  on); elsewhere plans start 4 px from the day line, like the right side. */
-  function railPxFor(dayYMD: string): number {
-    const hasTrack = layers.recorded && ((realityByDay.get(dayYMD)?.length ?? 0) > 0 || dayYMD === toYMD(new Date()));
-    return hasTrack ? RAIL_PX(singleDay, tinyDays) : 4;
+  // Decision 58 — the recorded-time rail is gone from the Calendar (owner,
+  // 2026-11-21: "I really hate it"): plans use the whole day, a small inset.
+  function railPxFor(_dayYMD: string): number {
+    return 3;
   }
+  void RAIL_PX;
 
   function renderTaskBlocks(dayYMD: string) {
     const slices = slicesByDay.get(dayYMD);
@@ -1651,9 +1749,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             zIndex: 2,
             padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : detail === 'letter' ? (letterTop ? '3px 0 0' : 0) : detail === 'wrap' ? '2px 0 0 1px' : 0,
             opacity: 1,
-            // A ring of the ground keeps back-to-back plans apart; the border is
-            // its only edge (a border or a shadow, never both).
-            boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper)',
+            // Decision 58 — a plan (a task) floats above the grid with a soft
+            // shadow; a repeating event lies flat on it. A ring of the ground
+            // keeps back-to-back plans apart.
+            boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.28), 0 6px 14px -6px rgba(0,0,0,0.45)',
             display: 'flex',
             flexDirection: 'column',
             // A one-line title sits centred in short blocks instead of being
@@ -1770,6 +1869,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 lineHeight: 1.2,
               }}
             >
+              <span aria-hidden className={`cal-task-box${isDone ? ' is-done' : ''}`} style={{ borderColor: taskTone, ...(isDone ? { background: taskTone } : {}) }}>
+                {isDone && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+              </span>
               {task.text}
             </span>
           )}
@@ -2111,7 +2213,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 6, overflow: 'hidden',
             ...(occ.skipped
               ? { border: `1px dashed color-mix(in srgb, ${col} 55%, transparent)`, background: 'transparent' }
-              : { border: `1px solid color-mix(in srgb, ${col} 34%, transparent)`, background: `color-mix(in srgb, ${col} 15%, var(--paper))` }),
+              : { border: `1px solid color-mix(in srgb, ${col} 30%, transparent)`, background: `color-mix(in srgb, ${col} 13%, var(--paper))` }),
           }}
         >
           {sideways && (
@@ -2160,7 +2262,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   const trackW = TRACK_W(singleDay, tinyDays);
   const trackLeft = TRACK_LEFT(tinyDays);
   function renderRealityBlocks(dayYMD: string) {
-    if (!layers.recorded) return null;
+    // Decision 58 — not drawn on the Calendar any more (the Clock shows recorded time).
+    if (dayYMD) return null;
     const segs = realityByDay.get(dayYMD) ?? [];
     const todayYMD = toYMD(new Date());
     const nowD = new Date();
@@ -2281,14 +2384,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
 
       const hoursFromStart = habitHour - hourRange.start + habitMin / 60;
       const topPx = Math.round(hoursFromStart * rowHeight);
-      // A pill cut by the edge of the shown hours waits for its page (the hour
-      // pager sits on that edge): never half a pill under the pager.
-      if (gridH > 0) {
-        const winTop = (win.startHour - hourRange.start) * rowHeight;
-        const winBottom = (win.endHour - hourRange.start) * rowHeight;
-        const straddles = (edge: number) => topPx - 12 < edge && topPx + 12 > edge;
-        if ((win.startHour > 0 && straddles(winTop)) || straddles(winBottom)) continue;
-      }
       const done = habit.log.includes(dayYMD);
       const colour = `var(--${habit.color})`;
       const titleSuffix = habit.schedule.durationMin ? ` (${habit.schedule.durationMin} min)` : '';
@@ -2312,44 +2407,51 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             }).catch(() => { /* never break the calendar */ });
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          className="nodrag"
+          className="nodrag cal-habit"
+          data-icon-only={iconOnly ? 'true' : undefined}
           style={{
-            // A habit is a small pill at its time on the right edge — it marks
-            // the moment without covering the plan beside it.
+            // Decision 58 — a habit is a small tick box on its time line (centred
+            // on it), at the right of the day: the box in the habit's colour,
+            // filled with a check when done; its name beside it when there is
+            // room. No ring with a dot inside.
             position: 'absolute',
-            top: topPx + 1,
-            right: 3,
+            top: topPx - 10,
+            right: 4,
             left: 'auto',
-            height: 18,
-            maxWidth: singleDay ? 168 : 'calc(100% - 14px)',
-            ...(iconOnly ? { width: 18, justifyContent: 'center', padding: 0 } : { padding: singleDay ? '0 7px 0 4px' : '0 6px 0 4px' }),
+            height: 20,
+            maxWidth: singleDay ? 180 : 'calc(100% - 10px)',
+            padding: iconOnly ? 2 : '0 7px 0 4px',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
-            borderRadius: 999,
-            // Done: the habit's colour as a tint with a check; open: an outline.
-            // Text is always ink, so it reads in every colour and theme.
-            border: `1px solid color-mix(in srgb, ${colour} ${done ? 80 : 60}%, transparent)`,
-            background: done ? `color-mix(in srgb, ${colour} 30%, var(--paper))` : 'var(--paper)',
+            gap: 5,
+            borderRadius: 6,
+            border: iconOnly ? '0' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)',
+            background: iconOnly ? 'transparent' : 'var(--node-bg, var(--paper))',
             color: 'var(--ink)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+            boxShadow: iconOnly ? 'none' : '0 1px 2px rgba(0,0,0,0.22), 0 3px 8px -3px rgba(0,0,0,0.3)',
             zIndex: 3,
             cursor: isFuture ? 'default' : 'pointer',
             font: 'inherit',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
+            fontFamily: 'var(--font-read, var(--font-sans))',
+            fontSize: 11.5,
             fontWeight: 600,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
+            opacity: isFuture ? 0.85 : 1,
           }}
         >
-          <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0, color: done ? 'var(--ink)' : colour }}>
-            {done
-              ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-              : habit.icon ? <HabitIcon icon={habit.icon} size={10} /> : <span style={{ width: 7, height: 7, borderRadius: 999, background: colour, display: 'inline-block' }} />}
+          <span aria-hidden className="cal-habit__box" style={{
+            width: 14, height: 14, flexShrink: 0, boxSizing: 'border-box', borderRadius: 4,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            border: done ? '0' : `1.5px solid ${colour}`,
+            background: done ? colour : (iconOnly ? 'var(--node-bg, var(--paper))' : 'transparent'),
+            color: 'var(--ink-on-bright)',
+            boxShadow: iconOnly ? '0 1px 2px rgba(0,0,0,0.3)' : 'none',
+          }}>
+            {done && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
           </span>
-          {!iconOnly && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{habit.name}</span>}
-          {habit.amount && !done && (
+          {!iconOnly && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, color: done ? 'var(--ink-3)' : 'var(--ink)' }}>{habit.name}</span>}
+          {habit.amount && !done && !iconOnly && (
             <span data-testid={`calendar-habit-count-${habit.id}`} style={{ flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>
               {countOn({ amount: habit.amount, ...(habit.counts ? { counts: habit.counts } : {}), log: [...habit.log] }, dayYMD)}/{habit.amount.target}
             </span>
@@ -2633,37 +2735,46 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         </button>
       )}
 
-      {/* Grid body: gutter + 7 columns — flex-fills the calendar card. Shows a
-          window of whole hours; wheel / pager / edge-drag flip windows. */}
+      {/* Grid body: gutter + 7 columns — flex-fills the calendar card and
+          scrolls smoothly (Decision 58). */}
       <div
         ref={gridBodyRef}
         className="krnl-week-grid nowheel"
         data-testid="calendar-grid-body"
-        onWheel={(e) => {
-          if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) < 4) return;
-          e.stopPropagation();
-          flipHours(e.deltaY > 0 ? 1 : -1);
-        }}
+        onWheel={(e) => { if (!e.ctrlKey && !e.metaKey) e.stopPropagation(); }}
+        onScroll={(e) => { const t = e.currentTarget.scrollTop; window.requestAnimationFrame(() => setGridTop(t)); }}
         onDragOver={(e) => {
+          // Held near the top or bottom edge while dragging: the hours glide on.
           const rect = e.currentTarget.getBoundingClientRect();
           if (!Number.isFinite(e.clientY) || rect.height <= 0) return;
-          if (e.clientY > rect.bottom - 18) flipHours(1);
-          else if (e.clientY < rect.top + 18) flipHours(-1);
+          if (e.clientY > rect.bottom - 28) e.currentTarget.scrollTop += 10;
+          else if (e.clientY < rect.top + 28) e.currentTarget.scrollTop -= 10;
         }}
         style={{
           display: useAgenda ? 'none' : 'flex',
           flex: 1,
           minHeight: 0,
-          overflow: 'hidden',
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
           position: 'relative',
+          padding: `${GRID_PAD}px 0`,
         }}
       >
-        {/* Time gutter */}
+        {/* Time gutter — drag it up or down to zoom the hours (Decision 58). */}
         <div
+          data-testid="calendar-gutter"
+          onPointerDown={gutterDrag}
+          title="Drag up or down to zoom the hours (or pinch, or Ctrl + scroll)"
+          className="cal-gutter nodrag"
           style={{
             width: GUTTER_WIDTH,
             flexShrink: 0,
             position: 'relative',
+            cursor: 'ns-resize',
+            touchAction: 'none',
+            alignSelf: 'flex-start',
+            height: rowCount * rowHeight,
           }}
         >
           {Array.from({ length: rowCount }, (_, i) => {
@@ -2682,16 +2793,18 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                     keeps its lines but no half-cut label. */}
                 <span
                   style={{
+                    // On its hour's line (Decision 58), the right of the gutter.
                     position: 'absolute',
-                    top: 1,
-                    right: 4,
+                    top: -6,
+                    right: 8,
                     // The "now" time takes this label's place when it would sit on it.
-                    visibility: hour >= win.endHour || hour < win.startHour || (todayColIndex >= 0 && Math.abs(hour * 60 - nowMin) < 22 * (60 / rowHeight)) ? 'hidden' : undefined,
+                    visibility: todayColIndex >= 0 && Math.abs(hour * 60 - nowMin) < 22 * (60 / rowHeight) ? 'hidden' : undefined,
                     fontFamily: 'var(--font-mono)',
                     fontSize: 11,
                     fontVariantNumeric: 'tabular-nums',
                     color: 'var(--ink-3)',
-                    lineHeight: 1,
+                    lineHeight: '12px',
+                    pointerEvents: 'none',
                   }}
                 >
                   {String(hour).padStart(2, '0')}
@@ -2707,9 +2820,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               data-testid="calendar-now-time"
               aria-label={`Now ${fmtMinOfDay(nowMin)}`}
               style={{
-                position: 'absolute', right: 2, top: (nowMin / 60) * rowHeight - 8, height: 16, padding: '0 4px', boxSizing: 'border-box',
+                position: 'absolute', right: 5, top: (nowMin / 60) * rowHeight - 8, height: 16, padding: '0 4px', boxSizing: 'border-box',
                 display: 'inline-flex', alignItems: 'center', borderRadius: 4, zIndex: 2,
-                fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+                fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1,
                 color: '#fff', background: 'color-mix(in srgb, var(--k-now, #ef4444) 84%, #000)', pointerEvents: 'none',
               }}
             >
@@ -2735,7 +2848,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             // matches scrollHeight and lets the overlay span the full grid.
             // Plus the part of an hour the panel shows past the last whole
             // hour, so every page (the last too) starts on a whole hour.
-            minHeight: rowCount * rowHeight + (gridH > 0 ? gridH % rowHeight : 0),
+            minHeight: rowCount * rowHeight,
+            height: rowCount * rowHeight,
           }}
         >
           {/* Day-separator lines overlay — absolute layer sized to the full
@@ -2798,6 +2912,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                         height: rowHeight,
                         boxSizing: 'border-box',
                         borderBottom: `1px solid ${CAL_HOUR_LINE}`,
+                        // Decision 58 — every other hour a shade deeper, so an hour reads as a band.
+                        backgroundColor: hour % 2 === 1 ? CAL_HOUR_BAND : undefined,
                         // #4 — a faint dashed half-hour line once the grid is
                         // tall enough to need it, so blocks read against a ruler.
                         backgroundImage: subMarks.length > 0 ? CAL_HALF_LINE : undefined,
@@ -2873,7 +2989,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               columnWidth={NOMINAL_COLUMN_WIDTH}
               gutterWidth={0}
               // The Clock rail's knob marks now on today's track (F29).
-              showDot={!layers.recorded}
+              showDot
             />
           )}
         </div>
@@ -2903,7 +3019,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           items={[
             // easy-mode D22 — the layer switches and zoom are Advanced.
             ...(easy ? [] : ([
-              ['recorded', 'Recorded time'],
               ['habits', 'Habits'],
               ['routines', 'Repeating events'],
             ] as const).map(([k, label]): ContextMenuItem => ({
@@ -2913,31 +3028,73 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               onSelect: () => toggleLayer(k),
             }))),
             { label: 'Repeating events…', icon: <MenuIcon name="repeat" />, ...(easy ? {} : { divider: true }), onSelect: () => setEventsOpen({ x: calMenu.x, y: calMenu.y }) },
-            ...(easy ? [] : [
-              { label: 'Zoom in', icon: <MenuIcon name="plus" />, hint: `${zoom.toFixed(1)}×`, divider: true, disabled: zoom >= CAL_ZOOM_MAX, onSelect: () => setZoom(zoom + CAL_ZOOM_STEP) },
-              { label: 'Zoom out', icon: <span />, disabled: zoom <= CAL_ZOOM_MIN, onSelect: () => setZoom(zoom - CAL_ZOOM_STEP) },
-            ] as ContextMenuItem[]),
+            // Decision 58 — zoom is a gesture (pinch, Ctrl + scroll, or drag the hours).
           ]}
         />
       )}
       {/* window-frame.md — the standard footer: the one thing you add here. Opens
           the same card as a double-click on empty hours (a plan, or Repeats). */}
-      <div className="kw-foot">
-        <button
-          type="button"
-          className="kw-add"
-          data-testid="calendar-new"
-          title="Add a plan or a repeating event (or double-click empty hours)"
-          aria-label="Add to the Calendar"
-          onClick={(e) => {
-            const now = new Date();
-            const day = weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!;
-            const r = e.currentTarget.getBoundingClientRect();
-            openNewAt(day, Math.min(23 * 60, (now.getHours() + 1) * 60), r.left, r.top - 8);
-          }}
-        >
-          add a plan
-        </button>
+      {/* Decision 58 — you add to the Calendar the way you add to Todo: you
+          type at the bottom. A time in the words ("Gym fri 18:00 1h") puts it
+          straight on the Calendar; without one, the plan card opens with the
+          name already in it, for the time (or Repeats). */}
+      <div className="kw-foot" ref={calAddRowRef}>
+        {calAdding ? (
+          <>
+            <input
+              ref={calAddInputRef}
+              data-testid="calendar-add-input"
+              aria-label="Add a plan to the Calendar"
+              autoFocus
+              value={calAddText}
+              placeholder="Add a plan — try: Gym fri 18:00 1h"
+              onChange={(e) => setCalAddText(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Escape') { setCalAdding(false); setCalAddText(''); return; }
+                if (e.key !== 'Enter') return;
+                const raw = calAddText.trim();
+                if (!raw) return;
+                const q = parseQuickAdd(raw);
+                const day = q.day ?? (weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!);
+                if (q.time && !q.hint) {
+                  void addPlanAt(q.text || raw, day, q.time, q.durationMin ?? 60);
+                  setCalAddText('');
+                  return;
+                }
+                const r = e.currentTarget.getBoundingClientRect();
+                const now = new Date();
+                const minute = Math.min(23 * 60, (now.getHours() + 1) * 60);
+                const snapMin = Math.floor(minute / 15) * 15;
+                const at = `${String(Math.floor(snapMin / 60)).padStart(2, '0')}:${String(snapMin % 60).padStart(2, '0')}`;
+                const isoDow = ((new Date(`${day}T00:00:00`).getDay() + 6) % 7) + 1;
+                setEventCard({ x: r.left, y: r.top - 340, day, allowOnce: true, initial: { name: q.text || raw, mode: 'once', days: [isoDow], time: at, lengthMin: q.durationMin ?? 60 } });
+                setCalAddText('');
+                setCalAdding(false);
+              }}
+              onBlur={() => { if (!calAddText.trim()) setCalAdding(false); }}
+              style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', caretColor: 'var(--acid)' }}
+            />
+            {(() => {
+              const q = calAddText.trim() ? parseQuickAdd(calAddText.trim()) : null;
+              if (!q || !q.time || q.hint) return null;
+              const day = q.day ?? (weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!);
+              const label = new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+              return <span data-testid="calendar-add-preview" className="kw-kbd" style={{ width: 'auto', padding: '0 8px', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{label} {q.time}{q.durationMin ? ` · ${fmtDur(q.durationMin)}` : ''}</span>;
+            })()}
+          </>
+        ) : (
+          <button
+            type="button"
+            className="kw-add"
+            data-testid="calendar-new"
+            title="Add a plan: type it here (or double-click empty hours)"
+            aria-label="Add to the Calendar"
+            onClick={() => setCalAdding(true)}
+          >
+            add a plan
+          </button>
+        )}
         <span className="kw-kbd" aria-hidden>↵</span>
       </div>
 

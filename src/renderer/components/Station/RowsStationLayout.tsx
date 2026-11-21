@@ -1,19 +1,20 @@
 /**
- * RowsStationLayout — the Station's fixed presets (Decision 54): two rows of
- * windows in a set order, picked from the top bar's layout menu.
+ * RowsStationLayout — the Station's Grid and Planner presets (Decision 54,
+ * Decision 58): two rows of windows that start in the preset's arrangement
  *
  *   Grid                                   Planner
  *   ┌────────┬────────┬────────┐           ┌──────┬──────┬──────┬──────┐
- *   │ Timer  │ Todos  │ Habits │           │Timer │Todos │Habits│Clock │
+ *   │ Timer  │ Todos  │ Habits │           │Timer │Clock │Todos │Habits│
  *   ├────────┴────────┼────────┤           ├──────┴──────┴──────┴──────┤
  *   │ Calendar        │ Clock  │           │ Calendar                   │
  *   └─────────────────┴────────┘           └────────────────────────────┘
  *
- * The windows are the same as Classic's (StationCell), found by kind, so a
- * preset always looks the way its name says, whatever was swapped in Classic.
- * Each preset saves its own panel sizes (`layoutGeometry.station.<preset>`),
- * so switching never disturbs another one. A hidden window lets its
- * neighbours fill the row; an empty row gives its height to the other.
+ * and are yours from there: drag a window onto another to swap them (the
+ * preset keeps its own order, `station.<preset>.order`), show any window from
+ * the top bar (one the preset does not place joins the bottom row), resize
+ * every seam. Each preset keeps its own sizes, so switching never disturbs
+ * another. A hidden window lets its neighbours fill the row; an empty row
+ * gives its height to the other.
  */
 
 import { useCallback, useMemo } from 'react';
@@ -23,20 +24,24 @@ import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { useFrameTheme } from '../../themes/useFrameTheme';
 import { StationCell } from './StationCell';
+import { EmbeddedCanvasCell } from './EmbeddedCanvasCell';
 import { StationToolbar } from './StationToolbar';
 import { isStationHidden } from './stationVisibility';
 import { CellWrapper, EmptyShellHint } from './StationShell';
 import { restoredSizes } from './restoredSizes';
 import { useSnapshot } from './layoutGeometry';
-import { ROWS_PRESETS, withPreset, type RowsPreset } from '../../../shared/stationLayouts';
+import { ROWS_PRESETS, presetRows, withPreset, type RowsPreset, type StationWindow } from '../../../shared/stationLayouts';
 import type { StationGridGeometry } from '../../../shared/types';
 
-export const ROWS_LIMITS = { minRow: 20, minColumn: 12 } as const;
+export const ROWS_LIMITS = { minRow: 20, minColumn: 10 } as const;
 
 const vHandle: React.CSSProperties = { width: 9, margin: '0 -4px', cursor: 'col-resize', flexShrink: 0, position: 'relative', zIndex: 3 };
 const hHandle: React.CSSProperties = { height: 9, margin: '-4px 0', cursor: 'row-resize', flexShrink: 0, position: 'relative', zIndex: 3 };
 
 const near = (a: number | undefined, b: number): boolean => a !== undefined && Math.abs(a - b) < 0.002;
+
+/** A window's default weight in its row: the Calendar and the canvas take more. */
+const WEIGHT: Partial<Record<StationWindow, number>> = { calendar: 2, canvas: 2 };
 
 type Which = 'top' | 'bottom';
 
@@ -45,20 +50,22 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
   const panelSlot = useFrameTheme().manifest.slots.panelToggles;
   const setLayoutGeometry = useBoardStore((s) => s.setLayoutGeometry);
   const nodes = useBoardStore((s) => s.board?.nodes);
-  const saved = useBoardStore((s) => s.board?.layoutGeometry?.station?.[id]);
+  const geo = useBoardStore((s) => s.board?.layoutGeometry?.station);
+  const saved = geo?.[id];
+  const canvasHidden = geo?.canvasHidden ?? false;
   const [dockStyle] = useDockStyle();
 
-  const ids = (which: Which) => def[which].map((kind) => `${id}-${which}-${kind}`);
-  const shown = (which: Which) => def[which]
-    .map((kind, i) => ({ kind, i, panelId: ids(which)[i]! }))
-    .filter((d) => {
-      const node = nodes?.find((n) => n.isMother && n.kind === d.kind);
-      return !!node && !isStationHidden(node);
-    });
-  const top = shown('top');
-  const bottom = shown('bottom');
+  const rows = presetRows(id, saved?.order);
+  const pid = (k: StationWindow) => `${id}-${k}`;
+  const shown = (k: StationWindow): boolean => {
+    if (k === 'canvas') return !canvasHidden;
+    const node = nodes?.find((n) => n.isMother && n.kind === k);
+    return !!node && !isStationHidden(node);
+  };
+  const top = rows.top.filter(shown);
+  const bottom = rows.bottom.filter(shown);
 
-  /** Saves one part of this preset's sizes, keeping everything else the Station saved (NF1). */
+  /** Saves one part of this preset's geometry, keeping everything else the Station saved (NF1). */
   const save = useCallback((patch: Partial<StationGridGeometry>) => {
     const current = useBoardStore.getState().board?.layoutGeometry?.station;
     setLayoutGeometry({ station: { ...withPreset(current, id), [id]: { ...current?.[id], ...patch } } });
@@ -74,18 +81,21 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
     save({ rowFraction: f });
   }, [save, id, rowTop, rowBottom]);
 
-  const onRow = useCallback((which: Which) => (layout: Layout) => {
-    const prev = useBoardStore.getState().board?.layoutGeometry?.station?.[id]?.[which];
-    const fallback = which === 'top' ? def.topSizes : def.bottomSizes;
-    const next = ids(which).map((pid, i) => (layout[pid] !== undefined ? layout[pid]! / 100 : (prev?.[i] ?? fallback[i]! / 100)));
-    if (prev && prev.length === next.length && prev.every((v, i) => near(v, next[i]!))) return;
-    save({ [which]: next });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [save, id, def]);
-  const onTop = useMemo(() => onRow('top'), [onRow]);
-  const onBottom = useMemo(() => onRow('bottom'), [onRow]);
+  // Each window's share of its row, by window: it keeps its width when you move it or show another.
+  const onRow = useCallback((layout: Layout) => {
+    const prev = useBoardStore.getState().board?.layoutGeometry?.station?.[id]?.sizes ?? {};
+    const next: Record<string, number> = { ...prev };
+    let changed = false;
+    for (const [panel, size] of Object.entries(layout)) {
+      if (!panel.startsWith(`${id}-`) || panel.startsWith(`${id}-row-`)) continue;
+      const k = panel.slice(id.length + 1);
+      const f = size / 100;
+      if (!near(prev[k], f)) { next[k] = f; changed = true; }
+    }
+    if (changed) save({ sizes: next });
+  }, [save, id]);
 
-  // Sizes are read once per set of visible windows (layoutGeometry.ts, issue #199).
+  // Sizes are read once per set and order of visible windows (layoutGeometry.ts, issue #199).
   const has = saved ? 'saved' : 'none';
   const rowPercent = useSnapshot(`${id}|${top.length > 0}|${bottom.length > 0}|${has}`, () => {
     const f = saved?.rowFraction;
@@ -93,26 +103,27 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
       ? Math.min(100 - ROWS_LIMITS.minRow, Math.max(ROWS_LIMITS.minRow, f * 100))
       : def.rowPercent;
   });
-  const sizesFor = (which: Which, visible: Array<{ panelId: string; i: number }>) => {
-    const fallback = which === 'top' ? def.topSizes : def.bottomSizes;
-    const all = ids(which);
-    const stored = saved?.[which];
-    const savedMap = stored && stored.length === all.length ? Object.fromEntries(all.map((pid, i) => [pid, stored[i]!])) : undefined;
-    // Defaults scaled to fill the row with only the visible windows.
-    const raw = visible.map((d) => fallback[d.i]!);
+  const sizesFor = (visible: readonly StationWindow[]) => {
+    const raw = visible.map((k) => WEIGHT[k] ?? 1);
     const sum = raw.reduce((a, v) => a + v, 0) || 1;
-    return restoredSizes(visible.map((d) => d.panelId), raw.map((v) => (v / sum) * 100), visible.map(() => ROWS_LIMITS.minColumn), savedMap);
+    const defaults = raw.map((v) => (v / sum) * 100);
+    const map = saved?.sizes;
+    const savedMap = map && visible.every((k) => typeof map[k] === 'number') ? Object.fromEntries(visible.map((k) => [pid(k), map[k]!])) : undefined;
+    return restoredSizes(visible.map(pid), defaults, visible.map(() => ROWS_LIMITS.minColumn), savedMap);
   };
-  const topSizes = useSnapshot(`${id}|${top.map((d) => d.panelId).join(',')}|${has}`, () => sizesFor('top', top));
-  const bottomSizes = useSnapshot(`${id}|${bottom.map((d) => d.panelId).join(',')}|${has}`, () => sizesFor('bottom', bottom));
+  const topKey = top.join(',');
+  const bottomKey = bottom.join(',');
+  const topSizes = useSnapshot(`${id}|${topKey}|${has}`, () => sizesFor(top));
+  const bottomSizes = useSnapshot(`${id}|${bottomKey}|${has}`, () => sizesFor(bottom));
+  const onRowMemo = useMemo(() => onRow, [onRow]);
 
-  const row = (visible: Array<{ panelId: string; kind: string }>, sizes: number[]) => {
+  const row = (visible: readonly StationWindow[], sizes: number[]) => {
     const out: React.ReactNode[] = [];
-    visible.forEach((d, i) => {
-      if (i > 0) out.push(<Separator key={`sep-${d.panelId}`} className="station-splitter" style={vHandle} />);
+    visible.forEach((k, i) => {
+      if (i > 0) out.push(<Separator key={`sep-${k}`} className="station-splitter" style={vHandle} />);
       out.push(
-        <Panel key={d.panelId} id={d.panelId} defaultSize={sizes[i]} minSize={ROWS_LIMITS.minColumn}>
-          <CellWrapper><StationCell kind={d.kind} /></CellWrapper>
+        <Panel key={pid(k)} id={pid(k)} defaultSize={sizes[i]} minSize={ROWS_LIMITS.minColumn}>
+          <CellWrapper>{k === 'canvas' ? <EmbeddedCanvasCell /> : <StationCell kind={k} />}</CellWrapper>
         </Panel>,
       );
     });
@@ -139,11 +150,11 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
         {!hasTop && !hasBottom ? (
           <EmptyShellHint />
         ) : (
-          // Keyed by preset: switching Grid ↔ Planner mounts fresh panels with that preset's sizes.
-          <Group key={id} orientation="vertical" onLayoutChanged={onRows} style={{ flex: 1, minHeight: 0 }}>
+          // Keyed by preset and order: a swap or a shown window mounts the rows fresh with their sizes.
+          <Group key={`${id}|${topKey}|${bottomKey}`} orientation="vertical" onLayoutChanged={onRows} style={{ flex: 1, minHeight: 0 }}>
             {hasTop && (
               <Panel id={rowTop} defaultSize={hasBottom ? rowPercent : 100} minSize={ROWS_LIMITS.minRow}>
-                <Group orientation="horizontal" onLayoutChanged={onTop} style={{ height: '100%' }}>
+                <Group orientation="horizontal" onLayoutChanged={onRowMemo} style={{ height: '100%' }}>
                   {row(top, topSizes)}
                 </Group>
               </Panel>
@@ -151,7 +162,7 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
             {hasTop && hasBottom && <Separator className="station-splitter" style={hHandle} />}
             {hasBottom && (
               <Panel id={rowBottom} defaultSize={hasTop ? 100 - rowPercent : 100} minSize={ROWS_LIMITS.minRow}>
-                <Group orientation="horizontal" onLayoutChanged={onBottom} style={{ height: '100%' }}>
+                <Group orientation="horizontal" onLayoutChanged={onRowMemo} style={{ height: '100%' }}>
                   {row(bottom, bottomSizes)}
                 </Group>
               </Panel>

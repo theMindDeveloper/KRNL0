@@ -33,6 +33,8 @@ const StationRowsSchema = z.object({
   rowFraction: z.number().optional(),
   top: z.array(z.number()).optional(),
   bottom: z.array(z.number()).optional(),
+  order: z.object({ top: z.array(z.string()), bottom: z.array(z.string()) }).optional(),
+  sizes: z.record(z.number()).optional(),
 });
 
 export const BoardSchema = z.object({

@@ -3,6 +3,8 @@
 // label, the Analytics window's page and range, a media title, an image's alt
 // text. Each one writes the board the way the window does it.
 
+import { presetOf, presetRows, swapInRows, withPreset } from '../../shared/stationLayouts';
+import type { StationGeometry } from '../../shared/types/board';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { Board } from '../../shared/types';
@@ -93,6 +95,15 @@ export function windowSwap(ctx: WindowCtx, a: string | undefined, b: string | un
   const mb = motherOf(board, b);
   if (typeof mb === 'string') return { ok: false, message: mb };
   if (ma.id === mb.id) return { ok: false, message: 'Pick two different windows' };
+  // Decision 58 — in Grid and Planner the two windows trade places in that layout's order.
+  const geo = (board['layoutGeometry'] as { station?: StationGeometry } | undefined)?.station;
+  const preset = presetOf(geo);
+  if (board['layoutMode'] === 'station' && preset !== 'classic') {
+    const order = swapInRows(presetRows(preset, geo?.[preset]?.order), ma.kind, mb.kind);
+    board['layoutGeometry'] = { ...(board['layoutGeometry'] as object | undefined), station: { ...withPreset(geo, preset), [preset]: { ...geo?.[preset], order } } };
+    save(ctx, board);
+    return { ok: true, message: `${label(ma.kind)} and ${label(mb.kind)} swapped places (${preset === 'grid' ? 'Grid' : 'Planner'})` };
+  }
   const posA = ma.position ?? { x: 0, y: 0 };
   const posB = mb.position ?? { x: 0, y: 0 };
   const slotA = ma.config?.['stationSlot'];
@@ -102,10 +113,7 @@ export function windowSwap(ctx: WindowCtx, a: string | undefined, b: string | un
   ma.config = { ...(ma.config ?? {}), stationSlot: slotB };
   mb.config = { ...(mb.config ?? {}), stationSlot: slotA };
   save(ctx, board);
-  // Decision 54 — Grid and Planner keep their own fixed order; places are Classic's.
-  const preset = (board['layoutGeometry'] as { station?: { preset?: string } } | undefined)?.station?.preset;
-  const note = preset === 'grid' || preset === 'planner' ? ` (shows in the Classic layout; ${preset === 'grid' ? 'Grid' : 'Planner'} keeps its own order)` : '';
-  return { ok: true, message: `${label(ma.kind)} and ${label(mb.kind)} swapped places${note}` };
+  return { ok: true, message: `${label(ma.kind)} and ${label(mb.kind)} swapped places` };
 }
 
 /** `krnl pomo label "<what you are doing>" [--tag <id>]` — the timer's free-text label (Observe). */

@@ -29,6 +29,10 @@ export interface RowsPreset {
 
 export type RowsKind = 'pomo' | 'todo' | 'habit' | 'calendar' | 'clock';
 
+/** Every window a Station can hold; 'canvas' is the embedded canvas (not a node). */
+export const STATION_WINDOWS = ['pomo', 'todo', 'habit', 'calendar', 'clock', 'analytics', 'term', 'canvas'] as const;
+export type StationWindow = (typeof STATION_WINDOWS)[number];
+
 export const ROWS_PRESETS: Record<RowsPreset['id'], RowsPreset> = {
   grid: {
     id: 'grid',
@@ -38,11 +42,12 @@ export const ROWS_PRESETS: Record<RowsPreset['id'], RowsPreset> = {
     bottomSizes: [66.67, 33.33],
     rowPercent: 52,
   },
+  // Owner, 2026-11-21: the clock in the middle of the top row.
   planner: {
     id: 'planner',
-    top: ['pomo', 'todo', 'habit', 'clock'],
+    top: ['pomo', 'clock', 'todo', 'habit'],
     bottom: ['calendar'],
-    topSizes: [26, 28, 22, 24],
+    topSizes: [26, 24, 28, 22],
     bottomSizes: [100],
     rowPercent: 36,
   },
@@ -122,9 +127,34 @@ export function withPreset(geo: StationGeometry | undefined, preset: StationPres
   };
 }
 
-/** The windows the toolbar can show or hide in a preset (null = every window). */
-export function presetKinds(preset: StationPreset): ReadonlySet<string> | null {
-  if (preset === 'classic') return null;
-  const p = ROWS_PRESETS[preset];
-  return new Set<string>([...p.top, ...p.bottom]);
+/**
+ * The windows the toolbar can show or hide in a preset: every one, always
+ * (Decision 58 — a preset is a starting arrangement, never a cage).
+ */
+export function presetKinds(_preset: StationPreset): ReadonlySet<string> | null {
+  return null;
+}
+
+export interface PresetRows { top: StationWindow[]; bottom: StationWindow[] }
+
+/**
+ * A preset's arrangement (Decision 58): the saved order when there is one,
+ * else the preset's own; any window it does not place yet joins the end of
+ * the bottom row (it shows there once you show it).
+ */
+export function presetRows(preset: RowsPreset['id'], saved?: { top?: readonly string[]; bottom?: readonly string[] }): PresetRows {
+  const def = ROWS_PRESETS[preset];
+  const isWin = (k: string): k is StationWindow => (STATION_WINDOWS as readonly string[]).includes(k);
+  const seen = new Set<string>();
+  const clean = (xs: readonly string[]): StationWindow[] => xs.filter((k) => isWin(k) && !seen.has(k) && (seen.add(k), true)) as StationWindow[];
+  const top = clean(saved?.top ?? def.top);
+  const bottom = clean(saved?.bottom ?? def.bottom);
+  for (const k of STATION_WINDOWS) if (!seen.has(k)) { seen.add(k); bottom.push(k); }
+  return { top, bottom };
+}
+
+/** The arrangement with two windows trading places (dragging one onto the other, or `krnl window swap`). */
+export function swapInRows(rows: PresetRows, a: string, b: string): PresetRows {
+  const swap = (xs: StationWindow[]): StationWindow[] => xs.map((k) => (k === a ? (b as StationWindow) : k === b ? (a as StationWindow) : k));
+  return { top: swap(rows.top), bottom: swap(rows.bottom) };
 }

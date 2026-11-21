@@ -29,7 +29,7 @@ import type { StationSlot } from '../../../shared/types';
 interface Props {
   /** Classic: the window in this place (places can be swapped by dragging). */
   slot?: StationSlot;
-  /** Grid and Planner (Decision 54): this window, in the preset's fixed order. */
+  /** Grid and Planner (Decision 54): this window, wherever the preset's order puts it. */
   kind?: string;
 }
 
@@ -57,8 +57,8 @@ export function StationCell({ slot, kind }: Props) {
   return (
     <MotherFrameStationContext.Provider value={true}>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-        {/* A fixed preset keeps its order: only Classic swaps windows by dragging. */}
-        {kind === undefined && <DragHandle nodeId={node.id} />}
+        {/* Every layout lets you swap windows by dragging (Decision 58). */}
+        <DragHandle nodeId={node.id} />
         <Component
           node={node}
           selected={false}

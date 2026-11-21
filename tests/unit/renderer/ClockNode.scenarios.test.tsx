@@ -299,10 +299,12 @@ describe('Task arcs reflect past / future state', () => {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 describe('Header', () => {
-  it('shows the Big Clock (dial-only) toggle', () => {
+  it('the Big Clock is a quiet icon beside the views, not a third view (Decision 58)', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
-    expect(screen.getByTestId('clock-dial-only').textContent).toMatch(/BIG CLOCK/);
+    const btn = screen.getByTestId('clock-dial-only');
+    expect(btn.getAttribute('aria-label')).toMatch(/Big clock/);
+    expect(btn.closest('[data-testid="clock-view-switch"]')).toBeNull();
   });
 
   it('is named Clock, like its toggle in the top bar (window-frame.md)', () => {

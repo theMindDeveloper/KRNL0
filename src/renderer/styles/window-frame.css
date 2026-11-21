@@ -291,3 +291,8 @@
   .kw-head > .kw-views:has(> button:nth-child(4)) > button { font-size: 0; padding: 0 8px; }
   .kw-head > .kw-views:has(> button:nth-child(4)) > button::first-letter { font-size: 12px; }
 }
+
+/* Decision 58 — the Clock's big-clock icon: quiet until you reach for it. */
+.clock-expand { opacity: 0.5; margin-left: 4px; }
+.clock-expand:hover, .clock-expand:focus-visible, .clock-expand[aria-pressed='true'] { opacity: 1; }
+.clock-list { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent; }

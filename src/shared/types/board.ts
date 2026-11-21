@@ -44,6 +44,10 @@ export interface StationGridGeometry {
   top?: number[];
   /** Bottom-row window widths as fractions, in the preset's order. */
   bottom?: number[];
+  /** Decision 58 — where each window sits (window kinds, 'canvas' for the canvas); dragging rearranges it. */
+  order?: { top: string[]; bottom: string[] };
+  /** Decision 58 — each window's share of its row, by window. */
+  sizes?: Record<string, number>;
 }
 
 // ADR 0008 § 2.4 — station geometry (rowFraction, columnFractions,

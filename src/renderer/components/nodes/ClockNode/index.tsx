@@ -25,7 +25,6 @@ import { Z } from '../../ui/layers';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { ClockBezel } from './ClockBezel';
 import { ClockWeek, buildWeek } from './ClockWeek';
-import { PagedView } from '../../ui/PagedView';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { spanTaskName, spanTaskTargets } from '../PomoNode/taskTargets';
@@ -390,22 +389,12 @@ export function ClockNode({
             <button
               type="button"
               data-testid="clock-view-day"
-              aria-pressed={!weekView && !dialOnly}
+              aria-pressed={!weekView}
               title="The day, with its schedule"
-              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); if (dialOnly) onCommand('clock.setDialOnly', { on: false }); }}
+              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); }}
               onMouseDown={(e) => e.stopPropagation()}
             >
               DAY
-            </button>
-            <button
-              type="button"
-              data-testid="clock-dial-only"
-              aria-pressed={dialOnly && !weekView}
-              title="Big clock — dial only"
-              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); onCommand('clock.setDialOnly', { on: true }); }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              BIG CLOCK
             </button>
             <button
               type="button"
@@ -418,6 +407,24 @@ export function ClockNode({
               WEEK
             </button>
           </span>
+          {/* Decision 58 — the big clock is a quiet icon, not a third view: the
+              dial takes the whole window, and the icon brings the list back. */}
+          {!weekView && (
+            <button
+              type="button"
+              className="kw-btn nodrag clock-expand"
+              data-testid="clock-dial-only"
+              aria-pressed={dialOnly}
+              aria-label={dialOnly ? 'Show the day\'s list again' : 'Big clock: the dial fills the window'}
+              title={dialOnly ? 'Show the list' : 'Big clock'}
+              onClick={(e) => { e.stopPropagation(); onCommand('clock.setDialOnly', { on: !dialOnly }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {dialOnly ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+              </svg>
+            </button>
+          )}
         </div>
         {/* #207 — Week view replaces the day view; the day view stays mounted
             (display: contents keeps its flex layout) so switching back is instant. */}
@@ -508,9 +515,10 @@ export function ClockNode({
             position: 'relative',
             // Flexes with the window so the whole clock always fits: the
             // dial's height comes from the free space, its width follows.
-            flex: dialOnly ? '1 1 auto' : '3 1 0',
+            // Decision 58 — the dial takes all the room the list does not need.
+            flex: '1 1 auto',
             minHeight: 140,
-            maxHeight: dialOnly ? '100%' : inStation ? 620 : 300,
+            maxHeight: dialOnly || inStation ? '100%' : 300,
             aspectRatio: '1 / 1',
             maxWidth: '100%',
             margin: '0 auto',
@@ -965,12 +973,18 @@ export function ClockNode({
             that sat here are gone: the WEEK view shows the week, and the list
             below marks the plan that is running. */}
         {/* Task list — pages of whole rows, never a scrollbar. */}
-        <PagedView
-          testId="clock-task-pages"
-          resetKey={selectedDate}
-          style={{ width: '100%', flex: tasks.length > 0 ? '1 1 0' : '0 0 auto', minHeight: tasks.length > 0 ? 64 : 0, display: dialOnly ? 'none' : undefined }}
-          contentStyle={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)' }}
-          revealIndex={activeIdx}
+        {/* Decision 58 — at the bottom, as tall as its rows (up to about four);
+            more scroll in place, so no gap opens between the dial and the list. */}
+        <div
+          data-testid="clock-task-pages"
+          ref={(el) => {
+            // The plan going on now stays in view in a long list.
+            if (!el || activeIdx < 0) return;
+            const row = el.querySelectorAll<HTMLElement>('[data-testid="clock-task-row"]')[activeIdx];
+            if (row && (row.offsetTop < el.scrollTop || row.offsetTop + row.offsetHeight > el.scrollTop + el.clientHeight)) el.scrollTop = row.offsetTop - 4;
+          }}
+          className="clock-list nowheel"
+          style={{ width: '100%', flex: '0 0 auto', maxHeight: 'min(132px, 34%)', overflowY: 'auto', overscrollBehavior: 'contain', display: dialOnly || tasks.length === 0 ? 'none' : 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)', marginTop: 'auto' }}
         >
           {tasks.map((t, i) => {
             const ended = isToday && nowFloat >= t.realEnd;
@@ -1053,7 +1067,7 @@ export function ClockNode({
               </div>
             );
           })}
-        </PagedView>
+        </div>
         {!dialOnly && dueItems.length > 0 && (
           <div
             data-testid="clock-due"

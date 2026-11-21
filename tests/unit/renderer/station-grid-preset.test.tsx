@@ -11,7 +11,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
 import { StationToolbar } from '../../../src/renderer/components/Station/StationToolbar';
 import { LayoutMenu } from '../../../src/renderer/components/ui/LayoutMenu';
-import { ROWS_PRESETS, layoutChoiceOf, parseLayoutChoice, presetKinds, presetOf } from '../../../src/shared/stationLayouts';
+import { ROWS_PRESETS, layoutChoiceOf, parseLayoutChoice, presetKinds, presetOf, presetRows } from '../../../src/shared/stationLayouts';
 import type { Board } from '../../../src/shared/types';
 
 if (typeof global.ResizeObserver === 'undefined') {
@@ -84,16 +84,25 @@ describe('The layout menu (Decision 54, F1)', () => {
   });
 });
 
-describe('The toolbar follows the preset (F2)', () => {
-  it('Grid and Planner show only their five windows and no canvas toggle', () => {
+describe('Every window can be shown in every layout (F2, Decision 58)', () => {
+  it('Grid and Planner offer every toggle, the canvas too', () => {
     for (const preset of ['grid', 'planner']) {
       useBoardStore.setState({ board: board('station', preset) });
       render(<StationToolbar />);
-      for (const w of ['Timer', 'Todos', 'Habits', 'Calendar', 'Clock']) expect(has(w)).toBe(true);
-      expect(has('Analytics')).toBe(false);
-      expect(has('Canvas')).toBe(false);
+      for (const w of ['Timer', 'Todos', 'Habits', 'Calendar', 'Clock', 'Analytics', 'Canvas']) expect(has(w)).toBe(true);
       cleanup();
     }
+  });
+
+  it('in Planner, swapping two windows changes the Planner order and leaves Classic places alone (F4)', () => {
+    useBoardStore.setState({ board: board('station', 'planner') });
+    useBoardStore.getState().swapMotherSlots('mother-clock', 'mother-calendar');
+    const st = station() as { planner?: { order?: { top: string[]; bottom: string[] } } };
+    expect(st.planner?.order?.top.slice(0, 2)).toEqual(['pomo', 'calendar']);
+    expect(st.planner?.order?.bottom[0]).toBe('clock');
+    const cfg = (id: string) => (state().nodes.find((n) => n.id === id)!.config as { stationSlot?: string }).stationSlot;
+    expect(cfg('mother-clock')).toBe('top-right-lower');
+    expect(cfg('mother-calendar')).toBe('top-right-upper');
   });
 
   it('in Free every window has its toggle, whatever the Station preset', () => {
@@ -104,10 +113,11 @@ describe('The toolbar follows the preset (F2)', () => {
 });
 
 describe('Layout names (shared with the CLI)', () => {
-  it('Planner puts Timer, Todos, Habits and Clock over a full-width Calendar', () => {
-    expect(ROWS_PRESETS.planner.top).toEqual(['pomo', 'todo', 'habit', 'clock']);
+  it('Planner starts with Timer, Clock, Todos and Habits over a full-width Calendar; other windows join the bottom row', () => {
+    expect(ROWS_PRESETS.planner.top).toEqual(['pomo', 'clock', 'todo', 'habit']);
     expect(ROWS_PRESETS.planner.bottom).toEqual(['calendar']);
-    expect([...presetKinds('planner')!].sort()).toEqual(['calendar', 'clock', 'habit', 'pomo', 'todo']);
+    expect(presetRows('planner').bottom).toEqual(['calendar', 'analytics', 'term', 'canvas']);
+    expect(presetKinds('planner')).toBeNull();
     expect(presetKinds('classic')).toBeNull();
   });
 
