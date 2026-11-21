@@ -3259,3 +3259,11 @@ Typecheck clean; all tests pass.
 - Real one-click test: a 0.2.0 Docker server, a paired device and the owner's password, `POST /api/v1/server/update`. The server reached 0.2.1 in 90 s (backup, download, switch, health), its updater moved to 0.2.1 too, and port, hosts, time zone and the backup were kept.
 - The release script's tag step now waits for the build of its own tag (#268).
 - Next: 0.14.1 with "the latest edit wins" (#270), once the owner approves its notes.
+
+## [2026-11-21] — Release notes for v0.14.1
+
+**Type:** Docs
+**PRs/Commits:** `docs/v0.14.1-notes`
+**Files changed:** `docs/releases/v0.14.1.md`, `docs/08-history/HISTORY.md`
+
+**Summary:** The 0.14.1 notes, approved by the owner: the change made last wins between devices, an edit beats a delete, wrong clocks are corrected, and a polling phone reads the server's time (#270).
