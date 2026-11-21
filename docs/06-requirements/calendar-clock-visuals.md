@@ -42,6 +42,13 @@
 | F34 | (Decision 55) **Today is clear.** The day header shows the weekday small and the date large; today's date sits in an accent circle, days gone by step back to grey, weekend names are quieter. Today's column is a neutral lift (no olive wash; none in the day view). The now line is solid and 2 px across today only, a faint trace across the other days, with no glow; the time now ("04:53") sits in the gutter on the line and the hour label under it gives way. |
 | F35 | (Decision 55) **The Orb stays off the windows.** In a Station layout the Orb rests in the top bar, at half size, after the Settings button (`[data-orb-dock]`): a click opens it as before, it does not drag there, and its full-size box never takes clicks from the windows under the bar. In Free it keeps its own place. |
 
+| F36 | (Owner, 2026-11-21 — Decision 58) **Smooth hours.** The hour grid scrolls smoothly with the wheel, a trackpad or a finger; the arrows glide by most of a screen; dragging near the top or bottom edge keeps it moving. (Replaces whole-hour windows.) |
+| F37 | (Decision 58) **Zoom by gesture.** Pinch on a trackpad, Ctrl/⌘ + wheel, two fingers on a touch screen, or dragging the hour gutter up and down zooms the hours; the hour under the pointer stays under it; the zoom is saved once the gesture rests (`calendar.setZoom`, `krnl cal zoom`). No zoom buttons. |
+| F38 | (Decision 58) **Depth.** Every other hour is a shade deeper; plans float with a soft shadow and a tick box before the name; repeating events lie flat (tint and border, no box). The hour labels sit on their lines in a 48 px gutter with room above 00:00. |
+| F39 | (Decision 58) **No recorded rail.** Recorded time is not drawn on the Calendar (the Clock shows it); plans use the whole day column. |
+| F40 | (Decision 58) **Habits are tick boxes.** A habit set for a time is a small box centred on its time line at the right of the day, in its colour, filled with a check when done; its name beside it when there is room; a click ticks it. |
+| F41 | (Decision 58) **Add by typing at the bottom.** The Calendar's "add a plan" opens a field in the footer, as in Todo. "Gym fri 18:00 1h" adds the plan at once (the parsed day and time show beside the field); a name without a time opens the plan card with the name filled in. Escape closes the field. |
+| F42 | (Decision 58) **A bigger Clock.** The dial takes the room the list does not need; the day's list sits at the bottom, about four rows tall, and scrolls beyond that (the row going on now stays in view). The big clock is a quiet icon at the end of the header. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin

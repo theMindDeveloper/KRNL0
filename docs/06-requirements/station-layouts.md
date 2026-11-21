@@ -16,9 +16,9 @@ Classic, Grid and Planner are the Station (`layoutMode: 'station'`) with a prese
 | # | Requirement |
 |---|---|
 | F1 | The top bar shows one **layout menu** in place of the Station / Free switch: a button with the current layout's drawing and name, opening a list of Classic, Grid, Planner and Free (each with its drawing and one line). The choice applies at once; the chosen one is ticked. |
-| F2 | In Grid and Planner the window toggles show only the windows the preset arranges (Timer, Todos, Habits, Calendar, Clock); hiding one lets its neighbours fill the row, and a row with nothing left gives its height to the other. In Free every window has its toggle. |
+| F2 | (Decision 58) Every window toggle is always there, in every layout. In Grid and Planner a window the preset does not place joins the end of the bottom row when shown; hiding one lets its neighbours fill the row, and a row with nothing left gives its height to the other. |
 | F3 | Each preset keeps its own panel sizes (`layoutGeometry.station.grid`, `.planner`); resizing one never changes another, and switching back restores it exactly. |
-| F4 | Grid and Planner place windows by kind in a fixed order, so they always look as named whatever was swapped in Classic; only Classic shows the drag-to-swap handle. |
+| F4 | (Decision 58) Grid and Planner start in their own arrangement, whatever was swapped in Classic, and are yours from there: dragging a window onto another swaps them in that layout's own order (`station.<preset>.order`; `krnl window swap` does the same), and each window keeps its width by name. Planner starts with Timer, Clock, Todos and Habits on top. |
 | F5 | CLI: `krnl settings layout [classic\|grid\|planner\|free]` shows (with the list) or picks the layout; the older words `station` (the Station with its last preset) and `canvas` (Free) still work. `krnl settings station-layout [classic\|grid\|planner]` sets the preset without leaving Free. |
 | F6 | ⌘/Ctrl+Shift+L flips between the Station (its last preset) and Free. |
 | F7 | The choice belongs to the device (part of `layoutGeometry`): with sync, each computer keeps its own layout. |
@@ -59,14 +59,17 @@ Feature: Free from the menu (F1, F6)
   Then the canvas shows
   And pressing Ctrl+Shift+L brings Planner back
 
-Feature: Toggles follow the preset (F2)
+Feature: Every toggle in every layout (F2)
   Given the layout is Grid or Planner
-  Then the toolbar offers Timer, Todos, Habits, Calendar and Clock, and no Canvas, Terminal or Analytics toggle
+  Then the toolbar offers every window, the canvas too
+  When I show Analytics
+  Then it joins the bottom row
 
-Feature: Fixed order (F4)
-  Given Clock and Calendar were swapped in Classic
-  When I pick Planner
-  Then the Clock is in the top row and the Calendar the full width below
+Feature: Rearrange a preset (F4)
+  Given the layout is Planner
+  When I drag the Clock onto the Calendar
+  Then they trade places in Planner
+  And Classic's places are unchanged
 
 Feature: CLI (F5)
   When I run "krnl settings layout planner"
