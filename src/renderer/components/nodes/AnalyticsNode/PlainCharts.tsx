@@ -20,7 +20,7 @@ export function hm(min: number): string {
 }
 
 /** A list of labelled bars, longest first: where something came from. */
-export function BarList({ rows, color = ACCENT, testId }: { rows: Array<{ id: string; label: string; value: number; display?: string; note?: string }>; color?: string; testId?: string }) {
+export function BarList({ rows, color = ACCENT, testId, share = false }: { rows: Array<{ id: string; label: string; value: number; display?: string; note?: string }>; color?: string; testId?: string; /** Show each row's share of the whole (only where the rows add up to one whole). */ share?: boolean }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   const total = rows.reduce((a, r) => a + r.value, 0);
   if (rows.length === 0 || total === 0) return <p className="an-empty">Nothing in this period yet.</p>;
@@ -31,7 +31,7 @@ export function BarList({ rows, color = ACCENT, testId }: { rows: Array<{ id: st
           {/* The name on its own line (read in full at any width), the bar, then the figure. */}
           <span className="an-barlist__label">{r.label}</span>
           <span className="an-barlist__track" aria-hidden="true"><i style={{ width: `${Math.max(2, (r.value / max) * 100)}%`, background: color }} /></span>
-          <span className="an-barlist__value">{r.display ?? r.value}<span className="an-barlist__share"> · {Math.round((r.value / total) * 100)}%</span></span>
+          <span className="an-barlist__value">{r.display ?? r.value}{share && <span className="an-barlist__share"> · {Math.round((r.value / total) * 100)}%</span>}</span>
           {r.note && <span className="an-barlist__note">{r.note}</span>}
         </li>
       ))}
@@ -39,7 +39,7 @@ export function BarList({ rows, color = ACCENT, testId }: { rows: Array<{ id: st
   );
 }
 
-/** This period beside the one before, measure by measure: the figure, then what it was. */
+/** This period beside the one before, one line a measure: the figure and its change ("was …" on hover). */
 export function CompareTable({ axes, rangeDays }: { axes: readonly RadarAxis[]; rangeDays: number }) {
   const fmt = (a: RadarAxis, v: number): string => (a.key === 'focus' ? hm(v) : a.key === 'active' ? `${v} of ${a.max ?? rangeDays}` : String(Math.round(v)));
   return (
@@ -50,12 +50,10 @@ export function CompareTable({ axes, rangeDays }: { axes: readonly RadarAxis[]; 
         const trend = diff === null || diff === 0 ? 'flat' : diff > 0 ? 'up' : 'down';
         const label = a.key === 'focus' ? 'Focus' : a.key === 'active' ? 'Active days' : a.key === 'streak' ? 'Longest streak' : a.key === 'habits' ? 'Habit check-ins' : a.key === 'tasks' ? 'Tasks done' : a.label;
         return (
-          <div key={a.key} className="an-compare__row">
+          <div key={a.key} className="an-compare__row" title={prev === undefined ? `${label}: nothing before` : `${label}: was ${fmt(a, prev)} in the ${rangeDays} days before`}>
             <dt>{label}</dt>
             <dd className="an-compare__now">{fmt(a, a.value)}</dd>
-            <dd className="an-compare__was">
-              {prev === undefined ? 'nothing before' : <>was {fmt(a, prev)}{diff !== null && diff !== 0 && <span data-trend={trend}> · {diff > 0 ? '+' : '−'}{a.key === 'focus' ? hm(Math.abs(diff)) : Math.abs(Math.round(diff))}</span>}</>}
-            </dd>
+            <dd className="an-compare__diff" data-trend={trend}>{diff === null ? 'new' : diff === 0 ? '±0' : `${diff > 0 ? '+' : '−'}${a.key === 'focus' ? hm(Math.abs(diff)) : Math.abs(Math.round(diff))}`}</dd>
           </div>
         );
       })}
@@ -63,7 +61,6 @@ export function CompareTable({ axes, rangeDays }: { axes: readonly RadarAxis[]; 
   );
 }
 
-/** Seven bars, Monday first; the strongest day is named. */
 /** "45m", "6h": short enough for a seventh of a phone. */
 const compact = (m: number): string => (m < 60 ? `${Math.round(m)}m` : `${Math.round(m / 60)}h`);
 
@@ -127,5 +124,24 @@ export function DayBars({ data, metric, width, height, color }: { data: readonly
         </text>
       ))}
     </svg>
+  );
+}
+
+/** Twenty-four bars, midnight first; the busiest hour is named under them. */
+export function HourBars({ values, fmt = (n: number) => String(Math.round(n)), color = ACCENT, height = 160 }: { values: readonly number[]; fmt?: (n: number) => string; color?: string; height?: number }) {
+  const max = Math.max(1, ...values);
+  const best = values.indexOf(Math.max(...values));
+  if (!values.some((v) => v > 0)) return <p className="an-empty">Nothing in this period yet.</p>;
+  return (
+    <div className="an-hours" style={{ height }} data-testid="analytics-hour-bars">
+      <div className="an-hours__bars">
+        {values.map((v, h) => (
+          <span key={h} className="an-hours__bar" title={`${String(h).padStart(2, '0')}:00 · ${fmt(v)}`}
+            style={{ height: `${v > 0 ? Math.max(4, (v / max) * 100) : 2}%`, background: v > 0 ? (h === best ? color : `color-mix(in srgb, ${color} 55%, transparent)`) : 'var(--k-an-line, var(--paper-3))' }} />
+        ))}
+      </div>
+      <div className="an-hours__axis" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+      <p className="an-hours__note">Busiest around <b>{String(best).padStart(2, '0')}:00</b> · {fmt(values[best] ?? 0)}</p>
+    </div>
   );
 }

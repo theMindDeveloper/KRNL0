@@ -26,7 +26,7 @@ export function DowHourMatrix({
   metric = 'count',
   width = 520,
   height = 200,
-  colorMax = '#c9f158',
+  colorMax = 'var(--k-an-accent-ink, var(--acid-ink, var(--acid)))',
 }: DowHourMatrixProps) {
   const pad = { left: 30, right: 8, top: 20, bottom: 20 };
   const innerW = Math.max(60, width - pad.left - pad.right);
@@ -59,7 +59,7 @@ export function DowHourMatrix({
     if (v <= 0) return 'rgba(255,255,255,0.025)';
     const t = Math.min(1, v / peak);
     const alpha = 0.15 + t * 0.85;
-    return `${colorMax}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
+    return `color-mix(in oklab, ${colorMax} ${Math.round(alpha * 100)}%, transparent)`;
   };
 
   return (

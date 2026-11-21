@@ -13,14 +13,14 @@ const COLOR_GRID = 'var(--k-an-grid, #2a2e33)';
 
 export function TagList({ tags, width = 320 }: { tags: readonly TagSlice[]; width?: number }) {
   if (tags.length === 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_LABEL }}>No completed tasks in this range yet.</div>;
+    return <div style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 13, color: COLOR_LABEL }}>No completed tasks in this range yet.</div>;
   }
   const max = Math.max(...tags.map((t) => t.minutes), 1);
   return (
     <div data-testid="tag-list" style={{ display: 'flex', flexDirection: 'column', gap: 7, width }}>
       {tags.map((t) => (
         <div key={t.id} data-testid={`tag-row-${t.id}`} style={{ display: 'grid', gridTemplateColumns: '84px 1fr 92px', alignItems: 'center', gap: 8 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--k-an-ink-1, #eef1f4)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 12.5, color: 'var(--k-an-ink-1, #eef1f4)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
             {t.label}
           </span>

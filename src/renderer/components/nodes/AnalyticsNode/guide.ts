@@ -100,3 +100,9 @@ export function cardsOfPage(page: PageId): AnalyticsCardId[] {
     .sort(([, a], [, b]) => a.row - b.row || a.col - b.col)
     .map(([id]) => id as AnalyticsCardId);
 }
+
+/** The first card of a page (Decision 58): the pages scroll and settle on these. */
+export function isPageStart(id: string): boolean {
+  const s = LAYOUT[id as AnalyticsCardId];
+  return !!s && s.row === 0 && s.col === 1;
+}

@@ -110,7 +110,7 @@ function FocusPerDay({ byDay }: { byDay: readonly DayBucket[] }) {
 
 export function SummaryHero({ summary, byDay, rangeDays = 30 }: { summary: AnalyticsSummary; byDay: readonly DayBucket[]; rangeDays?: number }) {
   return (
-    <section data-page-item data-testid="analytics-summary" className="an-summary" style={cardPlacement('summary')}>
+    <section data-page-item data-page-start data-testid="analytics-summary" className="an-summary" style={cardPlacement('summary')}>
       <h3 data-testid="analytics-summary-headline" className="an-summary__headline">{summary.headline}</h3>
 
       {/* Four figures in one band, divided by hairlines (2 × 2 when narrow). */}

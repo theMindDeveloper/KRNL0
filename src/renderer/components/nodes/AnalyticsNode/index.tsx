@@ -26,7 +26,7 @@ import { HoldButton } from '../../ui/HoldButton';
 import { PagedView } from '../../ui/PagedView';
 import { summarizeAnalytics } from '../../../analytics/summary';
 import { SummaryHero } from './SummaryHero';
-import { EASY_HIDDEN_PAGES, cardPlacement, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
+import { EASY_HIDDEN_PAGES, cardPlacement, isPageStart, isPagedCard, pageOfCard, pageSelector, pagesFor, type PageId } from './guide';
 import { useEasyMode } from '../../../store/uiMode';
 import { PageNav } from './PageNav';
 import { AnalyticsSettings } from './AnalyticsSettings';
@@ -73,7 +73,7 @@ import {
   defaultAnalyticsState,
 } from './types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
-import { ACCENT, BarList, CompareTable, DayBars, WeekdayBars } from './PlainCharts';
+import { ACCENT, BarList, CompareTable, DayBars, HourBars, WeekdayBars } from './PlainCharts';
 import { LineGlyph } from '../../ui/LineGlyph';
 
 // The page each (older) view name opens: `krnl analytics show --view …` and
@@ -323,13 +323,7 @@ function ChartCard({
   if (hidden) return <div data-card-id={cardId} data-hidden-card aria-hidden style={{ ...cardPlacement(cardId, easy), minHeight: 0 }} />;
 
   const cardStyle: React.CSSProperties = {
-    // A section of the window, not a card inside a card: a hairline on top
-    // (acid when pinned), spacing does the rest.
-    background: 'transparent',
-    borderTop: `1px solid ${pinned ? 'var(--acid-ink, var(--acid))' : 'var(--k-an-line, #23262a)'}`,
-    boxShadow: 'none',
-    borderRadius: 0,
-    padding: '10px 2px 6px',
+    // Decision 58 — each card is its own surface (analytics.css .an-card).
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
@@ -344,7 +338,7 @@ function ChartCard({
   };
 
   return (
-    <div data-card-id={cardId} data-pinned={pinned || undefined} style={cardStyle}>
+    <div data-card-id={cardId} data-pinned={pinned || undefined} data-page-start={isPageStart(cardId) || undefined} className="an-card" style={cardStyle}>
       {/* The toolbar wraps under the title when both don't fit: the title is read in full. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 18, flexWrap: 'wrap', rowGap: 6 }}>
         <span
@@ -431,10 +425,25 @@ export function AnalyticsNode({
   const [currentCard, setCurrentCard] = useState<string | null>(null);
   const [jumpTo, setJumpTo] = useState<string | null>(null);
 
-  const onPageChange = useCallback((item: HTMLElement | null) => {
-    setCurrentCard(item?.getAttribute('data-card-id') ?? (item ? 'summary' : null));
-    setJumpTo(null);
+  // The page on screen: the last page whose first card has reached the top.
+  const [scrollRef, scrollSize] = useElementSize<HTMLDivElement>();
+  const pageH = Math.max(440, Math.round(scrollSize.height || 0));
+  const onScrollPages = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const box = e.currentTarget;
+    let cur: string | null = null;
+    for (const el of Array.from(box.querySelectorAll<HTMLElement>('[data-page-start]'))) {
+      if (el.offsetTop - box.offsetTop <= box.scrollTop + 40) cur = el.getAttribute('data-card-id') ?? 'summary';
+    }
+    setCurrentCard(cur ?? 'summary');
   }, []);
+  // A page icon (or a view set from the CLI) glides to its page.
+  useEffect(() => {
+    if (!jumpTo) return;
+    const box = scrollRef.current;
+    const el = box?.querySelector<HTMLElement>(jumpTo);
+    if (box && el) box.scrollTo({ top: el.offsetTop - box.offsetTop, behavior: 'smooth' });
+    setJumpTo(null);
+  }, [jumpTo, scrollRef]);
 
   // Open the saved / CLI-set view's page. Deferred a frame so the pager has
   // measured its cards (and its first page report has passed).
@@ -607,7 +616,7 @@ export function AnalyticsNode({
       </div>
 
       {/* window-frame.md — the time row: which page (an icon each, the current one named), then the range. */}
-      <div className="kw-range" style={toolbarStyle}>
+      <div className="kw-range an-toolbar" style={toolbarStyle}>
         <PageNav current={currentPage} pages={pages} onPick={(id) => setJumpTo(pageSelector(id))} />
         {/* window-frame.md — the range is the same switch every window uses. */}
         <div className="kw-views" role="group" aria-label="Range" style={{ marginLeft: 'auto' }}>
@@ -626,8 +635,7 @@ export function AnalyticsNode({
         </div>
       </div>
 
-      {/* Body — split: cards on the left, settings sidebar on the right.
-          No scrolling: cards are split into pages (PagedView). */}
+      {/* Body — cards on the left (scrolling by pages), settings sidebar on the right. */}
       <div
         ref={bodyRef}
         style={{
@@ -640,20 +648,23 @@ export function AnalyticsNode({
           position: 'relative',
         }}
       >
-        <PagedView
-          testId="analytics-pages"
-          itemSelector="[data-page-item], [data-card-id]"
-          fillItems
-          revealSelector={jumpTo}
-          onPageChange={onPageChange}
-          showPager={false}
-          style={{ flex: 1, minWidth: 0 }}
-          contentStyle={{
+        {/* Decision 58 — the pages scroll smoothly and settle on whole pages
+            (no card stops at an edge); the page icons glide to their page. */}
+        <div
+          ref={scrollRef}
+          data-testid="analytics-pages"
+          className="an-scroll nowheel"
+          onScroll={onScrollPages}
+          style={{ flex: 1, minWidth: 0, ['--page-h' as string]: `${pageH}px` } as React.CSSProperties}
+        >
+        <div
+          style={{
             // Each page = 2 rows of the grid, each row half a page (minus the gap).
             display: 'grid',
             gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
-            gridTemplateRows: `repeat(${pages.length * 2}, calc((var(--page-h, 400px) - 10px) / 2))`,
-            gap: 10,
+            gridTemplateRows: `repeat(${pages.length * 2}, calc((var(--page-h, 400px) - 12px) / 2))`,
+            gap: 12,
+            paddingBottom: 12,
           }}
         >
           <SummaryHero summary={summary} byDay={byDay} rangeDays={state.rangeDays} />
@@ -690,7 +701,8 @@ export function AnalyticsNode({
             yearByDay={yearByDay}
           />
           ))}
-        </PagedView>
+        </div>
+        </div>
 
         {settingsOpen && (
           <AnalyticsSettings
@@ -754,9 +766,9 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
   const tile = (label: string, value: string, sub: string, testId: string) => (
     // containerType lets the number scale with the tile's own width (cqi), so it never spills out.
     <div data-testid={testId} style={{ minWidth: 0, minHeight: 0, padding: '10px 12px', border: '1px solid var(--k-an-line, #2a2e33)', borderRadius: 10, background: 'var(--k-an-tile, rgba(255,255,255,0.02))', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, overflow: 'hidden', containerType: 'inline-size' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'clamp(16px, 17cqi, 28px)', fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
-      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--k-an-ink-3, #aab0b7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
+      <div style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 12.5, color: 'var(--k-an-ink-3, #aab0b7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 'clamp(16px, 17cqi, 26px)', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 12, color: 'var(--k-an-ink-3, #aab0b7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
     </div>
   );
   const card = (id: AnalyticsCardId, title: string, span: number, contentHeight: number, body: (size: { width: number; height: number }) => React.ReactNode) => (
@@ -779,7 +791,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
     [
       {
         cardId: 'estimates.kpis' as const,
-        render: () => card('estimates.kpis', `Plan vs actual · last ${state.rangeDays}d`, 3, 96, (size) => {
+        render: () => card('estimates.kpis', `Planned and spent · last ${state.rangeDays} days`, 3, 96, (size) => {
           const kpis: Array<[string, string, string, string]> = [
             ['Accuracy', k.medianRatio === null ? '—' : `×${k.medianRatio.toFixed(2)}`, describeAccuracy(k.medianRatio) + (k.ratioBasis ? ` · ${k.ratioBasis} tasks` : ''), 'estimates-kpi-accuracy'],
             ['Planned', fmtMinutes(k.plannedMin), 'on tasks you tracked', 'estimates-kpi-planned'],
@@ -797,7 +809,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, width: '100%' }}>
                 {kpis.map(([label, value, sub, id]) => (
                   <div key={id} data-testid={id} title={sub} style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0, padding: '3px 0', borderBottom: '1px solid var(--k-an-line, #2a2e33)' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--k-an-ink-3, #aab0b7)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                    <span style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 12.5, color: 'var(--k-an-ink-3, #aab0b7)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
                     <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700, color: 'var(--k-an-ink-1, #eef0f2)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{value}</span>
                   </div>
                 ))}
@@ -813,7 +825,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
       },
       {
         cardId: 'estimates.perTask' as const,
-        render: () => card('estimates.perTask', 'Estimate vs actual · per task', 2, 250, (size) => (
+        render: () => card('estimates.perTask', 'Each task: planned and spent', 2, 250, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Legend items={[{ label: 'Planned (estimate)', color: COLOR_PLANNED }, { label: 'Recorded on the task', color: COLOR_TRACKED }]} />
             <EstimateBars tasks={est.tasks} width={chartWidth(size.width, 480)} {...(size.height > 0 ? { height: size.height - 30 } : {})} />
@@ -828,7 +840,7 @@ function EstimatesView(props: ViewBodyProps & { cardGridStyle: React.CSSProperti
       },
       {
         cardId: 'estimates.daily' as const,
-        render: () => card('estimates.daily', 'Planned vs worked · per day', 3, 200, (size) => (
+        render: () => card('estimates.daily', 'Each day: planned and worked', 3, 200, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Legend items={[{ label: 'Planned on calendar', color: COLOR_PLANNED }, { label: 'Recorded', color: COLOR_TRACKED }]} />
             <DailyPlanActual days={est.days} width={chartWidth(size.width, 640)} height={chartHeight(size.height - 20, 170)} />
@@ -873,7 +885,7 @@ function TimeView(props: ViewBodyProps & { cardGridStyle: React.CSSProperties })
     [
       {
         cardId: 'time.donut' as const,
-        render: () => card('time.donut', `Time by tag · last ${state.rangeDays}d`, 1, 260, (size) => (
+        render: () => card('time.donut', 'Time by tag', 1, 260, (size) => (
           <DonutChart
             data={slices}
             innerRatio={0.55}
@@ -886,19 +898,19 @@ function TimeView(props: ViewBodyProps & { cardGridStyle: React.CSSProperties })
       },
       {
         cardId: 'time.list' as const,
-        render: () => card('time.list', 'Tags ranked · time · share · tasks', 2, 260, (size) => (
+        render: () => card('time.list', 'Your tags, most time first', 2, 260, (size) => (
           <TagList tags={res.tags} width={chartWidth(size.width, 420)} />
         )),
       },
       {
         cardId: 'time.log' as const,
-        render: () => card('time.log', 'Time per task · per day', 3, 420, (size) => (
+        render: () => card('time.log', 'Time on each task, day by day', 3, 420, (size) => (
           <TimeLogHeatmap width={chartWidth(size.width, 900)} height={Math.max(160, size.height)} />
         )),
       },
       {
         cardId: 'time.daily' as const,
-        render: () => card('time.daily', 'Daily mix by tag', 3, 190, (size) => (
+        render: () => card('time.daily', 'Each day by tag', 3, 190, (size) => (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Legend items={res.tags.map((t) => ({ label: t.label, color: t.color }))} />
             <TagDailyBars days={res.days} tags={res.tags} width={chartWidth(size.width, 640)} height={chartHeight(size.height - 24, 150)} />
@@ -1019,7 +1031,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="overview.dowHour"
-              title="Weekday × hour heatmap"
+              title="When you get things done"
               span={clamp(2)}
               contentHeight={220}
               hidden={isHidden('overview.dowHour')}
@@ -1045,7 +1057,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="overview.dow"
-              title="By weekday · tasks"
+              title="Tasks done by weekday"
               contentHeight={220}
               hidden={isHidden('overview.dow')}
               pinned={isPinned('overview.dow')}
@@ -1054,12 +1066,7 @@ function ViewBody(props: ViewBodyProps) {
               onTogglePin={() => togglePin('overview.dow')}
             >
               {(size) => (
-                <DowBars
-                  data={dow}
-                  metric="tasks"
-                  width={chartWidth(size.width, 280)}
-                  height={chartHeight(size.height, 220)}
-                />
+                <div className="an-weekdays-host"><WeekdayBars values={dow.map((d) => d.tasks)} fmt={(n) => String(Math.round(n))} height={chartHeight(size.height, 200)} /></div>
               )}
             </ChartCard>
           ),
@@ -1069,7 +1076,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="overview.hour"
-              title="By hour · tasks"
+              title="Tasks done by hour"
               contentHeight={220}
               hidden={isHidden('overview.hour')}
               pinned={isPinned('overview.hour')}
@@ -1078,12 +1085,7 @@ function ViewBody(props: ViewBodyProps) {
               onTogglePin={() => togglePin('overview.hour')}
             >
               {(size) => (
-                <HourLine
-                  data={hour}
-                  metric="tasks"
-                  width={chartWidth(size.width, 280)}
-                  height={chartHeight(size.height, 220)}
-                />
+                <HourBars values={hour.map((h) => h.tasks)} height={chartHeight(size.height, 200)} />
               )}
             </ChartCard>
           ),
@@ -1107,7 +1109,7 @@ function ViewBody(props: ViewBodyProps) {
       <div style={cardGridStyle}>
         <ChartCard
           cardId="calendar.heatmap"
-          title={`Year heatmap · ${METRIC_LABELS[state.metric]}`}
+          title={`Your year · ${METRIC_TITLES[state.metric].toLowerCase()}`}
           span={clamp(3)}
           contentHeight={200}
           toolbar={metricPicker(state.metric, setMetric)}
@@ -1133,7 +1135,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="patterns.cumulative"
-              title="Your best days"
+              title="Your three best days"
               span={clamp(3)}
               contentHeight={240}
               hidden={isHidden('patterns.cumulative')}
@@ -1146,7 +1148,7 @@ function ViewBody(props: ViewBodyProps) {
                 // Decision 57 — the days that went best, in words, instead of three running totals on one axis.
                 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                const rows = [...byDay].filter((d) => d.focusMin > 0).sort((a, b) => b.focusMin - a.focusMin || b.taskCount - a.taskCount).slice(0, 5).map((d) => {
+                const rows = [...byDay].filter((d) => d.focusMin > 0).sort((a, b) => b.focusMin - a.focusMin || b.taskCount - a.taskCount).slice(0, 3).map((d) => {
                   const dt = new Date(`${d.date}T12:00:00`);
                   return { id: d.date, label: `${DAYS[dt.getDay()]}, ${MONTHS[dt.getMonth()]} ${dt.getDate()}`, value: d.focusMin, display: `${fmtMinutes(d.focusMin)} focus${d.taskCount > 0 ? ` · ${d.taskCount} done` : ''}` };
                 });
@@ -1160,7 +1162,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="patterns.dow"
-              title="Weekday pattern · tasks"
+              title="Tasks done by weekday"
               span={clamp(colCount >= 3 ? 2 : 1)}
               contentHeight={220}
               hidden={isHidden('patterns.dow')}
@@ -1170,12 +1172,7 @@ function ViewBody(props: ViewBodyProps) {
               onTogglePin={() => togglePin('patterns.dow')}
             >
               {(size) => (
-                <DowBars
-                  data={dow}
-                  metric="tasks"
-                  width={chartWidth(size.width, 580)}
-                  height={chartHeight(size.height, 220)}
-                />
+                <div className="an-weekdays-host"><WeekdayBars values={dow.map((d) => d.tasks)} fmt={(n) => String(Math.round(n))} height={chartHeight(size.height, 200)} /></div>
               )}
             </ChartCard>
           ),
@@ -1185,7 +1182,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="patterns.hour"
-              title="Hour pattern · tasks"
+              title="Tasks done by hour"
               contentHeight={220}
               hidden={isHidden('patterns.hour')}
               pinned={isPinned('patterns.hour')}
@@ -1194,12 +1191,7 @@ function ViewBody(props: ViewBodyProps) {
               onTogglePin={() => togglePin('patterns.hour')}
             >
               {(size) => (
-                <HourLine
-                  data={hour}
-                  metric="tasks"
-                  width={chartWidth(size.width, 320)}
-                  height={chartHeight(size.height, 220)}
-                />
+                <HourBars values={hour.map((h) => h.tasks)} height={chartHeight(size.height, 200)} />
               )}
             </ChartCard>
           ),
@@ -1209,7 +1201,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="patterns.month"
-              title={`Month pattern · ${year}`}
+              title={`Each month of ${year}`}
               span={clamp(3)}
               contentHeight={220}
               hidden={isHidden('patterns.month')}
@@ -1326,6 +1318,7 @@ function ViewBody(props: ViewBodyProps) {
             >
               {() => (
                 <BarList
+                  share
                   testId="analytics-sources"
                   rows={sourceSlices.map((sl) => ({
                     id: sl.id,
@@ -1384,7 +1377,7 @@ function ViewBody(props: ViewBodyProps) {
                   if (g && m > 0) g.n += 1;
                 }
                 const rows = groups.filter((g) => g.n > 0).map((g) => ({ id: g.id, label: g.label, value: g.n, display: `${g.n} ${g.n === 1 ? 'span' : 'spans'}` }));
-                return <BarList testId="analytics-span-lengths" rows={rows} />;
+                return <BarList share testId="analytics-span-lengths" rows={rows} />;
               }}
             </ChartCard>
           ),
@@ -1394,7 +1387,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="insights.histogramFocus"
-              title="Focus minutes · distribution"
+              title="How much you focus in a day"
               contentHeight={240}
               hidden={isHidden('insights.histogramFocus')}
               pinned={isPinned('insights.histogramFocus')}
@@ -1420,7 +1413,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="insights.histogramTasks"
-              title="Tasks per day · distribution"
+              title="How many tasks you finish in a day"
               contentHeight={240}
               hidden={isHidden('insights.histogramTasks')}
               pinned={isPinned('insights.histogramTasks')}
@@ -1487,28 +1480,11 @@ function ViewBody(props: ViewBodyProps) {
           onTogglePin={() => togglePin('sources.streaks')}
         >
           {() => (
-            <PagedView style={{ width: '100%', height: '100%' }} itemSelector="tbody > tr">
-              <table
-                style={{
-                  width: '100%',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  color: 'var(--k-an-ink-1, #eef1f4)',
-                  borderCollapse: 'collapse',
-                }}
-              >
-                <tbody>
-                  {streaks.perHabit.map((h) => (
-                    <tr key={h.habitId} style={{ borderTop: '1px solid var(--k-an-line, #23262a)' }}>
-                      <td style={{ padding: '4px 6px' }}>{h.label}</td>
-                      <td style={{ padding: '4px 6px', textAlign: 'right', color: 'var(--acid, #c9f158)' }}>
-                        {h.streak}{h.unit === 'week' ? 'w' : 'd'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </PagedView>
+            // Decision 58 — each habit's streak as a bar, longest first.
+            <BarList
+              testId="analytics-habit-streaks"
+              rows={[...streaks.perHabit].sort((x, y) => y.streak - x.streak).map((h) => ({ id: h.habitId, label: h.label, value: h.streak, display: `${h.streak} ${h.unit === 'week' ? (h.streak === 1 ? 'week' : 'weeks') : (h.streak === 1 ? 'day' : 'days')} in a row` }))}
+            />
           )}
         </ChartCard>
     </div>
