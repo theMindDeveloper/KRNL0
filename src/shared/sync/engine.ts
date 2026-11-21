@@ -4,13 +4,15 @@
 // across network calls, so two devices can never wait on each other. Every
 // conflict is resolved with boardMerge — the merge main already uses for the CLI.
 
-import { mergeBoards } from '../boardMerge';
+import { mergeBoards, type MergeOptions } from '../boardMerge';
 import { restoreDevice, sameContent, stripDevice } from './shape';
+import { latestWins, noteEdits, splitStamps, stampsFor, withStamps } from './stamps';
 import {
   SyncError,
   type DocBase,
   type Json,
   type Notice,
+  type Stamps,
   type SyncHost,
   type SyncStatus,
   type SyncStore,
@@ -80,17 +82,19 @@ export class SyncEngine {
     this.running = true;
     this.setState('connecting');
     this.closeLive = this.t.connect({
-      onOpen: ({ connectionId, serverTime, receivedAt }) => {
+      onOpen: ({ connectionId, serverTime }) => {
         this.connectionId = connectionId;
         this.t.setConnectionId(connectionId);
         this.connected = true;
         this.retryDelay = 1000;
-        this.status = { ...this.status, clockOffsetMs: serverTime - receivedAt };
+        // The engine's own clock, the one its stamps use (F10, F21).
+        if (Number.isFinite(serverTime)) this.measured(serverTime - this.now());
         void this.catchUp();
       },
       onNotice: (n) => this.onNotice(n),
       onPong: ({ serverTime, sentAt, receivedAt }) => {
-        this.status = { ...this.status, clockOffsetMs: Math.round(serverTime - (sentAt + receivedAt) / 2) };
+        // Half the round trip (measured by the transport) is the way back.
+        if (Number.isFinite(serverTime)) this.measured(Math.round(serverTime + (receivedAt - sentAt) / 2 - this.now()));
       },
       onClose: ({ retrying, kind, message }) => {
         this.connected = false;
@@ -113,6 +117,45 @@ export class SyncEngine {
     this.closeLive?.();
     this.closeLive = null;
     this.setState('off');
+  }
+
+  private measured(offsetMs: number): void {
+    this.status = { ...this.status, clockOffsetMs: offsetMs };
+    this.store.setClockOffset(offsetMs);
+  }
+
+  // ── Edit stamps (Decision 53) ───────────────────────────────────────────
+
+  /** Server time now, and whether this device has ever measured its clock. */
+  private serverNow(): { at: number; trusted: boolean } {
+    const offset = this.status.clockOffsetMs ?? this.store.clockOffset();
+    return { at: this.now() + (offset ?? 0), trusted: offset !== null };
+  }
+
+  /** Stamps what this device changed since the base. Nothing before a document's first agreement. */
+  private noteEdits(name: string, local: Json, base: DocBase | null): Stamps {
+    const stamps = this.store.getStamps(name) ?? {};
+    if (!base || base.body === null) return stamps;
+    const { at, trusted } = this.serverNow();
+    const next = noteEdits(stamps, this.host.normalize(name, base.body), local, at, trusted);
+    if (next !== stamps) this.store.setStamps(name, next);
+    return next;
+  }
+
+  /** How sync settles what the merge cannot: the later edit, and an edited item over a delete. */
+  private mergeOptions(mine: { stamps: Stamps; body: Json }, theirs: { stamps: Stamps; body: Json }): MergeOptions {
+    return { resolve: latestWins(mine, theirs), keepEdited: true };
+  }
+
+  /** The server's body without its stamp table, migrated and without per-device keys, and the table. */
+  private fromServer(name: string, body: Json): { body: Json; stamps: Stamps } {
+    const s = splitStamps(body);
+    return { body: stripDevice(name, this.host.normalize(name, s.body)), stamps: s.stamps };
+  }
+
+  /** The local body as sync compares it (a stamp table an older KRNL0 left in the file is not content). */
+  private fromHost(name: string, full: Json): Json {
+    return stripDevice(name, this.host.normalize(name, splitStamps(full).body));
   }
 
   private stopTimers(): void {
@@ -286,17 +329,17 @@ export class SyncEngine {
     for (let round = 0; ; round++) {
       const localFull = this.host.read(name);
       const base = this.store.getBase(name);
-      const local = localFull === null ? null : (stripDevice(name, this.host.normalize(name, localFull)) as Json);
+      const local = localFull === null ? null : this.fromHost(name, localFull);
 
       // Deleted on this device since the last agreement.
       if (local === null) {
         if (base && base.body !== null) {
           const r = await this.t.deleteDoc(name, base.rev);
-          if (r.ok) { this.store.setBase(name, { rev: r.rev, body: null }); return; }
-          if (r.reason === 'missing') { this.store.setBase(name, null); return; }
+          if (r.ok) { this.store.setBase(name, { rev: r.rev, body: null }); this.store.setStamps(name, null); return; }
+          if (r.reason === 'missing') { this.store.setBase(name, null); this.store.setStamps(name, null); return; }
           // Changed elsewhere after our base: the delete still wins (the other device keeps its copy aside).
-          this.store.setBase(name, { rev: r.rev, body: r.deleted ? null : (r.body as Json) });
-          if (r.deleted) return;
+          this.store.setBase(name, { rev: r.rev, body: r.deleted ? null : this.fromServer(name, r.body).body });
+          if (r.deleted) { this.store.setStamps(name, null); return; }
           if (round > this.maxConflicts) return this.pause(name);
           continue;
         }
@@ -315,7 +358,10 @@ export class SyncEngine {
         return this.download(name, localFull);
       }
 
-      const r = await this.t.putDoc(name, base?.rev ?? 0, local);
+      // What changed here gets its time, and travels with the upload (F21).
+      const stamps = stampsFor(local, this.serverNow().at, this.noteEdits(name, local, base));
+      this.store.setStamps(name, stamps);
+      const r = await this.t.putDoc(name, base?.rev ?? 0, withStamps(local, stamps));
       if (r.ok) {
         this.store.setBase(name, { rev: r.rev, body: local });
         this.conflictsInRow.delete(name);
@@ -332,6 +378,7 @@ export class SyncEngine {
         if (r.deleted) {
           this.host.remove(name);
           this.store.setBase(name, { rev: r.rev, body: null });
+          this.store.setStamps(name, null);
           return;
         }
         // The server lost it (restored from an older backup): upload ours as new.
@@ -339,10 +386,12 @@ export class SyncEngine {
         if (round > this.maxConflicts) return this.pause(name);
         continue;
       }
-      const theirs = stripDevice(name, this.host.normalize(name, r.body)) as Record<string, Json>;
+      const server = this.fromServer(name, r.body);
+      const theirs = server.body as Record<string, Json>;
       const baseBody = (base?.body !== null && base?.body !== undefined ? this.host.normalize(name, base.body) : {}) as Record<string, Json>;
-      const merged = mergeBoards(baseBody, local as Record<string, Json>, theirs);
+      const merged = mergeBoards(baseBody, local as Record<string, Json>, theirs, this.mergeOptions({ stamps, body: local }, server));
       this.store.setBase(name, { rev: r.rev, body: theirs });
+      this.store.setStamps(name, stampsFor(merged, this.serverNow().at, stamps, server.stamps));
       if (!sameContent(merged, local)) this.host.write(name, restoreDevice(name, merged, this.host.read(name)));
       const n = (this.conflictsInRow.get(name) ?? 0) + 1;
       this.conflictsInRow.set(name, n);
@@ -356,6 +405,7 @@ export class SyncEngine {
     if (r.deleted) {
       if (localFull !== null) this.host.remove(name);
       this.store.setBase(name, { rev: r.rev, body: null });
+      this.store.setStamps(name, null);
       return;
     }
     if (r.body === null) {
@@ -369,20 +419,24 @@ export class SyncEngine {
       this.setState('update', this.opts.newerAppMessage ?? 'A newer KRNL0 saved this board. Update KRNL0 to keep syncing it.');
       return;
     }
-    const theirs = stripDevice(name, this.host.normalize(name, r.body));
+    const server = this.fromServer(name, r.body);
+    const theirs = server.body;
     const current = this.host.read(name);
-    const currentSynced = current === null ? null : stripDevice(name, this.host.normalize(name, current));
+    const currentSynced = current === null ? null : this.fromHost(name, current);
     const base = this.store.getBase(name);
     // A local edit landed while we were downloading: merge rather than overwrite.
     if (currentSynced !== null && base && base.body !== null && !sameContent(currentSynced, base.body)) {
-      const merged = mergeBoards(this.host.normalize(name, base.body) as Record<string, Json>, currentSynced as Record<string, Json>, theirs as Record<string, Json>);
+      const stamps = this.noteEdits(name, currentSynced, base);
+      const merged = mergeBoards(this.host.normalize(name, base.body) as Record<string, Json>, currentSynced as Record<string, Json>, theirs as Record<string, Json>, this.mergeOptions({ stamps, body: currentSynced }, server));
       this.store.setBase(name, { rev: r.rev, body: theirs });
+      this.store.setStamps(name, stampsFor(merged, this.serverNow().at, stamps, server.stamps));
       if (!sameContent(merged, currentSynced)) this.host.write(name, restoreDevice(name, merged, current));
       this.changed(name);
       return;
     }
     if (currentSynced === null || !sameContent(theirs, currentSynced)) this.host.write(name, restoreDevice(name, theirs, current));
     this.store.setBase(name, { rev: r.rev, body: theirs });
+    this.store.setStamps(name, stampsFor(theirs, this.serverNow().at, this.store.getStamps(name) ?? {}, server.stamps));
   }
 
   private pause(name: string, reason?: string): void {

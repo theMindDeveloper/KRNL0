@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { FakeServer, makeDevice, settle, synced, type Device } from './fakes';
 import type { Json } from '../../../../src/shared/sync/types';
 import { sameContent } from '../../../../src/shared/sync/shape';
+import { splitStamps, stampsFor } from '../../../../src/shared/sync/stamps';
 
 type Node = { id: string; title?: string; done?: boolean; x?: number };
 const board = (nodes: Node[], extra: Record<string, Json> = {}) => ({ schemaVersion: 2, nodes, edges: [], ...extra });
@@ -191,7 +192,10 @@ describe('fuzz: three devices, random edits, dropped connections (NF7)', () => {
       await settle(ds, 12);
       const first = synced(ds[0]!, 'board:b1');
       for (const d of ds) expect(sameContent(synced(d, 'board:b1'), first)).toBe(true);
-      expect(sameContent(server.docs.get('board:b1')?.body, first)).toBe(true);
+      // The server's document is the same board plus its edit stamps (Decision 53), every one of them true for that board.
+      const onServer = splitStamps(server.docs.get('board:b1')?.body ?? null);
+      expect(sameContent(onServer.body, first)).toBe(true);
+      expect(stampsFor(onServer.body, Date.now(), onServer.stamps)).toEqual(onServer.stamps);
     }
   }, 60_000);
 });

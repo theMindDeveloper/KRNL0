@@ -46,6 +46,8 @@ export class WebTransport implements SyncTransport {
   private csrf: string;
   private readonly origin: string;
   private readonly f: typeof fetch;
+  /** The server's clock from its last answer's Date header (whole seconds), and when that came (F10). */
+  private serverClock: { serverMs: number; at: number } | null = null;
 
   constructor(private readonly opts: WebTransportOptions) {
     this.csrf = opts.csrf;
@@ -54,6 +56,11 @@ export class WebTransport implements SyncTransport {
   }
 
   setConnectionId(id: string | null): void { this.connectionId = id; }
+
+  /** The server's time now, from the last Date header; NaN before any answer. */
+  private serverTimeNow(): number {
+    return this.serverClock ? this.serverClock.serverMs + (Date.now() - this.serverClock.at) : Number.NaN;
+  }
 
   private async call(method: string, path: string, body?: { json?: unknown; raw?: Uint8Array }, retried = false): Promise<Reply> {
     const headers: Record<string, string> = { ...(this.opts.headers ?? {}) };
@@ -74,6 +81,9 @@ export class WebTransport implements SyncTransport {
     } finally {
       clearTimeout(timer);
     }
+    const date = Date.parse(res.headers?.get?.('date') ?? '');
+    // The header has whole seconds: the middle of that second is the best guess.
+    if (Number.isFinite(date)) this.serverClock = { serverMs: date + 500, at: Date.now() };
     if (res.status === 401) throw new SyncError('auth', 'Your session ended. Log in again.');
     if (res.status === 403 && !retried && this.opts.renewCsrf) {
       const err = await res.clone().json().catch(() => ({})) as { error?: { code?: string } };
@@ -202,10 +212,10 @@ export class WebTransport implements SyncTransport {
           const docs = await this.listDocs();
           if (first) {
             first = false;
-            handlers.onOpen({ connectionId: `poll-${Math.random().toString(36).slice(2, 10)}`, serverTime: Date.now(), receivedAt: Date.now() });
+            handlers.onOpen({ connectionId: `poll-${Math.random().toString(36).slice(2, 10)}`, serverTime: this.serverTimeNow(), receivedAt: Date.now() });
           } else if (++ticks % 15 === 0) {
             // Every minute: a full catch-up (time log, pictures).
-            handlers.onOpen({ connectionId: `poll-${Math.random().toString(36).slice(2, 10)}`, serverTime: Date.now(), receivedAt: Date.now() });
+            handlers.onOpen({ connectionId: `poll-${Math.random().toString(36).slice(2, 10)}`, serverTime: this.serverTimeNow(), receivedAt: Date.now() });
           } else {
             for (const d of docs) if (known.get(d.name) !== d.rev) handlers.onNotice({ kind: 'doc', name: d.name, rev: d.rev, deleted: !!d.deleted, by: null } as Notice);
           }
@@ -268,7 +278,7 @@ export class WebTransport implements SyncTransport {
           opened = true;
           failedOpens = 0;
           delay = 1000;
-          handlers.onOpen({ connectionId: String(msg.connectionId), serverTime: Number(msg.serverTime ?? Date.now()), receivedAt: Date.now() });
+          handlers.onOpen({ connectionId: String(msg.connectionId), serverTime: Number(msg.serverTime ?? Number.NaN), receivedAt: Date.now() });
           pingTimer = setInterval(() => {
             lastPing = Date.now();
             if (sock.readyState === 1) sock.send(JSON.stringify({ type: 'ping' }));

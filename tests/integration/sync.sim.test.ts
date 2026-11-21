@@ -174,6 +174,26 @@ describe.skipIf(!available)('sync simulation against the real server (NF7)', () 
     expect((syncedBoard(b) as { nodes: Array<{ id: string }> }).nodes.map((n) => n.id)).toContain('cli');
   }, 60_000);
 
+  it('the later of two offline edits wins, though the earlier one comes back first (F21, UC-S10)', async () => {
+    const [a, b, c] = devs as [Dev, Dev, Dev];
+    const title = (d: Dev) => (syncedBoard(d) as { nodes: Array<{ id: string; state: { title?: string } }> }).nodes.find((n) => n.id === 't1')?.state.title;
+    const setTitle = (d: Dev, t: string) => edit(d, (x) => { (x.nodes.find((n) => n.id === 't1')!.state as Record<string, unknown>).title = t; });
+    await converged([a, b, c]);
+    await killServer();
+    await sleep(300);
+    setTitle(a, 'Call mom 19:00');
+    await sleep(4000); // more than the 3 s tie window
+    setTitle(b, 'Call mom 20:00');
+    await sleep(800); // B notices its change while the server is away
+    b.svc.stop();
+    await startServer();
+    await converged([a, c], 40_000);
+    expect(title(c)).toBe('Call mom 19:00');
+    b.svc.start(); // B comes back second, with the later edit (its stamp was kept on disk)
+    await converged([a, b, c], 40_000);
+    for (const d of [a, b, c]) expect(title(d)).toBe('Call mom 20:00');
+  }, 90_000);
+
   it('per-device keys stay on their device', async () => {
     const [a, b, c] = devs as [Dev, Dev, Dev];
     edit(a, (x) => { x.viewport = { x: 1234, y: 5678, zoom: 2 }; x.nodes.push(task('vp', 'viewport check')); });

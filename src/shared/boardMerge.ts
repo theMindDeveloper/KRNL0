@@ -20,13 +20,28 @@
 
 type Json = unknown;
 
+/**
+ * How a caller settles what the merge cannot (sync, Decision 53). Without
+ * options the merge is the CLI's: board.json wins a clash and its deletes win.
+ */
+export interface MergeOptions {
+  /** Both sides changed the very same value: whose wins. `path` is the value's path (`pathKey`/`pathId`). */
+  resolve?: (path: string, mine: Json, theirs: Json) => 'mine' | 'theirs';
+  /** An item one side deleted and the other changed stays, whichever side deleted it. */
+  keepEdited?: boolean;
+}
+
+/** Paths name a value the way the merge walks to it: object keys, and `#id` for items of an id list. */
+export const pathKey = (path: string, key: string): string => `${path}/${encodeURIComponent(key)}`;
+export const pathId = (path: string, id: string): string => `${path}/#${encodeURIComponent(id)}`;
+
 const same = (a: Json, b: Json): boolean => a === b || JSON.stringify(a) === JSON.stringify(b);
 
 const isObject = (v: Json): v is Record<string, Json> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** The field that identifies the items of an array, if every item has one. */
-function idKey(...lists: Json[]): string | null {
+export function idKey(...lists: Json[]): string | null {
   for (const key of ['id', 'taskId']) {
     const ok = lists.every((l) => Array.isArray(l) && l.every((it) => isObject(it) && typeof it[key] === 'string'));
     if (ok) return key;
@@ -47,7 +62,7 @@ function reordered(list: Map<string, Json>, base: Map<string, Json>): boolean {
   return a.some((id, i) => id !== b[i]);
 }
 
-function mergeList(base: Json, mine: Json[], theirs: Json[], key: string): Json[] {
+function mergeList(base: Json, mine: Json[], theirs: Json[], key: string, opts: MergeOptions, path: string): Json[] {
   const b = byKey(base, key);
   const m = byKey(mine, key);
   const t = byKey(theirs, key);
@@ -63,13 +78,14 @@ function mergeList(base: Json, mine: Json[], theirs: Json[], key: string): Json[
     const theirItem = t.get(id);
     const baseItem = b.get(id);
     if (mineItem !== undefined && theirItem !== undefined) {
-      out.push(mergeValue(baseItem, mineItem, theirItem));
+      out.push(mergeValue(baseItem, mineItem, theirItem, opts, pathId(path, id)));
     } else if (theirItem !== undefined) {
       // The user deleted it: gone, unless the file changed it meanwhile (a
       // conflict — the file wins). Not in base either: new from the file.
       if (baseItem === undefined || !same(theirItem, baseItem)) out.push(theirItem);
-    } else if (baseItem === undefined) {
-      // Only the user added it (an item the file deleted stays deleted).
+    } else if (baseItem === undefined || (opts.keepEdited && !same(mineItem, baseItem))) {
+      // Only the user added it. An item the file deleted stays deleted, unless
+      // the caller keeps edited items (sync: an edit beats a delete).
       out.push(mineItem);
     }
   }
@@ -98,7 +114,10 @@ function mergeSet(base: Json[], mine: Json[], theirs: Json[]): Json[] {
   return out;
 }
 
-export function mergeValue(base: Json, mine: Json, theirs: Json): Json {
+/** A list of plain values without repeats: merged as a set, and a single value to the stamps. */
+export const isSetList = (l: Json[]): boolean => l.every(isPrimitive) && new Set(l).size === l.length;
+
+export function mergeValue(base: Json, mine: Json, theirs: Json, opts: MergeOptions = {}, path = ''): Json {
   if (same(mine, base)) return theirs;
   if (same(theirs, base) || same(mine, theirs)) return mine;
   // Both sides changed it.
@@ -106,28 +125,28 @@ export function mergeValue(base: Json, mine: Json, theirs: Json): Json {
     const b = isObject(base) ? base : {};
     const out: Record<string, Json> = {};
     for (const k of new Set([...Object.keys(b), ...Object.keys(mine), ...Object.keys(theirs)])) {
-      const v = mergeValue(b[k], mine[k], theirs[k]);
+      const v = mergeValue(b[k], mine[k], theirs[k], opts, pathKey(path, k));
       if (v !== undefined) out[k] = v;
     }
     return out;
   }
   if (Array.isArray(mine) && Array.isArray(theirs)) {
     const key = idKey(mine, theirs, Array.isArray(base) ? base : []);
-    if (key) return mergeList(base, mine, theirs, key);
+    if (key) return mergeList(base, mine, theirs, key, opts, path);
     const b = Array.isArray(base) ? base : [];
     // Only lists that are sets already: a list with repeats (coordinates, a
     // sequence) has an order and multiplicity a set merge would destroy.
-    const isSet = (l: Json[]): boolean => l.every(isPrimitive) && new Set(l).size === l.length;
-    if ([b, mine, theirs].every(isSet)) return mergeSet(b, mine, theirs);
+    if ([b, mine, theirs].every(isSetList)) return mergeSet(b, mine, theirs);
   }
-  // The same value changed on both sides: board.json wins.
-  return theirs;
+  // The same value changed on both sides: board.json wins, unless the caller decides.
+  return opts.resolve?.(path, mine, theirs) === 'mine' ? mine : theirs;
 }
 
 export function mergeBoards(
   base: Record<string, Json>,
   mine: Record<string, Json>,
   theirs: Record<string, Json>,
+  opts: MergeOptions = {},
 ): Record<string, Json> {
-  return mergeValue(base, mine, theirs) as Record<string, Json>;
+  return mergeValue(base, mine, theirs, opts) as Record<string, Json>;
 }

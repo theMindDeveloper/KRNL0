@@ -13,6 +13,7 @@ import {
   type Notice,
   type PutResult,
   type RemoteDoc,
+  type Stamps,
   type SyncHost,
   type SyncStore,
   type SyncTransport,
@@ -30,6 +31,8 @@ export class FakeServer {
   puts = 0;
   /** Network delay range in ms, to shuffle the order of concurrent requests. */
   delay: [number, number] = [0, 3];
+  /** The server's clock (hello and pong carry it). */
+  clock: () => number = () => Date.now();
 
   async wait(): Promise<void> {
     const [a, b] = this.delay;
@@ -90,7 +93,7 @@ export class FakeTransport implements SyncTransport {
     if (!this.handlers) return;
     if (on) {
       this.server.clients.add(this);
-      this.handlers.onOpen({ connectionId: this.id, serverTime: Date.now(), receivedAt: Date.now() });
+      this.handlers.onOpen({ connectionId: this.id, serverTime: this.server.clock(), receivedAt: Date.now() });
     } else {
       this.server.clients.delete(this);
       this.handlers.onClose({ retrying: true, kind: 'network', message: 'offline' });
@@ -136,7 +139,7 @@ export class FakeTransport implements SyncTransport {
     this.handlers = handlers;
     if (this.online) {
       this.server.clients.add(this);
-      setTimeout(() => handlers.onOpen({ connectionId: this.id, serverTime: Date.now(), receivedAt: Date.now() }), 0);
+      setTimeout(() => handlers.onOpen({ connectionId: this.id, serverTime: this.server.clock(), receivedAt: Date.now() }), 0);
     }
     return () => { this.server.clients.delete(this); this.handlers = null; };
   }
@@ -146,6 +149,8 @@ export class MemoryStore implements SyncStore {
   bases = new Map<string, DocBase>();
   pending: Array<{ boardId: string; month: string; entry: Json }> = [];
   flags = new Set<string>();
+  stamps = new Map<string, Stamps>();
+  offset: number | null = null;
   getBase(name: string) { const b = this.bases.get(name); return b ? clone(b) : null; }
   setBase(name: string, base: DocBase | null) { if (base) this.bases.set(name, clone(base)); else this.bases.delete(name); }
   pendingTimelog() { return clone(this.pending); }
@@ -153,6 +158,10 @@ export class MemoryStore implements SyncStore {
   dropPendingTimelog(ids: Set<string>) { this.pending = this.pending.filter((p) => !ids.has((p.entry as { id: string }).id)); }
   flag(key: string) { return this.flags.has(key); }
   setFlag(key: string, on: boolean) { if (on) this.flags.add(key); else this.flags.delete(key); }
+  getStamps(name: string) { const s = this.stamps.get(name); return s ? clone(s) : null; }
+  setStamps(name: string, s: Stamps | null) { if (s && Object.keys(s).length > 0) this.stamps.set(name, clone(s)); else this.stamps.delete(name); }
+  clockOffset() { return this.offset; }
+  setClockOffset(ms: number) { this.offset = ms; }
 }
 
 export class MemoryHost implements SyncHost {
@@ -193,12 +202,12 @@ export interface Device {
   edit: (name: string, fn: (b: Record<string, Json>) => void) => void;
 }
 
-export function makeDevice(server: FakeServer, seed: Record<string, Json> = {}): Device {
+export function makeDevice(server: FakeServer, seed: Record<string, Json> = {}, opts: { now?: () => number; store?: MemoryStore } = {}): Device {
   const host = new MemoryHost();
   for (const [k, v] of Object.entries(seed)) host.docs.set(k, clone(v));
-  const store = new MemoryStore();
+  const store = opts.store ?? new MemoryStore();
   const transport = new FakeTransport(server);
-  const engine = new SyncEngine({ transport, host, store, debounceMs: 5 });
+  const engine = new SyncEngine({ transport, host, store, debounceMs: 5, ...(opts.now ? { now: opts.now } : {}) });
   const edit = (name: string, fn: (b: Record<string, Json>) => void) => {
     const b = (host.read(name) ?? { schemaVersion: 2, nodes: [], edges: [] }) as Record<string, Json>;
     fn(b);
