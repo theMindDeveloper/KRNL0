@@ -3245,3 +3245,17 @@ Typecheck clean; all tests pass.
 - Tests: 23 unit tests for stamps and merge options, 11 engine tests with a hand-moved clock (both arrival orders, an hour-fast clock, an offline restart, a device that never measured its clock, a stale stamp, edit vs delete both ways, no re-upload loop), and a real-server simulation (UC-S10). Mutation checks: the old rule, raw clocks and trusting stale stamps each fail the engine tests.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-21] — v0.14.0 published, with KRNL0 server 0.2.0 and 0.2.1
+
+**Type:** Release (published)
+**PRs/Commits:** #267 (release PR), tag `v0.14.0`; server: theMindDeveloper/krnl0-server#12, #13, #15; website: theMindDeveloper/theminddeveloper.github.io#4
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:**
+- KRNL0 0.14.0 published at 01:02 UTC: installer, blockmap, `latest.yml` (0.14.0) and the web app (`krnl0-web-0.14.0.tar.gz` with a matching `.sha256`). Installed apps update themselves.
+- KRNL0 server 0.2.0 published first (one-click updates, Docker in one command). Before Publish its draft was tested for real: the updater against the draft's signed files (real Sigstore check), the image pulled from GHCR by its signed digest, a container swap 0.1.9 → 0.2.0 with settings and backup kept. `:latest` was checked against `release.json`.
+- Publishing 0.14.0 started the server's follow workflow. It opened server 0.2.1 (website = KRNL0 0.14.0), and merging it tagged and built the release. The draft was verified (signature, 9 files, image runs 0.2.1 with the 0.14.0 website) and published. `:latest` was checked again.
+- Real one-click test: a 0.2.0 Docker server, a paired device and the owner's password, `POST /api/v1/server/update`. The server reached 0.2.1 in 90 s (backup, download, switch, health), its updater moved to 0.2.1 too, and port, hosts, time zone and the backup were kept.
+- The release script's tag step now waits for the build of its own tag (#268).
+- Next: 0.14.1 with "the latest edit wins" (#270), once the owner approves its notes.
