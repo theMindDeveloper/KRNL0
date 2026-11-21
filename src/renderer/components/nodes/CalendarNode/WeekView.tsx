@@ -1022,7 +1022,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   const flipHours = (dir: 1 | -1) => {
     const el = gridBodyRef.current;
     if (!el) return;
-    el.scrollBy({ top: dir * Math.max(rowHeight, el.clientHeight * 0.8), behavior: 'smooth' });
+    const by = dir * Math.max(rowHeight, el.clientHeight * 0.8);
+    if (typeof el.scrollBy === 'function') el.scrollBy({ top: by, behavior: 'smooth' });
+    else { el.scrollTop += by; setGridTop(el.scrollTop); }
   };
   void stepHourWindow;
 
@@ -1315,7 +1317,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     // the day at that time (owner, 2026-11-09).
     const relX = (e.clientX - rect.left) / screenScale(e.currentTarget);
     const SLACK = 4;
-    const onLine = relX >= trackLeft - SLACK && relX <= trackLeft + trackW + SLACK;
+    // Decision 58 — the rail is not drawn, so nothing invisible takes a click.
+    const onLine = false && relX >= trackLeft - SLACK && relX <= trackLeft + trackW + SLACK;
     if (onLine) for (const seg of realityByDay.get(dayYMD) ?? []) {
       if (minute >= seg.startMin && minute < seg.endMin) {
         items.push({ kind: 'reality', seg });

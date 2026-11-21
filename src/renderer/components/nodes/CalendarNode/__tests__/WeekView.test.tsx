@@ -769,7 +769,8 @@ function boardWith(nodes: unknown[]) {
 }
 
 describe('WeekView — overlap disambiguation (#6/#7)', () => {
-  it('right-click where a task and a tracked-reality segment overlap opens the layer picker', () => {
+  // Decision 58 — recorded time is not drawn or clickable on the Calendar (the Clock keeps its popup).
+  it.skip('right-click where a task and a tracked-reality segment overlap opens the layer picker', () => {
     // Both span 09:00–09:25 on Monday 2026-05-11.
     boardWith([
       makeTask('task-a', '2026-05-11T09:00', 25),
@@ -787,7 +788,8 @@ describe('WeekView — overlap disambiguation (#6/#7)', () => {
     expect(document.querySelector('[data-testid="calendar-layer-item-reality"]')).toBeTruthy();
   });
 
-  it('picking the reality item shows the tracked-reality info popup with start/end', () => {
+  // Decision 58 — recorded time is not drawn or clickable on the Calendar (the Clock keeps its popup).
+  it.skip('picking the reality item shows the tracked-reality info popup with start/end', () => {
     boardWith([
       makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
     ]);
@@ -806,7 +808,8 @@ describe('WeekView — overlap disambiguation (#6/#7)', () => {
 });
 
 describe('WeekView — delete tracked-reality segment (#12)', () => {
-  it('delete button removes the segment from the pomo history (and thus analytics)', () => {
+  // Decision 58 — recorded time is not drawn or clickable on the Calendar (the Clock keeps its popup).
+  it.skip('delete button removes the segment from the pomo history (and thus analytics)', () => {
     boardWith([
       makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
     ]);
@@ -827,7 +830,8 @@ describe('WeekView — delete tracked-reality segment (#12)', () => {
 // ── #203 — left-click a recorded span opens its details ───────────────────────
 
 describe('WeekView — left-click on a recorded span (#203)', () => {
-  it('a left click on a tracked span opens the details popup', () => {
+  // Decision 58 — recorded time is not drawn or clickable on the Calendar (the Clock keeps its popup).
+  it.skip('a left click on a tracked span opens the details popup', () => {
     boardWith([
       makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
     ]);
@@ -841,7 +845,8 @@ describe('WeekView — left-click on a recorded span (#203)', () => {
     expect(popup?.textContent).toMatch(/09:25/);
   });
 
-  it('a click in the day beside the line, at a recorded time, opens nothing — only the line itself does', () => {
+  // Decision 58 — recorded time is not drawn or clickable on the Calendar (the Clock keeps its popup).
+  it.skip('a click in the day beside the line, at a recorded time, opens nothing — only the line itself does', () => {
     boardWith([
       makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00'),
     ]);
@@ -865,7 +870,8 @@ describe('WeekView — left-click on a recorded span (#203)', () => {
     expect(document.querySelector('[data-testid="calendar-reality-popup"]')).toBeNull();
   });
 
-  it('a left click where two spans overlap opens the picker, and a row opens its details', () => {
+  // Decision 58 — recorded time is not drawn or clickable on the Calendar (the Clock keeps its popup).
+  it.skip('a left click where two spans overlap opens the picker, and a row opens its details', () => {
     const pomo = makePomoWithHistory('mother-pomo', '2026-05-11T09:00:00', '2026-05-11T09:25:00');
     (pomo.state.history as unknown[]).push(
       { id: 'seg-2', startedAt: '2026-05-11T09:05:00', endedAt: '2026-05-11T09:20:00', durationMin: 15, completed: false, kind: 'work', label: '' },
@@ -893,7 +899,8 @@ describe('WeekView — tagged span shows its task (#204)', () => {
     return pomo;
   }
 
-  it('the band, the popup title and the menu header name the task — even once it is done', () => {
+  // Decision 58 — recorded time is not on the Calendar any more (the Clock shows it).
+  it.skip('the band, the popup title and the menu header name the task — even once it is done', () => {
     const task = makeTask('task-a', '2026-05-12T09:00', 25);
     (task.state as Record<string, unknown>)['done'] = true;
     (task.state as Record<string, unknown>)['completedAt'] = '2026-05-11T09:25:00';
@@ -911,7 +918,8 @@ describe('WeekView — tagged span shows its task (#204)', () => {
     expect(document.querySelector('[data-testid="calendar-reality-retag"]')?.textContent).toMatch(/Task task-a/);
   });
 
-  it('a span whose task was deleted still names it (orphan option)', () => {
+  // Decision 58 — recorded time is not drawn or clickable on the Calendar (the Clock keeps its popup).
+  it.skip('a span whose task was deleted still names it (orphan option)', () => {
     boardWith([taggedPomo('task-gone', 'build cluster')]);
     render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={noop} />);
 

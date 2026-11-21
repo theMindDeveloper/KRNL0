@@ -51,8 +51,10 @@ describe('The thing you do sits in the footer', () => {
   });
   it('the Calendar adds from its footer, not from a + in the time row', () => {
     const s = src('CalendarNode/WeekView.tsx');
+    // Decision 58 — the footer is a field like Todo's; "add a plan" opens it.
     const foot = s.slice(s.indexOf('className="kw-foot"'));
-    expect(foot.slice(0, 600)).toContain('data-testid="calendar-new"');
+    expect(foot.slice(0, 5000)).toContain('data-testid="calendar-add-input"');
+    expect(foot.slice(0, 5000)).toContain('data-testid="calendar-new"');
     expect(s.split('data-testid="calendar-new"').length - 1).toBe(1);
   });
   it('"log past time" is a button in the Timer footer, not a link under START', () => {
@@ -117,7 +119,7 @@ describe('One name per window; no second summary rows (window-frame.md)', () => 
     expect(src('PomoNode/index.tsx')).not.toContain('CycleCounter');
   });
   it('Analytics: pages are a row of icons in the time row, the current one named (owner, 2026-11-20)', () => {
-    expect(src('AnalyticsNode/index.tsx')).toContain('<div className="kw-range" style={toolbarStyle}>');
+    expect(src('AnalyticsNode/index.tsx')).toContain('<div className="kw-range an-toolbar" style={toolbarStyle}>');
     const nav = src('AnalyticsNode/PageNav.tsx');
     expect(nav).toContain('data-testid={`analytics-page-${p.id}`}');
     expect(nav).toContain('data-testid="analytics-page-label"');
