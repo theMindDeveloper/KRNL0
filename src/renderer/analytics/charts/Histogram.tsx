@@ -125,7 +125,7 @@ export function Histogram({
         x2={xAt(mean)}
         y1={pad.top}
         y2={pad.top + innerH}
-        stroke="var(--acid)"
+        stroke="var(--k-an-ink, #f4f6f8)"
         strokeWidth={1}
         strokeDasharray="3 3"
       />
@@ -133,7 +133,7 @@ export function Histogram({
         const t = `μ ${mean.toFixed(0)}`;
         const c = clampLabelX(xAt(mean), t, 11, pad.left, pad.left + innerW);
         return (
-          <text x={c.x} y={pad.top - 3} fontSize={11} textAnchor={c.anchor} fill="var(--acid)" fontFamily="var(--font-mono)" fontWeight={700}>
+          <text x={c.x} y={pad.top - 3} fontSize={11} textAnchor={c.anchor} fill="var(--k-an-ink, #f4f6f8)" fontFamily="var(--font-mono)" fontWeight={700}>
             {t}
           </text>
         );
@@ -145,14 +145,14 @@ export function Histogram({
         x2={xAt(median)}
         y1={pad.top + innerH}
         y2={pad.top + innerH + 4}
-        stroke="#8a7bff"
+        stroke="var(--k-an-ink-3, #9aa1a8)"
         strokeWidth={1.4}
       />
       {(() => {
         const t = `med ${median.toFixed(0)}`;
         const c = clampLabelX(xAt(median), t, 11, pad.left, pad.left + innerW);
         return (
-          <text x={c.x} y={pad.top + innerH + 14} fontSize={11} textAnchor={c.anchor} fill="#8a7bff" fontFamily="var(--font-mono)">
+          <text x={c.x} y={pad.top + innerH + 14} fontSize={11} textAnchor={c.anchor} fill="var(--k-an-ink-3, #9aa1a8)" fontFamily="var(--font-mono)">
             {t}
           </text>
         );

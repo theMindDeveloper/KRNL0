@@ -57,6 +57,7 @@ import { PagedView } from '../../ui/PagedView';
 import { TaskPopup } from './TaskPopup';
 import { showPlanGuide } from '../../PlanGuide';
 import { hourWindow, stepHourWindow } from './hourWindow';
+import { EVENT_TEXT, eventLines, eventTitleAndPlace } from './eventText';
 import { Z } from '../../ui/layers';
 import { MenuIcon } from '../../ui/menuIcons';
 import { RemindPicker } from '../../ui/RemindPicker';
@@ -231,8 +232,13 @@ interface WeekViewProps {
 
 /** Window event: scroll the hour window to this week's first routine (routines tour). */
 export const SHOW_ROUTINES_EVENT = 'krnl:calendar-show-routines';
-const GUTTER_WIDTH = 40; // px — time gutter width (hours, with ":30" sub-marks under them)
+const GUTTER_WIDTH = 40; // px — time gutter width (the hours only; half hours are a line in the grid)
 const MIN_ROW_HEIGHT = 28; // px — minimum row height
+// Grid lines (owner, 2026-11-21: they were too faint to read). Frame styles
+// can still set --k-cal-grid; the half hour stays a quiet dashed line.
+const CAL_HOUR_LINE = 'var(--k-cal-grid, color-mix(in srgb, var(--ink) 11%, transparent))';
+const CAL_DAY_LINE = 'var(--k-cal-grid, color-mix(in srgb, var(--ink) 11%, transparent))';
+const CAL_HALF_LINE = 'linear-gradient(to right, color-mix(in srgb, var(--ink) 10%, transparent) 50%, transparent 0)';
 /** F31 — the wrapped name in a narrow block: 10 px mono, one letter about 5.5 px wide, 11 px a line. */
 const WRAP_CH_PX = 5.5;
 const WRAP_LINE_PX = 11;
@@ -494,6 +500,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
 
   // 60-second tick for "now" — used to gray out past task blocks (PR #122).
   const [nowMs, setNowMs] = useState(() => Date.now());
+  // Minutes into today: the gutter shows the time on the now-line.
+  const nowMin = new Date(nowMs).getHours() * 60 + new Date(nowMs).getMinutes();
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
@@ -1582,8 +1590,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // wrapped piece): the title's lines are over-estimated (7.2 px a letter,
       // room kept for the corner badge), so the row never claims space it lacks.
       const titleInner = widthPx - 2 * BLOCK_TEXT_INSET - 20;
-      const titleLinesEst = blockH >= 48 && task.text.length * 7.2 > titleInner ? 2 : 1;
+      // Decision 55 — a tall block gives a long name all the lines it needs
+      // (it used to stop at two), keeping one line for the time under it.
+      const titleNeeded = Math.max(1, Math.ceil((task.text.length * 7.2) / Math.max(1, titleInner)));
+      const titleLinesEst = blockH >= 48 ? Math.max(1, Math.min(titleNeeded, Math.floor((blockH - 6 - 14) / 14))) : 1;
       const timeRowLines = Math.max(1, Math.min(2, Math.floor((blockH - 6 - titleLinesEst * 14) / 14)));
+      const titleClamp = detail === 'full' ? Math.max(2, titleLinesEst) : Math.max(2, Math.floor((blockH - 4) / 13.2));
       // A short bar centres its letter; a tall one keeps it at the top, tick below.
       const letterTop = blockH >= (letterStack ? letter.length * 11 + 14 : 30);
 
@@ -1639,7 +1651,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             zIndex: 2,
             padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : detail === 'letter' ? (letterTop ? '3px 0 0' : 0) : detail === 'wrap' ? '2px 0 0 1px' : 0,
             opacity: 1,
-            boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper), 0 1px 2px rgba(0,0,0,0.3)',
+            // A ring of the ground keeps back-to-back plans apart; the border is
+            // its only edge (a border or a shadow, never both).
+            boxShadow: task.timeOpen ? 'none' : '0 0 0 1px var(--paper)',
             display: 'flex',
             flexDirection: 'column',
             // A one-line title sits centred in short blocks instead of being
@@ -1735,8 +1749,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           {(detail === 'title' || detail === 'full') && (
             <span
               style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: detail === 'full' ? 11.5 : 11,
+                // Decision 55 — names in the reading font, like the events beside them.
+                fontFamily: 'var(--font-read, var(--font-sans))',
+                fontSize: detail === 'full' ? 12 : 11.5,
                 fontWeight: 600,
                 color: isDone ? 'var(--ink-2)' : 'var(--ink)',
                 textDecoration: 'none',
@@ -1744,7 +1759,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 // under it) instead of cutting it at the first.
                 flexShrink: 0,
                 ...((detail === 'full' && blockH >= 48) || (detail === 'title' && blockH >= 34)
-                  ? { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, whiteSpace: 'normal', overflowWrap: 'anywhere' as const, overflow: 'hidden', textAlign: detail === 'title' ? 'center' as const : undefined }
+                  ? { display: '-webkit-box', WebkitLineClamp: titleClamp, WebkitBoxOrient: 'vertical' as const, whiteSpace: 'normal', overflowWrap: 'break-word' as const, overflow: 'hidden', textAlign: detail === 'title' ? 'center' as const : undefined }
                   : { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }),
                 minWidth: 0,
                 paddingLeft: isContinuation ? 12 : 0,
@@ -2056,57 +2071,82 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     });
   }
 
-  // Decision 39 / routines.md F6 — a routine is a soft band across its day,
-  // behind the plans, every week; a skipped one is a dashed outline. No
-  // pointer events (drops reach the hour cells); the column hit-tests clicks.
+  // Decision 39 / routines.md F6 — a repeating event across its day, behind
+  // the plans, every week; a skipped one is a dashed outline. No pointer
+  // events (drops reach the hour cells); the column hit-tests clicks.
+  // Decision 55 (owner, 2026-11-21) — readable: a calm tinted card (no
+  // hatching), the whole name over as many lines as it has, then the time and
+  // the place (eventText.ts). Only a lane too thin for words writes sideways.
   function renderRoutineBands(dayYMD: string) {
     if (!layers.routines) return null;
     const out: ReactNode[] = [];
     const colPxB = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
+    const railPx = railPxFor(dayYMD);
     for (const { h, occ, lane, lanes } of routinesOnDay(dayYMD)) {
       const top = (occ.startMin / 60) * rowHeight;
       const height = Math.max(6, ((occ.endMin - occ.startMin) / 60) * rowHeight);
       const col = `var(--${h.color})`;
-      // The name with an ellipsis while it can show a few letters; initials
-      // only when the lane is truly tiny. The repeat icon needs the room.
       const laneW = colPxB / lanes;
-      // Sideways as soon as the name would not fit across the lane.
-      const narrow = laneW < Math.min(96, h.name.length * 7 + 16);
-      const showIcon = laneW >= 96;
-      // Decision 40 — a narrow lane writes the name sideways, never initials.
-      const label = occ.skipped ? (narrow ? `${h.name} · skip` : `${h.name} · skipped`) : occ.spill ? `${h.name} · from last night` : h.name;
+      const lead = (lane === 0 ? railPx : 0) + 6;
+      const blockH = Math.max(5, height - 2);
+      const { title, place } = eventTitleAndPlace(h.name, h.note);
+      const textW = laneW - 4 - lead - 6;
+      const sideways = textW < 28 && blockH > 40;
+      const showIcon = textW >= 110;
+      const lines = sideways ? { titleLines: 0, showTime: false, showPlace: false } : eventLines(blockH, textW - (showIcon ? 15 : 0), title, !!place);
+      const time = occ.spill
+        ? `until ${fmtMinOfDay(occ.endMin)} · from last night`
+        : `${fmtMinOfDay(occ.fullStart)}–${fmtMinOfDay(occ.fullEnd)}`;
       out.push(
         <div
           key={`routine-${h.id}${occ.spill ? '-spill' : ''}`}
           data-testid={`calendar-routine-${h.id}${occ.spill ? '-spill' : ''}`}
           data-date={occ.date}
           data-skipped={occ.skipped ? 'true' : undefined}
-          aria-label={`${h.name}, repeating event${occ.skipped ? ', skipped this time' : ''}`}
-          title={`${h.name} · repeating event${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
+          className="cal-event"
+          aria-label={`${h.name}, repeating event, ${time}${occ.skipped ? ', skipped this time' : ''}`}
+          title={`${h.name} · ${time} · repeating event${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
           style={{
-            position: 'absolute', left: `${(lane / lanes) * 100}%`, width: `${100 / lanes}%`, top, height, zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box',
-            // Side by side: a hairline between lanes so they read as two.
-            ...(lane > 0 ? { borderLeft: `1px solid color-mix(in srgb, ${col} 45%, transparent)` } : {}),
+            position: 'absolute', left: `calc(${(lane / lanes) * 100}% + 2px)`, width: `calc(${100 / lanes}% - 4px)`, top: top + 1, height: blockH,
+            zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 6, overflow: 'hidden',
             ...(occ.skipped
-              ? { border: `1px dashed color-mix(in srgb, ${col} 55%, transparent)`, borderRadius: 4, background: 'transparent' }
-              : {
-                  // Decision 40 — hatched: an event that just happens, never a plan.
-                  background: `repeating-linear-gradient(135deg, color-mix(in srgb, ${col} 22%, transparent) 0 1px, transparent 1px 6px), color-mix(in srgb, ${col} 10%, transparent)`,
-                  borderTop: `1px solid color-mix(in srgb, ${col} 45%, transparent)`,
-                  borderBottom: `1px solid color-mix(in srgb, ${col} 45%, transparent)`,
-                }),
+              ? { border: `1px dashed color-mix(in srgb, ${col} 55%, transparent)`, background: 'transparent' }
+              : { border: `1px solid color-mix(in srgb, ${col} 34%, transparent)`, background: `color-mix(in srgb, ${col} 15%, var(--paper))` }),
           }}
         >
-          {height >= 16 && (
+          {sideways && (
             <span style={{
-              position: 'absolute', top: 2, left: (lane === 0 ? railPxFor(dayYMD) : 0) + (narrow ? 2 : 4), right: narrow ? undefined : 4, display: 'flex', alignItems: 'center', gap: 4,
-              fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, lineHeight: '14px', whiteSpace: 'nowrap', overflow: 'hidden',
-              ...(narrow ? { writingMode: 'vertical-rl' as const, maxHeight: height - 4 } : {}),
-              color: `color-mix(in srgb, ${col} 70%, var(--ink))`, opacity: occ.skipped ? 0.8 : 1,
-            }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-              {showIcon && <span style={{ marginLeft: 'auto', display: 'inline-flex', flexShrink: 0 }}><CalIcon name="repeat" size={11} /></span>}
-            </span>
+              position: 'absolute', top: 4, left: lead - 3, writingMode: 'vertical-rl', maxHeight: blockH - 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 11, fontWeight: 600, lineHeight: '13px', color: `color-mix(in srgb, ${col} 22%, var(--ink))`,
+            }}>{title}</span>
+          )}
+          {lines.titleLines > 0 && (
+            <div style={{ position: 'absolute', inset: 0, padding: `${EVENT_TEXT.padY}px 6px ${EVENT_TEXT.padY}px ${lead}px`, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, minWidth: 0 }}>
+                <span
+                  data-testid={`calendar-routine-title-${h.id}`}
+                  style={{
+                    flex: 1, minWidth: 0, fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 12, fontWeight: 600, lineHeight: `${EVENT_TEXT.titleLine}px`,
+                    color: `color-mix(in srgb, ${col} 22%, var(--ink))`, overflowWrap: 'break-word',
+                    display: '-webkit-box', WebkitLineClamp: lines.titleLines, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    opacity: occ.skipped ? 0.75 : 1,
+                  }}
+                >
+                  {title}
+                </span>
+                {showIcon && <span aria-hidden style={{ flexShrink: 0, display: 'inline-flex', marginTop: 2, color: `color-mix(in srgb, ${col} 45%, var(--ink-3))` }}><CalIcon name="repeat" size={11} /></span>}
+              </div>
+              {lines.showTime && (
+                <span data-testid={`calendar-routine-time-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
+                  {time}{occ.skipped ? ' · skipped' : occ.moved ? ' · moved' : ''}
+                </span>
+              )}
+              {lines.showPlace && place && (
+                <span data-testid={`calendar-routine-place-${h.id}`} style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 11.5, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {place}
+                </span>
+              )}
+            </div>
           )}
         </div>,
       );
@@ -2447,18 +2487,49 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               data-today-col={isToday ? 'true' : undefined}
               style={{
                 flex: 1,
-                textAlign: 'center',
-                padding: '4px 0 3px',
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: tinyDays ? 3 : 6,
+                padding: '5px 0',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                color: isToday ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
+                fontSize: 10.5,
+                color: isToday ? 'var(--acid-ink, var(--acid))' : ymdToIsoDow(dayYMD) >= 6 ? 'var(--ink-4)' : 'var(--ink-3)',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                animation: isToday ? 'krnl-today-pulse 2s ease-in-out infinite' : undefined,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
               }}
             >
-              {/* A narrow day (the Station week) shows "S 7": full names would run into each other. */}
-              {tinyDays ? DAY_LABELS[ymdToIsoDow(dayYMD) - 1]!.slice(0, 1) : DAY_LABELS[ymdToIsoDow(dayYMD) - 1]} {dayNum}
+              {/* The weekday small, the date large (owner, 2026-11-21: "MON 16" in
+                  one small grey line was hard to read). Today's date sits in an
+                  accent circle. A narrow day (the Station week) shows "S 7". */}
+              <span>{tinyDays ? DAY_LABELS[ymdToIsoDow(dayYMD) - 1]!.slice(0, 1) : DAY_LABELS[ymdToIsoDow(dayYMD) - 1]}</span>
+              <span
+                data-testid={`week-col-date-${dayYMD}`}
+                style={{
+                  fontFamily: 'var(--font-read, var(--font-sans))',
+                  fontSize: tinyDays ? 12 : 14,
+                  fontWeight: 600,
+                  letterSpacing: 0,
+                  fontVariantNumeric: 'tabular-nums',
+                  lineHeight: 1,
+                  minWidth: tinyDays ? 18 : 24,
+                  height: tinyDays ? 18 : 24,
+                  padding: '0 4px',
+                  boxSizing: 'border-box',
+                  borderRadius: 999,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  // Days gone by step back a little; today is the accent circle.
+                  color: isToday ? 'var(--ink-on-bright)' : dayYMD < today ? 'var(--ink-3)' : 'var(--ink)',
+                  background: isToday ? 'var(--acid)' : 'transparent',
+                }}
+              >
+                {dayNum}
+              </span>
               {(() => {
                 // The day's tracked total, beside its name (F29) — when it fits.
                 if (!layers.recorded) return null;
@@ -2467,7 +2538,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 const min = Math.round((realityByDay.get(dayYMD) ?? []).filter((s) => s.kind === 'work').reduce((a, s) => a + (s.endMin - s.startMin), 0));
                 // ^ this day's piece only: a span over midnight counts on each day for its own part
                 if (min <= 0) return null;
-                return <span data-testid={`week-col-tracked-${dayYMD}`} title="Tracked this day" style={{ marginLeft: 6, letterSpacing: 0, textTransform: 'none', color: 'var(--ink-2)' }}>{fmtDur(min)}</span>;
+                return <span data-testid={`week-col-tracked-${dayYMD}`} title="Tracked this day" style={{ letterSpacing: 0, textTransform: 'none', color: 'var(--ink-3)' }}>{fmtDur(min)}</span>;
               })()}
             </div>
           );
@@ -2614,40 +2685,37 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                     position: 'absolute',
                     top: 1,
                     right: 4,
-                    visibility: hour >= win.endHour || hour < win.startHour ? 'hidden' : undefined,
+                    // The "now" time takes this label's place when it would sit on it.
+                    visibility: hour >= win.endHour || hour < win.startHour || (todayColIndex >= 0 && Math.abs(hour * 60 - nowMin) < 22 * (60 / rowHeight)) ? 'hidden' : undefined,
                     fontFamily: 'var(--font-mono)',
                     fontSize: 11,
+                    fontVariantNumeric: 'tabular-nums',
                     color: 'var(--ink-3)',
                     lineHeight: 1,
                   }}
                 >
                   {String(hour).padStart(2, '0')}
                 </span>
-                {/* #5 ruler sub-marks — appear as the grid is zoomed in, so the
-                    gutter reads like a ruler. Only the minutes, small, under
-                    their hour (13, :15, :30, :45): the hour is said once
-                    (owner, 2026-11-09 — "13 / 13:30" was too much). */}
-                {subMarks.map((min) => (
-                  <span
-                    key={min}
-                    style={{
-                      position: 'absolute',
-                      top: (min / 60) * rowHeight - 4,
-                      right: 4,
-                      visibility: hour >= win.endHour || hour < win.startHour ? 'hidden' : undefined,
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 9.5,
-                      color: 'var(--ink-4)',
-                      lineHeight: 1,
-                    }}
-                    aria-label={`${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`}
-                  >
-                    :{String(min).padStart(2, '0')}
-                  </span>
-                ))}
+                {/* Only the hours are labelled (owner, 2026-11-21: the ":30" under
+                    every hour was clutter). Half hours are a faint line in the grid. */}
               </div>
             );
           })}
+          {/* Decision 55 — the time now, in the gutter on the now-line. */}
+          {todayColIndex >= 0 && (
+            <span
+              data-testid="calendar-now-time"
+              aria-label={`Now ${fmtMinOfDay(nowMin)}`}
+              style={{
+                position: 'absolute', right: 2, top: (nowMin / 60) * rowHeight - 8, height: 16, padding: '0 4px', boxSizing: 'border-box',
+                display: 'inline-flex', alignItems: 'center', borderRadius: 4, zIndex: 2,
+                fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+                color: '#fff', background: 'color-mix(in srgb, var(--k-now, #ef4444) 84%, #000)', pointerEvents: 'none',
+              }}
+            >
+              {fmtMinOfDay(nowMin)}
+            </span>
+          )}
         </div>
 
         {/* 7 day columns */}
@@ -2689,7 +2757,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 key={i}
                 style={{
                   flex: 1,
-                  borderLeft: i > 0 ? '1px solid var(--k-cal-grid, rgba(154, 145, 128, 0.25))' : undefined,
+                  borderLeft: i > 0 ? `1px solid ${CAL_DAY_LINE}` : undefined,
                 }}
               />
             ))}
@@ -2706,7 +2774,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 style={{
                   flex: 1,
                   position: 'relative',
-                  background: isToday ? 'var(--k-cal-today, rgba(201, 241, 88, 0.08))' : 'transparent',
+                  // Today: a light wash (its name in the header is the marker).
+                  background: isToday && !singleDay ? 'var(--k-cal-today, color-mix(in srgb, var(--ink) 3.5%, transparent))' : 'transparent',
                   // borderLeft moved to the absolute overlay above so lines
                   // span the full scroll content, not just clientHeight.
                 }}
@@ -2728,13 +2797,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                       style={{
                         height: rowHeight,
                         boxSizing: 'border-box',
-                        borderBottom: '1px solid var(--k-cal-grid, rgba(154, 145, 128, 0.25))',
-                        // #4 — faint half-hour gridline once the grid is zoomed
-                        // enough to warrant it, so blocks read against a ruler.
-                        backgroundImage:
-                          subMarks.length > 0
-                            ? 'linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(154,145,128,0.12) 50%, transparent calc(50% + 0.5px))'
-                            : undefined,
+                        borderBottom: `1px solid ${CAL_HOUR_LINE}`,
+                        // #4 — a faint dashed half-hour line once the grid is
+                        // tall enough to need it, so blocks read against a ruler.
+                        backgroundImage: subMarks.length > 0 ? CAL_HALF_LINE : undefined,
+                        backgroundSize: subMarks.length > 0 ? '6px 1px' : undefined,
+                        backgroundPosition: subMarks.length > 0 ? '0 50%' : undefined,
+                        backgroundRepeat: subMarks.length > 0 ? 'repeat-x' : undefined,
                       }}
                     />
                   );

@@ -1,4 +1,4 @@
-/** `settings station-layout` (Decision 52) — the Station's Classic / Grid preset from the CLI. */
+/** `settings station-layout` (Decision 54) — the Station's Classic / Grid / Planner preset from the CLI. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -29,7 +29,7 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const facade = (onBoardChanged = vi.fn()) => new SysFacade({ boardPath, hasOpenRenderer: () => false, onBoardChanged });
 
-describe('settings station-layout (Decision 52)', () => {
+describe('settings station-layout (Decision 54)', () => {
   it('is classic until set', async () => {
     expect((await facade().run(['settings', 'station-layout'])).message).toBe('station layout: classic');
   });
@@ -43,6 +43,8 @@ describe('settings station-layout (Decision 52)', () => {
     expect(st?.rowFraction).toBe(0.4);
     expect(st?.bottomFractions).toEqual({ 'station-bottom-canvas': 0.5 });
     expect(changed).toHaveBeenCalledTimes(1);
+    expect((await facade().run(['settings', 'station-layout', 'planner'])).ok).toBe(true);
+    expect(read().layoutGeometry?.station?.preset).toBe('planner');
     expect((await facade().run(['settings', 'station-layout', 'classic'])).ok).toBe(true);
     expect(read().layoutGeometry?.station?.preset).toBe('classic');
   });
@@ -54,9 +56,10 @@ describe('settings station-layout (Decision 52)', () => {
   });
 
   it('the board schema accepts the preset and the Grid sizes', () => {
-    const station = { rowFraction: 0.4, columnFractions: [0.25], rightColumnSplit: 0.6, preset: 'grid', grid: { rowFraction: 0.5, top: [0.3, 0.3, 0.4], bottom: [0.66, 0.34] } };
+    const station = { rowFraction: 0.4, columnFractions: [0.25], rightColumnSplit: 0.6, preset: 'grid', grid: { rowFraction: 0.5, top: [0.3, 0.3, 0.4], bottom: [0.66, 0.34] }, planner: { rowFraction: 0.36, top: [0.25, 0.25, 0.25, 0.25], bottom: [1] } };
     const shape = BoardSchema.shape.layoutGeometry.unwrap().shape.station.unwrap();
     expect(shape.safeParse(station).success).toBe(true);
+    expect(shape.safeParse({ ...station, preset: 'planner' }).success).toBe(true);
     expect(shape.safeParse({ ...station, preset: 'masonry' }).success).toBe(false);
   });
 });

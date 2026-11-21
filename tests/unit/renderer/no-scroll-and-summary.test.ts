@@ -65,7 +65,8 @@ describe('summarizeAnalytics — the text on top of Overview', () => {
   it('writes a headline, trends and patterns in plain language', () => {
     const s = summarizeAnalytics(engine(), r, p, 30);
     expect(s.headline).toBe('In the last 30 days you finished 12 tasks and focused 5h.');
-    expect(s.sentences.join(' ')).toMatch(/up 100% on the period before/);
+    // Decision 57 — the change in its own unit, not a percentage.
+    expect(s.sentences.join(' ')).toMatch(/2h 30m more than the 30 days before/);
     expect(s.sentences.join(' ')).toMatch(/Tuesdays, around 10:00/);
     expect(s.sentences.join(' ')).toMatch(/Longest habit streak: 5 days \(Run\)/);
     expect(s.sentences.join(' ')).toMatch(/3 tasks are still open/);

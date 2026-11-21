@@ -75,6 +75,8 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
   const menu = (
     <div
       ref={menuRef}
+      role="menu"
+      data-testid="context-menu"
       style={{
         position: 'fixed',
         left: pos.left,

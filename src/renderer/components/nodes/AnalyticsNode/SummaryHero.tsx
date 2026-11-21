@@ -1,101 +1,140 @@
-// Overview text summary — the first thing on the Analytics Overview tab.
+// The Summary page of Analytics (Decision 57): it answers "how did my time
+// go in this period?" in one look.
 //
-// A one-line headline, four headline figures with their change vs the
-// previous period, a focus-per-day sparkline, and a few plain sentences
-// (analytics/summary.ts — the same text `sys analytics summary` prints).
-// Text never touches an edge: every row has an inset and ellipsizes.
+//   - the headline sentence, set large in the reading font;
+//   - four figures in one divided band (label over value), each with its
+//     change in words against the period before ("+7 on the 30 days before"),
+//     never a percentage off a near-empty baseline;
+//   - Focus per day as a real chart: gridlines with hour labels, dates under
+//     it, the average as a dashed line and stated in words, today marked;
+//   - the plain sentences (analytics/summary.ts — the same text
+//     `sys analytics summary` prints).
+// One hue (the accent) for the data; everything else is ink and paper, so it
+// follows the light and dark themes and every frame style.
 
 import type { AnalyticsSummary } from '../../../analytics/summary';
 import type { DayBucket } from '../../../analytics/types';
+import { useElementSize } from '../../../analytics';
 import { cardPlacement } from './guide';
+import './analytics.css';
 
-const INSET = 12;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export function SummaryHero({ summary, byDay }: { summary: AnalyticsSummary; byDay: readonly DayBucket[] }) {
-  const max = Math.max(1, ...byDay.map((d) => d.focusMin));
-  const W = 100;
-  const H = 28;
-  const bw = byDay.length > 0 ? W / byDay.length : W;
+function hm(min: number): string {
+  const m = Math.max(0, Math.round(min));
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r === 0 ? `${h}h` : `${h}h ${String(r).padStart(2, '0')}m`;
+}
+
+const dayLabel = (ymd: string): string => `${MONTHS[Number(ymd.slice(5, 7)) - 1] ?? ''} ${Number(ymd.slice(8, 10))}`;
+
+/** Days grouped into weeks when a range is too long for a bar a day. */
+export function focusBars(byDay: readonly DayBucket[]): Array<{ key: string; from: string; to: string; min: number }> {
+  if (byDay.length <= 62) return byDay.map((d) => ({ key: d.date, from: d.date, to: d.date, min: d.focusMin }));
+  const out: Array<{ key: string; from: string; to: string; min: number }> = [];
+  for (let i = 0; i < byDay.length; i += 7) {
+    const week = byDay.slice(i, i + 7);
+    out.push({ key: week[0]!.date, from: week[0]!.date, to: week[week.length - 1]!.date, min: week.reduce((a, d) => a + d.focusMin, 0) });
+  }
+  return out;
+}
+
+/** A round hour step so the tallest bar sits under three gridlines or fewer. */
+export function hourStep(maxMin: number): number {
+  for (const step of [15, 30, 60, 120, 180, 240, 360, 480, 720, 1440, 2880]) if (maxMin <= step * 3) return step;
+  return Math.ceil(maxMin / 3 / 1440) * 1440;
+}
+
+function FocusPerDay({ byDay }: { byDay: readonly DayBucket[] }) {
+  const [ref, size] = useElementSize<HTMLDivElement>();
+  const bars = focusBars(byDay);
+  const weekly = bars.length !== byDay.length;
+  const active = byDay.filter((d) => d.focusMin > 0);
+  const avg = active.length > 0 ? active.reduce((a, d) => a + d.focusMin, 0) / byDay.length : 0;
+  const max = Math.max(1, ...bars.map((b) => b.min));
+  const step = hourStep(max);
+  const top = Math.ceil(max / step) * step;
+  const W = Math.max(160, size.width || 320);
+  const H = Math.max(80, size.height || 120);
+  const padR = 34;
+  const padB = 18;
+  const plotW = W - padR;
+  const plotH = H - padB - 4;
+  const y = (m: number): number => 4 + plotH - (m / top) * plotH;
+  const bw = plotW / Math.max(1, bars.length);
+  const gap = Math.min(4, bw * 0.28);
+  const ticks: number[] = [];
+  for (let t = step; t <= top; t += step) ticks.push(t);
+  const xLabels = bars.length >= 3 ? [0, Math.floor((bars.length - 1) / 2), bars.length - 1] : bars.map((_, i) => i);
+  const avgDay = weekly ? avg * 7 : avg;
+
   return (
-    <section
-      data-page-item
-      data-testid="analytics-summary"
-      style={{
-        background: 'linear-gradient(135deg, var(--k-an-bg-2, #16191c) 0%, var(--k-an-bg, #101214) 100%)',
-        border: '1px solid var(--k-an-line, #23262a)',
-        borderRadius: 10,
-        padding: `${INSET}px ${INSET + 2}px`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        minWidth: 0,
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        ...cardPlacement('summary'),
-      }}
-    >
-      <div
-        data-testid="analytics-summary-headline"
-        style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 650, lineHeight: 1.3, color: 'var(--k-an-ink, #f4f6f8)' }}
-      >
-        {summary.headline}
-      </div>
-
-      {/* Four tiles: one row when wide, 2 × 2 when narrow (never 3 + 1). */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(max(120px, calc(50% - 4px)), 1fr))', gap: 8, flexShrink: 0 }}>
-        {summary.stats.map((s) => {
-          const d = s.deltaPct;
-          const tone = d === null ? 'var(--k-an-ink-4, #7d848b)' : d >= 0 ? 'var(--acid, #c9f158)' : 'var(--k-an-warm, #ff8e64)';
-          return (
-            <div
-              key={s.key}
-              data-testid={`analytics-summary-stat-${s.key}`}
-              style={{ background: 'var(--k-an-tile, rgba(255,255,255,0.03))', border: '1px solid var(--k-an-line, #23262a)', borderRadius: 8, padding: '8px 10px', minWidth: 0 }}
-            >
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--k-an-ink-3, #9aa1a8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {s.label}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 700, color: 'var(--k-an-ink, #f4f6f8)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{s.value}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tone, whiteSpace: 'nowrap' }}>
-                  {d === null ? '—' : <><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ verticalAlign: '-0.05em', marginRight: 3 }}><path d={d >= 0 ? 'M12 19V5M6 11l6-6 6 6' : 'M12 5v14M6 13l6 6 6-6'} /></svg>{Math.abs(d)}%</>}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {byDay.length > 1 && (
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H} aria-label="Focus minutes per day" role="img">
-          {byDay.map((d, i) => {
-            const h = d.focusMin > 0 ? Math.max(1.5, (d.focusMin / max) * H) : 0.8;
+    <figure className="an-fpd" data-testid="analytics-focus-per-day">
+      <figcaption className="an-fpd__head">
+        <span className="an-fpd__title">Focus per {weekly ? 'week' : 'day'}</span>
+        {avg > 0 && <span className="an-fpd__note" data-testid="analytics-focus-average">average {hm(avgDay)} a {weekly ? 'week' : 'day'}</span>}
+      </figcaption>
+      <div ref={ref} className="an-fpd__plot">
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Focus per ${weekly ? 'week' : 'day'}: average ${hm(avgDay)}`}>
+          {/* Gridlines: the baseline solid, round hours faint, labelled on the right. */}
+          <line x1={0} x2={plotW} y1={y(0)} y2={y(0)} className="an-fpd__base" />
+          {ticks.map((t) => (
+            <g key={t}>
+              <line x1={0} x2={plotW} y1={y(t)} y2={y(t)} className="an-fpd__grid" />
+              <text x={W - 2} y={y(t) + 3.5} textAnchor="end" className="an-fpd__tick">{hm(t)}</text>
+            </g>
+          ))}
+          {bars.map((b, i) => {
+            const h = b.min > 0 ? Math.max(2, y(0) - y(b.min)) : 0;
+            const last = i === bars.length - 1;
             return (
-              <rect
-                key={d.date}
-                x={i * bw + bw * 0.15}
-                y={H - h}
-                width={bw * 0.7}
-                height={h}
-                rx={0.6}
-                fill={d.focusMin > 0 ? 'var(--acid, #c9f158)' : 'var(--k-an-line, #23262a)'}
-                opacity={d.focusMin > 0 ? 0.85 : 1}
-              >
-                <title>{`${d.date}: ${d.focusMin}m focus, ${d.taskCount} tasks`}</title>
+              <rect key={b.key} x={i * bw + gap / 2} y={y(0) - h} width={Math.max(1, bw - gap)} height={h} rx={Math.min(3, (bw - gap) / 3)}
+                className={last ? 'an-fpd__bar an-fpd__bar--now' : 'an-fpd__bar'}>
+                <title>{`${b.from === b.to ? dayLabel(b.from) : `${dayLabel(b.from)} – ${dayLabel(b.to)}`}: ${hm(b.min)} focus`}</title>
               </rect>
             );
           })}
+          {avgDay > 0 && <line x1={0} x2={plotW} y1={y(avgDay)} y2={y(avgDay)} className="an-fpd__avg" />}
+          {xLabels.map((i) => (
+            <text key={i} x={Math.min(plotW - 1, Math.max(1, i * bw + bw / 2))} y={H - 3} textAnchor={i === 0 ? 'start' : i === bars.length - 1 ? 'end' : 'middle'} className="an-fpd__tick">
+              {i === bars.length - 1 && !weekly ? 'Today' : dayLabel(bars[i]!.from)}
+            </text>
+          ))}
         </svg>
-      )}
+      </div>
+    </figure>
+  );
+}
+
+export function SummaryHero({ summary, byDay, rangeDays = 30 }: { summary: AnalyticsSummary; byDay: readonly DayBucket[]; rangeDays?: number }) {
+  return (
+    <section data-page-item data-testid="analytics-summary" className="an-summary" style={cardPlacement('summary')}>
+      <h3 data-testid="analytics-summary-headline" className="an-summary__headline">{summary.headline}</h3>
+
+      {/* Four figures in one band, divided by hairlines (2 × 2 when narrow). */}
+      <dl className="an-kpis">
+        {summary.stats.map((s) => {
+          const change = s.change ?? null;
+          const zero = s.value === '0' || s.value === '0m';
+          const words = change === null ? (zero ? 'none yet' : 'new this period') : change === '±0' ? `same as the ${rangeDays} days before` : `${change} on the ${rangeDays} days before`;
+          const trend = change === null || change === '±0' ? 'flat' : change.startsWith('+') ? 'up' : 'down';
+          return (
+            <div key={s.key} className="an-kpi" data-testid={`analytics-summary-stat-${s.key}`}>
+              <dt>{s.label}</dt>
+              <dd className="an-kpi__value">{s.value}</dd>
+              <dd className="an-kpi__delta" data-trend={trend}>{words}</dd>
+            </div>
+          );
+        })}
+      </dl>
+
+      {byDay.length > 1 && <FocusPerDay byDay={byDay} />}
 
       {/* The sentences take what's left; in a small window they scroll rather than being cut. */}
-      <ul className="nowheel" style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', paddingBottom: 10, maskImage: 'linear-gradient(to bottom, #000 calc(100% - 16px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 16px), transparent)' }}>
-        {summary.sentences.map((t) => (
-          <li key={t} style={{ display: 'flex', gap: 8, fontFamily: 'var(--font-sans)', fontSize: 12, lineHeight: 1.4, color: 'var(--k-an-ink-2b, #aab0b7)' }}>
-            <span aria-hidden style={{ color: 'var(--acid, #c9f158)', flexShrink: 0 }}>•</span>
-            <span style={{ minWidth: 0 }}>{t}</span>
-          </li>
-        ))}
+      <ul className="an-summary__notes nowheel">
+        {summary.sentences.map((t) => <li key={t}>{t}</li>)}
       </ul>
     </section>
   );

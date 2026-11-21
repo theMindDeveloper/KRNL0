@@ -27,13 +27,16 @@ import { resolveStationSlot, SLOT_INDEX } from './SlotResolver';
 import type { StationSlot } from '../../../shared/types';
 
 interface Props {
-  slot: StationSlot;
+  /** Classic: the window in this place (places can be swapped by dragging). */
+  slot?: StationSlot;
+  /** Grid and Planner (Decision 54): this window, in the preset's fixed order. */
+  kind?: string;
 }
 
-export function StationCell({ slot }: Props) {
+export function StationCell({ slot, kind }: Props) {
   const node = useBoardStore((s) =>
     s.board?.nodes.find(
-      (n) => n.isMother && resolveStationSlot(n) === slot
+      (n) => n.isMother && (kind !== undefined ? n.kind === kind : resolveStationSlot(n) === slot)
     ) ?? null
   );
   const selectNode = useBoardStore((s) => s.selectNode);
@@ -48,12 +51,14 @@ export function StationCell({ slot }: Props) {
   if (!Component) return null;
 
   const onCommand = makeCommandHandler(node.id);
-  const slotIndex = SLOT_INDEX[slot] ?? 1;
+  const place = slot ?? resolveStationSlot(node);
+  const slotIndex = (place && SLOT_INDEX[place]) ?? 1;
 
   return (
     <MotherFrameStationContext.Provider value={true}>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-        <DragHandle nodeId={node.id} />
+        {/* A fixed preset keeps its order: only Classic swaps windows by dragging. */}
+        {kind === undefined && <DragHandle nodeId={node.id} />}
         <Component
           node={node}
           selected={false}

@@ -102,7 +102,10 @@ export function windowSwap(ctx: WindowCtx, a: string | undefined, b: string | un
   ma.config = { ...(ma.config ?? {}), stationSlot: slotB };
   mb.config = { ...(mb.config ?? {}), stationSlot: slotA };
   save(ctx, board);
-  return { ok: true, message: `${label(ma.kind)} and ${label(mb.kind)} swapped places` };
+  // Decision 54 — Grid and Planner keep their own fixed order; places are Classic's.
+  const preset = (board['layoutGeometry'] as { station?: { preset?: string } } | undefined)?.station?.preset;
+  const note = preset === 'grid' || preset === 'planner' ? ` (shows in the Classic layout; ${preset === 'grid' ? 'Grid' : 'Planner'} keeps its own order)` : '';
+  return { ok: true, message: `${label(ma.kind)} and ${label(mb.kind)} swapped places${note}` };
 }
 
 /** `krnl pomo label "<what you are doing>" [--tag <id>]` — the timer's free-text label (Observe). */

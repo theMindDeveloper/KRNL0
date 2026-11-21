@@ -158,7 +158,7 @@ export async function startTerminalSession(deps: SessionDeps): Promise<() => voi
 
     const k = event.key;
 
-    // Ctrl+Shift+L toggles Station / Canvas (LayoutModeToggle); not a ^L for the shell.
+    // Ctrl+Shift+L toggles Station / Canvas (the layout menu, LayoutMenu); not a ^L for the shell.
     if (event.shiftKey && (k === 'l' || k === 'L')) return false;
 
     if (!event.shiftKey && (k === 'c' || k === 'C')) {

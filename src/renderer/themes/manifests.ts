@@ -19,7 +19,8 @@ export const CLASSIC_CLOCK: ClockSkin = { bezel: 'none', hand: 'line', readoutWi
 export const CLASSIC_K: TokenMap = {
   '--k-now': '#ef4444',
   '--k-cal-grid': 'rgba(154, 145, 128, 0.25)',
-  '--k-cal-today': 'rgba(201, 241, 88, 0.08)',
+  // Decision 55 — today's column is a neutral lift, not an olive wash.
+  '--k-cal-today': 'color-mix(in srgb, var(--ink) 3.5%, transparent)',
   '--k-pointer-core': '#fff5ec',
   '--k-mother-radius': '8px',
   '--k-mother-wash': 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 30%)',
@@ -34,8 +35,10 @@ const CLASSIC_XTERM: XtermColors = {
   cursorAccent: '#0e0d0b',
 };
 
+// Decision 57 — Analytics follows the theme in Classic too (it kept a fixed
+// dark slate, even in the light theme).
 const legacy = (): ThemeManifest => ({
-  tokens: { light: CLASSIC_K, dark: CLASSIC_K },
+  tokens: { light: { ...CLASSIC_K, ...AN_THEMED }, dark: { ...CLASSIC_K, ...AN_THEMED } },
   components: { pomo: {}, clock: CLASSIC_CLOCK, terminal: { xterm: { light: CLASSIC_XTERM, dark: CLASSIC_XTERM } } },
   slots: { panelToggles: 'topbar' },
 });
@@ -89,8 +92,9 @@ const PRO_DARK: TokenMap = {
   '--btn-primary-fg': '#1a1612',
   '--btn-primary-ring': 'rgba(201, 241, 88, 0.45)',
   '--k-now': '#ef4444',
-  '--k-cal-grid': '#202020',
-  '--k-cal-today': 'rgba(201, 241, 88, 0.045)',
+  // Decision 55 — hour lines you can read on #161616 (they were #202020).
+  '--k-cal-grid': '#2c2c2c',
+  '--k-cal-today': 'color-mix(in srgb, var(--ink) 3.5%, transparent)',
   '--k-pointer-core': '#fff5ec',
   '--k-mother-radius': '6px',
   '--k-mother-wash': 'linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0) 18%)',
@@ -152,7 +156,7 @@ const PRO_LIGHT: TokenMap = {
   '--btn-primary-ring': 'rgba(94, 125, 29, 0.40)',
   '--k-now': '#dc2626',
   '--k-cal-grid': '#e2e2de',
-  '--k-cal-today': 'rgba(94, 125, 29, 0.07)',
+  '--k-cal-today': 'color-mix(in srgb, var(--ink) 3.5%, transparent)',
   '--k-pointer-core': '#fff5ec',
   '--k-mother-radius': '6px',
   '--k-mother-wash': 'linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 18%)',

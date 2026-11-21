@@ -272,6 +272,12 @@
 .krnl-pointer-held iframe { pointer-events: none !important; }
 
 /* Calendar: a missed block's replan button shows on hover or focus only. */
+/* Decision 55 — a plan answers the hand at once: it lifts a step on hover and
+   presses in on pointer-down (transform only, 120 ms; still for reduced motion). */
+.cal-block { transition: filter 120ms ease-out, transform 120ms ease-out; }
+.cal-block:hover { filter: brightness(1.08); }
+.cal-block:active { transform: scale(0.985); }
+@media (prefers-reduced-motion: reduce) { .cal-block { transition: none; } .cal-block:active { transform: none; } }
 .cal-block .cal-replan { opacity: 0; transition: opacity 120ms ease; }
 .cal-block:hover .cal-replan,
 .cal-block .cal-replan:focus-visible { opacity: 1; }

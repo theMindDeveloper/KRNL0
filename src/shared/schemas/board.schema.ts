@@ -28,6 +28,13 @@ export const BoardViewportSchema = z.object({
 // ADR 0008 § 4.1 — schemaVersion bumped to 2. The Zod schema validates boards
 // that have already been migrated. Raw files on disk may arrive as version 1
 // and are migrated by loadBoardFrom() before they reach this schema.
+// Decision 54 — the panel sizes of a fixed Station preset (Grid, Planner).
+const StationRowsSchema = z.object({
+  rowFraction: z.number().optional(),
+  top: z.array(z.number()).optional(),
+  bottom: z.array(z.number()).optional(),
+});
+
 export const BoardSchema = z.object({
   version: z.literal(1),
   schemaVersion: z.literal(2),
@@ -54,15 +61,10 @@ export const BoardSchema = z.object({
           rightColumnSplit: z.number(),
           canvasHidden: z.boolean().optional(),
           bottomFractions: z.record(z.number()).optional(),
-          // Decision 52 — Station preset and the Grid preset's own panel sizes.
-          preset: z.enum(['classic', 'grid']).optional(),
-          grid: z
-            .object({
-              rowFraction: z.number().optional(),
-              top: z.array(z.number()).optional(),
-              bottom: z.array(z.number()).optional(),
-            })
-            .optional(),
+          // Decision 54 — Station preset and the Grid and Planner presets' own panel sizes.
+          preset: z.enum(['classic', 'grid', 'planner']).optional(),
+          grid: StationRowsSchema.optional(),
+          planner: StationRowsSchema.optional(),
         })
         .optional(),
     })

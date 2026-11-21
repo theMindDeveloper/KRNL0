@@ -1,8 +1,9 @@
-// The web app on a phone or an iPad (Decision 51; designs PhoneToday,
-// PhoneFocus, PhoneCalendar, PhoneCanvas, Tablet, TabletCanvas). One shell,
+// The web app on a phone or an iPad (Decision 51, Decision 56). One shell,
 // two arrangements of the board's own windows:
 //   phone   header · one view · tab bar (Today, Calendar, Habits, Insights, Canvas)
 //   tablet  side rail with the same views · two-column Today
+// Today answers "what now?": the date, your day in time order with the item
+// going on now (or next) opened out, then the Timer, Plans, Habits and Clock.
 // While the timer runs, Today offers Focus: the Timer on its own, full size.
 // The open view is this browser's own (sessionStorage), never synced.
 
@@ -16,10 +17,13 @@ import { SettingsModal, type Theme } from '../TopBar/SettingsModal';
 import { SaveSyncBadge } from '../Sync/SyncChip';
 import { EmbeddedCanvasCell } from '../Station/EmbeddedCanvasCell';
 import { MothersElsewhereContext, setMothersElsewhere } from '../Station/useStationViewportGate';
+import { makeCommandHandler } from '../Canvas/commandDispatch';
 import { pomoClock, formatElapsed, formatRemaining, isObserve } from '../nodes/PomoNode/derive';
 import type { PomoConfig, PomoState } from '../nodes/PomoNode/types';
 import type { TodoItem } from '../nodes/TodoNode/types';
 import { MotherWindow } from './MotherWindow';
+import { DayList, useDayAgenda } from './DayList';
+import { dayLine } from './dayAgenda';
 import type { FormFactor } from './useFormFactor';
 import logo from '../../assets/launch/logo.webp';
 import './mobile.css';
@@ -59,23 +63,18 @@ const EXPAND = 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5';
 
 const ymd = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** "3 of 6 plans done today", from the Plans window's items. */
+/** The line under the date: plans done today and the day's events (dayAgenda.ts). */
 function useTodayLine(): string {
-  return useTodayFacts().line;
+  return dayLine(useDayAgenda().agenda);
 }
 
-/** The headline, and how many rows the Plans window shows (for its height). */
-function useTodayFacts(): { line: string; listed: number } {
+/** How many rows the Plans window shows (for its height). */
+function usePlansListed(): number {
   const items = useBoardStore((s) => (s.board?.nodes.find((n) => n.isMother && n.kind === 'todo')?.state as { items?: TodoItem[] } | undefined)?.items);
   return useMemo(() => {
     const today = ymd(new Date());
-    const live = (items ?? []).filter((i) => !i.archivedAt && !(i as { droppedAt?: string }).droppedAt);
-    const todays = live.filter((i) => i.scheduledFor?.slice(0, 10) === today || (i.done && i.completedAt !== null && ymd(new Date(i.completedAt)) === today));
-    const open = live.filter((i) => !i.done).length;
-    const listed = live.filter((i) => !i.done || (i.completedAt !== null && ymd(new Date(i.completedAt)) === today)).length;
-    if (todays.length > 0) return { line: `${todays.filter((i) => i.done).length} of ${todays.length} plans done today`, listed };
-    if (open > 0) return { line: `${open} open ${open === 1 ? 'plan' : 'plans'}, none set for today`, listed };
-    return { line: 'Nothing planned yet', listed };
+    return (items ?? []).filter((i) => !i.archivedAt && !(i as { droppedAt?: string }).droppedAt)
+      .filter((i) => !i.done || (i.completedAt !== null && ymd(new Date(i.completedAt)) === today)).length;
   }, [items]);
 }
 
@@ -148,7 +147,6 @@ const CAL_VIEW_KEY = 'krnl0-web-calendar-view';
 type CalView = 'day' | 'week' | 'month' | 'year';
 
 function CalendarView({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
-  const [which, setWhich] = useState<'calendar' | 'clock'>('calendar');
   // A phone shows one day by default; its choice stays on this phone (the
   // stored view is the desktop's and is never changed from here).
   const [calView, setCalView] = useState<CalView>(() => {
@@ -167,22 +165,30 @@ function CalendarView({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
       return true;
     },
   } : {};
+  // Decision 56 - the phone gives the Calendar the whole screen (the Clock is
+  // on Today); an iPad has room for both side by side.
+  if (ff === 'phone') return <div className="m-fill m-cal m-enter" data-testid="m-calendar"><MotherWindow kind="calendar" label="Calendar" {...phoneCal} /></div>;
   return (
-    <div className="m-fill m-stack">
-      <div className="m-seg" role="tablist" aria-label="Calendar or clock">
-        <button type="button" role="tab" aria-selected={which === 'calendar'} className={which === 'calendar' ? 'on' : ''} onClick={() => setWhich('calendar')}>Calendar</button>
-        <button type="button" role="tab" aria-selected={which === 'clock'} className={which === 'clock' ? 'on' : ''} onClick={() => setWhich('clock')}>Clock</button>
-      </div>
-      <div className="m-grow">
-        {which === 'calendar' ? <MotherWindow kind="calendar" label="Calendar" {...phoneCal} /> : <MotherWindow kind="clock" label="Clock" />}
-      </div>
+    <div className="m-fill m-cal-split m-enter" data-testid="m-calendar">
+      <div className="m-grow"><MotherWindow kind="calendar" label="Calendar" /></div>
+      <div className="m-grow"><MotherWindow kind="clock" label="Clock" /></div>
     </div>
   );
 }
 
 function FocusPill({ onOpen }: { onOpen: () => void }) {
   const reading = useTimerReading();
-  if (!reading) return null;
+  const pomoId = useBoardStore((s) => s.board?.nodes.find((n) => n.isMother && n.kind === 'pomo')?.id ?? null);
+  // Idle: one tap starts the timer from the top of Today (the Timer window is further down).
+  if (!reading) {
+    if (!pomoId) return null;
+    return (
+      <button type="button" className="m-chip" onClick={() => makeCommandHandler(pomoId)('pomo.start', {})} data-testid="m-timer-start">
+        <svg className="m-icon" width={14} height={14} viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" fill="currentColor" stroke="none" /></svg>
+        <span>Start timer</span>
+      </button>
+    );
+  }
   return (
     <button type="button" className="m-chip m-chip--live" onClick={onOpen} data-testid="m-focus-open">
       <span className="m-dot m-dot--acid" aria-hidden="true" />
@@ -193,25 +199,31 @@ function FocusPill({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function PhoneToday({ onFocus }: { onFocus: () => void }) {
-  const { line, listed } = useTodayFacts();
-  const habits = useBoardStore((s) => ((s.board?.nodes.find((n) => n.isMother && n.kind === 'habit')?.state as { habits?: Array<{ archived?: boolean }> } | undefined)?.habits ?? []).filter((h) => !h.archived).length);
+function PhoneToday({ onFocus, onOpenCalendar }: { onFocus: () => void; onOpenCalendar: () => void }) {
+  const line = useTodayLine();
+  const listed = usePlansListed();
+  const habits = useBoardStore((s) => ((s.board?.nodes.find((n) => n.isMother && n.kind === 'habit')?.state as { habits?: Array<{ archived?: boolean; kind?: string }> } | undefined)?.habits ?? []).filter((h) => !h.archived && h.kind !== 'routine').length);
   // The windows fill what they get: give each the height its rows need.
-  const plansH = Math.min(620, Math.max(250, 150 + listed * 30));
+  const plansH = Math.min(620, Math.max(250, 150 + listed * 34));
   const habitsH = Math.min(560, Math.max(230, 150 + habits * 56));
   const now = new Date();
   return (
-    <div className="m-scroll" data-testid="m-today">
-      <div className="m-headline">
-        <h1>{now.toLocaleDateString(undefined, { weekday: 'long' })} {now.getDate()}</h1>
+    <div className="m-scroll m-enter" data-testid="m-today">
+      <header className="m-headline">
+        <h1>
+          <span>{now.toLocaleDateString(undefined, { weekday: 'long' })}</span>{' '}
+          <span className="m-headline__date">{now.toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}</span>
+        </h1>
         <div className="m-headline__row">
-          <p>{line}</p>
+          <p data-testid="m-today-line">{line}</p>
           <FocusPill onOpen={onFocus} />
         </div>
-      </div>
+      </header>
+      <DayList onOpenCalendar={onOpenCalendar} />
       <div className="m-slot m-slot--timer"><MotherWindow kind="pomo" label="Timer" /></div>
       <div className="m-slot" style={{ height: plansH }}><MotherWindow kind="todo" label="Plans" /></div>
       <div className="m-slot" style={{ height: habitsH }}><MotherWindow kind="habit" label="Habits" /></div>
+      <div className="m-slot m-slot--clock"><MotherWindow kind="clock" label="Clock" /></div>
     </div>
   );
 }
@@ -231,12 +243,12 @@ function TabletToday() {
   );
 }
 
-function ViewBody({ view, ff, onFocus }: { view: View; ff: Exclude<FormFactor, 'desktop'>; onFocus: () => void }) {
+function ViewBody({ view, ff, onFocus, onOpenCalendar }: { view: View; ff: Exclude<FormFactor, 'desktop'>; onFocus: () => void; onOpenCalendar: () => void }) {
   switch (view) {
-    case 'today': return ff === 'phone' ? <PhoneToday onFocus={onFocus} /> : <TabletToday />;
+    case 'today': return ff === 'phone' ? <PhoneToday onFocus={onFocus} onOpenCalendar={onOpenCalendar} /> : <TabletToday />;
     case 'calendar': return <CalendarView ff={ff} />;
-    case 'habits': return <div className="m-fill"><MotherWindow kind="habit" label="Habits" /></div>;
-    case 'insights': return <div className="m-fill"><MotherWindow kind="analytics" label="Insights" /></div>;
+    case 'habits': return <div className="m-fill m-enter"><MotherWindow kind="habit" label="Habits" /></div>;
+    case 'insights': return <div className="m-fill m-enter"><MotherWindow kind="analytics" label="Insights" /></div>;
     case 'canvas': return <div className="m-fill m-canvas" data-testid="m-canvas"><EmbeddedCanvasCell /><FitOnFirstOpen phone={ff === 'phone'} /></div>;
   }
 }
@@ -276,6 +288,13 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
   const setView = (v: View): void => {
     setViewState(v);
     try { sessionStorage.setItem(VIEW_KEY, v); } catch { /* private window */ }
+  };
+  // A row of "Your day": the Calendar on today, as a day.
+  const openCalendarToday = (): void => {
+    try { sessionStorage.setItem(CAL_VIEW_KEY, 'day'); } catch { /* private window */ }
+    const cal = useBoardStore.getState().board?.nodes.find((n) => n.isMother && n.kind === 'calendar');
+    if (cal) makeCommandHandler(cal.id)('calendar.setAnchor', { date: ymd(new Date()) });
+    setView('calendar');
   };
   // Focus closes by itself when the timer stops.
   useEffect(() => { if (!reading) setFocus(false); }, [reading]);
@@ -348,7 +367,7 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
           {ff === 'phone' && settingsButton}
         </header>
         <main className="m-body">
-          <ViewBody view={view} ff={ff} onFocus={() => setFocus(true)} />
+          <ViewBody view={view} ff={ff} onFocus={() => setFocus(true)} onOpenCalendar={openCalendarToday} />
         </main>
       </div>
 

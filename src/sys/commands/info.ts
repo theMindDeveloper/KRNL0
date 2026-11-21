@@ -8,6 +8,8 @@
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { BoardShape } from '../../shared/dispatch/types';
+import type { StationGeometry } from '../../shared/types/board';
+import { LAYOUT_OPTIONS, STATION_PRESETS, isStationPreset, layoutChoiceOf, parseLayoutChoice, presetOf, withPreset, type LayoutChoice } from '../../shared/stationLayouts';
 
 export interface InfoCtx {
   boardPath: string;
@@ -151,56 +153,65 @@ export function settingsGrid(
 }
 
 /**
- * `krnl settings station-layout [classic|grid]` (Decision 52) — how the
- * Station arranges its windows. Same as the Classic / Grid switch in the
- * Station toolbar. Each preset keeps its own panel sizes.
+ * `krnl settings station-layout [classic|grid|planner]` (Decision 54) — which
+ * arrangement the Station uses, without leaving Free if you are there. Each
+ * preset keeps its own panel sizes. `settings layout` picks the same and also
+ * switches to the Station.
  */
 export function settingsStationLayout(
   ctx: { boardPath: string; onBoardChanged?: () => void },
   preset: string | undefined,
 ): SysResult {
-  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { layoutGeometry?: { station?: Record<string, unknown> } }) | null;
+  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { layoutGeometry?: { station?: StationGeometry } }) | null;
   if (!raw) return { ok: false, message: 'No board found' };
   const station = raw.layoutGeometry?.station;
-  const current = station?.['preset'] === 'grid' ? 'grid' : 'classic';
+  const current = presetOf(station);
   if (preset === undefined) return { ok: true, message: `station layout: ${current}`, data: { preset: current } };
-  if (preset !== 'classic' && preset !== 'grid') {
-    return { ok: false, message: `settings station-layout: expected classic or grid, got "${preset}"` };
+  const want = preset.trim().toLowerCase();
+  if (!isStationPreset(want)) {
+    return { ok: false, message: `settings station-layout: expected ${STATION_PRESETS.join(', ')}, got "${preset}"` };
   }
-  if (preset !== current) {
-    const nextStation = {
-      rowFraction: 0.35,
-      columnFractions: [],
-      rightColumnSplit: 0.6,
-      ...station,
-      preset,
-    };
-    saveBoardTo(ctx.boardPath, { ...raw, layoutGeometry: { ...raw.layoutGeometry, station: nextStation }, savedAt: new Date().toISOString() });
+  if (want !== current || station?.preset === undefined) {
+    saveBoardTo(ctx.boardPath, { ...raw, layoutGeometry: { ...raw.layoutGeometry, station: withPreset(station, want) }, savedAt: new Date().toISOString() });
     ctx.onBoardChanged?.();
   }
-  const note = raw['layoutMode'] === 'station' ? '' : ' (shows when the layout is Station: krnl settings layout station)';
-  return { ok: true, message: `station layout: ${preset}${note}`, data: { preset } };
+  const note = raw['layoutMode'] === 'station' ? '' : ` (shows in the Station: krnl settings layout ${want})`;
+  return { ok: true, message: `station layout: ${want}${note}`, data: { preset: want } };
 }
 
 /**
- * `krnl settings layout [station|canvas]` — show or set the layout (ADR 0008):
- * Station docks the windows beside the terminal, Canvas is the free board.
- * The top-bar pill and ⌘⇧L set the same board field.
+ * `krnl settings layout [classic|grid|planner|free]` — show or pick the layout,
+ * the same list as the top bar's layout menu (Decision 54): Classic, Grid and
+ * Planner are the Station's presets, Free is the canvas. The older words still
+ * work: `station` (the Station with its last preset) and `canvas` (Free).
  */
 export function settingsLayout(
   ctx: { boardPath: string; onBoardChanged?: () => void },
   layout: string | undefined,
 ): SysResult {
-  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { layoutMode?: string }) | null;
+  const raw = loadBoardFrom(ctx.boardPath) as (Record<string, unknown> & { layoutMode?: string; layoutGeometry?: { station?: StationGeometry } }) | null;
   if (!raw) return { ok: false, message: 'No board found' };
-  const current = raw.layoutMode === 'station' ? 'station' : 'canvas';
-  if (layout === undefined) return { ok: true, message: `layout: ${current}`, data: { layout: current } };
-  if (layout !== 'station' && layout !== 'canvas') {
-    return { ok: false, message: `settings layout: expected station or canvas, got "${layout}"` };
+  const station = raw.layoutGeometry?.station;
+  const current = layoutChoiceOf(raw.layoutMode, station);
+  const describe = (c: LayoutChoice): string => `layout: ${c}${c === 'free' ? ' (canvas)' : ' (Station)'}`;
+  const dataOf = (c: LayoutChoice) => ({ layout: c, mode: c === 'free' ? 'canvas' : 'station', ...(c === 'free' ? {} : { preset: c }) });
+  if (layout === undefined) {
+    const options = LAYOUT_OPTIONS.map((o) => `  ${o.id.padEnd(8)} ${o.hint}`).join('\n');
+    return { ok: true, message: `${describe(current)}\n${options}`, data: dataOf(current) };
   }
-  if (layout !== current) {
-    saveBoardTo(ctx.boardPath, { ...raw, layoutMode: layout, savedAt: new Date().toISOString() });
+  const want = parseLayoutChoice(layout, presetOf(station));
+  if (!want) {
+    return { ok: false, message: `settings layout: expected ${LAYOUT_OPTIONS.map((o) => o.id).join(', ')}, got "${layout}"` };
+  }
+  if (want !== current || (want !== 'free' && station?.preset === undefined)) {
+    const next: Record<string, unknown> = { ...raw, savedAt: new Date().toISOString() };
+    if (want === 'free') next['layoutMode'] = 'canvas';
+    else {
+      next['layoutMode'] = 'station';
+      next['layoutGeometry'] = { ...raw.layoutGeometry, station: withPreset(station, want) };
+    }
+    saveBoardTo(ctx.boardPath, next);
     ctx.onBoardChanged?.();
   }
-  return { ok: true, message: `layout: ${layout}`, data: { layout } };
+  return { ok: true, message: describe(want), data: dataOf(want) };
 }

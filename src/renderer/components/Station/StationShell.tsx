@@ -1,4 +1,4 @@
-// Shared pieces of both Station presets (Decision 52).
+// Shared pieces of both Station presets (Decision 54).
 
 /** Thin wrapper that sizes a station cell to fill its panel. Transparent so
  *  the dock chrome's themed background shows between cards. */

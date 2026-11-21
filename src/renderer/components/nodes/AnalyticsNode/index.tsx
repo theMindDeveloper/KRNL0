@@ -73,6 +73,7 @@ import {
   defaultAnalyticsState,
 } from './types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
+import { ACCENT, BarList, CompareTable, DayBars, WeekdayBars } from './PlainCharts';
 import { LineGlyph } from '../../ui/LineGlyph';
 
 // The page each (older) view name opens: `krnl analytics show --view …` and
@@ -99,6 +100,14 @@ const VIEW_LABELS: Record<AnalyticsView, string> = {
 
 const RANGE_PRESETS = [7, 30, 90, 365] as const;
 
+// Decision 57 — a card names its measure in words: "Focus per day".
+const METRIC_TITLES: Record<AnalyticsMetric, string> = {
+  taskCount: 'Tasks done',
+  habitCount: 'Habit check-ins',
+  focusMin: 'Focus',
+  sessions: 'Sessions',
+};
+
 const METRIC_LABELS: Record<AnalyticsMetric, string> = {
   taskCount: 'tasks',
   habitCount: 'habits',
@@ -115,9 +124,10 @@ const SOURCE_PALETTE: Record<string, string> = {
   pomo: 'var(--rust)',
 };
 
-const FALLBACK_PALETTE = ['#8a7bff', '#5dd3c5', '#d18bff', '#f4d35e', 'var(--k-an-warm, #ff8e64)'];
-// Seven days, seven hues — the 5-colour palette repeated Mon/Sat and Tue/Sun.
-const WEEKDAY_PALETTE = [...FALLBACK_PALETTE, 'var(--cyan)', 'var(--acid)'];
+// Decision 57 — one hue per chart. A source the app does not know yet takes a
+// neutral step; the weekdays are steps of the accent, Monday darkest.
+const FALLBACK_PALETTE = ['var(--k-an-ink-3, var(--ink-3))', 'var(--k-an-ink-4, var(--ink-4))', 'var(--k-an-ink-2, var(--ink-2))'];
+const WEEKDAY_PALETTE = [100, 86, 72, 60, 48, 36, 26].map((p) => `color-mix(in srgb, ${ACCENT} ${p}%, var(--k-an-bg, var(--node-bg)))`);
 
 /** A source without a fixed hue keeps one by its id, not by its rank today. */
 function fallbackColor(id: string): string {
@@ -234,7 +244,7 @@ const tabPill = (active: boolean): React.CSSProperties => ({
   border: '1px solid ' + (active ? 'var(--k-an-line-3, #3a4048)' : 'var(--k-an-line, #23262a)'),
   borderRadius: 999,
   background: active
-    ? 'linear-gradient(180deg, var(--k-an-line-2, #2a2e33) 0%, var(--k-an-tab-end, #1c1f23) 100%)'
+    ? 'var(--k-an-tile, var(--paper-2))'
     : 'transparent',
   color: active ? 'var(--k-an-accent-ink, var(--acid, #c9f158))' : 'var(--k-an-ink-2b, #aab0b7)',
   cursor: 'pointer',
@@ -338,16 +348,13 @@ function ChartCard({
       {/* The toolbar wraps under the title when both don't fit: the title is read in full. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 18, flexWrap: 'wrap', rowGap: 6 }}>
         <span
+          // Decision 57 — a card is named in words (reading font, sentence
+          // case), not a tiny tracked uppercase label (analytics.css).
+          className="an-card-title"
+          data-pinned={pinned || undefined}
           style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: pinned ? 'var(--acid)' : 'var(--k-an-ink-3, #9aa1a8)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            fontWeight: pinned ? 700 : 500,
             // Charts rule: a title is read in full — it wraps to a second
-            // line (and only then clips), never "TASKS × FOCUS · PE…".
-            lineHeight: 1.35,
+            // line (and only then clips), never "Tasks × focus · pe…".
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
@@ -649,7 +656,7 @@ export function AnalyticsNode({
             gap: 10,
           }}
         >
-          <SummaryHero summary={summary} byDay={byDay} />
+          <SummaryHero summary={summary} byDay={byDay} rangeDays={state.rangeDays} />
           {ANALYTICS_VIEWS.map((v) => (
           <ViewBody
             key={v}
@@ -984,7 +991,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="overview.activity"
-              title={`Activity · ${METRIC_LABELS[state.metric]}`}
+              title={`${METRIC_TITLES[state.metric]} per day`}
               span={clamp(3)}
               contentHeight={70}
               toolbar={metricPicker(state.metric, setMetric)}
@@ -995,11 +1002,13 @@ function ViewBody(props: ViewBodyProps) {
               onTogglePin={() => togglePin('overview.activity')}
             >
               {(size) => (
-                <ActivityStrip
+                // Decision 57 — whole-number counts per day read as bars, not a zigzag line.
+                <DayBars
                   data={byDay}
                   metric={state.metric}
                   width={chartWidth(size.width, 580)}
                   height={chartHeight(size.height, 70)}
+                  color={ACCENT}
                 />
               )}
             </ChartCard>
@@ -1124,7 +1133,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="patterns.cumulative"
-              title={`Cumulative · last ${state.rangeDays}d`}
+              title="Your best days"
               span={clamp(3)}
               contentHeight={240}
               hidden={isHidden('patterns.cumulative')}
@@ -1133,13 +1142,16 @@ function ViewBody(props: ViewBodyProps) {
               onToggleHidden={() => toggleHidden('patterns.cumulative')}
               onTogglePin={() => togglePin('patterns.cumulative')}
             >
-              {(size) => (
-                <CumulativeLine
-                  data={byDay}
-                  width={chartWidth(size.width, 580)}
-                  height={chartHeight(size.height, 240)}
-                />
-              )}
+              {() => {
+                // Decision 57 — the days that went best, in words, instead of three running totals on one axis.
+                const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const rows = [...byDay].filter((d) => d.focusMin > 0).sort((a, b) => b.focusMin - a.focusMin || b.taskCount - a.taskCount).slice(0, 5).map((d) => {
+                  const dt = new Date(`${d.date}T12:00:00`);
+                  return { id: d.date, label: `${DAYS[dt.getDay()]}, ${MONTHS[dt.getMonth()]} ${dt.getDate()}`, value: d.focusMin, display: `${fmtMinutes(d.focusMin)} focus${d.taskCount > 0 ? ` · ${d.taskCount} done` : ''}` };
+                });
+                return <BarList testId="analytics-best-days" rows={rows} />;
+              }}
             </ChartCard>
           ),
         },
@@ -1231,7 +1243,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="insights.radar"
-              title={`Multivariate · this vs prev ${state.rangeDays}d`}
+              title="This period and the one before"
               span={clamp(colCount >= 3 ? 1 : 1)}
               contentHeight={260}
               hidden={isHidden('insights.radar')}
@@ -1240,13 +1252,7 @@ function ViewBody(props: ViewBodyProps) {
               onToggleHidden={() => toggleHidden('insights.radar')}
               onTogglePin={() => togglePin('insights.radar')}
             >
-              {(size) => (
-                <Radar
-                  axes={radarAxes}
-                  width={Math.min(chartWidth(size.width, 280), 320)}
-                  height={chartHeight(size.height, 260)}
-                />
-              )}
+              {() => <CompareTable axes={radarAxes} rangeDays={state.rangeDays} />}
             </ChartCard>
           ),
         },
@@ -1255,7 +1261,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="insights.scatterTasksFocus"
-              title={`Tasks × focus · per day`}
+              title="Focus on days you finished something"
               span={clamp(colCount >= 3 ? 2 : 1)}
               contentHeight={260}
               hidden={isHidden('insights.scatterTasksFocus')}
@@ -1264,15 +1270,17 @@ function ViewBody(props: ViewBodyProps) {
               onToggleHidden={() => toggleHidden('insights.scatterTasksFocus')}
               onTogglePin={() => togglePin('insights.scatterTasksFocus')}
             >
-              {(size) => (
-                <Scatter
-                  data={scatterTasksFocus}
-                  width={chartWidth(size.width, 480)}
-                  height={chartHeight(size.height, 260)}
-                  xLabel="focus min"
-                  yLabel="tasks done"
-                />
-              )}
+              {() => {
+                // Decision 57 — the question the scatter asked, answered in words: do days with a finished task also hold more focus?
+                const withTask = byDay.filter((d) => d.taskCount > 0);
+                const without = byDay.filter((d) => d.taskCount === 0);
+                const avg = (xs: typeof byDay) => (xs.length > 0 ? xs.reduce((a, d) => a + d.focusMin, 0) / xs.length : 0);
+                const rows = [
+                  { id: 'with', label: 'Days you finished a task', value: Math.round(avg(withTask)), display: `${fmtMinutes(Math.round(avg(withTask)))} focus on average · ${withTask.length} ${withTask.length === 1 ? 'day' : 'days'}` },
+                  { id: 'without', label: 'Days you finished none', value: Math.round(avg(without)), display: `${fmtMinutes(Math.round(avg(without)))} focus on average · ${without.length} ${without.length === 1 ? 'day' : 'days'}` },
+                ].filter((r) => r.display && (r.id === 'with' ? withTask.length : without.length) > 0);
+                return <BarList testId="analytics-focus-by-done" rows={rows} />;
+              }}
             </ChartCard>
           ),
         },
@@ -1308,7 +1316,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="insights.donutSources"
-              title="Sources split (pie)"
+              title="Where your activity came from"
               contentHeight={260}
               hidden={isHidden('insights.donutSources')}
               pinned={isPinned('insights.donutSources')}
@@ -1316,10 +1324,17 @@ function ViewBody(props: ViewBodyProps) {
               onToggleHidden={() => toggleHidden('insights.donutSources')}
               onTogglePin={() => togglePin('insights.donutSources')}
             >
-              {(size) => {
-                const side = Math.min(220, chartWidth(size.width, 220));
-                return <DonutChart data={sourceSlices} innerRatio={0} size={side} />;
-              }}
+              {() => (
+                <BarList
+                  testId="analytics-sources"
+                  rows={sourceSlices.map((sl) => ({
+                    id: sl.id,
+                    label: sl.label,
+                    value: sl.value,
+                    display: sl.id === 'pomo' ? `${sl.value} timer spans` : sl.id === 'habit' ? `${sl.value} check-ins` : sl.id === 'task' ? `${sl.value} done` : String(sl.value),
+                  }))}
+                />
+              )}
             </ChartCard>
           ),
         },
@@ -1336,21 +1351,7 @@ function ViewBody(props: ViewBodyProps) {
               onToggleHidden={() => toggleHidden('insights.donutSessionsByDay')}
               onTogglePin={() => togglePin('insights.donutSessionsByDay')}
             >
-              {(size) => {
-                const total = sessionsByDowSlices.reduce((s, d) => s + d.value, 0);
-                const side = Math.min(220, chartWidth(size.width, 220));
-                return (
-                  <DonutChart
-                    data={sessionsByDowSlices}
-                    innerRatio={0.55}
-                    size={side}
-                    // A number with its unit ("8h 27m"), not a bare "507".
-                    centerPrimary={fmtMinutes(total)}
-                    centerSecondary="focus"
-                    formatValue={fmtMinutes}
-                  />
-                );
-              }}
+              {(size) => <div className="an-weekdays-host"><WeekdayBars values={dow.map((d) => Math.round(d.focusMin))} height={chartHeight(size.height, 180)} /></div>}
             </ChartCard>
           ),
         },
@@ -1359,7 +1360,7 @@ function ViewBody(props: ViewBodyProps) {
           render: () => (
             <ChartCard
               cardId="insights.stacked"
-              title="Daily mix (stacked)"
+              title="How long you focus at a time"
               span={clamp(3)}
               contentHeight={220}
               hidden={isHidden('insights.stacked')}
@@ -1368,13 +1369,23 @@ function ViewBody(props: ViewBodyProps) {
               onToggleHidden={() => toggleHidden('insights.stacked')}
               onTogglePin={() => togglePin('insights.stacked')}
             >
-              {(size) => (
-                <StackedArea
-                  data={byDay}
-                  width={chartWidth(size.width, 560)}
-                  height={chartHeight(size.height, 220)}
-                />
-              )}
+              {() => {
+                // Decision 57 — the length of each focus span, grouped: a habit you can act on.
+                const groups = [
+                  { id: 'short', label: 'Under 25 minutes', from: 0, to: 25 },
+                  { id: 'pomo', label: '25 to 49 minutes', from: 25, to: 50 },
+                  { id: 'long', label: '50 to 89 minutes', from: 50, to: 90 },
+                  { id: 'deep', label: '90 minutes or more', from: 90, to: Infinity },
+                ].map((g) => ({ ...g, n: 0 }));
+                for (const e of events) {
+                  if (e.source !== 'pomo' || e.type !== 'pomo.work' || e.date < range.start || e.date > range.end) continue;
+                  const m = e.durationMin ?? 0;
+                  const g = groups.find((x) => m >= x.from && m < x.to);
+                  if (g && m > 0) g.n += 1;
+                }
+                const rows = groups.filter((g) => g.n > 0).map((g) => ({ id: g.id, label: g.label, value: g.n, display: `${g.n} ${g.n === 1 ? 'span' : 'spans'}` }));
+                return <BarList testId="analytics-span-lengths" rows={rows} />;
+              }}
             </ChartCard>
           ),
         },
@@ -1397,7 +1408,7 @@ function ViewBody(props: ViewBodyProps) {
                   bins={10}
                   width={chartWidth(size.width, 320)}
                   height={chartHeight(size.height, 240)}
-                  color="var(--rust)"
+                  color={ACCENT}
                   xLabel="min/day"
                 />
               )}
@@ -1423,7 +1434,7 @@ function ViewBody(props: ViewBodyProps) {
                   bins={8}
                   width={chartWidth(size.width, 320)}
                   height={chartHeight(size.height, 240)}
-                  color="var(--cyan)"
+                  color={ACCENT}
                   xLabel="tasks/day"
                 />
               )}
@@ -1441,7 +1452,7 @@ function ViewBody(props: ViewBodyProps) {
     <div style={cardGridStyle}>
       <ChartCard
         cardId="sources.list"
-        title="Registered sources"
+        title="Habit check-ins"
         span={clamp(2)}
         contentHeight={240}
         hidden={isHidden('sources.list')}
@@ -1450,39 +1461,19 @@ function ViewBody(props: ViewBodyProps) {
         onToggleHidden={() => toggleHidden('sources.list')}
         onTogglePin={() => togglePin('sources.list')}
       >
-        {() => (
-          <PagedView style={{ width: '100%', height: '100%' }} itemSelector="tbody > tr">
-            <table
-              style={{
-                width: '100%',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                color: 'var(--k-an-ink-1, #eef1f4)',
-                borderCollapse: 'collapse',
-              }}
-            >
-              <thead>
-                <tr style={{ color: 'var(--k-an-ink-3, #9aa1a8)', textAlign: 'left' }}>
-                  <th style={{ padding: '4px 6px' }}>id</th>
-                  <th style={{ padding: '4px 6px' }}>label</th>
-                  <th style={{ padding: '4px 6px', textAlign: 'right' }}>events</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sources.map((s) => {
-                  const count = events.filter((e) => e.source === s.id).length;
-                  return (
-                    <tr key={s.id} style={{ borderTop: '1px solid var(--k-an-line, #23262a)' }}>
-                      <td style={{ padding: '4px 6px' }}>{s.id}</td>
-                      <td style={{ padding: '4px 6px' }}>{s.label}</td>
-                      <td style={{ padding: '4px 6px', textAlign: 'right' }}>{count}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </PagedView>
-        )}
+        {() => {
+          // Decision 57 — what a person wants here is each habit's check-ins in the period, not the app's data sources.
+          const per = new Map<string, { label: string; n: number }>();
+          for (const e of events) {
+            if (e.source !== 'habit' || e.date < range.start || e.date > range.end) continue;
+            const id = String(e.metadata?.['habitId'] ?? 'habit');
+            const cur = per.get(id) ?? { label: String(e.metadata?.['habitName'] ?? 'Habit'), n: 0 };
+            cur.n += 1;
+            per.set(id, cur);
+          }
+          const rows = [...per.entries()].sort((x, y) => y[1].n - x[1].n).map(([id, v]) => ({ id, label: v.label, value: v.n, display: `${v.n} of ${state.rangeDays} days` }));
+          return <BarList testId="analytics-habit-checkins" rows={rows} />;
+        }}
       </ChartCard>
       {/* No habits yet: still a (placeholder) card, so the page grid holds. */}
         <ChartCard

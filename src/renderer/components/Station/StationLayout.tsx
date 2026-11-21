@@ -50,7 +50,8 @@ import type { Node } from '../../../shared/types/node';
 import { dividers, snapPercent, snapRow, type RowLayout } from './softSnap';
 import { restoredSizes, restoredSizesAround } from './restoredSizes';
 import { bottomUnchanged, columnsUnchanged, rowUnchanged, useSnapshot } from './layoutGeometry';
-import { GridStationLayout } from './GridStationLayout';
+import { RowsStationLayout } from './RowsStationLayout';
+import { presetOf } from '../../../shared/stationLayouts';
 import { CellWrapper, EmptyShellHint } from './StationShell';
 
 const PANEL_IDS = {
@@ -106,10 +107,10 @@ const TOP_ROW_DEFS: ReadonlyArray<{
 // isStationHidden moved to ./stationVisibility; re-exported for existing callers.
 export { isStationHidden } from './stationVisibility';
 
-/** Decision 52 — the Station picks its arrangement from the saved preset. */
+/** Decision 54 — the Station picks its arrangement from the saved preset (the top bar's layout menu). */
 export function StationLayout() {
-  const preset = useBoardStore((s) => s.board?.layoutGeometry?.station?.preset);
-  return preset === 'grid' ? <GridStationLayout /> : <ClassicStationLayout />;
+  const preset = useBoardStore((s) => presetOf(s.board?.layoutGeometry?.station));
+  return preset === 'classic' ? <ClassicStationLayout /> : <RowsStationLayout preset={preset} />;
 }
 
 function ClassicStationLayout() {

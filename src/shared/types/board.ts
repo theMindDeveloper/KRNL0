@@ -32,15 +32,17 @@ export type StationSlot =
   | 'bottom-strip'
   | 'bottom-right-pre';
 
-/** Decision 52 — Classic: four windows over canvas, terminal, analytics, clock. Grid: Timer, Todos, Habits over Calendar and Clock. */
-export type StationPreset = 'classic' | 'grid';
+/** Decision 54 — Classic: four windows over canvas, terminal, analytics, clock.
+ *  Grid: Timer, Todos, Habits over Calendar and Clock. Planner: Timer, Todos,
+ *  Habits, Clock over a full-width Calendar. The names live in shared/stationLayouts.ts. */
+export type StationPreset = 'classic' | 'grid' | 'planner';
 
 export interface StationGridGeometry {
   /** Top row height as a fraction. */
   rowFraction?: number;
-  /** Timer, Todos, Habits widths as fractions. */
+  /** Top-row window widths as fractions, in the preset's order (shared/stationLayouts.ts). */
   top?: number[];
-  /** Calendar, Clock widths as fractions. */
+  /** Bottom-row window widths as fractions, in the preset's order. */
   bottom?: number[];
 }
 
@@ -58,10 +60,12 @@ export interface StationGeometry {
   // Bottom-row panel widths by panel id, as fractions — canvas, terminal,
   // analytics and clock each keep the width the user dragged them to.
   bottomFractions?: Record<string, number>;
-  // Decision 52 — which arrangement the Station uses; absent = classic.
+  // Decision 54 — which arrangement the Station uses; absent = classic.
   preset?: StationPreset;
-  // Panel sizes of the Grid preset, kept apart so switching never disturbs Classic.
+  // Panel sizes of the Grid and Planner presets, each kept apart so switching
+  // never disturbs another preset.
   grid?: StationGridGeometry;
+  planner?: StationGridGeometry;
 }
 
 // Structural mixin for mother-node config objects.

@@ -69,16 +69,19 @@ export function NowLine({
   // regardless of how the columns flex out (previous fixed `width:
   // columnWidth*7` ended mid-week because columnWidth was a nominal 40px
   // while real columns were ~80px each).
-  // Dot position uses a percentage across the 7-column area so it lands at
-  // today's column center for any column width.
-  const dotLeftPct = ((todayColumnIndex + 0.5) * 100) / days;
   // Silence unused-param ESLint warning — columnWidth is no longer needed
   // but kept on the props interface for back-compat with callers.
   void columnWidth;
 
+  // Decision 55 — today carries the line; the other days only a faint trace
+  // of it, so the eye goes to today. No glow (calm, readable).
+  const todayLeftPct = (todayColumnIndex * 100) / days;
+  const colPct = 100 / days;
+
   return (
     <div
       data-testid="now-line"
+      data-now-min={currentHour * 60 + currentMinute}
       style={{
         position: 'absolute',
         top: yPos,
@@ -88,7 +91,7 @@ export function NowLine({
         zIndex: 10,
       }}
     >
-      {/* Horizontal red "now" line spanning all 7 day-columns. */}
+      {/* The faint trace across the whole week. */}
       <div
         data-testid="now-line-bar"
         style={{
@@ -97,22 +100,32 @@ export function NowLine({
           left: gutterWidth,
           right: 0,
           height: 1,
-          background: 'var(--k-now, #ef4444)',
-          boxShadow: '0 0 4px rgba(239, 68, 68, 0.7)',
+          background: 'color-mix(in srgb, var(--k-now, #ef4444) 38%, transparent)',
         }}
       />
-      {/* 4px dot at the intersection with today's column. */}
+      {/* Today's part: solid and 2 px, from its left edge to its right. */}
+      <div
+        data-testid="now-line-today"
+        style={{
+          position: 'absolute',
+          top: -0.5,
+          left: `calc(${gutterWidth}px + ${todayLeftPct}%)`,
+          width: `${colPct}%`,
+          height: 2,
+          background: 'var(--k-now, #ef4444)',
+        }}
+      />
+      {/* A dot where today's line starts. */}
       {showDot && <div
         data-testid="now-line-dot"
         style={{
           position: 'absolute',
-          top: -2,
-          left: `calc(${gutterWidth}px + ${dotLeftPct}% - 2px)`,
-          width: 5,
-          height: 5,
+          top: -3.5,
+          left: `calc(${gutterWidth}px + ${todayLeftPct}% - 4px)`,
+          width: 8,
+          height: 8,
           borderRadius: '50%',
           background: 'var(--k-now, #ef4444)',
-          boxShadow: '0 0 6px rgba(239, 68, 68, 0.8)',
         }}
       />}
     </div>

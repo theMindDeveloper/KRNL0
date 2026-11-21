@@ -24,21 +24,39 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const facade = (onBoardChanged = vi.fn()) => new SysFacade({ boardPath, hasOpenRenderer: () => false, onBoardChanged });
 
-describe('settings layout', () => {
-  it('shows the current layout', async () => {
-    expect((await facade().run(['settings', 'layout'])).message).toBe('layout: canvas');
+describe('settings layout (Decision 54: the layout menu)', () => {
+  const geo = () => (JSON.parse(readFileSync(boardPath, 'utf-8')) as { layoutGeometry?: { station?: { preset?: string } } }).layoutGeometry?.station;
+  it('shows the current layout and lists the four', async () => {
+    const res = await facade().run(['settings', 'layout']);
+    expect(res.message.split('\n')[0]).toBe('layout: free (canvas)');
+    for (const o of ['classic', 'grid', 'planner', 'free']) expect(res.message).toContain(`  ${o}`);
   });
 
-  it('switches to station and tells the window', async () => {
+  it('the old word "station" opens the Station and tells the window', async () => {
     const changed = vi.fn();
     const res = await facade(changed).run(['settings', 'layout', 'station']);
     expect(res.ok).toBe(true);
     expect(read().layoutMode).toBe('station');
+    expect(geo()?.preset).toBe('classic');
     expect(changed).toHaveBeenCalledTimes(1);
   });
 
+  it('planner opens the Station with the Planner preset; free goes back to the canvas', async () => {
+    expect((await facade().run(['settings', 'layout', 'planner'])).message).toBe('layout: planner (Station)');
+    expect(read().layoutMode).toBe('station');
+    expect(geo()?.preset).toBe('planner');
+    expect((await facade().run(['settings', 'layout'])).message.split('\n')[0]).toBe('layout: planner (Station)');
+    expect((await facade().run(['settings', 'layout', 'grid'])).ok).toBe(true);
+    expect(geo()?.preset).toBe('grid');
+    expect((await facade().run(['settings', 'layout', 'free'])).ok).toBe(true);
+    expect(read().layoutMode).toBe('canvas');
+    // Free keeps the preset for the next time the Station opens.
+    expect(geo()?.preset).toBe('grid');
+    expect((await facade().run(['settings', 'layout', 'station'])).message).toBe('layout: grid (Station)');
+  });
+
   it('rejects anything else and writes nothing', async () => {
-    const res = await facade().run(['settings', 'layout', 'grid']);
+    const res = await facade().run(['settings', 'layout', 'masonry']);
     expect(res.ok).toBe(false);
     expect(read().layoutMode).toBe('canvas');
   });

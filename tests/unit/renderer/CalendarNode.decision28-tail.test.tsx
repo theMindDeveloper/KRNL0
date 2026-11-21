@@ -190,10 +190,10 @@ describe('Calendar header and gutter (owner, 2026-11-09)', () => {
     expect(document.querySelector('[data-testid="calendar-new"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="calendar-new-repeating"]')).toBeNull();
   });
-  it('the gutter says each hour once; its sub-marks are only minutes (":30", not "09:30")', () => {
+  it('the gutter labels only the hours: no ":30" under each one (owner, 2026-11-21)', () => {
     seedBoard([makePomoNode(), makeTodoNode('todo-g')]);
     renderWeekView();
-    const marks = [...document.querySelectorAll('span[aria-label$=":30"]')].map((s) => s.textContent);
-    for (const m of marks) expect(m).toBe(':30');
+    const texts = [...document.querySelectorAll('span')].map((s) => s.textContent ?? '');
+    expect(texts.filter((t) => /^:\d\d$/.test(t))).toEqual([]);
   });
 });

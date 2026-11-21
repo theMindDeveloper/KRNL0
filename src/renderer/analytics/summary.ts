@@ -10,6 +10,16 @@ export interface SummaryStat {
   value: string;
   /** % change vs the previous range of the same length; null when there's no baseline. */
   deltaPct: number | null;
+  /** The change in its own unit vs the range before ("+7", "+3h 10m", "-2"); null when the range before had none. */
+  change?: string | null;
+}
+
+/** "+7" / "-3" / "+1h 20m": the difference in the stat's own unit. */
+function changeOf(now: number, prev: number, fmt: (n: number) => string = (n) => String(n)): string | null {
+  if (prev <= 0) return null;
+  const d = Math.round(now - prev);
+  if (d === 0) return '±0';
+  return `${d > 0 ? '+' : '-'}${fmt(Math.abs(d))}`;
 }
 
 export interface AnalyticsSummary {
@@ -33,11 +43,17 @@ function pct(now: number, prev: number): number | null {
   return Math.round(((now - prev) / prev) * 100);
 }
 
-function trendWord(delta: number | null): string {
+/**
+ * The trend in the stat's own unit (Decision 57): "3h 10m more than the 30
+ * days before", never "up 754%" off a near-empty period. Within 10% it is
+ * "about the same"; nothing before, nothing said.
+ */
+function trendWords(now: number, prev: number, rangeDays: number, fmt: (n: number) => string = (n) => String(n)): string {
+  const delta = pct(now, prev);
   if (delta === null) return '';
-  if (delta >= 10) return ` — up ${delta}% on the period before`;
-  if (delta <= -10) return ` — down ${Math.abs(delta)}% on the period before`;
-  return ' — about the same as the period before';
+  if (Math.abs(delta) < 10) return ` — about the same as the ${rangeDays} days before`;
+  const diff = Math.round(Math.abs(now - prev));
+  return ` — ${fmt(diff)} ${now > prev ? 'more' : 'less'} than the ${rangeDays} days before`;
 }
 
 function hourLabel(h: number): string {
@@ -82,9 +98,9 @@ export function summarizeAnalytics(
     if (tot.focusMin > 0) {
       const over = tot.sessions > 0 ? ` over ${tot.sessions} session${tot.sessions === 1 ? '' : 's'}` : '';
       const breaks = tot.breakMin ? `, plus ${fmtMinutes(tot.breakMin)} of breaks` : '';
-      sentences.push(`Focus: ${fmtMinutes(tot.focusMin)}${over}${breaks}${trendWord(focusDelta)}.`);
+      sentences.push(`Focus: ${fmtMinutes(tot.focusMin)}${over}${breaks}${trendWords(tot.focusMin, prev.focusMin, rangeDays, fmtMinutes)}.`);
     }
-    if (tot.tasksDone > 0) sentences.push(`Tasks: ${tot.tasksDone} done${trendWord(tasksDelta)}.`);
+    if (tot.tasksDone > 0) sentences.push(`Tasks: ${tot.tasksDone} done${trendWords(tot.tasksDone, prev.tasksDone, rangeDays)}.`);
     sentences.push(`You were active on ${activeDays} of ${rangeDays} days.`);
     if (hasBestDow && hasBestHour) {
       sentences.push(`You get the most done on ${DOW[bestDow!.dow]}s, around ${hourLabel(bestHour!.hour)}.`);
@@ -103,10 +119,10 @@ export function summarizeAnalytics(
     headline,
     sentences,
     stats: [
-      { key: 'tasks', label: 'Tasks done', value: String(tot.tasksDone), deltaPct: tasksDelta },
-      { key: 'focus', label: 'Focus', value: fmtMinutes(tot.focusMin), deltaPct: focusDelta },
-      { key: 'sessions', label: 'Sessions', value: String(tot.sessions), deltaPct: pct(tot.sessions, prev.sessions) },
-      { key: 'habits', label: 'Habit check-ins', value: String(tot.habitCheckins), deltaPct: pct(tot.habitCheckins, prev.habitCheckins) },
+      { key: 'tasks', label: 'Tasks done', value: String(tot.tasksDone), deltaPct: tasksDelta, change: changeOf(tot.tasksDone, prev.tasksDone) },
+      { key: 'focus', label: 'Focus', value: fmtMinutes(tot.focusMin), deltaPct: focusDelta, change: changeOf(tot.focusMin, prev.focusMin, fmtMinutes) },
+      { key: 'sessions', label: 'Sessions', value: String(tot.sessions), deltaPct: pct(tot.sessions, prev.sessions), change: changeOf(tot.sessions, prev.sessions) },
+      { key: 'habits', label: 'Habit check-ins', value: String(tot.habitCheckins), deltaPct: pct(tot.habitCheckins, prev.habitCheckins), change: changeOf(tot.habitCheckins, prev.habitCheckins) },
     ],
   };
 }

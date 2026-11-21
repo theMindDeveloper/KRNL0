@@ -357,9 +357,10 @@ describe('Visual bugs fixed (owner list, 2026-11-20)', () => {
     const css = read('renderer/styles/window-frame.css');
     expect(css).toContain('[data-testid="topbar"] .krnl-topbar-btn {');
     expect(css).toContain('[data-testid="topbar-panel-toggles"] .krnl-panel-toggle {');
-    const t = read('renderer/components/ui/LayoutModeToggle.tsx');
-    expect(t).toContain('label="Station"');
-    expect(t).toContain('label="Free"');
+    // Decision 54 — the Station / Free switch became the layout menu.
+    const t = read('renderer/components/ui/LayoutMenu.tsx');
+    expect(t).toContain('data-testid="layout-menu"');
+    expect(read('shared/stationLayouts.ts')).toContain("label: 'Free'");
   });
   it('no second frame inside a window: Analytics draws no border of its own, Pro light has no inset highlight', () => {
     expect(read('renderer/components/nodes/AnalyticsNode/index.tsx')).toContain("borderRadius: 'calc(var(--k-mother-radius, 8px) - 1px)'");
@@ -380,14 +381,15 @@ describe('The Timer clock, the layout switch and a flat Analytics header (owner,
     expect(d).toContain("alignItems: 'center', fontFamily: 'var(--font-clock)'");
     expect(d).toContain('data-testid="pomo-colon" role="presentation"');
   });
-  it('Fit sits before the Station / Free switch, so the switch never moves when Fit appears', () => {
+  it('Fit sits before the layout menu, so the menu never moves when Fit appears', () => {
     const bar = read('components/TopBar/index.tsx');
     expect(bar.indexOf('testId="topbar-fit"')).toBeGreaterThan(0);
-    expect(bar.indexOf('testId="topbar-fit"')).toBeLessThan(bar.indexOf('<LayoutModeToggle />'));
+    expect(bar.indexOf('testId="topbar-fit"')).toBeLessThan(bar.indexOf('<LayoutMenu />'));
   });
-  it('the switch is a track with a raised thumb', () => {
-    expect(read('styles/window-frame.css')).toContain('[data-testid="layout-mode-toggle"] > button[aria-pressed="true"] {');
-    expect(read('components/ui/LayoutModeToggle.tsx')).toContain('aria-pressed={active}');
+  it('the layout menu lists every layout as a radio item with a drawing of it (Decision 54)', () => {
+    const m = read('components/ui/LayoutMenu.tsx');
+    expect(m).toContain('role="menuitemradio"');
+    expect(m).toContain('<LayoutGlyph rects={o.glyph}');
   });
   it('the Analytics header is flat: no gradient, no shadow', () => {
     const a = read('components/nodes/AnalyticsNode/index.tsx');

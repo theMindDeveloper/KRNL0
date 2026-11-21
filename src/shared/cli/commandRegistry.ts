@@ -296,8 +296,8 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'show', usage: 'settings show [--json]', summary: 'theme + viewport + boardPath + version' },
       { name: 'mode', usage: 'settings mode [easy|advanced]', summary: 'Show or set the UI mode (Easy hides links between features; data is the same)' },
       { name: 'grid', usage: 'settings grid [off|cards|all]', summary: 'Show or set Align to grid: cards only, or everything (things you move settle on an invisible grid, never on top of each other)' },
-      { name: 'layout', usage: 'settings layout [station|canvas]', summary: 'Show or set the layout (Station docks windows beside the terminal; same as the top-bar pill / Ctrl+Shift+L)' },
-      { name: 'station-layout', usage: 'settings station-layout [classic|grid]', summary: 'Show or set how the Station arranges its windows: Classic (four windows over canvas, terminal, analytics, clock) or Grid (Timer, Todos, Habits over Calendar and Clock)' },
+      { name: 'layout', usage: 'settings layout [classic|grid|planner|free]', summary: 'Show or pick the layout, as in the layout menu of the top bar: Classic (four windows over canvas, terminal, analytics, clock), Grid (Timer, Todos, Habits over Calendar and Clock), Planner (Timer, Todos, Habits, Clock over a wide Calendar) or Free (the canvas). "station" and "canvas" still work; Ctrl+Shift+L flips Station and Free' },
+      { name: 'station-layout', usage: 'settings station-layout [classic|grid|planner]', summary: 'Show or set which arrangement the Station uses, without leaving Free (each keeps its own panel sizes)' },
     ],
   },
   {

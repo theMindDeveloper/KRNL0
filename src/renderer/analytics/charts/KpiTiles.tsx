@@ -50,12 +50,12 @@ function deltaPct(curr: number, prev: number | undefined): number | undefined {
   return ((curr - prev) / prev) * 100;
 }
 
-const tileStyle = (accent: string): React.CSSProperties => ({
+const tileStyle = (_accent: string): React.CSSProperties => ({
   flex: '1 1 140px',
   minWidth: 130,
-  background: 'var(--k-an-tile, linear-gradient(180deg, rgba(20,22,24,0.55) 0%, rgba(12,14,16,0.55) 100%))',
+  // Flat, one border; the metric's colour is on its figure, never a left bar (Decision 57).
+  background: 'var(--k-an-tile, var(--paper-2))',
   border: '1px solid var(--k-an-line, #23262a)',
-  borderLeft: `3px solid ${accent}`,
   borderRadius: 6,
   padding: '10px 12px 8px',
   display: 'flex',
