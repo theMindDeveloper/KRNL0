@@ -5,7 +5,7 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.1] — unreleased
+## [0.14.1] — 2026-11-21
 
 ### Changed
 - Sync: when two devices changed the very same thing while apart, the change made last now wins, whichever device comes back online first (it was the first one back). Times are corrected for a device whose clock is off; when the app cannot tell, the version already on the server stays (Decision 53, server-sync.md F21).

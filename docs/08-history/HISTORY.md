@@ -3267,3 +3267,15 @@ Typecheck clean; all tests pass.
 **Files changed:** `docs/releases/v0.14.1.md`, `docs/08-history/HISTORY.md`
 
 **Summary:** The 0.14.1 notes, approved by the owner: the change made last wins between devices, an edit beats a delete, wrong clocks are corrected, and a polling phone reads the server's time (#270).
+
+## [2026-11-21] — Release v0.14.1
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.14.1`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.14.0 → 0.14.1`. Notes: `docs/releases/v0.14.1.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
