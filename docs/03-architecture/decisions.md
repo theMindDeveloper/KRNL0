@@ -2855,3 +2855,20 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
 7. **No fades.** Month cells, the month's plan strip and notes end crisply (no gradient masks, which read as a blur). The Year view grows with the window (day cells up to 56 px, dates in them once they fit).
 
 **Consequences.** Decision 60's live store writes during a resize and the row lift above notes are gone. Boards saved with a `canvasSize` keep it on that device only.
+
+---
+
+## Decision 62 — Tasks and events: an event can happen once (PROPOSED, 2026-11-21)
+
+**Status:** Proposed — waiting for the owner's pick of the add flow on the canvas "KRNL0 one-time events". No code until then. Requirements: `docs/06-requirements/one-time-events.md`.
+
+**Context.** The owner asked whether the Calendar should hold scheduled to-do tasks, events, or both, and why the Calendar's field adds tasks. Since Decisions 39/40 a one-time thing is a plan (a task: in Todo, ticked, can be "missed") and only repeating things are events; the field was made to add plans in Decision 58. So an appointment or an exam had to be a task.
+
+**Decision (proposed).**
+1. **Two kinds, one question:** *do I have to do it (task) or does it just happen (event)?* Tasks live in Todo and are placed on the Calendar by dragging or a When; events live on the Calendar and the Clock, are never ticked, and happen **once or repeat**.
+2. **One-time events are the same record as repeating ones** (`Habit`, `kind: 'routine'`): `schedule: { kind: 'weekly', days: [its weekday], timeOfDay, durationMin }`, `endsOn` = its date and a new optional `startsOn` = its date. No new schedule kind: an older KRNL0's `isDayScheduled` assumes `days` on anything not daily or weekdays and would fail on a new kind; with this shape an older version reads it without error (it may show it on that weekday earlier in its first week until it updates).
+3. **The Calendar's field and double-click make events** (Once by default, Repeats one click away or from "every …"); Todo's field makes tasks. How the Calendar offers a task instead is the design pick.
+4. A one-time event follows every rule of an event (shared lanes, the one drag ghost, info card, Clock arc) and is never counted as a plan. Either kind can be turned into the other from its menu.
+5. CLI: `krnl event add … --on <date>`, `event list|move|repeat`, `event task` / `task event`.
+
+**Consequences.** Decision 58's "the footer adds a plan" is replaced. Existing plans stay tasks (no migration). Tour lines that say "add a plan on the Calendar" change.
