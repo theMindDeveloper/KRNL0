@@ -29,8 +29,10 @@ import { StationToolbar } from './StationToolbar';
 import { isStationHidden } from './stationVisibility';
 import { CellWrapper, EmptyShellHint } from './StationShell';
 import { restoredSizes } from './restoredSizes';
+import { MIN_WINDOW, minSizeOf } from './minSize';
+import { useElementSize } from '../../analytics/useElementSize';
 import { useSnapshot } from './layoutGeometry';
-import { ROWS_PRESETS, presetRows, withPreset, type RowsPreset, type StationWindow } from '../../../shared/stationLayouts';
+import { ROWS_PRESETS, presetRows, presetWindows, withPreset, type RowsPreset, type StationWindow } from '../../../shared/stationLayouts';
 import type { StationGridGeometry } from '../../../shared/types';
 
 export const ROWS_LIMITS = { minRow: 20, minColumn: 10 } as const;
@@ -57,10 +59,17 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
 
   const rows = presetRows(id, saved?.order);
   const pid = (k: StationWindow) => `${id}-${k}`;
+  // Decision 59 — a ready-made layout shows its own set of windows (the top
+  // bar's toggles change it here only); picking the layout again restores it.
+  const windows = presetWindows(id, saved);
+  void canvasHidden;
   const shown = (k: StationWindow): boolean => {
-    if (k === 'canvas') return !canvasHidden;
+    if (!windows.has(k)) return false;
+    if (k === 'canvas') return true;
     const node = nodes?.find((n) => n.isMother && n.kind === k);
-    return !!node && !isStationHidden(node);
+    if (!node) return false;
+    // The terminal never shows where there is none (the web) or in Easy.
+    return k !== 'term' || !isStationHidden({ ...node, config: { ...(node.config ?? {}), stationHidden: false } });
   };
   const top = rows.top.filter(shown);
   const bottom = rows.bottom.filter(shown);
@@ -117,12 +126,15 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
   const bottomSizes = useSnapshot(`${id}|${bottomKey}|${has}`, () => sizesFor(bottom));
   const onRowMemo = useMemo(() => onRow, [onRow]);
 
+  // Decision 59 — real minimums in px (see minSize.ts), from the measured area.
+  const [areaRef, area] = useElementSize<HTMLDivElement>();
   const row = (visible: readonly StationWindow[], sizes: number[]) => {
     const out: React.ReactNode[] = [];
+    const minW = minSizeOf(MIN_WINDOW.width, area.width, visible.length);
     visible.forEach((k, i) => {
       if (i > 0) out.push(<Separator key={`sep-${k}`} className="station-splitter" style={vHandle} />);
       out.push(
-        <Panel key={pid(k)} id={pid(k)} defaultSize={sizes[i]} minSize={ROWS_LIMITS.minColumn}>
+        <Panel key={pid(k)} id={pid(k)} defaultSize={sizes[i]} minSize={minW}>
           <CellWrapper>{k === 'canvas' ? <EmbeddedCanvasCell /> : <StationCell kind={k} />}</CellWrapper>
         </Panel>,
       );
@@ -145,7 +157,7 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
       style={{ pointerEvents: 'auto', zIndex: 0, position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: dockStyle === 'classic' ? 'var(--paper)' : undefined }}
     >
       {Chrome ? <Chrome /> : null}
-      <div style={{ position: 'absolute', top: padding.top, bottom: padding.bottom, left: 0, right: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 1 }}>
+      <div ref={areaRef} style={{ position: 'absolute', top: padding.top, bottom: padding.bottom, left: 0, right: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 1 }}>
         {panelSlot === 'row' && <StationToolbar />}
         {!hasTop && !hasBottom ? (
           <EmptyShellHint />
@@ -153,7 +165,7 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
           // Keyed by preset and order: a swap or a shown window mounts the rows fresh with their sizes.
           <Group key={`${id}|${topKey}|${bottomKey}`} orientation="vertical" onLayoutChanged={onRows} style={{ flex: 1, minHeight: 0 }}>
             {hasTop && (
-              <Panel id={rowTop} defaultSize={hasBottom ? rowPercent : 100} minSize={ROWS_LIMITS.minRow}>
+              <Panel id={rowTop} defaultSize={hasBottom ? rowPercent : 100} minSize={minSizeOf(MIN_WINDOW.height, area.height, 2)}>
                 <Group orientation="horizontal" onLayoutChanged={onRowMemo} style={{ height: '100%' }}>
                   {row(top, topSizes)}
                 </Group>
@@ -161,7 +173,7 @@ export function RowsStationLayout({ preset: id }: { preset: RowsPreset['id'] }) 
             )}
             {hasTop && hasBottom && <Separator className="station-splitter" style={hHandle} />}
             {hasBottom && (
-              <Panel id={rowBottom} defaultSize={hasTop ? 100 - rowPercent : 100} minSize={ROWS_LIMITS.minRow}>
+              <Panel id={rowBottom} defaultSize={hasTop ? 100 - rowPercent : 100} minSize={minSizeOf(MIN_WINDOW.height, area.height, 2)}>
                 <Group orientation="horizontal" onLayoutChanged={onRowMemo} style={{ height: '100%' }}>
                   {row(bottom, bottomSizes)}
                 </Group>

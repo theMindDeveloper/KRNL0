@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useContext } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
@@ -13,7 +13,7 @@ import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
 import { dayProgress, progressRatio } from '../../../store/dayProgress';
-import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { dueOnDay } from '../../../../shared/dueOn';
 import { MenuIcon } from '../../ui/menuIcons';
@@ -250,7 +250,9 @@ export function ClockNode({
 
   // Task facts + scheduled habits for the day model (dayModel.ts).
   const taskInfo = useMemo(() => collectTaskInfo(board), [board?.nodes]);
-  const scheduledHabits = useMemo(() => collectScheduledHabits(board), [board?.nodes]);
+  // Decision 60 — habits are not drawn on the Clock (owner, 2026-11-21); a
+  // repeating event (a class, a shift) still is.
+  const scheduledHabits = useMemo(() => collectScheduledHabits(board).filter((h) => !!h.routine), [board?.nodes]);
 
   // Today (real wall-clock day) — used to decide whether `now`-derived UI
   // (now-pointer, active task, now-playing strip) is meaningful for the
@@ -350,10 +352,6 @@ export function ClockNode({
   const trackInnerEdge = REALITY_R - REALITY_SW / 2;
   const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
 
-  // Station mode: the bottom-right Clock panel is much taller than the canvas-
-  // mode fixed mother (540px) — scale the dial up so it fills the space
-  // instead of leaving a strip of empty card around a tiny 244px square.
-  const inStation = useContext(MotherFrameStationContext);
   // engagement.md F18 — the outer ring closes as the day's planned blocks are ticked.
   const dayDone = useMemo(() => dayProgress(board0, selectedDate), [board0, selectedDate]);
   const ringR = trackOuterEdge + 6;
@@ -518,7 +516,9 @@ export function ClockNode({
             // Decision 58 — the dial takes all the room the list does not need.
             flex: '1 1 auto',
             minHeight: 140,
-            maxHeight: dialOnly || inStation ? '100%' : 300,
+            // Decision 59 — the same in Free as in the Station: the dial grows
+            // with the window (a 300 px cap left a tall canvas Clock half empty).
+            maxHeight: '100%',
             aspectRatio: '1 / 1',
             maxWidth: '100%',
             margin: '0 auto',
@@ -562,12 +562,14 @@ export function ClockNode({
               <g data-testid="clock-done-ring" data-done={dayDone.done} data-planned={dayDone.planned} pointerEvents="none">
                 <title>{`${dayDone.done} of ${dayDone.planned} planned done`}</title>
                 <circle cx={CX} cy={CY} r={ringR} fill="none" stroke="var(--paper-3)" strokeWidth={2.5} />
-                <circle
+                {/* Decision 60 — the fill only once something is done: a zero-length
+                    round cap drew a lone dot at 12. */}
+                {dayDone.done > 0 && <circle
                   cx={CX} cy={CY} r={ringR} fill="none" stroke="var(--acid)" strokeWidth={2.5} strokeLinecap="round"
                   strokeDasharray={`${(progressRatio(dayDone) * ringC).toFixed(2)} ${ringC.toFixed(2)}`}
                   transform={`rotate(-90 ${CX} ${CY})`}
                   style={{ transition: 'stroke-dasharray 400ms cubic-bezier(0.32, 0.72, 0, 1)' }}
-                />
+                />}
               </g>
             )}
 

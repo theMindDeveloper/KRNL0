@@ -274,8 +274,12 @@
 /* Calendar: a missed block's replan button shows on hover or focus only. */
 /* Decision 55 — a plan answers the hand at once: it lifts a step on hover and
    presses in on pointer-down (transform only, 120 ms; still for reduced motion). */
-.cal-block { transition: filter 120ms ease-out, transform 120ms ease-out; }
-.cal-block:hover { filter: brightness(1.08); }
+/* Decision 60 — hover is a plain tint on top, never a filter: a filter moved
+   the block onto its own GPU layer and the text re-rasterised, so every
+   block seemed to shift a hair when you pointed at one (owner, 2026-11-21). */
+.cal-block { transition: transform 120ms ease-out; }
+.cal-block::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ink); opacity: 0; pointer-events: none; }
+.cal-block:hover::after { opacity: 0.06; }
 .cal-block:active { transform: scale(0.985); }
 @media (prefers-reduced-motion: reduce) { .cal-block { transition: none; } .cal-block:active { transform: none; } }
 .cal-block .cal-replan { opacity: 0; transition: opacity 120ms ease; }
@@ -363,14 +367,8 @@
 }
 [data-motion="reduced"] .react-flow__node[data-settling] { transition: none; }
 
-/* Decision 58 — a plan is a task: a small tick box before its name tells it
-   from a repeating event (which has none and lies flat). */
-.cal-task-box {
-  display: inline-flex; align-items: center; justify-content: center; vertical-align: -1px;
-  width: 10px; height: 10px; margin-right: 5px; box-sizing: border-box; border-radius: 3px;
-  border: 1.5px solid currentColor; color: var(--ink-on-bright); flex-shrink: 0;
-}
-.cal-task-box.is-done { border-width: 0; }
+/* Decision 59 — a task carries a small list mark at its top right (from your
+   Todos); a repeating event carries the repeat mark. */
 .cal-block[data-plan-state='done'] { filter: saturate(0.6); }
 /* The hours: a thin scrollbar that appears on use, never a heavy track. */
 .krnl-week-grid { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent; }

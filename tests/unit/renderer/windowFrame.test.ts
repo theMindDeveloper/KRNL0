@@ -192,7 +192,7 @@ describe('Cards are a list you read; the Timer is a clock first (window-frame.md
   });
   it('the plan card: the day is one line of at most four choices, named in full', () => {
     const c = read('components/ui/WhenPopover.tsx');
-    expect(c).toContain("['tmrw', 'Tomorrow', tomorrow]");
+    expect(c).toContain("['tmrw', 'Tmrw', tomorrow]");
     expect(c).toContain('<div style={cardDays}>');
   });
   it('the Timer face: the time, today as one line; no total tiles', () => {
@@ -362,7 +362,7 @@ describe('Visual bugs fixed (owner list, 2026-11-20)', () => {
     // Decision 54 — the Station / Free switch became the layout menu.
     const t = read('renderer/components/ui/LayoutMenu.tsx');
     expect(t).toContain('data-testid="layout-menu"');
-    expect(read('shared/stationLayouts.ts')).toContain("label: 'Free'");
+    expect(read('shared/stationLayouts.ts')).toContain("label: 'Free canvas'");
   });
   it('no second frame inside a window: Analytics draws no border of its own, Pro light has no inset highlight', () => {
     expect(read('renderer/components/nodes/AnalyticsNode/index.tsx')).toContain("borderRadius: 'calc(var(--k-mother-radius, 8px) - 1px)'");

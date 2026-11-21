@@ -38,6 +38,8 @@ import {
 } from 'react-resizable-panels';
 import { useBoardStore } from '../../store/boardStore';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
+import { MIN_WINDOW, minSizeOf } from './minSize';
+import { useElementSize } from '../../analytics/useElementSize';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { StationCell } from './StationCell';
 import { EmbeddedCanvasCell } from './EmbeddedCanvasCell';
@@ -110,7 +112,10 @@ export { isStationHidden } from './stationVisibility';
 /** Decision 54 — the Station picks its arrangement from the saved preset (the top bar's layout menu). */
 export function StationLayout() {
   const preset = useBoardStore((s) => presetOf(s.board?.layoutGeometry?.station));
-  return preset === 'classic' ? <ClassicStationLayout /> : <RowsStationLayout preset={preset} />;
+  // Decision 59 — a reset (or picking a ready-made layout) bumps `rev`: the
+  // panels lay out afresh from the saved (or designed) sizes.
+  const rev = useBoardStore((s) => s.board?.layoutGeometry?.station?.rev ?? 0);
+  return preset === 'classic' ? <ClassicStationLayout key={`classic-${rev}`} /> : <RowsStationLayout key={`${preset}-${rev}`} preset={preset} />;
 }
 
 function ClassicStationLayout() {
@@ -119,6 +124,7 @@ function ClassicStationLayout() {
   const storedGeometry = useBoardStore((s) => s.board?.layoutGeometry?.station);
   const board = useBoardStore((s) => s.board);
   const [dockStyle] = useDockStyle();
+  const [areaRef, area] = useElementSize<HTMLDivElement>();
 
   const canvasHidden = storedGeometry?.canvasHidden ?? false;
 
@@ -259,6 +265,8 @@ function ClassicStationLayout() {
     );
   });
   const topRowChildren: React.ReactNode[] = [];
+  // Decision 59 — real minimums in px (see minSize.ts), from the measured area.
+  const minTop = minSizeOf(MIN_WINDOW.width, area.width, visibleTopDefs.length);
   visibleTopDefs.forEach((d, i) => {
     if (i > 0) topRowChildren.push(<Separator key={`sep-${d.panelId}`} className="station-splitter" style={verticalHandleStyle} />);
     topRowChildren.push(
@@ -266,7 +274,7 @@ function ClassicStationLayout() {
         key={d.panelId}
         id={d.panelId}
         defaultSize={topSizes[i]}
-        minSize={SLOT_DEFAULTS.minColumn}
+        minSize={minTop}
       >
         <CellWrapper><StationCell slot={d.slot} /></CellWrapper>
       </Panel>
@@ -318,10 +326,11 @@ function ClassicStationLayout() {
     bottomDefault: defaultLines(bottomItems.map((it) => (it.id === PANEL_IDS.bottomCanvas ? canvasSize : it.id === PANEL_IDS.bottomTerminal ? terminalSize : it.id === PANEL_IDS.bottomAnalytics ? analyticsSize : clockSize))),
     mins: Object.fromEntries([...visibleTopDefs.map((d) => [d.panelId, SLOT_DEFAULTS.minColumn] as const), ...bottomItems.map((it) => [it.id, it.min] as const)]),
   };
+  const minBottom = minSizeOf(MIN_WINDOW.width, area.width, bottomItems.length);
   bottomItems.forEach((it, i) => {
     if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} className="station-splitter" style={verticalHandleStyle} />);
     bottomRowChildren.push(
-      <Panel key={it.id} id={it.id} defaultSize={it.size} minSize={it.min}>
+      <Panel key={it.id} id={it.id} defaultSize={it.size} minSize={minBottom}>
         {it.node}
       </Panel>
     );
@@ -345,6 +354,7 @@ function ClassicStationLayout() {
       {Chrome ? <Chrome /> : null}
 
       <div
+        ref={areaRef}
         style={{
           position: 'absolute',
           top: padding.top,
@@ -375,7 +385,7 @@ function ClassicStationLayout() {
               <Panel
                 id={PANEL_IDS.outerTop}
                 defaultSize={bottomRowVisible ? topRowPercent : 100}
-                minSize={SLOT_DEFAULTS.minRow}
+                minSize={minSizeOf(MIN_WINDOW.height, area.height, 2)}
               >
                 <Group
                   orientation="horizontal"
@@ -396,7 +406,7 @@ function ClassicStationLayout() {
               <Panel
                 id={PANEL_IDS.outerBottom}
                 defaultSize={topRowVisible ? 100 - topRowPercent : 100}
-                minSize={SLOT_DEFAULTS.minCanvas}
+                minSize={minSizeOf(MIN_WINDOW.height, area.height, 2)}
               >
                 <Group
                   orientation="horizontal"

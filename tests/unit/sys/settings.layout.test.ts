@@ -26,10 +26,12 @@ const facade = (onBoardChanged = vi.fn()) => new SysFacade({ boardPath, hasOpenR
 
 describe('settings layout (Decision 54: the layout menu)', () => {
   const geo = () => (JSON.parse(readFileSync(boardPath, 'utf-8')) as { layoutGeometry?: { station?: { preset?: string } } }).layoutGeometry?.station;
-  it('shows the current layout and lists the four', async () => {
+  it('shows the current layout and lists My layout, Free canvas and reset (Decision 60)', async () => {
     const res = await facade().run(['settings', 'layout']);
-    expect(res.message.split('\n')[0]).toBe('layout: free (canvas)');
-    for (const o of ['classic', 'grid', 'planner', 'free']) expect(res.message).toContain(`  ${o}`);
+    expect(res.message.split('\n')[0]).toBe('layout: free — Free canvas (canvas)');
+    for (const o of ['classic', 'free', 'reset']) expect(res.message).toContain(`  ${o}`);
+    expect(res.message).not.toContain('  grid');
+    expect(res.message).not.toContain('  planner');
   });
 
   it('the old word "station" opens the Station and tells the window', async () => {
@@ -41,18 +43,32 @@ describe('settings layout (Decision 54: the layout menu)', () => {
     expect(changed).toHaveBeenCalledTimes(1);
   });
 
-  it('planner opens the Station with the Planner preset; free goes back to the canvas', async () => {
-    expect((await facade().run(['settings', 'layout', 'planner'])).message).toBe('layout: planner (Station)');
+  it('mine opens My layout; free goes back to the canvas; grid and planner are refused (Decision 60)', async () => {
+    expect((await facade().run(['settings', 'layout', 'mine'])).message).toBe('layout: classic — My layout (Station)');
     expect(read().layoutMode).toBe('station');
-    expect(geo()?.preset).toBe('planner');
-    expect((await facade().run(['settings', 'layout'])).message.split('\n')[0]).toBe('layout: planner (Station)');
-    expect((await facade().run(['settings', 'layout', 'grid'])).ok).toBe(true);
-    expect(geo()?.preset).toBe('grid');
+    expect((await facade().run(['settings', 'layout', 'planner'])).ok).toBe(false);
+    expect((await facade().run(['settings', 'layout', 'grid'])).ok).toBe(false);
+    expect(read().layoutMode).toBe('station');
     expect((await facade().run(['settings', 'layout', 'free'])).ok).toBe(true);
     expect(read().layoutMode).toBe('canvas');
-    // Free keeps the preset for the next time the Station opens.
-    expect(geo()?.preset).toBe('grid');
-    expect((await facade().run(['settings', 'layout', 'station'])).message).toBe('layout: grid (Station)');
+    expect((await facade().run(['settings', 'layout', 'station'])).message).toBe('layout: classic — My layout (Station)');
+  });
+
+  it('reset puts My layout back: Timer, Clock and Todos over a full-width Calendar (F9)', async () => {
+    writeFileSync(boardPath, JSON.stringify({ version: 1, schemaVersion: 2, layoutMode: 'canvas', viewport: { x: 0, y: 0, zoom: 1 }, edges: [], nodes: [
+      { id: 'mother-pomo', kind: 'pomo', isMother: true, position: { x: 0, y: 0 }, config: { stationSlot: 'top-center' }, state: {} },
+      { id: 'mother-calendar', kind: 'calendar', isMother: true, position: { x: 0, y: 0 }, config: { stationSlot: 'top-right-upper' }, state: {} },
+      { id: 'mother-habit', kind: 'habit', isMother: true, position: { x: 0, y: 0 }, config: { stationSlot: 'top-right-pre' }, state: {} },
+    ] }), 'utf-8');
+    const res = await facade().run(['settings', 'layout', 'reset']);
+    expect(res.ok).toBe(true);
+    const b = JSON.parse(readFileSync(boardPath, 'utf-8')) as { layoutMode: string; nodes: Array<{ kind: string; config: { stationSlot?: string; stationHidden?: boolean } }>; layoutGeometry: { station: { canvasHidden?: boolean } } };
+    const c = (k: string) => b.nodes.find((n) => n.kind === k)!.config;
+    expect(b.layoutMode).toBe('station');
+    expect(c('pomo').stationSlot).toBe('top-left');
+    expect(c('calendar').stationSlot).toBe('top-right-lower');
+    expect(c('habit').stationHidden).toBe(true);
+    expect(b.layoutGeometry.station.canvasHidden).toBe(true);
   });
 
   it('rejects anything else and writes nothing', async () => {

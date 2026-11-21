@@ -14,7 +14,8 @@ import { isModalOpen } from '../../utils/keyboardTargets';
 import { LineGlyph } from './LineGlyph';
 import { Z } from './layers';
 import { cardBox } from './addCard';
-import { LAYOUT_OPTIONS, layoutChoiceOf, presetOf, withPreset, type LayoutChoice, type LayoutOption } from '../../../shared/stationLayouts';
+import { CLASSIC_HIDDEN, CLASSIC_SLOTS, LAYOUT_OPTIONS, freshLayout, layoutChoiceOf, presetOf, resetClassicGeometry, type LayoutChoice, type LayoutOption } from '../../../shared/stationLayouts';
+import type { MotherNodeConfig } from '../../../shared/types';
 
 const READ = 'var(--font-read)';
 
@@ -38,10 +39,27 @@ export function applyLayoutChoice(choice: LayoutChoice): void {
     return;
   }
   const geo = board.layoutGeometry?.station;
-  if (presetOf(geo) !== choice || geo?.preset === undefined) {
-    setLayoutGeometry({ ...board.layoutGeometry, station: withPreset(geo, choice) });
+  // Decision 59 — a ready-made layout comes back exactly as designed every
+  // time it is picked (picking the one in use resets it too); My layout
+  // keeps what you left.
+  if (choice !== 'classic' || presetOf(geo) !== choice || geo?.preset === undefined) {
+    setLayoutGeometry({ ...board.layoutGeometry, station: freshLayout(geo, choice) });
   }
   if (board.layoutMode !== 'station') useBoardStore.getState().setLayoutMode('station');
+}
+
+/** Decisions 59–60 — Reset: Timer, Clock and Todos over a full-width Calendar; the other windows hidden, first sizes. */
+export function resetMyLayout(): void {
+  const { board, setLayoutGeometry, updateNode } = useBoardStore.getState();
+  if (!board) return;
+  for (const n of board.nodes) {
+    const slot = n.isMother ? CLASSIC_SLOTS[n.kind] : undefined;
+    if (!slot) continue;
+    const cfg = (n.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
+    updateNode(n.id, { config: { ...cfg, stationSlot: slot, stationHidden: CLASSIC_HIDDEN.has(n.kind) } });
+  }
+  setLayoutGeometry({ ...useBoardStore.getState().board?.layoutGeometry, station: resetClassicGeometry(useBoardStore.getState().board?.layoutGeometry?.station) });
+  if (useBoardStore.getState().board?.layoutMode !== 'station') useBoardStore.getState().setLayoutMode('station');
 }
 
 export function LayoutMenu() {
@@ -118,10 +136,11 @@ export function LayoutMenu() {
           className="kw-card"
           style={{ ...cardBox, width: 320, padding: 8, gap: 2, position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: Z.popover }}
         >
-          {LAYOUT_OPTIONS.map((o) => {
+          {LAYOUT_OPTIONS.map((o, i) => {
             const on = o.id === choice;
+            const firstOfGroup = i === 0 || LAYOUT_OPTIONS[i - 1]!.group !== o.group;
             return (
-              <div key={o.id} style={o.id === 'free' ? { borderTop: '1px solid var(--paper-3)', marginTop: 4, paddingTop: 4 } : undefined}>
+              <div key={o.id} style={{ position: 'relative', ...(firstOfGroup && i > 0 ? { borderTop: '1px solid var(--paper-3)', marginTop: 4, paddingTop: 4 } : {}) }}>
                 <button
                   type="button"
                   role="menuitemradio"
@@ -145,7 +164,23 @@ export function LayoutMenu() {
                     <span style={{ display: 'block', fontSize: 12.5, lineHeight: 1.35, color: 'var(--ink-3)', marginTop: 1 }}>{o.hint}</span>
                   </span>
                   {on && <span aria-hidden style={{ color: 'var(--acid-ink, var(--acid))', display: 'inline-flex', flexShrink: 0 }}><LineGlyph name="check" size={13} weight={2.4} /></span>}
+                  {o.group === 'yours' && <span aria-hidden style={{ width: 54, flexShrink: 0 }} />}
                 </button>
+                {o.group === 'yours' && (
+                  <button
+                    type="button"
+                    data-testid="layout-reset-mine"
+                    title="Timer, Clock and Todos on top, the Calendar below"
+                    onClick={(e) => { e.stopPropagation(); setOpen(false); resetMyLayout(); }}
+                    style={{
+                      position: 'absolute', right: 8, bottom: 14, height: 26, padding: '0 10px', border: 'none', borderRadius: 8,
+                      background: 'var(--paper-3)', color: 'var(--ink-2)', fontFamily: READ, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      letterSpacing: 0, textTransform: 'none',
+                    }}
+                  >
+                    Reset
+                  </button>
+                )}
               </div>
             );
           })}

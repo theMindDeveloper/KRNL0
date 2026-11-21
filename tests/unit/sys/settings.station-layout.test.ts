@@ -34,19 +34,15 @@ describe('settings station-layout (Decision 54)', () => {
     expect((await facade().run(['settings', 'station-layout'])).message).toBe('station layout: classic');
   });
 
-  it('switches to grid, keeps the Classic sizes, tells the window', async () => {
+  it('only My layout (classic) is left: grid and planner are refused, classic keeps the sizes (Decision 60)', async () => {
+    expect((await facade().run(['settings', 'station-layout', 'grid'])).ok).toBe(false);
+    expect((await facade().run(['settings', 'station-layout', 'planner'])).ok).toBe(false);
     const changed = vi.fn();
-    const res = await facade(changed).run(['settings', 'station-layout', 'grid']);
-    expect(res.ok).toBe(true);
+    expect((await facade(changed).run(['settings', 'station-layout', 'classic'])).ok).toBe(true);
     const st = read().layoutGeometry?.station;
-    expect(st?.preset).toBe('grid');
+    expect(st?.preset).toBe('classic');
     expect(st?.rowFraction).toBe(0.4);
     expect(st?.bottomFractions).toEqual({ 'station-bottom-canvas': 0.5 });
-    expect(changed).toHaveBeenCalledTimes(1);
-    expect((await facade().run(['settings', 'station-layout', 'planner'])).ok).toBe(true);
-    expect(read().layoutGeometry?.station?.preset).toBe('planner');
-    expect((await facade().run(['settings', 'station-layout', 'classic'])).ok).toBe(true);
-    expect(read().layoutGeometry?.station?.preset).toBe('classic');
   });
 
   it('rejects anything else and writes nothing', async () => {

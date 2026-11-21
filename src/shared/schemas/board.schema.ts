@@ -35,6 +35,7 @@ const StationRowsSchema = z.object({
   bottom: z.array(z.number()).optional(),
   order: z.object({ top: z.array(z.string()), bottom: z.array(z.string()) }).optional(),
   sizes: z.record(z.number()).optional(),
+  windows: z.array(z.string()).optional(),
 });
 
 export const BoardSchema = z.object({
@@ -67,6 +68,7 @@ export const BoardSchema = z.object({
           preset: z.enum(['classic', 'grid', 'planner']).optional(),
           grid: StationRowsSchema.optional(),
           planner: StationRowsSchema.optional(),
+          rev: z.number().optional(),
         })
         .optional(),
     })

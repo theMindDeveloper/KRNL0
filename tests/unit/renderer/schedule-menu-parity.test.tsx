@@ -150,12 +150,32 @@ describe('Calendar ↔ Clock right-click parity', () => {
   });
 });
 
-describe('Recorded time is not drawn on the Calendar (owner, 2026-11-21; Decision 58)', () => {
-  it('no rail, no track, no knob; the now line keeps its own dot', () => {
+describe('The recorded-time line (Decision 59)', () => {
+  it('a slim line at the day\'s left that never takes pointer events', () => {
     seed();
     render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
-    expect(document.querySelector('[data-testid="calendar-reality-block"]')).toBeNull();
-    expect(document.querySelector('[data-testid="calendar-reality-track"]')).toBeNull();
+    const band = document.querySelector('[data-testid="calendar-reality-block"]') as HTMLElement;
+    expect(band).toBeTruthy();
+    expect(band.style.pointerEvents).toBe('none');
+    expect(band.getAttribute('data-reality-kind')).toBe('work');
+    const track = document.querySelector('[data-testid="calendar-reality-track"]') as HTMLElement;
+    expect(track).toBeTruthy();
+    expect(band.style.left).toBe('3px');
+    expect(track.style.left).toBe('3px');
+    expect(band.style.width).toBe(track.style.width);
+  });
+
+  it('a running span is a calm solid fill (no stripes)', () => {
+    seed();
+    render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
+    for (const el of Array.from(document.querySelectorAll('[data-testid="calendar-reality-block"]')) as HTMLElement[]) {
+      expect(el.style.background).not.toContain('repeating-linear-gradient');
+    }
+  });
+
+  it('today has one now mark: the now line\'s dot, on the line', () => {
+    seed();
+    render(<WeekView state={calState()} config={calConfig()} onCommand={() => {}} singleDay />);
     expect(document.querySelector('[data-testid="calendar-reality-now"]')).toBeNull();
     expect(document.querySelector('[data-testid="now-line-dot"]')).not.toBeNull();
   });

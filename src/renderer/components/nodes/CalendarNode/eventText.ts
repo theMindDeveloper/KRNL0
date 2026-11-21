@@ -19,29 +19,36 @@ export interface EventLines {
   /** Lines the name may use (0 = none fit). */
   titleLines: number;
   showTime: boolean;
+  /** Lines the small time line may wrap onto (Decision 60: a narrow block wraps it). */
+  metaLines: number;
   showPlace: boolean;
 }
 
-/** Type metrics of an event block (the reading font at 12 px, mono at 11 px). */
-export const EVENT_TEXT = { padY: 3, titleLine: 15, metaLine: 14, charPx: 6.6 } as const;
+/** Type metrics of an event block (the reading font at 13 px; the time small, mono 10 px). */
+export const EVENT_TEXT = { padY: 3, titleLine: 16, metaLine: 13, charPx: 7.1, metaCharPx: 6.1 } as const;
 
 /**
- * How the block's height is shared out: the name first (up to two lines), then
- * the time, then the rest of the name, then the place. Nothing is cut in half:
- * a part shows whole or not at all.
+ * How the block's height is shared out (Decision 60, the owner's pick: the
+ * drag preview's look): the name first (up to three lines), then the time and
+ * how often it repeats in small type (wrapping when the block is narrow), then
+ * the rest of the name, then the place. Nothing is cut in half: a part shows
+ * whole or not at all.
  */
-export function eventLines(heightPx: number, textWidthPx: number, title: string, hasPlace: boolean): EventLines {
-  const { padY, titleLine, metaLine, charPx } = EVENT_TEXT;
+export function eventLines(heightPx: number, textWidthPx: number, title: string, hasPlace: boolean, meta = '00:00–00:00'): EventLines {
+  const { padY, titleLine, metaLine, charPx, metaCharPx } = EVENT_TEXT;
   let room = heightPx - 2 * padY;
-  if (room < titleLine - 1 || textWidthPx < 14) return { titleLines: 0, showTime: false, showPlace: false };
+  if (room < titleLine - 1 || textWidthPx < 14) return { titleLines: 0, showTime: false, metaLines: 0, showPlace: false };
   const needed = Math.max(1, Math.ceil((title.length * charPx) / Math.max(1, textWidthPx)));
-  let titleLines = Math.max(1, Math.min(needed, 2, Math.floor(room / titleLine)));
+  let titleLines = Math.max(1, Math.min(needed, 3, Math.floor(room / titleLine)));
   room -= titleLines * titleLine;
-  const showTime = textWidthPx >= 64 && room >= metaLine;
-  if (showTime) room -= metaLine;
+  const metaNeed = Math.max(1, Math.min(3, Math.ceil((meta.length * metaCharPx) / Math.max(1, textWidthPx))));
+  // The time at least (one line), the rest of the line when it fits.
+  const metaLines = textWidthPx >= 30 ? Math.max(0, Math.min(metaNeed, Math.floor(room / metaLine))) : 0;
+  const showTime = metaLines > 0;
+  room -= metaLines * metaLine;
   const more = Math.max(0, Math.min(needed - titleLines, Math.floor(room / titleLine)));
   titleLines += more;
   room -= more * titleLine;
   const showPlace = hasPlace && showTime && room >= metaLine;
-  return { titleLines, showTime, showPlace };
+  return { titleLines, showTime, metaLines, showPlace };
 }

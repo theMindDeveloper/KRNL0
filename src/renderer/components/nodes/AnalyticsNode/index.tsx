@@ -425,25 +425,12 @@ export function AnalyticsNode({
   const [currentCard, setCurrentCard] = useState<string | null>(null);
   const [jumpTo, setJumpTo] = useState<string | null>(null);
 
-  // The page on screen: the last page whose first card has reached the top.
-  const [scrollRef, scrollSize] = useElementSize<HTMLDivElement>();
-  const pageH = Math.max(440, Math.round(scrollSize.height || 0));
-  const onScrollPages = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const box = e.currentTarget;
-    let cur: string | null = null;
-    for (const el of Array.from(box.querySelectorAll<HTMLElement>('[data-page-start]'))) {
-      if (el.offsetTop - box.offsetTop <= box.scrollTop + 40) cur = el.getAttribute('data-card-id') ?? 'summary';
-    }
-    setCurrentCard(cur ?? 'summary');
-  }, []);
-  // A page icon (or a view set from the CLI) glides to its page.
-  useEffect(() => {
-    if (!jumpTo) return;
-    const box = scrollRef.current;
-    const el = box?.querySelector<HTMLElement>(jumpTo);
-    if (box && el) box.scrollTo({ top: el.offsetTop - box.offsetTop, behavior: 'smooth' });
+  // Decision 59 — the pages snap whole again (PagedView: one scroll, one
+  // page), as the owner liked; a page icon reveals its page.
+  const onPageChange = useCallback((item: HTMLElement | null) => {
+    setCurrentCard(item?.getAttribute('data-card-id') ?? (item ? 'summary' : null));
     setJumpTo(null);
-  }, [jumpTo, scrollRef]);
+  }, []);
 
   // Open the saved / CLI-set view's page. Deferred a frame so the pager has
   // measured its cards (and its first page report has passed).
@@ -589,17 +576,26 @@ export function AnalyticsNode({
       {/* Titlebar — the shared header class, so every frame style's header
           skin (Macintosh title bar, Submarine module tag, …) reaches it as it
           does the other mother windows. */}
+      {/* Decision 59 — the header every window has (window-frame.md): the dot,
+          the name, the view switch at the right (here the range), one icon. */}
       <div className="krnl-node-header an-head kw-head" style={titlebarStyle}>
         <span className="kw-dot" style={dotStyle} aria-hidden />
-        <span style={{ color: 'var(--k-an-ink, #f4f6f8)', fontWeight: 600 }}>Analytics</span>
-        <div style={{ flex: 1 }} />
-        <span className="an-chip an-chip--done" style={summaryChipStyle}>
-          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>Done </span>
-          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.tasksDone}</span>
-        </span>
-        <span className="an-chip an-chip--focus" style={summaryChipStyle}>
-          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>Focus </span>
-          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin >= 60 ? `${Math.floor(tot.focusMin / 60)}h ${String(tot.focusMin % 60).padStart(2, '0')}m` : `${tot.focusMin}m`}</span>
+        <span className="kw-title">Analytics</span>
+        <span className="kw-sp" />
+        <span className="kw-views nodrag" role="group" aria-label="Range" data-testid="analytics-range-switch">
+          {RANGE_PRESETS.map((days) => (
+            <button
+              key={days}
+              type="button"
+              data-testid={`analytics-range-${days}`}
+              aria-pressed={state.rangeDays === days}
+              title={`The last ${days} days`}
+              onClick={(e) => { e.stopPropagation(); onCommand('analytics.setRangeDays', { days }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {days}d
+            </button>
+          ))}
         </span>
         <button
           type="button"
@@ -618,21 +614,15 @@ export function AnalyticsNode({
       {/* window-frame.md — the time row: which page (an icon each, the current one named), then the range. */}
       <div className="kw-range an-toolbar" style={toolbarStyle}>
         <PageNav current={currentPage} pages={pages} onPick={(id) => setJumpTo(pageSelector(id))} />
-        {/* window-frame.md — the range is the same switch every window uses. */}
-        <div className="kw-views" role="group" aria-label="Range" style={{ marginLeft: 'auto' }}>
-          {RANGE_PRESETS.map((days) => (
-            <button
-              key={days}
-              type="button"
-              data-testid={`analytics-range-${days}`}
-              aria-pressed={state.rangeDays === days}
-              onClick={(e) => { e.stopPropagation(); onCommand('analytics.setRangeDays', { days }); }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {days}d
-            </button>
-          ))}
-        </div>
+        {/* The range's two numbers, quiet, where the Clock shows its day. */}
+        <span className="an-chip an-chip--done" style={{ ...summaryChipStyle, marginLeft: 'auto' }}>
+          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>Done </span>
+          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.tasksDone}</span>
+        </span>
+        <span className="an-chip an-chip--focus" style={summaryChipStyle}>
+          <span style={{ color: 'var(--k-an-ink-3, #9aa1a8)' }}>Focus </span>
+          <span style={{ color: 'var(--k-an-ink, #f4f6f8)' }}>{tot.focusMin >= 60 ? `${Math.floor(tot.focusMin / 60)}h ${String(tot.focusMin % 60).padStart(2, '0')}m` : `${tot.focusMin}m`}</span>
+        </span>
       </div>
 
       {/* Body — cards on the left (scrolling by pages), settings sidebar on the right. */}
@@ -648,23 +638,21 @@ export function AnalyticsNode({
           position: 'relative',
         }}
       >
-        {/* Decision 58 — the pages scroll smoothly and settle on whole pages
-            (no card stops at an edge); the page icons glide to their page. */}
-        <div
-          ref={scrollRef}
-          data-testid="analytics-pages"
-          className="an-scroll nowheel"
-          onScroll={onScrollPages}
-          style={{ flex: 1, minWidth: 0, ['--page-h' as string]: `${pageH}px` } as React.CSSProperties}
-        >
-        <div
-          style={{
+        {/* Decision 59 — whole pages that snap (PagedView), as before. */}
+        <PagedView
+          testId="analytics-pages"
+          itemSelector="[data-page-item], [data-card-id]"
+          fillItems
+          revealSelector={jumpTo}
+          onPageChange={onPageChange}
+          showPager={false}
+          style={{ flex: 1, minWidth: 0 }}
+          contentStyle={{
             // Each page = 2 rows of the grid, each row half a page (minus the gap).
             display: 'grid',
             gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
             gridTemplateRows: `repeat(${pages.length * 2}, calc((var(--page-h, 400px) - 12px) / 2))`,
             gap: 12,
-            paddingBottom: 12,
           }}
         >
           <SummaryHero summary={summary} byDay={byDay} rangeDays={state.rangeDays} />
@@ -701,8 +689,7 @@ export function AnalyticsNode({
             yearByDay={yearByDay}
           />
           ))}
-        </div>
-        </div>
+        </PagedView>
 
         {settingsOpen && (
           <AnalyticsSettings

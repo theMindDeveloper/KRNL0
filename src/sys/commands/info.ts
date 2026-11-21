@@ -9,7 +9,7 @@ import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { BoardShape } from '../../shared/dispatch/types';
 import type { StationGeometry } from '../../shared/types/board';
-import { LAYOUT_OPTIONS, STATION_PRESETS, isStationPreset, layoutChoiceOf, parseLayoutChoice, presetOf, withPreset, type LayoutChoice } from '../../shared/stationLayouts';
+import { CLASSIC_HIDDEN, CLASSIC_SLOTS, LAYOUT_OPTIONS, STATION_PRESETS, freshLayout, isStationPreset, layoutChoiceOf, layoutLabel, parseLayoutChoice, presetOf, resetClassicGeometry, withPreset, type LayoutChoice } from '../../shared/stationLayouts';
 
 export interface InfoCtx {
   boardPath: string;
@@ -168,7 +168,8 @@ export function settingsStationLayout(
   const current = presetOf(station);
   if (preset === undefined) return { ok: true, message: `station layout: ${current}`, data: { preset: current } };
   const want = preset.trim().toLowerCase();
-  if (!isStationPreset(want)) {
+  // Decision 60 — one Station arrangement: My layout (classic).
+  if (!isStationPreset(want) || !STATION_PRESETS.includes(want)) {
     return { ok: false, message: `settings station-layout: expected ${STATION_PRESETS.join(', ')}, got "${preset}"` };
   }
   if (want !== current || station?.preset === undefined) {
@@ -193,22 +194,43 @@ export function settingsLayout(
   if (!raw) return { ok: false, message: 'No board found' };
   const station = raw.layoutGeometry?.station;
   const current = layoutChoiceOf(raw.layoutMode, station);
-  const describe = (c: LayoutChoice): string => `layout: ${c}${c === 'free' ? ' (canvas)' : ' (Station)'}`;
+  const describe = (c: LayoutChoice): string => `layout: ${c} — ${layoutLabel(c)}${c === 'free' ? ' (canvas)' : ' (Station)'}`;
   const dataOf = (c: LayoutChoice) => ({ layout: c, mode: c === 'free' ? 'canvas' : 'station', ...(c === 'free' ? {} : { preset: c }) });
   if (layout === undefined) {
-    const options = LAYOUT_OPTIONS.map((o) => `  ${o.id.padEnd(8)} ${o.hint}`).join('\n');
+    const options = LAYOUT_OPTIONS.map((o) => `  ${o.id.padEnd(8)} ${o.label} — ${o.hint}${o.group === 'ready' ? ' (back as designed each time)' : ''}`).join('\n') + '\n  reset    put the layout in use back as it came';
     return { ok: true, message: `${describe(current)}\n${options}`, data: dataOf(current) };
+  }
+  // Decision 59 — `reset`: My layout back to how it came (every window in its
+  // first place and size), or the ready-made layout in use back as designed.
+  if (layout.trim().toLowerCase() === 'reset') {
+    const preset = presetOf(station);
+    const next: Record<string, unknown> = { ...raw, savedAt: new Date().toISOString(), layoutMode: 'station' };
+    if (preset === 'classic') {
+      next['layoutGeometry'] = { ...raw.layoutGeometry, station: resetClassicGeometry(station) };
+      next['nodes'] = ((raw['nodes'] as Array<Record<string, unknown>> | undefined) ?? []).map((n) => {
+        const slot = n['isMother'] === true ? CLASSIC_SLOTS[String(n['kind'])] : undefined;
+        if (!slot) return n;
+        const cfg = (n['config'] as Record<string, unknown> | undefined) ?? {};
+        return { ...n, config: { ...cfg, stationSlot: slot, stationHidden: CLASSIC_HIDDEN.has(String(n['kind'])) } };
+      });
+    } else {
+      next['layoutGeometry'] = { ...raw.layoutGeometry, station: freshLayout(station, preset) };
+    }
+    saveBoardTo(ctx.boardPath, next);
+    ctx.onBoardChanged?.();
+    return { ok: true, message: `layout: ${preset} — ${layoutLabel(preset)} reset`, data: dataOf(preset) };
   }
   const want = parseLayoutChoice(layout, presetOf(station));
   if (!want) {
-    return { ok: false, message: `settings layout: expected ${LAYOUT_OPTIONS.map((o) => o.id).join(', ')}, got "${layout}"` };
+    return { ok: false, message: `settings layout: expected ${LAYOUT_OPTIONS.map((o) => o.id).join(', ')} or reset, got "${layout}"` };
   }
-  if (want !== current || (want !== 'free' && station?.preset === undefined)) {
+  // A ready-made layout comes back as designed every time it is picked.
+  if (want !== current || (want !== 'free' && station?.preset === undefined) || (want === 'grid' || want === 'planner')) {
     const next: Record<string, unknown> = { ...raw, savedAt: new Date().toISOString() };
     if (want === 'free') next['layoutMode'] = 'canvas';
     else {
       next['layoutMode'] = 'station';
-      next['layoutGeometry'] = { ...raw.layoutGeometry, station: withPreset(station, want) };
+      next['layoutGeometry'] = { ...raw.layoutGeometry, station: freshLayout(station, want) };
     }
     saveBoardTo(ctx.boardPath, next);
     ctx.onBoardChanged?.();

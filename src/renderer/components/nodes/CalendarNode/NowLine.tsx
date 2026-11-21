@@ -14,8 +14,11 @@ export interface NowLineProps {
   rowHeight: number;
   columnWidth: number;
   gutterWidth: number;
-  /** Draw the dot in today's column (off when the Clock rail's knob marks now). */
+  /** Draw the dot in today's column. */
   showDot?: boolean;
+  /** Decision 59 — the dot's centre, in px from today's left edge (on the
+   *  recorded-time line when the Calendar draws one; 0 = on the day line). */
+  dotX?: number;
 }
 
 // Parse a YYYY-MM-DD to a Date at local midnight.
@@ -38,6 +41,7 @@ export function NowLine({
   columnWidth,
   gutterWidth,
   showDot = true,
+  dotX = 0,
 }: NowLineProps) {
   const [now, setNow] = useState(() => new Date());
 
@@ -121,7 +125,7 @@ export function NowLine({
         style={{
           position: 'absolute',
           top: -3.5,
-          left: `calc(${gutterWidth}px + ${todayLeftPct}% - 4px)`,
+          left: `calc(${gutterWidth}px + ${todayLeftPct}% + ${dotX - 4}px)`,
           width: 8,
           height: 8,
           borderRadius: '50%',

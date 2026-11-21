@@ -25,6 +25,8 @@ export interface ContextMenuItem {
   /** menus.md — the rare things: choosing this row shows these instead, with a
    *  way back. One level only. */
   children?: ContextMenuItem[];
+  /** Stay open after choosing (a step you may press a few times, like zoom). */
+  keepOpen?: boolean;
 }
 
 export interface ContextMenuProps {
@@ -133,7 +135,7 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
               if (item.disabled) return;
               if (item.children) { setSub({ label: item.label, items: item.children }); return; }
               item.onSelect();
-              onDismiss();
+              if (!item.keepOpen) onDismiss();
             }}
             style={{
               display: 'flex',

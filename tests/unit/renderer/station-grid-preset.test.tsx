@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 /**
- * Decision 54 — the layout menu and the Station's presets (station-layouts F1–F3):
- *   - the top bar's layout menu lists Classic, Grid, Planner and Free, and
- *     picking one keeps every saved size
- *   - Grid and Planner offer only the windows they arrange; Free offers all
+ * The layout menu (Decisions 54, 59, 60; station-layouts F1, F9, F11):
+ *   - the top bar's layout menu lists My layout and Free canvas
+ *   - Reset puts My layout back as the owner arranged it: Timer, Clock and
+ *     Todos across the top, the Calendar the full width below
+ *   - a board saved on a retired preset (Grid, Planner) opens as My layout
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import React from 'react';
@@ -11,7 +12,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
 import { StationToolbar } from '../../../src/renderer/components/Station/StationToolbar';
 import { LayoutMenu } from '../../../src/renderer/components/ui/LayoutMenu';
-import { ROWS_PRESETS, layoutChoiceOf, parseLayoutChoice, presetKinds, presetOf, presetRows } from '../../../src/shared/stationLayouts';
+import { CLASSIC_HIDDEN, CLASSIC_SLOTS, layoutChoiceOf, parseLayoutChoice, presetOf } from '../../../src/shared/stationLayouts';
 import type { Board } from '../../../src/shared/types';
 
 if (typeof global.ResizeObserver === 'undefined') {
@@ -37,44 +38,52 @@ function board(layoutMode: 'station' | 'canvas' = 'station', preset?: string): B
 
 const state = () => useBoardStore.getState().board!;
 const station = () => state().layoutGeometry!.station!;
+const cfg = (id: string) => state().nodes.find((n) => n.id === id)!.config as { stationSlot?: string; stationHidden?: boolean };
 const has = (label: string) => screen.queryByRole('button', { name: new RegExp(`^${label}$`, 'i') }) !== null;
 
 beforeEach(() => useBoardStore.setState({ board: board() }));
 afterEach(() => { cleanup(); useBoardStore.setState({ board: null }); });
 
-describe('The layout menu (Decision 54, F1)', () => {
-  it('names the layout in use and lists the four layouts', () => {
+describe('The layout menu (Decision 60, F11)', () => {
+  it('names the layout in use and lists My layout and Free canvas', () => {
     render(<LayoutMenu />);
     const btn = screen.getByTestId('layout-menu');
     expect(btn.getAttribute('data-layout')).toBe('classic');
     fireEvent.click(btn);
     const items = screen.getAllByRole('menuitemradio');
-    expect(items.map((i) => i.getAttribute('data-testid'))).toEqual(['layout-option-classic', 'layout-option-grid', 'layout-option-planner', 'layout-option-free']);
+    expect(items.map((i) => i.getAttribute('data-testid'))).toEqual(['layout-option-classic', 'layout-option-free']);
+    expect(items[0]!.textContent).toContain('My layout');
+    expect(items[1]!.textContent).toContain('Free canvas');
     expect(screen.getByTestId('layout-option-classic').getAttribute('aria-checked')).toBe('true');
   });
 
-  it('picking Planner keeps the Classic sizes; Free leaves the Station and remembers Planner', () => {
+  it('Free canvas leaves the Station; My layout brings it back with its sizes', () => {
     render(<LayoutMenu />);
-    fireEvent.click(screen.getByTestId('layout-menu'));
-    fireEvent.click(screen.getByTestId('layout-option-planner'));
-    expect(station().preset).toBe('planner');
-    expect(station().rowFraction).toBe(0.4);
-    expect(station().bottomFractions).toEqual({ 'station-bottom-canvas': 0.55 });
-    expect(screen.getByTestId('layout-menu').getAttribute('data-layout')).toBe('planner');
     fireEvent.click(screen.getByTestId('layout-menu'));
     fireEvent.click(screen.getByTestId('layout-option-free'));
     expect(state().layoutMode).toBe('canvas');
-    expect(station().preset).toBe('planner');
+    fireEvent.click(screen.getByTestId('layout-menu'));
+    fireEvent.click(screen.getByTestId('layout-option-classic'));
+    expect(state().layoutMode).toBe('station');
+    expect(station().rowFraction).toBe(0.4);
+    expect(station().bottomFractions).toEqual({ 'station-bottom-canvas': 0.55 });
   });
 
-  it('from Free, a Station layout opens the Station with that preset', () => {
-    useBoardStore.setState({ board: board('canvas') });
+  it('Reset: Timer, Clock and Todos on top, the Calendar the full width below, the rest hidden (F9)', () => {
     render(<LayoutMenu />);
-    expect(screen.getByTestId('layout-menu').getAttribute('data-layout')).toBe('free');
     fireEvent.click(screen.getByTestId('layout-menu'));
-    fireEvent.click(screen.getByTestId('layout-option-grid'));
-    expect(state().layoutMode).toBe('station');
-    expect(station().preset).toBe('grid');
+    fireEvent.click(screen.getByTestId('layout-reset-mine'));
+    expect(cfg('mother-pomo').stationSlot).toBe('top-left');
+    expect(cfg('mother-clock').stationSlot).toBe('top-center');
+    expect(cfg('mother-todo').stationSlot).toBe('top-right-pre');
+    expect(cfg('mother-calendar').stationSlot).toBe('top-right-lower');
+    expect(cfg('mother-habit').stationHidden).toBe(true);
+    expect(cfg('mother-analytics').stationHidden).toBe(true);
+    expect(cfg('mother-calendar').stationHidden).toBe(false);
+    expect(station().canvasHidden).toBe(true);
+    expect(station().bottomFractions).toBeUndefined();
+    expect(CLASSIC_SLOTS['calendar']).toBe('top-right-lower');
+    expect(CLASSIC_HIDDEN.has('habit')).toBe(true);
   });
 
   it('Ctrl+Shift+L still flips Station and Free', () => {
@@ -84,49 +93,30 @@ describe('The layout menu (Decision 54, F1)', () => {
   });
 });
 
-describe('Every window can be shown in every layout (F2, Decision 58)', () => {
-  it('Grid and Planner offer every toggle, the canvas too', () => {
+describe('Retired presets (Decision 60)', () => {
+  it('a board saved on Grid or Planner opens as My layout, with every toggle', () => {
     for (const preset of ['grid', 'planner']) {
       useBoardStore.setState({ board: board('station', preset) });
+      expect(presetOf(station())).toBe('classic');
       render(<StationToolbar />);
       for (const w of ['Timer', 'Todos', 'Habits', 'Calendar', 'Clock', 'Analytics', 'Canvas']) expect(has(w)).toBe(true);
       cleanup();
     }
   });
 
-  it('in Planner, swapping two windows changes the Planner order and leaves Classic places alone (F4)', () => {
+  it('swapping two windows swaps their places in My layout', () => {
     useBoardStore.setState({ board: board('station', 'planner') });
     useBoardStore.getState().swapMotherSlots('mother-clock', 'mother-calendar');
-    const st = station() as { planner?: { order?: { top: string[]; bottom: string[] } } };
-    expect(st.planner?.order?.top.slice(0, 2)).toEqual(['pomo', 'calendar']);
-    expect(st.planner?.order?.bottom[0]).toBe('clock');
-    const cfg = (id: string) => (state().nodes.find((n) => n.id === id)!.config as { stationSlot?: string }).stationSlot;
-    expect(cfg('mother-clock')).toBe('top-right-lower');
-    expect(cfg('mother-calendar')).toBe('top-right-upper');
+    expect(cfg('mother-clock').stationSlot).toBe('top-right-upper');
+    expect(cfg('mother-calendar').stationSlot).toBe('top-right-lower');
   });
 
-  it('in Free every window has its toggle, whatever the Station preset', () => {
-    useBoardStore.setState({ board: board('canvas', 'planner') });
-    render(<StationToolbar />);
-    expect(has('Analytics')).toBe(true);
-  });
-});
-
-describe('Layout names (shared with the CLI)', () => {
-  it('Planner starts with Timer, Clock, Todos and Habits over a full-width Calendar; other windows join the bottom row', () => {
-    expect(ROWS_PRESETS.planner.top).toEqual(['pomo', 'clock', 'todo', 'habit']);
-    expect(ROWS_PRESETS.planner.bottom).toEqual(['calendar']);
-    expect(presetRows('planner').bottom).toEqual(['calendar', 'analytics', 'term', 'canvas']);
-    expect(presetKinds('planner')).toBeNull();
-    expect(presetKinds('classic')).toBeNull();
-  });
-
-  it('an unknown saved preset opens as Classic; old CLI words still work', () => {
-    expect(presetOf({ rowFraction: 0.4, columnFractions: [], rightColumnSplit: 0.6, preset: 'masonry' as never })).toBe('classic');
+  it('the CLI words: classic, mine, station, canvas; grid and planner are refused', () => {
     expect(layoutChoiceOf('canvas', undefined)).toBe('free');
-    expect(parseLayoutChoice('station', 'grid')).toBe('grid');
-    expect(parseLayoutChoice('canvas', 'grid')).toBe('free');
-    expect(parseLayoutChoice('Planner', 'classic')).toBe('planner');
-    expect(parseLayoutChoice('masonry', 'classic')).toBeNull();
+    expect(parseLayoutChoice('station', 'classic')).toBe('classic');
+    expect(parseLayoutChoice('mine', 'classic')).toBe('classic');
+    expect(parseLayoutChoice('canvas', 'classic')).toBe('free');
+    expect(parseLayoutChoice('Planner', 'classic')).toBeNull();
+    expect(parseLayoutChoice('grid', 'classic')).toBeNull();
   });
 });

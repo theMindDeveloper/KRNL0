@@ -17,8 +17,9 @@
  * treated as a layer too, with combined master×layer volume applied via
  * the YT IFrame API.
  *
- * Visual design: locked to the "Particle Field.html" reference (deep-purple
- * shell #090811, per-preset accent colour, JetBrains Mono).
+ * Visual design: the "Particle Field.html" reference, in KRNL0's own colours
+ * (Decision 59): a warm dark shell like the app's dark paper, softer sound
+ * colours, no purple chrome, and no text under 9.5 px.
  */
 
 import { LineGlyph } from '../ui/LineGlyph';
@@ -61,13 +62,13 @@ interface Preset {
 }
 
 const PRESETS: readonly Preset[] = [
-  { id: 'dark',  name: 'Dark',    sub: 'low-freq drone',  col: '#a78bfa', rgb: '167,139,250', mode: 'orbs'    },
-  { id: 'rain',  name: 'Rain',    sub: 'gentle rainfall', col: '#60a5fa', rgb: '96,165,250',  mode: 'fall'    },
-  { id: 'fire',  name: 'Fire',    sub: 'crackling fire',  col: '#fb923c', rgb: '251,146,60',  mode: 'rise'    },
+  { id: 'dark',  name: 'Dark',    sub: 'low-freq drone',  col: '#aaa0dc', rgb: '170,160,220', mode: 'orbs'    },
+  { id: 'rain',  name: 'Rain',    sub: 'gentle rainfall', col: '#86b4e0', rgb: '134,180,224', mode: 'fall'    },
+  { id: 'fire',  name: 'Fire',    sub: 'crackling fire',  col: '#ee8466', rgb: '238,132,102', mode: 'rise'    },
   { id: 'synth', name: 'Synth',   sub: 'ambient synth',   col: '#c9f158', rgb: '201,241,88',  mode: 'orbit'   },
-  { id: 'white', name: 'White',   sub: 'soft white',      col: '#e2e8f0', rgb: '226,232,240', mode: 'scatter' },
-  { id: 'brown', name: 'Brown',   sub: 'brown noise',     col: '#f59e0b', rgb: '245,158,11',  mode: 'drift'   },
-  { id: 'yt',    name: 'YouTube', sub: 'video stream',    col: '#f43f5e', rgb: '244,63,94',   mode: 'orbit'   },
+  { id: 'white', name: 'White',   sub: 'soft white',      col: '#e8e2d4', rgb: '232,226,212', mode: 'scatter' },
+  { id: 'brown', name: 'Brown',   sub: 'brown noise',     col: '#d9a55a', rgb: '217,165,90',  mode: 'drift'   },
+  { id: 'yt',    name: 'YouTube', sub: 'video stream',    col: '#e8697a', rgb: '232,105,122', mode: 'orbit'   },
 ];
 
 const PRESET_BY_ID: Record<LayerId, Preset> = PRESETS.reduce((acc, p) => {
@@ -338,6 +339,7 @@ interface MiniSliderProps {
   compact?: boolean;
 }
 function MiniSlider({ value, min, max, step, color, rgb, onChange, testId, compact = false }: MiniSliderProps) {
+  void rgb;
   const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
   const ref = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(false);
@@ -388,7 +390,7 @@ function MiniSlider({ value, min, max, step, color, rgb, onChange, testId, compa
     >
       <div style={{
         position: 'relative', width: '100%', height: compact ? 3 : 4,
-        background: 'rgba(255,255,255,.1)', borderRadius: 2,
+        background: 'var(--paper-3)', borderRadius: 2,
       }}>
         <div style={{
           position: 'absolute', top: 0, bottom: 0, left: 0,
@@ -401,9 +403,10 @@ function MiniSlider({ value, min, max, step, color, rgb, onChange, testId, compa
           left: `${pct * 100}%`,
           transform: `translate(-50%, -50%) scale(${active ? 1.25 : 1})`,
           width: thumbSize, height: thumbSize, borderRadius: '50%',
-          background: color,
-          boxShadow: `0 0 0 2px rgba(${rgb},.35), 0 1px 3px rgba(0,0,0,.5)`,
-          border: '1px solid rgba(255,255,255,.22)',
+          // Decision 60 — the app's thumb: a light knob, no coloured glow.
+          background: 'var(--ink)',
+          boxShadow: '0 1px 3px rgba(0,0,0,.35)',
+          border: 'none',
           pointerEvents: 'none',
           transition: 'transform .12s ease',
         }} />
@@ -553,8 +556,8 @@ export function AmbientRadio() {
       const idsToDraw: LayerId[] = active.size > 0 ? Array.from(active) : [focused];
 
       const bg = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-      bg.addColorStop(0, '#090811');
-      bg.addColorStop(1, '#0f0c1c');
+      bg.addColorStop(0, '#14120f');
+      bg.addColorStop(1, '#1a1814');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
@@ -676,7 +679,7 @@ export function AmbientRadio() {
       // VU bars — use focused preset colour
       vuPhaseRef.current += .1;
       const phase = vuPhaseRef.current;
-      const focusedCol = PRESET_BY_ID[focused]?.col ?? '#a78bfa';
+      const focusedCol = PRESET_BY_ID[focused]?.col ?? '#aaa0dc';
       const bars = vuRef.current?.querySelectorAll('span');
       if (bars) {
         bars.forEach((b, i) => {
@@ -1072,7 +1075,8 @@ export function AmbientRadio() {
     top: pos.y,
     width: WIDTH,
     zIndex: Z,
-    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+    // Decision 60 — the app's reading font; numbers stay mono where shown.
+    fontFamily: "var(--font-read, var(--font-sans))",
     transition: isDragging
       ? 'transform .12s ease'
       : 'left .42s cubic-bezier(0.22, 1, 0.36, 1), top .42s cubic-bezier(0.22, 1, 0.36, 1), transform .18s ease, box-shadow .25s ease',
@@ -1082,35 +1086,38 @@ export function AmbientRadio() {
   };
 
   const node: CSSProperties = {
-    background: '#090811',
-    border: '1px solid #19162a',
-    borderRadius: 10,
+    // Decision 60 — a window of the app: its paper, its line, its corner.
+    background: 'var(--paper)',
+    border: '1px solid var(--paper-3)',
+    borderRadius: 14,
+    color: 'var(--ink)',
     boxShadow: isDragging
-      ? '0 8px 24px rgba(10,8,17,.55), 0 24px 64px rgba(10,8,17,.85), 0 0 0 1px rgba(167,139,250,.18)'
-      : '0 2px 6px rgba(10,8,17,.4), 0 12px 40px rgba(10,8,17,.7), 0 0 0 1px rgba(167,139,250,.05)',
+      ? '0 10px 28px rgba(0,0,0,.4), 0 28px 64px rgba(0,0,0,.45)'
+      : '0 2px 6px rgba(0,0,0,.25), 0 18px 44px rgba(0,0,0,.4)',
     overflow: 'hidden',
     position: 'relative',
     transition: 'box-shadow .25s ease',
   };
 
   const header: CSSProperties = {
+    // The standard window header (window-frame.md): dot, name, one fact, icons.
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
-    padding: '7px 10px 6px',
-    borderBottom: '1px solid #19162a',
-    background: '#0f0c1c',
+    gap: 8,
+    height: 40,
+    boxSizing: 'border-box',
+    padding: '0 8px 0 14px',
     cursor: isDragging ? 'grabbing' : 'grab',
   };
 
   const headerBtn = (active: boolean): CSSProperties => ({
-    background: active ? `rgba(${focusedPreset.rgb},.18)` : 'none',
+    background: active ? 'var(--paper-3)' : 'transparent',
     border: 0,
-    color: active ? focusedPreset.col : 'rgba(196,181,253,.72)',
+    color: active ? 'var(--ink)' : 'var(--ink-3)',
     cursor: 'pointer',
-    width: 18, height: 18,
+    width: 26, height: 26,
     display: 'grid', placeItems: 'center',
-    borderRadius: 3,
+    borderRadius: 7,
     fontSize: 11, lineHeight: 1, padding: 0,
     transition: 'background .15s, color .15s',
   });
@@ -1121,14 +1128,14 @@ export function AmbientRadio() {
     transform: 'translateY(-50%)',
     width: PEEK_PX,
     height: 48,
-    background: '#0f0c1c',
-    border: '1px solid rgba(167,139,250,.3)',
+    background: 'var(--paper)',
+    border: '1px solid var(--paper-3)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    fontSize: 7,
-    color: 'rgba(167,139,250,.6)',
+    fontSize: 9,
+    color: 'var(--ink-3)',
     zIndex: 10,
   };
 
@@ -1170,45 +1177,17 @@ export function AmbientRadio() {
           {/* Header */}
           <div data-testid="ambient-radio-handle" style={header} onMouseDown={onHeaderMouseDown}>
             <span style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: focusedPreset.col,
-              boxShadow: 'none',
+              width: 8, height: 8, borderRadius: '50%',
+              background: playing ? focusedPreset.col : 'var(--ink-4)',
               flexShrink: 0,
-              transition: 'background .2s, box-shadow .2s',
+              transition: 'background .2s',
             }} />
-            <span style={{
-              fontSize: 11, fontWeight: 500, color: '#c4b5fd',
-              letterSpacing: '0.04em', textTransform: 'uppercase',
-            }}>ambient.radio</span>
-            <span style={{ fontSize: 11, color: 'rgba(196,181,253,.62)', marginLeft: 2 }}>v03</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Radio</span>
+            <span data-testid="ambient-radio-now" style={{ fontSize: 12.5, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+              {activeLayers.size === 0 ? (playing ? focusedPreset.name : 'Off') : activeIdsArr.map((id) => PRESET_BY_ID[id]?.name ?? '').join(' + ')}
+            </span>
 
             {/* Active-layers badge */}
-            {activeLayers.size >= 2 && (
-              <span
-                data-testid="ambient-radio-layer-badge"
-                style={{
-                  marginLeft: 6,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '1px 5px 1px 4px',
-                  fontSize: 7.5,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  borderRadius: 100,
-                  border: `1px solid rgba(${focusedPreset.rgb},.35)`,
-                  background: `rgba(${focusedPreset.rgb},.10)`,
-                  color: focusedPreset.col,
-                }}
-              >
-                <span style={{ display: 'inline-flex', gap: 2 }}>
-                  {activeIdsArr.slice(0, 4).map((id) => (
-                    <span key={id} style={{ width: 5, height: 5, borderRadius: '50%', background: PRESET_BY_ID[id]?.col ?? '#fff' }} />
-                  ))}
-                </span>
-                <span>{activeLayers.size} layers</span>
-              </span>
-            )}
 
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
               <button type="button" data-testid="ambient-radio-gear" title="Settings" onClick={() => setSettingsOpen((o) => !o)} style={headerBtn(settingsOpen)}><SettingsIcon name="settings" size={12} /></button>
@@ -1219,18 +1198,28 @@ export function AmbientRadio() {
           </div>
 
           {/* Canvas — multi-layer particle field */}
-          <div style={{ position: 'relative', height: HEIGHT, overflow: 'hidden' }}>
-            <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} style={{ display: 'block', width: '100%', height: '100%' }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 55%, #090811)', pointerEvents: 'none' }} />
+          {/* Decision 60 — the particles play on a small dark screen set into
+              the window (rounded, inset), like the Clock's face. */}
+          <div style={{ position: 'relative', height: HEIGHT - 28, overflow: 'hidden', margin: '0 10px', borderRadius: 10, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.04)' }}>
+            <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} style={{ display: 'block', width: '100%', height: HEIGHT, marginTop: -14 }} />
+            {/* Decision 60 — the screen is seen through a fine speaker grille
+                in the window's own colour, with a soft inner shade: the
+                particles glow through the holes instead of floating on a slab. */}
+            <div aria-hidden data-testid="ambient-radio-grille" style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
+              backgroundImage: 'radial-gradient(circle, transparent 1.05px, var(--paper) 1.4px)',
+              backgroundSize: '3.5px 3.5px',
+              opacity: 0.62,
+              boxShadow: 'inset 0 0 22px 4px rgba(0,0,0,.45)',
+            }} />
             <div style={{
-              position: 'absolute', top: 10, left: 12, right: 60,
-              display: 'flex', flexWrap: 'wrap', gap: 6,
-              fontSize: 11, fontWeight: 600, letterSpacing: '0.12em',
-              textTransform: 'uppercase', zIndex: 2, pointerEvents: 'none',
+              position: 'absolute', top: 9, left: 12, right: 56,
+              display: 'flex', flexWrap: 'wrap', gap: '2px 8px',
+              fontSize: 12.5, fontWeight: 600, zIndex: 2, pointerEvents: 'none',
             }}>
               {labelFragments.slice(0, 4).map((f, i) => (
-                <span key={`${f.id}-${i}`} style={{ color: f.col, textShadow: '0 0 12px rgba(0,0,0,.8)' }}>
-                  {f.name}
+                <span key={`${f.id}-${i}`} style={{ color: f.col }}>
+                  {f.name.charAt(0) + f.name.slice(1).toLowerCase()}
                 </span>
               ))}
               {labelFragments.length > 4 && (
@@ -1238,13 +1227,13 @@ export function AmbientRadio() {
               )}
             </div>
             {activeLayers.size === 0 && (
-              <div style={{ position: 'absolute', top: 26, left: 12, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.78, color: focusedPreset.col, zIndex: 2, pointerEvents: 'none' }}>
-                tap a chip to layer
+              <div style={{ position: 'absolute', top: 28, left: 12, fontSize: 12, color: 'rgba(244,239,226,.6)', zIndex: 2, pointerEvents: 'none' }}>
+                Tap a sound below to play it
               </div>
             )}
             <div
               ref={vuRef}
-              style={{ position: 'absolute', bottom: 18, right: 10, display: 'flex', gap: 2, alignItems: 'flex-end', zIndex: 2 }}
+              style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 2, alignItems: 'flex-end', zIndex: 2 }}
             >
               {Array.from({ length: 9 }, (_, i) => (
                 <span key={i} style={{ width: 3, borderRadius: 1.5, height: 4, background: 'rgba(255,255,255,.15)', transition: 'height .08s ease' }} />
@@ -1256,10 +1245,8 @@ export function AmbientRadio() {
           {isYtFocused && !settingsOpen && (
             <>
               <div style={{
-                display: 'flex', gap: 6, alignItems: 'center',
-                padding: '7px 10px',
-                borderBottom: favsOpen ? '1px solid rgba(244,63,94,.15)' : '1px solid rgba(255,255,255,.05)',
-                background: 'rgba(244,63,94,.03)',
+                display: 'flex', gap: 5, alignItems: 'center',
+                padding: '10px 10px 4px',
               }}>
                 <input
                   data-testid="ambient-radio-yt-url"
@@ -1270,13 +1257,15 @@ export function AmbientRadio() {
                   onKeyDown={(e) => { if (e.key === 'Enter') onYtLoad(); }}
                   style={{
                     flex: 1, minWidth: 0,
-                    background: 'rgba(255,255,255,.06)',
-                    border: `1px solid rgba(244,63,94,${ytError ? '.7' : '.25'})`,
-                    borderRadius: 5,
-                    color: 'rgba(255,255,255,.8)',
+                    background: 'var(--paper-2)',
+                    border: `1px solid ${ytError ? 'var(--rust)' : 'var(--paper-3)'}`,
+                    borderRadius: 8,
+                    color: 'var(--ink)',
                     fontFamily: 'inherit',
-                    fontSize: 11,
-                    padding: '5px 7px',
+                    fontSize: 12.5,
+                    height: 30,
+                    boxSizing: 'border-box',
+                    padding: '0 9px',
                     outline: 'none',
                   }}
                 />
@@ -1288,13 +1277,14 @@ export function AmbientRadio() {
                   onClick={toggleStar}
                   disabled={!currentFavId}
                   style={{
-                    background: isStarred ? 'rgba(244,63,94,.18)' : 'rgba(255,255,255,.04)',
-                    border: `1px solid rgba(244,63,94,${isStarred ? '.55' : '.2'})`,
-                    borderRadius: 5,
-                    color: isStarred ? '#f43f5e' : (currentFavId ? 'rgba(244,63,94,.55)' : 'rgba(255,255,255,.2)'),
-                    fontSize: 11,
+                    background: 'var(--paper-2)',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: isStarred ? 'var(--acid-ink, var(--acid))' : (currentFavId ? 'var(--ink-2)' : 'var(--ink-4)'),
+                    fontSize: 12,
                     lineHeight: 1,
-                    padding: '4px 7px',
+                    height: 30,
+                    padding: '0 9px',
                     cursor: currentFavId ? 'pointer' : 'not-allowed',
                     fontFamily: 'inherit',
                     flexShrink: 0,
@@ -1308,12 +1298,13 @@ export function AmbientRadio() {
                   title={`${ytFavs.length} saved`}
                   onClick={() => setFavsOpen((o) => !o)}
                   style={{
-                    background: favsOpen ? 'rgba(244,63,94,.18)' : 'rgba(255,255,255,.04)',
-                    border: `1px solid rgba(244,63,94,${favsOpen ? '.55' : '.2'})`,
-                    borderRadius: 5,
-                    color: favsOpen ? '#f43f5e' : 'rgba(244,63,94,.55)',
-                    fontSize: 11,
-                    padding: '5px 7px',
+                    background: favsOpen ? 'var(--paper-3)' : 'var(--paper-2)',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: 'var(--ink-2)',
+                    fontSize: 12,
+                    height: 30,
+                    padding: '0 9px',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     flexShrink: 0,
@@ -1326,12 +1317,14 @@ export function AmbientRadio() {
                   type="button"
                   onClick={onYtLoad}
                   style={{
-                    background: 'rgba(244,63,94,.12)',
-                    border: '1px solid rgba(244,63,94,.3)',
-                    borderRadius: 5,
-                    color: '#f43f5e',
-                    fontSize: 11,
-                    padding: '5px 10px',
+                    background: 'var(--paper-2)',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: 'var(--ink)',
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    height: 30,
+                    padding: '0 11px',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     letterSpacing: '0.04em',
@@ -1346,14 +1339,12 @@ export function AmbientRadio() {
                 <div
                   data-testid="ambient-radio-yt-favs"
                   style={{
-                    borderBottom: '1px solid rgba(255,255,255,.05)',
-                    background: 'rgba(244,63,94,.02)',
                     padding: ytFavs.length === 0 ? '10px' : '4px 6px',
                   }}
                 >
                   {ytFavs.length === 0 ? (
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: '0.04em', textAlign: 'center' }}>
-                      no saved videos — load one, then tap the star
+                    <div style={{ fontSize: 12.5, color: 'var(--ink-3)', textAlign: 'center' }}>
+                      No saved videos yet — play one, then tap the star.
                     </div>
                   ) : ytFavs.map((fav) => {
                     const playing_ = currentVidId === fav.id;
@@ -1365,28 +1356,29 @@ export function AmbientRadio() {
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 6,
-                          padding: '4px 6px',
-                          borderRadius: 4,
+                          gap: 8,
+                          padding: '0 6px',
+                          height: 30,
+                          borderRadius: 8,
                           cursor: 'pointer',
                           // Active = a tinted fill, never a left-edge bar.
-                          background: playing_ ? 'rgba(244,63,94,.16)' : 'transparent',
+                          background: playing_ ? 'var(--paper-2)' : 'transparent',
                           transition: 'background .12s',
                         }}
-                        onMouseEnter={(e) => { if (!playing_) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,.04)'; }}
+                        onMouseEnter={(e) => { if (!playing_) (e.currentTarget as HTMLDivElement).style.background = 'var(--paper-2)'; }}
                         onMouseLeave={(e) => { if (!playing_) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                       >
                         <span style={{
                           fontSize: 11,
-                          color: playing_ ? '#f43f5e' : 'rgba(244,63,94,.7)',
+                          color: playing_ ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)',
                           flexShrink: 0,
                         }}><LineGlyph name={playing_ ? 'play' : 'note'} size={11} /></span>
                         <span
                           title={fav.title}
                           style={{
                             flex: 1, minWidth: 0,
-                            fontSize: 11,
-                            color: playing_ ? '#fff' : 'rgba(255,255,255,.75)',
+                            fontSize: 12.5,
+                            color: playing_ ? 'var(--ink)' : 'var(--ink-2)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -1399,14 +1391,14 @@ export function AmbientRadio() {
                           onClick={(e) => { e.stopPropagation(); removeFav(fav.id); }}
                           style={{
                             background: 'none', border: 0,
-                            color: 'rgba(255,255,255,.35)',
-                            cursor: 'pointer', fontSize: 12, lineHeight: 1,
-                            padding: 0, width: 14, height: 14,
+                            color: 'var(--ink-3)',
+                            cursor: 'pointer', lineHeight: 0,
+                            padding: 0, width: 22, height: 22,
                             display: 'grid', placeItems: 'center',
-                            borderRadius: 2,
+                            borderRadius: 6,
                             flexShrink: 0,
                           }}
-                        >×</button>
+                        ><LineGlyph name="close" size={11} /></button>
                       </div>
                     );
                   })}
@@ -1420,32 +1412,29 @@ export function AmbientRadio() {
           {settingsOpen ? (
             <PagedView style={{ maxHeight: 280 }} itemSelector={"[data-testid='ambient-radio-settings'] > *"}>
             <div data-testid="ambient-radio-settings" style={{
-              padding: '8px 10px 10px',
-              borderBottom: '1px solid rgba(255,255,255,.05)',
-              background: 'rgba(255,255,255,.015)',
+              padding: '10px 12px 12px',
             }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase',
-                color: focusedPreset.col, marginBottom: 8,
+                fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 10,
               }}>
-                <span>{focusedPreset.name} settings</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: focusedPreset.col }} />{focusedPreset.name}</span>
                 {(curSettings.length > 0 || focusedId === 'synth') && (
                   <button
                     type="button"
                     onClick={resetSettings}
                     style={{
-                      background: 'none', border: '1px solid rgba(255,255,255,.1)',
-                      color: 'rgba(255,255,255,.4)', fontFamily: 'inherit',
-                      fontSize: 7, padding: '2px 6px', borderRadius: 3,
-                      cursor: 'pointer', letterSpacing: '0.08em',
+                      background: 'var(--paper-2)', border: 'none',
+                      color: 'var(--ink-2)', fontFamily: 'inherit',
+                      fontSize: 12, fontWeight: 500, height: 24, padding: '0 9px', borderRadius: 7,
+                      cursor: 'pointer',
                     }}
-                  >reset</button>
+                  >Reset</button>
                 )}
               </div>
               {curSettings.length === 0 && focusedId !== 'synth' ? (
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.58)', padding: '6px 0' }}>
-                  no settings for this preset
+                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', padding: '6px 0' }}>
+                  This sound has nothing to set.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1453,9 +1442,9 @@ export function AmbientRadio() {
                     const v = curParams[s.key] ?? s.min;
                     return (
                       <div key={s.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7.5, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                          <span style={{ color: 'rgba(255,255,255,.5)' }}>{s.label}</span>
-                          <span style={{ color: focusedPreset.col, opacity: 0.85 }}>{
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                          <span style={{ color: 'var(--ink-2)' }}>{s.label.charAt(0) + s.label.slice(1).toLowerCase()}</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums' }}>{
                             s.step >= 1 ? Math.round(v).toString() : v.toFixed(2)
                           }</span>
                         </div>
@@ -1476,7 +1465,7 @@ export function AmbientRadio() {
                   {focusedId === 'synth' && (
                     <>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                        <span style={{ fontSize: 7.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)' }}>Polyphonic</span>
+                        <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>Several notes at once</span>
                         <button
                           type="button"
                           data-testid="ambient-radio-setting-polyphonic"
@@ -1484,8 +1473,8 @@ export function AmbientRadio() {
                           style={{
                             width: 28, height: 14,
                             borderRadius: 7,
-                            border: `1px solid rgba(${focusedPreset.rgb},${(curParams.polyphonic ?? 0) > 0.5 ? '.6' : '.25'})`,
-                            background: (curParams.polyphonic ?? 0) > 0.5 ? `rgba(${focusedPreset.rgb},.3)` : 'rgba(255,255,255,.06)',
+                            border: 'none',
+                            background: (curParams.polyphonic ?? 0) > 0.5 ? 'var(--acid)' : 'var(--paper-3)',
                             cursor: 'pointer', position: 'relative', padding: 0,
                             transition: 'background .15s, border-color .15s',
                           }}
@@ -1493,16 +1482,15 @@ export function AmbientRadio() {
                           <span style={{
                             position: 'absolute', top: 1, left: (curParams.polyphonic ?? 0) > 0.5 ? 14 : 1,
                             width: 10, height: 10, borderRadius: '50%',
-                            background: (curParams.polyphonic ?? 0) > 0.5 ? focusedPreset.col : 'rgba(255,255,255,.3)',
+                            background: (curParams.polyphonic ?? 0) > 0.5 ? 'var(--ink-on-bright, #111)' : 'var(--ink-3)',
                             transition: 'left .18s cubic-bezier(.4,0,.2,1)',
-                            boxShadow: (curParams.polyphonic ?? 0) > 0.5 ? `0 0 6px rgba(${focusedPreset.rgb},.7)` : 'none',
                           }} />
                         </button>
                       </div>
 
                       <div style={{ marginTop: 6 }}>
-                        <div style={{ fontSize: 7.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 4 }}>Chords</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                        <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 6 }}>Chords</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                           {CHORD_ORDER.map((name) => {
                             const key = `chord_${name}`;
                             const on = (curParams[key] ?? 0) > 0.5;
@@ -1514,16 +1502,16 @@ export function AmbientRadio() {
                                 onClick={() => onSettingChange(key, on ? 0 : 1)}
                                 style={{
                                   fontFamily: 'inherit',
-                                  fontSize: 11,
-                                  letterSpacing: '0.04em',
-                                  padding: '2px 7px',
-                                  border: `1px solid ${on ? focusedPreset.col : 'rgba(255,255,255,.12)'}`,
-                                  background: on ? `rgba(${focusedPreset.rgb},.16)` : 'rgba(255,255,255,.04)',
-                                  color: on ? focusedPreset.col : 'rgba(255,255,255,.38)',
-                                  borderRadius: 100,
+                                  fontSize: 12,
+                                  fontWeight: on ? 600 : 500,
+                                  height: 24,
+                                  padding: '0 9px',
+                                  border: 'none',
+                                  background: on ? `color-mix(in srgb, ${focusedPreset.col} 22%, var(--paper-2))` : 'var(--paper-2)',
+                                  color: on ? 'var(--ink)' : 'var(--ink-3)',
+                                  borderRadius: 7,
                                   cursor: 'pointer',
-                                  transition: 'all .12s',
-                                  boxShadow: on ? `0 0 6px rgba(${focusedPreset.rgb},.22)` : 'none',
+                                  transition: 'background .12s, color .12s',
                                 }}
                               >
                                 {CHORD_LABELS[name] ?? name}
@@ -1541,11 +1529,11 @@ export function AmbientRadio() {
           ) : (
             <>
               {/* Preset chips — tap to layer */}
-              <div style={{ padding: '8px 10px 4px' }}>
-                <div style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.58)', marginBottom: 5 }}>
-                  tap to layer
+              <div style={{ padding: '10px 10px 6px' }}>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 6, paddingLeft: 2 }}>
+                  Sounds — tap to add or remove
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                   {PRESETS.map((s) => {
                     const on = activeLayers.has(s.id);
                     const isFocused = s.id === focusedId;
@@ -1555,29 +1543,29 @@ export function AmbientRadio() {
                         type="button"
                         data-testid={`ambient-radio-preset-${s.id}`}
                         onClick={() => toggleLayer(s.id)}
+                        aria-pressed={on}
                         style={{
                           fontFamily: 'inherit',
-                          fontSize: 11,
-                          letterSpacing: '0.06em',
-                          textTransform: 'uppercase',
-                          padding: '3px 9px 3px 7px',
+                          fontSize: 12.5,
+                          fontWeight: on ? 600 : 500,
+                          height: 28,
+                          padding: '0 10px 0 8px',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: 4,
-                          border: `1px solid ${on ? s.col : (isFocused ? `rgba(${s.rgb},.35)` : 'rgba(255,255,255,.1)')}`,
-                          background: on ? `rgba(${s.rgb},.18)` : 'rgba(255,255,255,.04)',
-                          color: on ? s.col : 'rgba(255,255,255,.66)',
-                          borderRadius: 100,
+                          gap: 6,
+                          border: 'none',
+                          boxShadow: isFocused && !on ? `inset 0 0 0 1px color-mix(in srgb, ${s.col} 45%, transparent)` : 'none',
+                          background: on ? `color-mix(in srgb, ${s.col} 20%, var(--paper-2))` : 'var(--paper-2)',
+                          color: on ? 'var(--ink)' : 'var(--ink-2)',
+                          borderRadius: 8,
                           cursor: 'pointer',
-                          transition: 'all .12s',
-                          boxShadow: on ? `0 0 8px rgba(${s.rgb},.28)` : 'none',
+                          transition: 'background .12s, color .12s',
                         }}
                       >
                         <span style={{
-                          width: 5, height: 5, borderRadius: '50%',
-                          background: on ? s.col : `rgba(${s.rgb},.4)`,
-                          boxShadow: on ? `0 0 4px ${s.col}` : 'none',
-                          transition: 'all .12s',
+                          width: 7, height: 7, borderRadius: '50%',
+                          background: on ? s.col : `color-mix(in srgb, ${s.col} 45%, transparent)`,
+                          transition: 'background .12s',
                         }} />
                         {s.name}
                       </button>
@@ -1590,8 +1578,7 @@ export function AmbientRadio() {
               {activeLayers.size > 0 && (
                 <PagedView style={{ maxHeight: 150 }} itemSelector={"[data-testid='ambient-radio-mixer'] > *"}>
                 <div data-testid="ambient-radio-mixer" style={{
-                  padding: '4px 8px 6px',
-                  borderTop: '1px solid rgba(255,255,255,.03)',
+                  padding: '2px 8px 6px',
                 }}>
                   {activeIdsArr.map((id) => {
                     const p = PRESET_BY_ID[id];
@@ -1605,20 +1592,20 @@ export function AmbientRadio() {
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 6,
-                          padding: '3px 5px 3px 4px',
+                          gap: 8,
+                          padding: '0 6px',
+                          height: 30,
                           marginBottom: 2,
-                          background: isFocused ? `rgba(${p.rgb},.14)` : 'transparent',
-                          borderRadius: 3,
+                          background: isFocused ? 'var(--paper-2)' : 'transparent',
+                          borderRadius: 8,
                           cursor: 'pointer',
                           transition: 'background .12s',
                         }}
                       >
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: p.col, flexShrink: 0 }} />
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: p.col, flexShrink: 0 }} />
                         <span style={{
-                          fontSize: 11, color: p.col,
-                          textTransform: 'uppercase', letterSpacing: '0.06em',
-                          minWidth: 40, flexShrink: 0,
+                          fontSize: 12.5, fontWeight: 600, color: 'var(--ink)',
+                          minWidth: 52, flexShrink: 0,
                         }}>{p.name}</span>
                         <MiniSlider
                           value={vol}
@@ -1628,21 +1615,21 @@ export function AmbientRadio() {
                           onChange={(v) => onLayerVolumeChange(id, v)}
                           testId={`ambient-radio-layer-vol-${id}`}
                         />
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', minWidth: 18, textAlign: 'right', flexShrink: 0 }}>{vol}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', minWidth: 20, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{vol}</span>
                         <button
                           type="button"
                           data-testid={`ambient-radio-layer-remove-${id}`}
                           aria-label={`Remove ${p.name}`}
                           onClick={(e) => { e.stopPropagation(); toggleLayer(id); }}
                           style={{
-                            background: 'none', border: 0, color: 'rgba(255,255,255,.35)',
-                            cursor: 'pointer', fontSize: 12, lineHeight: 1,
-                            padding: 0, width: 14, height: 14,
+                            background: 'none', border: 0, color: 'var(--ink-3)',
+                            cursor: 'pointer', lineHeight: 0,
+                            padding: 0, width: 22, height: 22,
                             display: 'grid', placeItems: 'center',
-                            borderRadius: 2,
+                            borderRadius: 6,
                             flexShrink: 0,
                           }}
-                        >×</button>
+                        ><LineGlyph name="close" size={11} /></button>
                       </div>
                     );
                   })}
@@ -1653,37 +1640,40 @@ export function AmbientRadio() {
           )}
 
           {/* Footer: master play disc + master volume */}
-          <div style={{ padding: '8px 10px 10px', display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+          <div style={{ padding: '8px 12px 12px', display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid var(--paper-3)', marginTop: 4 }}>
             <button
               type="button"
               data-testid="ambient-radio-play"
               aria-label={playing ? 'Pause' : 'Play'}
               onClick={togglePlay}
               style={{
-                width: 26, height: 26,
+                // Decision 60 — the app's primary button: play / pause you can read.
+                width: 34, height: 34,
                 borderRadius: '50%',
-                border: `1px solid rgba(${focusedPreset.rgb},${playing ? '.55' : '.25'})`,
-                background: playing
-                  ? `radial-gradient(circle at 30% 30%, rgba(255,255,255,.35), ${focusedPreset.col} 70%)`
-                  : `radial-gradient(circle at 30% 30%, rgba(${focusedPreset.rgb},.35), rgba(${focusedPreset.rgb},.08) 75%)`,
-                boxShadow: playing
-                  ? `0 0 12px rgba(${focusedPreset.rgb},.55), inset 0 0 6px rgba(0,0,0,.25)`
-                  : `inset 0 1px 2px rgba(0,0,0,.35)`,
+                border: 'none',
+                background: playing ? 'var(--acid)' : 'var(--paper-2)',
+                color: playing ? 'var(--ink-on-bright, #111)' : 'var(--ink)',
+                display: 'grid', placeItems: 'center',
                 cursor: 'pointer',
                 flexShrink: 0,
                 padding: 0,
-                transition: 'background .18s ease, box-shadow .18s ease, transform .12s ease',
+                transition: 'background .15s ease, transform .1s ease',
               }}
-            />
+            >
+              {playing
+                ? <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor" /><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor" /></svg>
+                : <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden><path d="M8 5.5v13l10-6.5z" fill="currentColor" /></svg>}
+            </button>
 
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: 'var(--ink-3)', flexShrink: 0 }}><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16.5 8.5a5 5 0 0 1 0 7" /></svg>
             <MiniSlider
               value={volume}
               min={0} max={100} step={1}
-              color={focusedPreset.col} rgb={focusedPreset.rgb}
+              color="var(--ink-2)" rgb={focusedPreset.rgb}
               onChange={onVolumeChange}
               testId="ambient-radio-volume"
             />
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,.62)', minWidth: 22, textAlign: 'right', flexShrink: 0 }}>{volume}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', minWidth: 22, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{volume}</span>
           </div>
         </div>
       </div>

@@ -12,7 +12,9 @@ import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } fro
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
-import { useBoardStore } from '../../../store/boardStore';
+import { useBoardStore, historyGroup } from '../../../store/boardStore';
+import { effectiveDraft, type PlanDraft, type PlanOverrides } from '../TodoNode/PlanAddCard';
+import type { TodoState } from '../TodoNode/types';
 import { taskSetPlannedMin, taskSetSchedule } from '../TaskNode/commands';
 import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
 import type { PomoState } from '../PomoNode/types';
@@ -40,7 +42,7 @@ import { routineLanes } from './routineLanes';
 import { dayOnlyPlans } from './dayOnly';
 import { DueFlag } from './DueFlag';
 import { TimeField } from '../../ui/TimeField';
-import { addPlanAt, applyPlanWhen, deletePlanOfTask, deleteRoutine, habitMotherCommand, planWhenOf, putPlanOnDay, toggleTaskDone } from '../../../store/scheduleActions';
+import { addPlanAt, applyPlanWhen, deletePlanOfTask, deleteRoutine, habitMotherCommand, planWhenOf, putPlanOnDay, scheduleTaskAt, setTaskReminder, toggleTaskDone } from '../../../store/scheduleActions';
 import { WhenPopover } from '../../ui/WhenPopover';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
@@ -54,6 +56,8 @@ import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { PagedView } from '../../ui/PagedView';
 import { TaskPopup } from './TaskPopup';
+import { useDismissOutside } from '../../ui/useDismissOutside';
+import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { showPlanGuide } from '../../PlanGuide';
 import { hourWindow, stepHourWindow } from './hourWindow';
 import { useLayoutEffect, type PointerEvent as ReactPointerEvent } from 'react';
@@ -61,6 +65,7 @@ import { EVENT_TEXT, eventLines, eventTitleAndPlace } from './eventText';
 import { parseQuickAdd } from '../../../../shared/quickAdd';
 import { Z } from '../../ui/layers';
 import { MenuIcon } from '../../ui/menuIcons';
+import { HabitIcon, habitIconId } from '../HabitNode/HabitIcon';
 import { RemindPicker } from '../../ui/RemindPicker';
 import { EventCard, type EventDraft } from './EventCard';
 import { screenScale } from './screenScale';
@@ -286,15 +291,16 @@ function CalIcon({ name, size = 11 }: { name: keyof typeof CAL_ICONS; size?: num
  */
 type RailStyle = 'A1' | 'A2' | 'A3' | 'A4';
 const RAIL_STYLE = 'A4' as RailStyle;
-/** Gap from the day's own line to its track. */
-const TRACK_LEFT = (tiny = false): number => (tiny ? 3 : 4);
+/** Gap from the day's own line to its track (Decision 59: tight, the owner
+ *  found the old gaps around the line too wide). */
+const TRACK_LEFT = (tiny = false): number => (tiny ? 2 : 3);
 const TRACK_W = (singleDay: boolean, tiny = false): number => {
   if (RAIL_STYLE === 'A3') return tiny ? 3 : 4;
-  if (RAIL_STYLE === 'A4') return singleDay ? 6 : tiny ? 4 : 5;
+  if (RAIL_STYLE === 'A4') return singleDay ? 5 : tiny ? 3 : 4;
   return singleDay ? 8 : tiny ? 5 : 7;
 };
-/** Plans start 5 px after the track (3 px in a Station-width day). */
-const RAIL_PX = (singleDay: boolean, tiny = false): number => TRACK_LEFT(tiny) + TRACK_W(singleDay, tiny) + (tiny ? 3 : 5);
+/** Plans start 3 px after the track (2 px in a Station-width day). */
+const RAIL_PX = (singleDay: boolean, tiny = false): number => TRACK_LEFT(tiny) + TRACK_W(singleDay, tiny) + (tiny ? 2 : 3);
 
 type HabitScheduleKind = 'weekly' | 'daily';
 
@@ -333,6 +339,21 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       setGridW((prev) => (prev === w ? prev : w));
     });
     ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Decision 59 — the hours' scrollbar narrows only the grid, so the rows
+  // above it (day names, ANY TIME) keep the same room at their right, or
+  // their day lines drift off the grid's (owner, 2026-11-21).
+  const [sbW, setSbW] = useState(0);
+  useEffect(() => {
+    const el = gridBodyRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => { const w = Math.max(0, el.offsetWidth - el.clientWidth); setSbW((p) => (p === w ? p : w)); };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
     return () => ro.disconnect();
   }, []);
 
@@ -431,6 +452,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       setResizeDraft(null);
+      // A press on the edge that did not move changes nothing.
+      if (last.startMinDelta === 0 && last.durationMin === origDurationMin) return;
       const newStartMin = Math.max(0, sliceStartMin + last.startMinDelta);
       const h = Math.floor(newStartMin / 60);
       const m = newStartMin % 60;
@@ -695,7 +718,20 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   }, [dragTaskId]);
   // Right-click menu (shared with the Clock — ContextMenu/scheduleMenus.ts).
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  // Decision 59 — a left click shows what it is (the info card, as on the
+  // Clock and the month); changing it is "Details" (here or right-click).
+  const [infoPopup, setInfoPopup] = useState<{ taskId: string; x: number; y: number; startMs?: number; endMs?: number; task?: ScheduledTask; routine?: { h: Habit; date: string; startMin: number; endMin: number } } | null>(null);
+  const openTaskInfo = (task: ScheduledTask, x: number, y: number) => {
+    // Decision 60 — one card or menu at a time: nothing stacks on another.
+    setCtxMenu(null);
+    setLayerMenu(null);
+    setTaskPopup(null);
+    const startMs = new Date(task.startISO).getTime();
+    setInfoPopup({ taskId: task.id, x, y, startMs, endMs: startMs + task.scheduledDurationMin * 60_000, task });
+  };
   const openItemMenu = (item: LayerItem, x: number, y: number) => {
+    setInfoPopup(null);
+    setTaskPopup(null);
     if (item.kind === 'task') {
       const t = item.task;
       const startMs = new Date(t.startISO).getTime();
@@ -714,7 +750,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   };
   // #203 — what a left click opens: a span's details popup, a task's popup.
   const openItemDetails = (item: LayerItem, x: number, y: number) => {
-    if (item.kind === 'task') setTaskPopup({ task: item.task, x, y });
+    if (item.kind === 'task') openTaskInfo(item.task, x, y);
     else setRealityPopup({ seg: item.seg, x, y });
   };
 
@@ -850,6 +886,118 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     return hit ? { h: hit.h, occ: hit.occ } : null;
   };
   const [routineMove, setRoutineMove] = useState<{ id: string; name: string; date: string; value: string; x: number; y: number } | null>(null);
+  // ── Decision 59 — drag a repeating event like a plan ──────────────────────
+  // Drag it to another time (or another weekday), or pull its bottom / top
+  // edge: the event changes for every week, not just this one (owner,
+  // 2026-11-21). The bands take no pointer events (drops on the hours under
+  // them must still land), so the day column finds the event under the press.
+  const [rtDrag, setRtDrag] = useState<{ id: string; name: string; color: string; fromDay: string; toDay: string; startMin: number; endMin: number } | null>(null);
+  const rtSuppressClick = useRef(false);
+  const RT_EDGE_PX = 6;
+  const routineEdgeAt = (dayYMD: string, e: { clientX: number; clientY: number; currentTarget: HTMLElement }) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scale = screenScale(e.currentTarget);
+    const relY = Math.max(0, e.clientY - rect.top) / scale;
+    const minute = (relY / rowHeight) * 60;
+    const r = routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width));
+    if (!r || r.occ.skipped || (r.occ as RoutineSpan).spill) return null;
+    const topPx = (r.occ.startMin / 60) * rowHeight;
+    const botPx = (r.occ.endMin / 60) * rowHeight;
+    const mode: 'move' | 'top' | 'bottom' = relY >= botPx - RT_EDGE_PX ? 'bottom' : relY <= topPx + RT_EDGE_PX - 1 && botPx - topPx > 3 * RT_EDGE_PX ? 'top' : 'move';
+    return { r, mode, rect, scale };
+  };
+  const onColumnPointerMove = (dayYMD: string, e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.buttons !== 0 || rtDrag) return;
+    const t = e.target as HTMLElement;
+    if (t.closest?.('.cal-block, .cal-habit, button')) { if (e.currentTarget.style.cursor) e.currentTarget.style.cursor = ''; return; }
+    const hit = layers.routines ? routineEdgeAt(dayYMD, e) : null;
+    const cur = !hit ? '' : hit.mode === 'move' ? 'grab' : 'ns-resize';
+    if (e.currentTarget.style.cursor !== cur) e.currentTarget.style.cursor = cur;
+  };
+  const onColumnPointerDown = (dayYMD: string, e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || !layers.routines) return;
+    if ((e.target as HTMLElement).closest?.('.cal-block, .cal-habit, button')) return;
+    const hit = routineEdgeAt(dayYMD, e);
+    if (!hit) return;
+    const { r, mode, scale } = hit;
+    const colW = e.currentTarget.getBoundingClientRect().width;
+    const span = r.occ as RoutineSpan;
+    const len = Math.max(15, span.fullEnd - span.fullStart);
+    const origStart = span.fullStart;
+    const origEnd = origStart + len;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const fromIdx = weekDays.indexOf(dayYMD);
+    const kind = r.h.schedule?.kind ?? 'daily';
+    let moved = false;
+    let last: { toDay: string; startMin: number; endMin: number } | null = null;
+    const snap = (m: number) => Math.round(m / 15) * 15;
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - x0;
+      const dy = ev.clientY - y0;
+      if (!moved && Math.hypot(dx, dy) < 4) return;
+      moved = true;
+      const dMin = snap(((dy / scale) / rowHeight) * 60);
+      let startMin = origStart;
+      let endMin = origEnd;
+      if (mode === 'move') { startMin = Math.max(0, Math.min(1440 - 15, origStart + dMin)); endMin = startMin + len; }
+      else if (mode === 'bottom') endMin = Math.max(origStart + 15, Math.min(origStart + 24 * 60, origEnd + dMin));
+      else startMin = Math.max(0, Math.min(origEnd - 15, origStart + dMin));
+      // Only a weekly event changes its day (a daily one is on every day).
+      const shift = mode === 'move' && kind === 'weekly' && !singleDay && colW > 0 ? Math.round(dx / colW) : 0;
+      const toIdx = Math.max(0, Math.min(weekDays.length - 1, fromIdx + shift));
+      last = { toDay: weekDays[toIdx] ?? dayYMD, startMin, endMin };
+      setRtDrag({ id: r.h.id, name: r.h.name, color: r.h.color, fromDay: dayYMD, ...last });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      setRtDrag(null);
+      if (!moved || !last) return;
+      rtSuppressClick.current = true;
+      window.setTimeout(() => { rtSuppressClick.current = false; }, 400);
+      const hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+      const sched = r.h.schedule;
+      if (!sched) return;
+      const durationMin = Math.max(15, last.endMin - last.startMin);
+      const timeOfDay = hm(last.startMin);
+      let next = { ...sched, timeOfDay, durationMin } as typeof sched;
+      if (sched.kind === 'weekly' && last.toDay !== dayYMD) {
+        const fromDow = ymdToIsoDow(dayYMD);
+        const toDow = ymdToIsoDow(last.toDay);
+        const days = [...new Set([...sched.days.filter((d) => d !== fromDow), toDow])].sort((a, b) => a - b);
+        next = { ...sched, days, timeOfDay, durationMin } as typeof sched;
+      }
+      if (sched.timeOfDay === timeOfDay && sched.durationMin === durationMin && last.toDay === dayYMD) return;
+      // A one-off moved occurrence follows the series again.
+      if (r.occ.moved) void habitMotherCommand('routine.unskip', { id: r.h.id, date: r.occ.date });
+      void habitMotherCommand('habit.setSchedule', { habitId: r.h.id, schedule: next });
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    e.stopPropagation();
+    e.preventDefault();
+  };
+  const renderRoutineDragGhost = (dayYMD: string) => {
+    if (!rtDrag || rtDrag.toDay !== dayYMD) return null;
+    const col = `var(--${rtDrag.color})`;
+    const top = (rtDrag.startMin / 60) * rowHeight;
+    const h = Math.max(8, ((Math.min(1440, rtDrag.endMin) - rtDrag.startMin) / 60) * rowHeight);
+    const hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    return (
+      <div data-testid="calendar-routine-ghost" aria-hidden style={{
+        position: 'absolute', left: 2, right: 2, top: top + 1, height: h - 2, zIndex: 6, pointerEvents: 'none', boxSizing: 'border-box',
+        borderRadius: 6, border: `1.5px solid ${col}`, background: `color-mix(in srgb, ${col} 22%, var(--paper))`,
+        boxShadow: '0 6px 18px -6px rgba(0,0,0,0.5)', padding: '3px 6px', overflow: 'hidden',
+        fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 11.5, fontWeight: 600, color: 'var(--ink)', lineHeight: '14px',
+      }}>
+        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rtDrag.name}</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-2)' }}>{hm(rtDrag.startMin)}–{hm(rtDrag.endMin)} · every week</div>
+      </div>
+    );
+  };
   useEffect(() => {
     if (!routineMove) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pickerOpen()) setRoutineMove(null); };
@@ -863,7 +1011,39 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   const daysOf = (h: Habit): number[] => !h.schedule || h.schedule.kind === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : h.schedule.kind === 'weekdays' ? [1, 2, 3, 4, 5] : [...h.schedule.days];
   const [calAdding, setCalAdding] = useState(false);
   const [calAddText, setCalAddText] = useState('');
+  // Decision 59 — one rule with Todo and Habits: while you type, the plan
+  // card shows above the field, filled from the words; Enter adds.
+  const [calOv, setCalOv] = useState<PlanOverrides>({});
+  // Decision 60 — a click away hides the card (as in Todo); typing brings it back.
+  const [calCardHidden, setCalCardHidden] = useState(false);
+  const calDefaultDay = (): string => (weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!);
+  const calDraftOf = (raw: string): { text: string; hint: boolean; d: PlanDraft } => {
+    const q = parseQuickAdd(raw);
+    const fromWords: PlanDraft = { day: q.day ?? calDefaultDay(), time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: q.deadline ?? null };
+    return { text: q.text || raw, hint: !!q.hint, d: effectiveDraft(fromWords, calOv) };
+  };
+  const addCalPlan = (text: string, d: PlanDraft) => {
+    // One Ctrl+Z, as in Todo (the scheduling lands after an await).
+    void historyGroup(async () => {
+      const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+      if (!todo) return;
+      const { makeCommandHandler } = await import('../../Canvas/commandDispatch');
+      const run = makeCommandHandler(todo.id);
+      run('todo.add', d.lengthMin ? { text, durationMin: d.lengthMin } : { text });
+      const st = useBoardStore.getState().board?.nodes.find((n) => n.id === todo.id)?.state as TodoState | undefined;
+      const item = [...(st?.items ?? [])].filter((i) => i.text === text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      if (!item) return;
+      if (d.deadline) run('todo.setDue', { id: item.id, dueOn: d.deadline });
+      if (d.day && d.time && item.taskNodeId) {
+        await scheduleTaskAt(item.taskNodeId, `${d.day}T${d.time}`);
+        if (d.remindMin !== undefined && d.remindMin !== null) await setTaskReminder(item.taskNodeId, d.remindMin);
+      } else if (d.day) run('todo.setOnDay', { id: item.id, onDay: d.day });
+    });
+    setCalAddText('');
+    setCalOv({});
+  };
   const calAddRowRef = useRef<HTMLDivElement>(null);
+  useDismissOutside(calAdding && calAddText.trim() !== '' && !calCardHidden, ['[data-testid="when-popover"]', calAddRowRef], () => setCalCardHidden(true));
   const calAddInputRef = useRef<HTMLInputElement>(null);
   const openNewAt = (dayYMD: string, minute: number, x: number, y: number) => {
     const snapMin = Math.max(0, Math.min(1425, Math.floor(minute / 15) * 15));
@@ -899,9 +1079,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // menus.md — six rows at most: this one (skip, move or back), the event
       // (edit), More, then the two ways out. The reminder and the less likely
       // of move / back sit behind More.
-      ...(occ.skipped ? [] : occ.moved
-        ? [{ label: 'Back to its usual time', icon: <MenuIcon name="undo" />, onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }]
-        : [{ label: 'Move this one…', icon: <MenuIcon name="move" />, onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(s0), x, y }) }]),
+      // Decision 59 — moving is a drag now (the whole series); a one-off moved
+      // earlier can still go back.
+      ...(occ.skipped || !occ.moved ? [] : [{ label: 'Back to its usual time', icon: <MenuIcon name="undo" />, onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }]),
       {
         label: 'Edit event…', icon: <MenuIcon name="rename" />,
         onSelect: () => setEventCard({ x, y, day: occ.date, allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days, time: h.schedule?.timeOfDay ?? hmOf(s0), lengthMin: h.schedule?.durationMin ?? 60 } }),
@@ -909,7 +1089,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // Reminders are Advanced (owner, 2026-11-09); a reminder set earlier still shows in Easy, to turn it off.
       ...((): ContextMenuItem[] => {
         const more: ContextMenuItem[] = [
-          ...(!occ.skipped && occ.moved ? [{ label: 'Move this one…', icon: <MenuIcon name="move" />, onSelect: () => setRoutineMove({ id: h.id, name: h.name, date: occ.date, value: hmOf(s0), x, y }) }] : []),
           ...(easy && h.remindMin === undefined ? [] : [{ label: 'Remind me…', icon: <MenuIcon name="reminder" />, hint: h.remindMin === undefined ? 'Off' : h.remindMin === 0 ? 'at start' : `${h.remindMin} min`, onSelect: () => setEventRemind({ id: h.id, x, y, value: h.remindMin ?? null }) }]),
         ];
         return more.length > 0 ? [{ label: 'More', icon: <MenuIcon name="more" />, children: more, onSelect: () => {} }] : [];
@@ -1316,9 +1495,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     // click is on the thin line itself (a few px of slack), never anywhere in
     // the day at that time (owner, 2026-11-09).
     const relX = (e.clientX - rect.left) / screenScale(e.currentTarget);
-    const SLACK = 4;
-    // Decision 58 — the rail is not drawn, so nothing invisible takes a click.
-    const onLine = false && relX >= trackLeft - SLACK && relX <= trackLeft + trackW + SLACK;
+    const SLACK = 3;
+    // Decision 59 — only the line itself (3 px either side) answers: a plan
+    // beside it keeps its own click (it stops the click before it gets here).
+    const onLine = layers.recorded && relX >= trackLeft - SLACK && relX <= trackLeft + trackW + SLACK;
     if (onLine) for (const seg of realityByDay.get(dayYMD) ?? []) {
       if (minute >= seg.startMin && minute < seg.endMin) {
         items.push({ kind: 'reality', seg });
@@ -1330,6 +1510,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   function handleColumnContextMenu(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
     e.preventDefault();
     e.stopPropagation();
+    // Decision 60 — a menu never opens over a card.
+    setInfoPopup(null);
+    setTaskPopup(null);
     const items = layersAt(dayYMD, e);
     // #207 F7b — empty time: offer to log time that wasn't recorded.
     if (items.length === 0) {
@@ -1385,7 +1568,17 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       const rect = e.currentTarget.getBoundingClientRect();
       const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
       const r = routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width));
-      if (r) { setCtxMenu({ x: e.clientX, y: e.clientY, items: routineMenuItems(r.h, r.occ, e.clientX, e.clientY) }); return; }
+      if (r) {
+        const [yy, mo, dd] = r.occ.date.split('-').map(Number) as [number, number, number];
+        const base = new Date(yy, mo - 1, dd).getTime();
+        const span = r.occ as RoutineSpan;
+        setInfoPopup({
+          taskId: `habit-${r.h.id}`, x: e.clientX, y: e.clientY,
+          startMs: base + span.fullStart * 60_000, endMs: base + span.fullEnd * 60_000,
+          routine: { h: r.h, date: r.occ.date, startMin: span.fullStart, endMin: span.fullEnd },
+        });
+        return;
+      }
       // A single click on empty hours does nothing: it got in the way of
       // moving and selecting. Adding is a double-click (or + / right-click).
       return;
@@ -1399,6 +1592,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
 
   /** Double-click on empty hours: add a plan or a repeating event there. */
   function handleColumnDoubleClick(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
+    // A double-click on anything drawn there (a habit, a plan, an event) is not "add here".
+    if ((e.target as HTMLElement).closest?.('.cal-habit, .cal-block, button')) return;
     if (layersAt(dayYMD, e).length > 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
@@ -1411,12 +1606,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   /** Room kept at a day's left for its recorded-time track — only on days
    *  that draw one (recorded time that day, or today with the Recorded layer
    *  on); elsewhere plans start 4 px from the day line, like the right side. */
-  // Decision 58 — the recorded-time rail is gone from the Calendar (owner,
-  // 2026-11-21: "I really hate it"): plans use the whole day, a small inset.
-  function railPxFor(_dayYMD: string): number {
-    return 3;
+  // Decision 59 — the recorded-time line is back (the owner disliked only its
+  // moving stripes and the wide gaps), slimmer and closer to the plans.
+  function railPxFor(dayYMD: string): number {
+    const hasTrack = layers.recorded && ((realityByDay.get(dayYMD)?.length ?? 0) > 0 || dayYMD === toYMD(new Date()));
+    return hasTrack ? RAIL_PX(singleDay, tinyDays) : 3;
   }
-  void RAIL_PX;
 
   function renderTaskBlocks(dayYMD: string) {
     const slices = slicesByDay.get(dayYMD);
@@ -1456,46 +1651,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       const g = cg.slices.map((x) => x.slice);
       const labels = clashLabels(g.map((x) => x.task.text));
       g.forEach((x, i) => letterOf.set(x.task.id, labels[i]!));
-      const open = g.filter((x) => !x.isContinuation && !x.task.done && new Date(x.task.startISO).getTime() >= nowMs);
-      const anchors = [...new Set(open.map((x) => x.task.anchorTaskId))];
-      if (anchors.length < 2) continue;
-      const TAB = 18;
-      const startPx = (cg.startMin / 60) * rowHeight;
-      const endPx = (cg.endMin / 60) * rowHeight;
-      // What else is drawn in this column, in px: other plans and habit pills.
-      const others: Array<[number, number]> = [
-        ...slices.filter((s) => !g.includes(s)).map((s) => [(s.sliceStartMin / 60) * rowHeight, (s.sliceEndMin / 60) * rowHeight] as [number, number]),
-        ...habitMins.map((m) => [(m / 60) * rowHeight - 12, (m / 60) * rowHeight + 12] as [number, number]),
-      ];
-      const free = (a: number, b: number) => a >= 0 && b <= 24 * rowHeight && others.every(([o0, o1]) => b <= o0 || a >= o1);
-      const top = free(startPx - TAB - 2, startPx - 1) ? startPx - TAB - 1 : free(endPx + 1, endPx + TAB + 2) ? endPx + 1 : null;
-      if (top === null) continue;
-      const lineUpClash = () => {
-        const units = anchors.map((a) => {
-          const members = scheduledTasks.filter((t) => t.anchorTaskId === a);
-          const s0 = Math.min(...members.map((t) => new Date(t.startISO).getTime()));
-          const e0 = Math.max(...members.map((t) => new Date(t.startISO).getTime() + t.scheduledDurationMin * 60_000));
-          return { taskId: a, startMs: s0, lengthMin: Math.round((e0 - s0) / 60_000) };
-        });
-        for (const mv of lineUp(units, Date.now())) onCommand('calendar.schedule', { taskId: mv.taskId, scheduledFor: mv.scheduledFor });
-      };
-      const roomy = colPxAll - railNumAll >= 110;
-      lineUpTabs.push(
-        <button
-          key={`lineup-${g[0]!.task.id}`}
-          type="button"
-          className="nodrag cal-lineup"
-          data-testid={`calendar-lineup-${g[0]!.task.id}`}
-          title={`These overlap: ${g.map((x) => x.task.text).join(', ')}. Click to put them one after another, from the earliest (never before now).`}
-          aria-label="Fix overlap: put them one after another"
-          draggable={false}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); lineUpClash(); }}
-          style={{ position: 'absolute', top, right: 3, height: TAB, zIndex: 5 }}
-        >
-          <CalIcon name="stairs" />{roomy && 'Fix overlap'}
-        </button>,
-      );
+      // Decision 60 — no "Fix overlap" tab: plans that overlap stay as you put them (owner, 2026-11-21).
     }
 
     const blocks = slices.map((slice) => {
@@ -1513,6 +1669,14 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       const heightPx = Math.max(MIN_BLOCK_PX, (sliceLen / 60) * rowHeight);
       // Resize handles only on a self-contained head block (no cross-midnight).
       const resizable = !isContinuation && !hasContinuation;
+      // The edge zone: 7 screen px, never more than a third of a short block.
+      const edgeAt = (e: ReactMouseEvent<HTMLDivElement>): 'top' | 'bottom' | null => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const zone = Math.min(7, r.height / 3);
+        if (r.bottom - e.clientY <= zone) return 'bottom';
+        if (e.clientY - r.top <= zone && r.height >= 18) return 'top';
+        return null;
+      };
 
       // Side-by-side layout inside the plan area (right of the reality rail):
       // equal columns per overlap cluster, widened over free columns.
@@ -1630,7 +1794,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
 
       const handleBlockClick = (e: ReactMouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
-        setTaskPopup({ task, x: e.clientX, y: e.clientY });
+        openTaskInfo(task, e.clientX, e.clientY);
       };
 
       // Visual cue: continuation slices are clipped flat on the top edge,
@@ -1678,7 +1842,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         wrap ? 'wrap'
         : letter !== undefined ? 'letter'
         : heightPx < 14 || widthPx < 34 ? 'none'
-        : widthPx < 110 || heightPx < 40 ? 'title' : 'full';
+        // Decision 60 — the same look at every width (the owner's pick): a tall
+        // block shows its name and, small, its time; only a short one centres its name.
+        : heightPx < 40 || widthPx < 44 ? 'title' : 'full';
       const textual = detail === 'title' || detail === 'full';
       // The letter shows when it fits the bar; the tick under it when there is room.
       // A name too wide for the bar stands its letters one above the other
@@ -1693,10 +1859,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       const titleInner = widthPx - 2 * BLOCK_TEXT_INSET - 20;
       // Decision 55 — a tall block gives a long name all the lines it needs
       // (it used to stop at two), keeping one line for the time under it.
-      const titleNeeded = Math.max(1, Math.ceil((task.text.length * 7.2) / Math.max(1, titleInner)));
-      const titleLinesEst = blockH >= 48 ? Math.max(1, Math.min(titleNeeded, Math.floor((blockH - 6 - 14) / 14))) : 1;
-      const timeRowLines = Math.max(1, Math.min(2, Math.floor((blockH - 6 - titleLinesEst * 14) / 14)));
-      const titleClamp = detail === 'full' ? Math.max(2, titleLinesEst) : Math.max(2, Math.floor((blockH - 4) / 13.2));
+      const titleNeeded = Math.max(1, Math.ceil((task.text.length * 7.8) / Math.max(1, titleInner)));
+      const titleLinesEst = blockH >= 48 ? Math.max(1, Math.min(titleNeeded, Math.floor((blockH - 6 - 14) / 15.6))) : 1;
+      const timeRowLines = Math.max(1, Math.min(2, Math.floor((blockH - 6 - titleLinesEst * 15.6) / 14)));
+      const titleClamp = detail === 'full' ? Math.max(2, titleLinesEst) : Math.max(2, Math.floor((blockH - 4) / 15));
       // A short bar centres its letter; a tall one keeps it at the top, tick below.
       const letterTop = blockH >= (letterStack ? letter.length * 11 + 14 : 30);
 
@@ -1710,6 +1876,19 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           onDragOver={handleBlockDragOver}
           onDrop={handleDropOnBlock}
           onClick={handleBlockClick}
+          // Decision 59 — the top and bottom edges are found in SCREEN pixels
+          // on the block itself, so they sit exactly on its drawn edge at any
+          // canvas zoom (the fixed 6 px strips shrank to 2 px zoomed out).
+          onMouseMove={resizable ? (e) => {
+            const edge = edgeAt(e);
+            const cur = edge ? 'ns-resize' : '';
+            if (e.currentTarget.style.cursor !== cur) e.currentTarget.style.cursor = cur;
+          } : undefined}
+          onMouseDown={resizable ? (e) => {
+            if (e.button !== 0) return;
+            const edge = edgeAt(e);
+            if (edge) startResize(edge, task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e);
+          } : undefined}
           data-time-open={task.timeOpen ? 'true' : undefined}
           data-plan-state={isDone ? 'done' : isMissed ? 'missed' : 'planned'}
           title={
@@ -1777,10 +1956,17 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               <CalIcon name="down" />
             </span>
           )}
-          {/* #171 — a done task shows a check, so it reads as finished. */}
+          {/* #171 — a done task shows a check, so it reads as finished.
+              Decision 59 — any other task shows a small list mark in the same
+              corner: it comes from your Todos (a repeating event shows ⟳). */}
           {isDone && !isContinuation && textual && (
-            <span data-testid={`task-done-check-${task.id}`} aria-hidden style={{ position: 'absolute', top: detail === 'full' ? 4 : '50%', transform: detail === 'full' ? undefined : 'translateY(-50%)', right: 4, color: 'var(--acid-ink, var(--acid))', lineHeight: 0, pointerEvents: 'none' }}>
+            <span data-testid={`task-done-check-${task.id}`} aria-hidden style={{ position: 'absolute', top: blockH >= 22 ? 4 : '50%', transform: blockH >= 22 ? undefined : 'translateY(-50%)', right: 4, color: 'var(--acid-ink, var(--acid))', lineHeight: 0, pointerEvents: 'none' }}>
               <CalIcon name="check" />
+            </span>
+          )}
+          {!isDone && !isContinuation && textual && (
+            <span data-testid={`task-kind-mark-${task.id}`} aria-hidden title="A task from your Todos" style={{ position: 'absolute', top: blockH >= 22 ? 5 : '50%', transform: blockH >= 22 ? undefined : 'translateY(-50%)', right: 5, color: `color-mix(in srgb, ${taskTone} 40%, var(--ink-3))`, lineHeight: 0, pointerEvents: 'none' }}>
+              <CalIcon name="list" size={10} />
             </span>
           )}
           {/* Decision 28 §6 — work/break sub-regions.
@@ -1853,7 +2039,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               style={{
                 // Decision 55 — names in the reading font, like the events beside them.
                 fontFamily: 'var(--font-read, var(--font-sans))',
-                fontSize: detail === 'full' ? 12 : 11.5,
+                // Decision 60 — a size up (the owner liked how the zoomed Free canvas read).
+                fontSize: detail === 'full' ? 13 : 12.5,
                 fontWeight: 600,
                 color: isDone ? 'var(--ink-2)' : 'var(--ink)',
                 textDecoration: 'none',
@@ -1865,16 +2052,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                   : { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }),
                 minWidth: 0,
                 paddingLeft: isContinuation ? 12 : 0,
-                paddingRight: isDone || (isMissed && !isContinuation) ? 16 : 0,
+                paddingRight: isContinuation ? 0 : 15,
                 pointerEvents: 'none',
                 position: 'relative',
                 zIndex: 1,
                 lineHeight: 1.2,
               }}
             >
-              <span aria-hidden className={`cal-task-box${isDone ? ' is-done' : ''}`} style={{ borderColor: taskTone, ...(isDone ? { background: taskTone } : {}) }}>
-                {isDone && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
-              </span>
               {task.text}
             </span>
           )}
@@ -1882,9 +2066,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             // The time comes first and never cuts; "Missed" (and tracked or
             // over notes) wrap under it as whole pieces, so a short block
             // loses those pieces at its bottom edge, never half the time.
-            <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 10, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: '14px', color: 'var(--ink-3)', overflow: 'hidden', minHeight: 14, maxHeight: timeRowLines * 14, flexShrink: 0, pointerEvents: 'none', position: 'relative', zIndex: 1 }}>
-              <span style={{ whiteSpace: 'nowrap' }}>
-                {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : `${fmtMinOfDay(blockStartMin)}–${fmtMinOfDay(blockEndMin)}`}
+            // Decision 60 — the time small (10 px), wrapping at the dash in a narrow block.
+            <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 8, fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: '13px', color: 'var(--ink-3)', overflow: 'hidden', minHeight: 13, maxHeight: Math.max(timeRowLines, widthPx < 110 ? 2 : 1) * 13, flexShrink: 0, pointerEvents: 'none', position: 'relative', zIndex: 1, marginTop: 1 }}>
+              <span>
+                {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : <>{fmtMinOfDay(blockStartMin)}–<wbr />{fmtMinOfDay(blockEndMin)}</>}
               </span>
               {startNote && <span data-testid={`task-start-delta-${task.id}`} style={{ whiteSpace: 'nowrap' }}>{startNote.replace(/^ · /, '')}</span>}
               {isMissed && !isContinuation && <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-2)', fontWeight: 600 }}>Missed</span>}
@@ -1914,7 +2099,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               onClick={(e) => { e.stopPropagation(); showPlanGuide({ mode: 'replan', taskId: task.id, text: task.text }); }}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
-                position: 'absolute', top: detail === 'full' ? 3 : '50%', transform: detail === 'full' ? undefined : 'translateY(-50%)', right: 3, zIndex: 4,
+                position: 'absolute', top: blockH >= 24 ? 3 : '50%', transform: blockH >= 24 ? undefined : 'translateY(-50%)', right: 3, zIndex: 4,
                 width: 18, height: 18, padding: 0, borderRadius: 5, cursor: 'pointer', display: 'grid', placeItems: 'center',
                 border: 0, background: 'var(--paper)', color: 'var(--ink-2)',
               }}
@@ -1931,12 +2116,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               <div
                 data-testid={`task-resize-top-${task.id}`}
                 onMouseDown={(e) => startResize('top', task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e)}
-                style={{ position: 'absolute', top: -2, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 3 }}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, cursor: 'ns-resize', zIndex: 3 }}
               />
               <div
                 data-testid={`task-resize-bottom-${task.id}`}
                 onMouseDown={(e) => startResize('bottom', task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e)}
-                style={{ position: 'absolute', bottom: -2, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 3 }}
+                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 3 }}
               />
             </>
           )}
@@ -2053,7 +2238,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           }}
           onDragOver={allowDrop}
           onDrop={dropAfter(it)}
-          onClick={(e) => { if (it.task) setTaskPopup({ task: it.task, x: e.clientX, y: e.clientY }); }}
+          onClick={(e) => { if (it.task) openTaskInfo(it.task, e.clientX, e.clientY); }}
           style={{
             display: 'grid', gridTemplateColumns: '42px 1fr', gap: 8, alignItems: 'start',
             padding: '7px 8px 7px 0', borderRadius: 6, cursor: it.task ? 'pointer' : 'default',
@@ -2196,12 +2381,14 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       const blockH = Math.max(5, height - 2);
       const { title, place } = eventTitleAndPlace(h.name, h.note);
       const textW = laneW - 4 - lead - 6;
-      const sideways = textW < 28 && blockH > 40;
+      const sideways = textW < 22 && blockH > 40;
       const showIcon = textW >= 110;
-      const lines = sideways ? { titleLines: 0, showTime: false, showPlace: false } : eventLines(blockH, textW - (showIcon ? 15 : 0), title, !!place);
       const time = occ.spill
         ? `until ${fmtMinOfDay(occ.endMin)} · from last night`
         : `${fmtMinOfDay(occ.fullStart)}–${fmtMinOfDay(occ.fullEnd)}`;
+      // Decision 60 — how often, in words, beside the time (small).
+      const every = occ.skipped ? 'skipped' : occ.moved ? 'moved' : !h.schedule || h.schedule.kind === 'daily' ? 'every day' : h.schedule.kind === 'weekdays' ? 'weekdays' : 'every week';
+      const lines = sideways ? { titleLines: 0, showTime: false, metaLines: 0, showPlace: false } : eventLines(blockH, textW - (showIcon ? 15 : 0), title, !!place, `${time} · ${every}`);
       out.push(
         <div
           key={`routine-${h.id}${occ.spill ? '-spill' : ''}`}
@@ -2214,6 +2401,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           style={{
             position: 'absolute', left: `calc(${(lane / lanes) * 100}% + 2px)`, width: `calc(${100 / lanes}% - 4px)`, top: top + 1, height: blockH,
             zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 6, overflow: 'hidden',
+            opacity: rtDrag && rtDrag.id === h.id ? 0.35 : 1,
             ...(occ.skipped
               ? { border: `1px dashed color-mix(in srgb, ${col} 55%, transparent)`, background: 'transparent' }
               : { border: `1px solid color-mix(in srgb, ${col} 30%, transparent)`, background: `color-mix(in srgb, ${col} 13%, var(--paper))` }),
@@ -2231,7 +2419,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 <span
                   data-testid={`calendar-routine-title-${h.id}`}
                   style={{
-                    flex: 1, minWidth: 0, fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 12, fontWeight: 600, lineHeight: `${EVENT_TEXT.titleLine}px`,
+                    flex: 1, minWidth: 0, fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 13, fontWeight: 600, lineHeight: `${EVENT_TEXT.titleLine}px`,
                     color: `color-mix(in srgb, ${col} 22%, var(--ink))`, overflowWrap: 'break-word',
                     display: '-webkit-box', WebkitLineClamp: lines.titleLines, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                     opacity: occ.skipped ? 0.75 : 1,
@@ -2242,8 +2430,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 {showIcon && <span aria-hidden style={{ flexShrink: 0, display: 'inline-flex', marginTop: 2, color: `color-mix(in srgb, ${col} 45%, var(--ink-3))` }}><CalIcon name="repeat" size={11} /></span>}
               </div>
               {lines.showTime && (
-                <span data-testid={`calendar-routine-time-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
-                  {time}{occ.skipped ? ' · skipped' : occ.moved ? ' · moved' : ''}
+                // Decision 60 — the time and how often, small, wrapping in a narrow block.
+                <span data-testid={`calendar-routine-time-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-3)', whiteSpace: 'normal', overflow: 'hidden', maxHeight: lines.metaLines * EVENT_TEXT.metaLine, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
+                  {occ.spill ? time : <>{fmtMinOfDay(occ.fullStart)}–<wbr />{fmtMinOfDay(occ.fullEnd)}</>}<span style={{ whiteSpace: 'nowrap' }}>{` · ${every}`}</span>
                 </span>
               )}
               {lines.showPlace && place && (
@@ -2260,13 +2449,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   }
 
   // What really happened (F16, F29): the Clock rail (see RAIL_STYLE). A
-  // break is a gap in the fill; a running span has moving stripes and grows
-  // to the knob. The rail sits beside the plans, never under them.
+  // break is a gap in the fill; a running span is a calm solid fill that
+  // grows to now (Decision 59: no moving stripes). The rail sits beside the
+  // plans, never under them.
   const trackW = TRACK_W(singleDay, tinyDays);
   const trackLeft = TRACK_LEFT(tinyDays);
   function renderRealityBlocks(dayYMD: string) {
-    // Decision 58 — not drawn on the Calendar any more (the Clock shows recorded time).
-    if (dayYMD) return null;
+    if (!layers.recorded) return null;
     const segs = realityByDay.get(dayYMD) ?? [];
     const todayYMD = toYMD(new Date());
     const nowD = new Date();
@@ -2326,41 +2515,25 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               : `${spanTitle(seg, 'Focus')} ${fmtHM(seg.startMs)}–${fmtHM(seg.endMs)}, ${minutes} minutes`
           }
           title={isWork ? `Recorded: ${spanTitle(seg, 'Focus')} · ${fmtHM(seg.startMs)}–${seg.live ? 'now' : fmtHM(seg.endMs)}` : `Break · ${minutes}m`}
-          className={isWork && seg.live ? 'cal-live-seg' : undefined}
           style={{
             position: 'absolute',
-            top: topPx + 1,
+            // Decision 59 — spans touch (no 1 px gaps between back-to-back
+            // sessions); only a real break leaves the track bare.
+            top: topPx,
             left: trackLeft,
             width: trackW,
             // Never shorter than its round caps.
-            height: Math.max(trackW, heightPx - 2),
+            height: Math.max(trackW, heightPx),
             pointerEvents: 'none',
             zIndex: 1,
             borderRadius: trackW / 2,
             // A break draws nothing: it is the empty track (hover keeps its title).
-            background: !isWork ? 'transparent'
-              : seg.live ? `repeating-linear-gradient(135deg, ${tone} 0 4px, color-mix(in srgb, ${tone} 50%, transparent) 4px 8px)`
-              : tone,
+            background: !isWork ? 'transparent' : tone,
           }}
         />,
       );
     });
-    // Today's "now": a knob on the track, like the tip of the Clock's hand.
-    if (dayYMD === todayYMD) {
-      const k = trackW + 4;
-      out.push(
-        <div
-          key="reality-now"
-          data-testid="calendar-reality-now"
-          aria-hidden
-          style={{
-            position: 'absolute', top: nowPx - k / 2, left: trackLeft + trackW / 2 - k / 2, width: k, height: k,
-            borderRadius: '50%', background: 'var(--node-bg, var(--paper))', boxShadow: 'inset 0 0 0 2px var(--k-now, #ef4444)',
-            pointerEvents: 'none', zIndex: 7,
-          }}
-        />,
-      );
-    }
+    // Today's "now" is the now line's own dot, centred on this track (NowLine dotX).
     return out;
   }
 
@@ -2397,8 +2570,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           key={`habit-block-${habit.id}`}
           data-testid={`habit-block-${habit.id}-${dayYMD}`}
           data-habit-done={done ? 'true' : undefined}
-          disabled={isFuture}
-          title={`${habit.name} · ${habit.schedule.timeOfDay}${titleSuffix} — ${isFuture ? 'later' : done ? 'done · click to undo' : 'click to tick it'}`}
+          aria-disabled={isFuture || undefined}
+          title={`${habit.name} · ${habit.schedule.timeOfDay}${titleSuffix} — ${isFuture ? 'not yet: tick it on the day' : done ? 'done · click to undo' : 'click to tick it'}`}
+          aria-label={`${habit.name} at ${habit.schedule.timeOfDay}${isFuture ? ', not yet' : done ? ', done' : ''}`}
+          // Decision 59 — a double-click on a habit is two ticks, never "add a plan here".
+          onDoubleClick={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             if (isFuture) return;
@@ -2440,18 +2616,24 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             fontWeight: 600,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
-            opacity: isFuture ? 0.85 : 1,
+            // A day still ahead can't be ticked yet: faded, with a dashed box.
+            opacity: isFuture ? 0.5 : 1,
           }}
         >
+          {/* Decision 59 — a narrow day has no room for the name, so the box
+              carries the habit's own icon (or its first letter) in its colour. */}
           <span aria-hidden className="cal-habit__box" style={{
-            width: 14, height: 14, flexShrink: 0, boxSizing: 'border-box', borderRadius: 4,
+            width: iconOnly ? 18 : 14, height: iconOnly ? 18 : 14, flexShrink: 0, boxSizing: 'border-box', borderRadius: iconOnly ? 5 : 4,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            border: done ? '0' : `1.5px solid ${colour}`,
+            border: done ? '0' : `1.5px ${isFuture ? 'dashed' : 'solid'} ${colour}`,
             background: done ? colour : (iconOnly ? 'var(--node-bg, var(--paper))' : 'transparent'),
-            color: 'var(--ink-on-bright)',
+            color: done ? 'var(--ink-on-bright)' : colour,
             boxShadow: iconOnly ? '0 1px 2px rgba(0,0,0,0.3)' : 'none',
+            fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 10, fontWeight: 700, lineHeight: 1,
           }}>
-            {done && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+            {done
+              ? <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+              : iconOnly ? (habitIconId(habit.icon) ? <HabitIcon icon={habit.icon} size={11} /> : (habit.name.trim()[0] ?? '').toUpperCase()) : null}
           </span>
           {!iconOnly && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, color: done ? 'var(--ink-3)' : 'var(--ink)' }}>{habit.name}</span>}
           {habit.amount && !done && !iconOnly && (
@@ -2565,6 +2747,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           display: 'flex',
           flexShrink: 0,
           borderBottom: '1px solid var(--paper-3)',
+          paddingRight: sbW,
         }}
       >
         <div
@@ -2655,7 +2838,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           with no time; a chip dragged into the hours gets that time. Plans
           are solid chips, deadlines dashed flags. It grows with its content. */}
       {!useAgenda && (
-        <div data-testid="calendar-day-only-row" style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid var(--paper-3)', minHeight: 26 }}>
+        <div data-testid="calendar-day-only-row" style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid var(--paper-3)', minHeight: 26, paddingRight: sbW }}>
           <div title="Any time that day: drop a plan here to put it on a day with no hour; drag it into the hours to give it a time" style={{ width: GUTTER_WIDTH, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 9.5, lineHeight: '11px', letterSpacing: '0.06em', color: 'var(--ink-4)' }}>ANY<br />TIME</div>
           {weekDays.map((dayYMD) => (
             <div
@@ -2885,8 +3068,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               <div
                 key={dayYMD}
                 data-testid={`week-col-${dayYMD}`}
+                className="nodrag"
                 onContextMenu={(e) => handleColumnContextMenu(dayYMD, e)}
-                onClick={(e) => handleColumnClick(dayYMD, e)}
+                onPointerDown={(e) => onColumnPointerDown(dayYMD, e)}
+                onPointerMove={(e) => onColumnPointerMove(dayYMD, e)}
+                onClick={(e) => { if (rtSuppressClick.current) { rtSuppressClick.current = false; return; } handleColumnClick(dayYMD, e); }}
                 onDoubleClick={(e) => handleColumnDoubleClick(dayYMD, e)}
                 style={{
                   flex: 1,
@@ -2931,6 +3117,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 {/* Issue #166 — tracked reality as background highlights
                     (zIndex 0, no pointer events — behind habits and tasks) */}
                 {renderRoutineBands(dayYMD)}
+                {renderRoutineDragGhost(dayYMD)}
                 {renderRealityBlocks(dayYMD)}
 
                 {/* App open / close markers (thin dashed lines). */}
@@ -2991,8 +3178,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               rowHeight={rowHeight}
               columnWidth={NOMINAL_COLUMN_WIDTH}
               gutterWidth={0}
-              // The Clock rail's knob marks now on today's track (F29).
+              // Decision 59 — the dot sits on today's recorded-time line.
               showDot
+              dotX={layers.recorded ? trackLeft + trackW / 2 : 0}
             />
           )}
         </div>
@@ -3022,6 +3210,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           items={[
             // easy-mode D22 — the layer switches and zoom are Advanced.
             ...(easy ? [] : ([
+              ['recorded', 'Recorded time'],
               ['habits', 'Habits'],
               ['routines', 'Repeating events'],
             ] as const).map(([k, label]): ContextMenuItem => ({
@@ -3031,7 +3220,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               onSelect: () => toggleLayer(k),
             }))),
             { label: 'Repeating events…', icon: <MenuIcon name="repeat" />, ...(easy ? {} : { divider: true }), onSelect: () => setEventsOpen({ x: calMenu.x, y: calMenu.y }) },
-            // Decision 58 — zoom is a gesture (pinch, Ctrl + scroll, or drag the hours).
+            // Decision 59 — zoom is a gesture (pinch, Ctrl + scroll, drag the
+            // hours), and here too for anyone who doesn't know the gesture.
+            { label: 'Bigger hours', icon: <MenuIcon name="plus" />, hint: 'Ctrl + scroll', divider: true, keepOpen: true, disabled: shownZoom >= CAL_ZOOM_MAX, onSelect: () => zoomTo(shownZoom + CAL_ZOOM_STEP, null) },
+            { label: 'Smaller hours', icon: <MenuIcon name="minus" />, hint: 'or pinch', keepOpen: true, disabled: shownZoom <= CAL_ZOOM_MIN, onSelect: () => zoomTo(shownZoom - CAL_ZOOM_STEP, null) },
           ]}
         />
       )}
@@ -3051,39 +3243,63 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               autoFocus
               value={calAddText}
               placeholder="Add a plan — try: Gym fri 18:00 1h"
-              onChange={(e) => setCalAddText(e.target.value)}
+              onChange={(e) => { setCalAddText(e.target.value); setCalCardHidden(false); }}
+              onFocus={() => setCalCardHidden(false)}
+              onClick={() => setCalCardHidden(false)}
               onKeyDown={(e) => {
                 e.stopPropagation();
-                if (e.key === 'Escape') { setCalAdding(false); setCalAddText(''); return; }
+                if (e.key === 'Escape') { setCalAdding(false); setCalAddText(''); setCalOv({}); return; }
                 if (e.key !== 'Enter') return;
                 const raw = calAddText.trim();
                 if (!raw) return;
-                const q = parseQuickAdd(raw);
-                const day = q.day ?? (weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!);
-                if (q.time && !q.hint) {
-                  void addPlanAt(q.text || raw, day, q.time, q.durationMin ?? 60);
+                const { text, hint, d } = calDraftOf(raw);
+                if (hint) {
+                  // "every Monday…": a repeating event, set on its own card.
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const day = d.day ?? calDefaultDay();
+                  const isoDow = ((new Date(`${day}T00:00:00`).getDay() + 6) % 7) + 1;
+                  setEventCard({ x: r.left, y: r.top - 340, day, allowOnce: true, initial: { name: raw, mode: 'repeat', days: [isoDow], time: d.time ?? '09:00', lengthMin: d.lengthMin ?? 60 } });
                   setCalAddText('');
+                  setCalOv({});
+                  setCalAdding(false);
                   return;
                 }
-                const r = e.currentTarget.getBoundingClientRect();
-                const now = new Date();
-                const minute = Math.min(23 * 60, (now.getHours() + 1) * 60);
-                const snapMin = Math.floor(minute / 15) * 15;
-                const at = `${String(Math.floor(snapMin / 60)).padStart(2, '0')}:${String(snapMin % 60).padStart(2, '0')}`;
-                const isoDow = ((new Date(`${day}T00:00:00`).getDay() + 6) % 7) + 1;
-                setEventCard({ x: r.left, y: r.top - 340, day, allowOnce: true, initial: { name: q.text || raw, mode: 'once', days: [isoDow], time: at, lengthMin: q.durationMin ?? 60 } });
-                setCalAddText('');
-                setCalAdding(false);
+                addCalPlan(text, d);
               }}
               onBlur={() => { if (!calAddText.trim()) setCalAdding(false); }}
               style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', caretColor: 'var(--acid)' }}
             />
-            {(() => {
-              const q = calAddText.trim() ? parseQuickAdd(calAddText.trim()) : null;
-              if (!q || !q.time || q.hint) return null;
-              const day = q.day ?? (weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!);
-              const label = new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
-              return <span data-testid="calendar-add-preview" className="kw-kbd" style={{ width: 'auto', padding: '0 8px', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>{label} {q.time}{q.durationMin ? ` · ${fmtDur(q.durationMin)}` : ''}</span>;
+            {calAddText.trim() !== '' && !calCardHidden && (() => {
+              const raw = calAddText.trim();
+              const { text, hint, d } = calDraftOf(raw);
+              const r = calAddRowRef.current?.getBoundingClientRect();
+              if (hint) {
+                return createPortal(
+                  <div data-testid="calendar-add-preview" className="kw-card" style={{ position: 'fixed', left: (r?.left ?? 8) + 8, top: (r?.top ?? window.innerHeight) - 44, zIndex: Z.popover, padding: '8px 12px', fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-2)', background: 'var(--paper)', border: '1px solid var(--paper-3)', borderRadius: 10 }}>
+                    Repeats — press Enter to pick its days
+                  </div>,
+                  document.body,
+                );
+              }
+              const value = { day: d.day, time: d.time, lengthMin: d.lengthMin, deadline: d.deadline, remindMin: d.remindMin ?? null };
+              return (
+                <WhenPopover
+                  x={0}
+                  y={0}
+                  today={todayYMD()}
+                  value={value}
+                  title={{ text }}
+                  onChange={(next) => {
+                    const patch: PlanOverrides = {};
+                    (['day', 'time', 'lengthMin', 'deadline', 'remindMin'] as const).forEach((k) => { if (next[k] !== value[k]) (patch as Record<string, unknown>)[k] = next[k]; });
+                    setCalOv((cur) => ({ ...cur, ...patch }));
+                  }}
+                  onApply={(next) => addCalPlan(text, { day: next.day, time: next.time, lengthMin: next.lengthMin, deadline: next.deadline, remindMin: next.remindMin })}
+                  onClose={() => { setCalAddText(''); setCalOv({}); setCalAdding(false); }}
+                  anchorAbove={r ? { left: r.left + 8, top: r.top } : { left: 8, top: window.innerHeight - 60 }}
+                  primaryLabel="Add ↵"
+                />
+              );
             })()}
           </>
         ) : (
@@ -3146,6 +3362,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             today={todayYMD()}
             value={plan.value}
             title={{ text: plan.text, tone: toneVarForTask(taskPopup.task.id), ...(afterOf.has(taskPopup.task.id) ? { sub: `after ${afterOf.get(taskPopup.task.id)}` } : {}) }}
+            // Decision 60 — double-click the name to rename the plan (its Todo row and task follow).
+            onRename={(text) => {
+              const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
+              if (!todo) return;
+              void import('../../Canvas/commandDispatch').then(({ makeCommandHandler }) => makeCommandHandler(todo.id)('todo.edit', { id: plan.itemId, text }));
+            }}
             actions={[
               // Easy (D9/D10): no timer action on a plan, as on the Todo card.
               ...(easy ? [] : [{ key: 'timer', label: observe ? 'Track it now' : 'Focus on it', icon: (observe ? 'observe' : 'play') as 'observe' | 'play', onClick: () => { onCommand('calendar.activateTask', { taskId: taskPopup.task.id }); close(); } }]),
@@ -3160,6 +3382,26 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           />
         );
       })()}
+      {infoPopup && (
+        <TaskInfoPopup
+          taskId={infoPopup.taskId}
+          x={infoPopup.x}
+          y={infoPopup.y}
+          {...(infoPopup.startMs !== undefined ? { startMs: infoPopup.startMs } : {})}
+          {...(infoPopup.endMs !== undefined ? { endMs: infoPopup.endMs } : {})}
+          onClose={() => setInfoPopup(null)}
+          onDetails={() => {
+            const p = infoPopup;
+            setInfoPopup(null);
+            if (p.task) { setTaskPopup({ task: p.task, x: p.x, y: p.y }); return; }
+            if (p.routine) {
+              const { h } = p.routine;
+              const hmOf = (m: number) => { const mm = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(mm / 60)).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}`; };
+              setEventCard({ x: p.x, y: p.y, day: p.routine.date, allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days: daysOf(h), time: h.schedule?.timeOfDay ?? hmOf(p.routine.startMin), lengthMin: h.schedule?.durationMin ?? 60 } });
+            }
+          }}
+        />
+      )}
       {/* Only while the task exists: an undo or a delete elsewhere closes it. */}
       {taskPopup && !planWhenOf({ taskId: taskPopup.task.id }) && useBoardStore.getState().board?.nodes.some((n) => n.id === taskPopup.task.id) && (
         <TaskPopup

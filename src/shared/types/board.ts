@@ -48,6 +48,8 @@ export interface StationGridGeometry {
   order?: { top: string[]; bottom: string[] };
   /** Decision 58 — each window's share of its row, by window. */
   sizes?: Record<string, number>;
+  /** Decision 59 — the windows this ready-made layout shows (absent = its own set). */
+  windows?: string[];
 }
 
 // ADR 0008 § 2.4 — station geometry (rowFraction, columnFractions,
@@ -70,6 +72,8 @@ export interface StationGeometry {
   // never disturbs another preset.
   grid?: StationGridGeometry;
   planner?: StationGridGeometry;
+  /** Decision 59 — bumped by a reset, so the panels lay out afresh. */
+  rev?: number;
 }
 
 // Structural mixin for mother-node config objects.

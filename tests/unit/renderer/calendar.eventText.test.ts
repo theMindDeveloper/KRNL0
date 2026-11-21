@@ -34,14 +34,14 @@ describe('eventLines', () => {
   });
 
   it('a short block gives its lines to the name first', () => {
-    const l = eventLines(36, 240, long, true);
+    const l = eventLines(38, 240, long, true);
     expect(l.titleLines).toBe(2);
     expect(l.showTime).toBe(false);
     expect(l.showPlace).toBe(false);
   });
 
   it('a short name leaves room for the time on a small block', () => {
-    expect(eventLines(36, 240, 'Gym', false)).toEqual({ titleLines: 1, showTime: true, showPlace: false });
+    expect(eventLines(36, 240, 'Gym', false)).toEqual({ titleLines: 1, showTime: true, metaLines: 1, showPlace: false });
   });
 
   it('a tall block lets a long name use every line it needs', () => {

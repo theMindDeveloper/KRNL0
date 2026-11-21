@@ -278,6 +278,9 @@
         (the full word stays in the tooltip and for screen readers).
    The name is never shortened. */
 .kw-head, .kw-range { container-type: inline-size; }
+/* Decision 59 — a header's view switch always sits at the right, also when
+   the narrow rule below hides the one fact that used to push it there. */
+.kw-head > .kw-views { margin-left: auto; }
 @container (max-width: 400px) {
   .kw-head:has(.kw-views) .kw-ctx { display: none; }
   .kw-title { flex-shrink: 0; overflow: visible; }
@@ -288,8 +291,8 @@
 /* Only a header's own switch with four or more views needs the letters
    (Day Week Month Year); three always fit, and ranges like 7d / 30d never shorten. */
 @container (max-width: 295px) {
-  .kw-head > .kw-views:has(> button:nth-child(4)) > button { font-size: 0; padding: 0 8px; }
-  .kw-head > .kw-views:has(> button:nth-child(4)) > button::first-letter { font-size: 12px; }
+  .kw-head > .kw-views:not([aria-label="Range"]):has(> button:nth-child(4)) > button { font-size: 0; padding: 0 8px; }
+  .kw-head > .kw-views:not([aria-label="Range"]):has(> button:nth-child(4)) > button::first-letter { font-size: 12px; }
 }
 
 /* Decision 58 — the Clock's big-clock icon: quiet until you reach for it. */

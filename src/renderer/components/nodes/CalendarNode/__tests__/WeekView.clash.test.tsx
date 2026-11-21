@@ -126,19 +126,12 @@ describe('WeekView — clashing plans as letter bars (F28)', () => {
     expect(unscheduleTask).not.toHaveBeenCalled();
   });
 
-  it('"Line up" puts the open plans one after another from the first start', () => {
+  it('no "Fix overlap" tab: overlapping plans stay as placed (Decision 60)', () => {
     seed(three());
     const onCommand = vi.fn();
     render(<WeekView state={state} config={config} onCommand={onCommand} />);
-    const btn = document.querySelector('[data-testid^="calendar-lineup-"]') as HTMLElement;
-    expect(btn).toBeTruthy();
-    fireEvent.click(btn);
-    const calls = onCommand.mock.calls.filter((c) => c[0] === 'calendar.schedule').map((c) => c[1]);
-    // B (30m) keeps 10:00, A (45m) follows at 10:30, Sam at 11:15.
-    expect(calls).toEqual([
-      { taskId: 't-a', scheduledFor: '2026-05-14T10:30' },
-      { taskId: 't-c', scheduledFor: '2026-05-14T11:15' },
-    ]);
+    expect(document.querySelector('[data-testid^="calendar-lineup-"]')).toBeNull();
+    expect(onCommand.mock.calls.filter((c) => c[0] === 'calendar.schedule')).toEqual([]);
   });
 
   it('no "Line up" for plans already in the past (replan handles those)', () => {
