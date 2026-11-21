@@ -22,6 +22,10 @@ const MONTH_HEAD_SMALL_PX = 17;
 /** Cells this big or bigger get the weekday letters above them. */
 export const DOW_MIN_CELL = 12;
 const CELL_GAP = 2;
+/** The biggest day cell (a large window fills with the year, not with empty space). */
+const MAX_CELL = 56;
+/** Cells this big or bigger show their date. */
+export const DATE_MIN_CELL = 22;
 const MONTH_GAP = 14;
 /** Room kept clear at each side, so the first and last month never touch (or leave) the window's edge. */
 const SIDE_PAD = 12;
@@ -38,9 +42,11 @@ export function yearLayout(w: number, h: number): { cols: number; cell: number }
     const rows = 12 / cols;
     const byW = ((room - MONTH_GAP * (cols - 1)) / cols - CELL_GAP * 6) / 7;
     const byHWith = (head: number) => ((h - MONTH_GAP * (rows - 1)) / rows - head - CELL_GAP * 5) / 6;
-    let cell = Math.floor(Math.min(byW, byHWith(MONTH_HEAD_PX), 28));
+    // Decision 60 — the months grow to fill the window (the old 28 px cap
+    // left a big Calendar mostly empty); dates show in the days once they fit.
+    let cell = Math.floor(Math.min(byW, byHWith(MONTH_HEAD_PX), MAX_CELL));
     // Too small for weekday letters: they are not drawn, so the months get that room.
-    if (cell < DOW_MIN_CELL) cell = Math.min(DOW_MIN_CELL - 1, Math.floor(Math.min(byW, byHWith(MONTH_HEAD_SMALL_PX), 28)));
+    if (cell < DOW_MIN_CELL) cell = Math.min(DOW_MIN_CELL - 1, Math.floor(Math.min(byW, byHWith(MONTH_HEAD_SMALL_PX), MAX_CELL)));
     if (cell > best.cell) best = { cols, cell };
   }
   return { cols: best.cols, cell: Math.max(3, best.cell) };
@@ -109,7 +115,7 @@ export function YearView({ state, onCommand }: Props) {
           for (let d = 1; d <= days; d++) cells.push(`${year}-${pad(m + 1)}-${pad(d)}`);
           return (
             <div key={name} data-testid={`calendar-year-month-${m + 1}`} style={{ minHeight: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: today.startsWith(`${year}-${pad(m + 1)}`) ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{name}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: fit.cell >= 34 ? 13 : 11, fontWeight: 700, color: today.startsWith(`${year}-${pad(m + 1)}`) ? 'var(--acid-ink, var(--acid))' : 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{name}</span>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(7, ${fit.cell}px)`, gridAutoRows: 'auto', alignContent: 'start', gap: CELL_GAP }}>
                 {fit.cell >= DOW_MIN_CELL && DOW.map((d, i) => (
                   <span key={`h${i}`} aria-hidden style={{ fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1, color: 'var(--ink-3)', textAlign: 'center' }}>{d}</span>
@@ -129,7 +135,7 @@ export function YearView({ state, onCommand }: Props) {
                       style={{
                         position: 'relative', minHeight: 0, padding: 0, cursor: 'pointer', aspectRatio: '1 / 1',
                         border: day === today ? '1px solid var(--acid)' : '1px solid transparent',
-                        borderRadius: 2,
+                        borderRadius: fit.cell >= 34 ? 6 : 2,
                         // An empty day is one clear shade above the window, so the month's shape reads.
                         background: pct > 0 ? `color-mix(in srgb, var(--acid) ${pct}%, var(--paper-3))` : 'var(--paper-3)',
                         // A heat map: no numbers in the cells (too small to read at
@@ -137,8 +143,11 @@ export function YearView({ state, onCommand }: Props) {
                       }}
                       aria-label={`${day}${f > 0 ? `, ${Math.round(f)} minutes focus` : ''}${t > 0 ? `, ${t} planned` : ''}`}
                     >
+                      {fit.cell >= DATE_MIN_CELL && (
+                        <span aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: 'center', fontFamily: 'var(--font-read, var(--font-sans))', fontSize: Math.round(Math.min(14, fit.cell * 0.36)), fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: pct > 45 ? 'var(--ink-on-bright, #111)' : day < today ? 'var(--ink-3)' : 'var(--ink-2)', pointerEvents: 'none' }}>{Number(day.slice(8))}</span>
+                      )}
                       {t > 0 && (
-                        <span aria-hidden style={{ position: 'absolute', right: 1, top: 1, width: 3, height: 3, borderRadius: 999, background: 'var(--cyan)' }} />
+                        <span aria-hidden style={{ position: 'absolute', right: 2, top: 2, width: fit.cell >= 34 ? 5 : 3, height: fit.cell >= 34 ? 5 : 3, borderRadius: 999, background: 'var(--cyan)' }} />
                       )}
                     </button>
                   );

@@ -67,6 +67,12 @@
 | F58 | (Decision 60) **Cards behave alike.** The Calendar's add card hides on a click away; a plan's Details card renames it on a double-click of its name; only one card or menu shows at a time; the info card shows name, when, category, planned, recorded and its buttons, nothing more. |
 | F59 | (Decision 60) **Steady edits.** A resized plan or a dragged event never flashes back to its old place before it lands; letting go is not a click; the plan being resized keeps its tint; events light up under the pointer. |
 | F60 | (Decision 60) **A resizable Calendar on the Free canvas.** Its right edge, bottom edge and corner resize it (420 × 360 to 1800 × 1400); the windows beside it move along and notes under it move down, so nothing overlaps, also after a swap; `krnl window size calendar <width> <height>`. |
+| F61 | (Decision 61) **One lane plan.** A plan and a repeating event at the same time sit side by side, never on top of each other. |
+| F62 | (Decision 61) **One drag look.** Anything carried onto the Calendar (Todo row, task card, Calendar block, canvas card, event, habit) shows as the same solid block at its landing slot with its name and times; the original steps back; habits can be carried to another time. |
+| F63 | (Decision 61) **A canvas card onto the Calendar** is planned (or moved) where it is let go; the card glides back to its place. |
+| F64 | (Decision 61) **The day fits.** By default the whole day fits the Calendar (no scroll, no empty band); zoom only makes it taller; "Fit the day" goes back; small hours drop the half-hour marks. |
+| F65 | (Decision 61) **The canvas Calendar** starts at 1400 × 1400, keeps its shape, 540 to 1400 with snaps at both ends, resizes smoothly (written once on release); the row never jumps when notes are placed. |
+| F66 | (Decision 61) **Per device:** window places, visibility and canvas size never sync. No fade masks anywhere; the Year view fills its window. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin

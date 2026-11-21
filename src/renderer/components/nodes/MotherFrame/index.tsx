@@ -60,7 +60,7 @@ interface Props {
   variant?: 'canvas' | 'station';
   /** Decision 60 — the window can be resized on the canvas (its right edge,
    *  bottom edge and corner); `onResized` gets the size when you let go. */
-  resizable?: { onResized: (width: number, height: number) => void; min: { width: number; height: number }; max: { width: number; height: number } };
+  resizable?: { onResize: (width: number, height: number, first: boolean) => void; min: { width: number; height: number }; max: { width: number; height: number } };
 }
 
 // Wave C (LifeOS UI refresh) — bumped to 500×500 so mothers read as the
@@ -170,21 +170,59 @@ export function MotherFrame({
     const w0 = width;
     const h0 = minHeight;
     let last = { width: w0, height: h0 };
-    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(v / 10) * 10));
+    let started = false;
+    // Decision 60 — smooth: while you drag, only the screen changes (this
+    // frame's size, and the windows to its right slid along with a CSS
+    // translate on their wrappers); the board is written once, on release.
+    // (Writing it on every move re-rendered the whole canvas: it stuttered.)
+    const frame = frameRef.current;
+    const ownWrap = frame?.closest('.react-flow__node') as HTMLElement | null;
+    const ownLeft = ownWrap?.getBoundingClientRect().left ?? 0;
+    const neighbours = Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node.krnl-mother'))
+      .filter((el) => el !== ownWrap && el.getBoundingClientRect().left > ownLeft + 1)
+      .map((el) => ({ el, transform: el.style.transform }));
+    let raf = 0;
+    const paint = () => {
+      raf = 0;
+      if (frame) { frame.style.width = `${last.width}px`; frame.style.height = `${last.height}px`; }
+      for (const n of neighbours) n.el.style.translate = `${last.width - w0}px 0px`;
+    };
+    // It grows like a picture (same shape), never below the standard size,
+    // and snaps to the smallest and largest sizes when you come close.
     const move = (ev: PointerEvent) => {
-      last = {
-        width: axis === 'y' ? w0 : clamp(w0 + (ev.clientX - x0) / zoom, resizable.min.width, resizable.max.width),
-        height: axis === 'x' ? h0 : clamp(h0 + (ev.clientY - y0) / zoom, resizable.min.height, resizable.max.height),
-      };
-      setLive(last);
+      const dx = (ev.clientX - x0) / zoom;
+      const dy = (ev.clientY - y0) / zoom;
+      const d = axis === 'x' ? dx : axis === 'y' ? dy : Math.max(dx, dy);
+      let side = Math.round((w0 + d) / 10) * 10;
+      if (side < resizable.min.width + 28) side = resizable.min.width;
+      if (side > resizable.max.width - 28) side = resizable.max.width;
+      const next = { width: side, height: Math.round(side * (h0 / Math.max(1, w0))) };
+      if (next.width === last.width && next.height === last.height) return;
+      last = next;
+      started = true;
+      if (!raf) raf = requestAnimationFrame(paint);
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      if (last.width === w0 && last.height === h0) { setLive(null); return; }
-      resizable.onResized(last.width, last.height);
-      window.setTimeout(() => setLive(null), 1500);
+      if (raf) { cancelAnimationFrame(raf); paint(); }
+      if (!started) return;
+      // One write (one undo step); the neighbours' slide is handed to the
+      // canvas once it has moved them (no jump back for a frame).
+      resizable.onResize(last.width, last.height, true);
+      let frames = 0;
+      const handOff = () => {
+        frames += 1;
+        let pending = false;
+        for (const n of neighbours) {
+          if (!n.el.style.translate) continue;
+          if (n.el.style.transform !== n.transform || frames > 30) n.el.style.translate = '';
+          else pending = true;
+        }
+        if (pending) requestAnimationFrame(handOff);
+      };
+      requestAnimationFrame(handOff);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -258,7 +296,12 @@ export function MotherFrame({
           <div className="nodrag nopan mother-resize mother-resize--y" data-testid={`mother-resize-y-${nodeId}`} title="Drag to resize" onPointerDown={startResize('y')}
             style={{ position: 'absolute', left: 14, right: 14, bottom: -5, height: 10, cursor: 'ns-resize', zIndex: 6 }} />
           <div className="nodrag nopan mother-resize mother-resize--xy" data-testid={`mother-resize-${nodeId}`} title="Drag to resize" onPointerDown={startResize('xy')}
-            style={{ position: 'absolute', right: -6, bottom: -6, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 7 }} />
+            style={{ position: 'absolute', right: 0, bottom: 0, width: 20, height: 20, cursor: 'nwse-resize', zIndex: 7 }}>
+            {/* The canvas's own resize grip (as on notes and images). */}
+            <svg className="mother-resize__grip" width="14" height="14" viewBox="0 0 14 14" aria-hidden style={{ position: 'absolute', right: 3, bottom: 3, color: 'var(--ink-4)', pointerEvents: 'none' }}>
+              <path d="M13 5L5 13M13 9L9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </div>
         </>
       )}
 

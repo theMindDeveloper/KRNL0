@@ -31,8 +31,8 @@ describe('yearLayout', () => {
     expect(yearLayout(300, 900).cols).toBeLessThanOrEqual(3);
   });
 
-  it('cells are capped at 28 px; in a tiny box they shrink to fit instead of being cut off', () => {
-    expect(yearLayout(4000, 3000).cell).toBe(28);
+  it('cells grow with the window up to 56 px (Decision 61); in a tiny box they shrink to fit instead of being cut off', () => {
+    expect(yearLayout(4000, 3000).cell).toBe(56);
     expect(yearLayout(50, 50).cell).toBe(3);
   });
 });

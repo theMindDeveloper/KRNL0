@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { setPlanDragImage } from '../CalendarNode/DropGhost';
+import { beginTaskDragInfo } from '../../../store/taskDrag';
 import { useDismissOutside } from '../../ui/useDismissOutside';
 import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
@@ -576,7 +578,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           : { itemId: item.id, durationMin };
         e.dataTransfer.setData('application/krnl-task', JSON.stringify(payload));
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
+        // Decision 60 — the one drag look: a clean chip with the plan's name.
+        setPlanDragImage(e, item.text, item.taskNodeId ? toneVarForTask(item.taskNodeId) : 'var(--acid)');
+        beginTaskDragInfo(payload);
       }}
       onContextMenu={(e) =>
         handleRowContextMenu(e, item.id, item.taskNodeId !== null)

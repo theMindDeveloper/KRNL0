@@ -26,7 +26,15 @@ export interface ObserveDashProps {
  *  (Recording, Break, Paused) is said in the header beside the window's name,
  *  not under the time and not in the row with the task (owner, 2026-11-20). */
 export function TimerClock({ text, blink = false, testId = 'pomo-clock' }: { text: string; /** The colon blinks while time is being recorded; it is still when paused or idle. */ blink?: boolean; testId?: string }): JSX.Element {
-  const i = text.lastIndexOf(':');
+  // Every colon is the drawn one (owner, 2026-11-21: with hours, the first was
+  // a typed ":" squeezed between "1" and "53" while the second was dots).
+  const parts = text.split(':');
+  const colon = (k: number) => (
+    <span key={`c${k}`} data-testid={k === parts.length - 2 ? 'pomo-colon' : 'pomo-colon-h'} role="presentation" style={{ display: 'inline-flex', flexDirection: 'column', justifyContent: 'center', gap: '0.24em', margin: '0 0.13em', animation: blink ? 'pomo-blink 1s steps(1) infinite' : 'none' }}>
+      <span style={{ width: '0.13em', height: '0.13em', borderRadius: '50%', background: 'var(--ink-4)' }} />
+      <span style={{ width: '0.13em', height: '0.13em', borderRadius: '50%', background: 'var(--ink-4)' }} />
+    </span>
+  );
   return (
     <div data-testid="pomo-timer-clock" style={{ display: 'flex', justifyContent: 'center', width: '100%', containerType: 'inline-size' }}>
       {/* The clock font (--font-clock): monospaced like the app, with plain
@@ -35,14 +43,7 @@ export function TimerClock({ text, blink = false, testId = 'pomo-clock' }: { tex
       <div data-testid={testId} style={{ display: 'flex', alignItems: 'center', fontFamily: 'var(--font-clock)', fontVariantNumeric: 'tabular-nums lining-nums', lineHeight: 1,
         // Grows with the window, so a large window is not mostly empty; smaller once it shows hours.
         fontSize: text.length > 5 ? 'clamp(44px, 14cqw, 112px)' : 'clamp(60px, 20cqw, 152px)', fontWeight: 500, letterSpacing: '-0.05em', color: 'var(--ink)' }}>
-        <span>{i < 0 ? text : text.slice(0, i)}</span>
-        {i >= 0 && (
-          <span data-testid="pomo-colon" role="presentation" style={{ display: 'inline-flex', flexDirection: 'column', justifyContent: 'center', gap: '0.24em', margin: '0 0.13em', animation: blink ? 'pomo-blink 1s steps(1) infinite' : 'none' }}>
-            <span style={{ width: '0.13em', height: '0.13em', borderRadius: '50%', background: 'var(--ink-4)' }} />
-            <span style={{ width: '0.13em', height: '0.13em', borderRadius: '50%', background: 'var(--ink-4)' }} />
-          </span>
-        )}
-        {i >= 0 && <span>{text.slice(i + 1)}</span>}
+        {parts.flatMap((p, k) => (k === 0 ? [<span key={`p${k}`}>{p}</span>] : [colon(k - 1), <span key={`p${k}`}>{p}</span>]))}
       </div>
     </div>
   );

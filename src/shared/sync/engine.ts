@@ -5,7 +5,7 @@
 // conflict is resolved with boardMerge — the merge main already uses for the CLI.
 
 import { mergeBoards, type MergeOptions } from '../boardMerge';
-import { restoreDevice, sameContent, stripDevice } from './shape';
+import { restoreDevice, sameContent, stripDevice, withDeviceNodeKeys } from './shape';
 import { latestWins, noteEdits, splitStamps, stampsFor, withStamps } from './stamps';
 import {
   SyncError,
@@ -361,7 +361,8 @@ export class SyncEngine {
       // What changed here gets its time, and travels with the upload (F21).
       const stamps = stampsFor(local, this.serverNow().at, this.noteEdits(name, local, base));
       this.store.setStamps(name, stamps);
-      const r = await this.t.putDoc(name, base?.rev ?? 0, withStamps(local, stamps));
+      // Decision 61 — the upload keeps this device's window places for older versions.
+      const r = await this.t.putDoc(name, base?.rev ?? 0, withStamps(withDeviceNodeKeys(name, local, this.host.read(name)), stamps));
       if (r.ok) {
         this.store.setBase(name, { rev: r.rev, body: local });
         this.conflictsInRow.delete(name);

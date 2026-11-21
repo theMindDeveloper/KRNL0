@@ -299,3 +299,7 @@
 .clock-expand { opacity: 0.5; margin-left: 4px; }
 .clock-expand:hover, .clock-expand:focus-visible, .clock-expand[aria-pressed='true'] { opacity: 1; }
 .clock-list { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent; }
+
+/* Decision 60 — the Calendar's resize grip on the Free canvas: quiet until reached for. */
+.mother-resize--xy .mother-resize__grip { opacity: 0.7; transition: opacity 120ms ease, color 120ms ease; }
+.mother-resize--xy:hover .mother-resize__grip { opacity: 1; color: var(--ink-2); }

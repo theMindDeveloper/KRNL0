@@ -493,7 +493,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'show', usage: 'window show <todo|timer|habits|calendar|clock|terminal|analytics>', summary: 'Show a window (the toolbar eye button)' },
       { name: 'hide', usage: 'window hide <name>', summary: 'Hide a window' },
       { name: 'swap', usage: 'window swap <a> <b>', summary: 'Swap the places of two windows' },
-      { name: 'size', usage: 'window size <name> [width height]', summary: 'Show a window\'s size on the Free canvas, or resize the calendar (the windows beside it move along)' },
+      { name: 'size', usage: 'window size <name> [size]', summary: 'Show a window\'s size on the Free canvas, or resize the calendar (it keeps its shape, 540 to 1400 px; this device only)' },
     ],
   },
   {

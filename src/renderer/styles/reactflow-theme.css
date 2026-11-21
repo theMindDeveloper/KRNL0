@@ -324,8 +324,9 @@ body.cal-resizing .cal-block.is-resizing::after, .cal-block.is-resizing::after {
 .cal-unsched.is-hot { background: color-mix(in srgb, var(--paper) 78%, var(--acid) 22%); box-shadow: inset 0 0 0 2px var(--acid), 0 6px 18px rgba(0, 0, 0, 0.35); }
 /* Decision 40 — ANY TIME strip cells: every cell is a target while a plan is
    dragged; the one under the pointer fills. */
-.cal-anytime.is-target { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 55%, transparent) !important; }
-.cal-anytime.is-hot { background: color-mix(in srgb, var(--acid) 14%, transparent); box-shadow: inset 0 0 0 1px var(--acid) !important; }
+/* Decision 60 — no outlined cells while dragging (owner: "remove this effect");
+   only the cell under the pointer takes a quiet tint. */
+.cal-anytime.is-hot { background: color-mix(in srgb, var(--acid) 10%, transparent); }
 .cal-unsched__text { display: flex; flex-direction: column; gap: 1px; pointer-events: none; }
 .cal-unsched__text b { font-size: 12px; font-weight: 600; color: var(--ink); }
 .cal-unsched__text span { font-size: 11px; color: var(--ink-2); }
@@ -383,3 +384,19 @@ body.cal-resizing .cal-block.is-resizing::after, .cal-block.is-resizing::after {
 .cal-habit { transition: transform 120ms ease-out; }
 .cal-habit:not(:disabled):active { transform: scale(0.94); }
 @media (prefers-reduced-motion: reduce) { .cal-habit { transition: none; } .cal-habit:active { transform: none; } }
+
+/* Decision 60 — a canvas card dragged onto the Calendar. The preview glides
+   from slot to slot; the card shrinks a little as it goes in; the plan lands
+   with a short pop. Reduced motion: no glide, no pop. */
+.cal-drop-preview { transition: top 140ms cubic-bezier(0.22, 1, 0.36, 1), height 140ms cubic-bezier(0.22, 1, 0.36, 1); animation: cal-drop-in 160ms ease-out; }
+@keyframes cal-drop-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+.react-flow__node[data-over-calendar] > * { transform: scale(0.9); opacity: 0.22; transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease; }
+.cal-block.is-carried { opacity: 0.35; }
+.cal-drop-ghost { transition: top 140ms cubic-bezier(0.22, 1, 0.36, 1), height 140ms cubic-bezier(0.22, 1, 0.36, 1); animation: cal-drop-in 160ms ease-out; }
+.react-flow__node > * { transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease; }
+.cal-block.is-landed { animation: cal-landed 520ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes cal-landed { 0% { transform: scale(0.92); box-shadow: 0 0 0 2px var(--acid); } 60% { transform: scale(1.02); } 100% { transform: none; box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .cal-drop-preview, .cal-drop-ghost, .cal-block.is-landed { animation: none; transition: none; }
+  .react-flow__node[data-over-calendar] > *, .react-flow__node > * { transition: none; }
+}

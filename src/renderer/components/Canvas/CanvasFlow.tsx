@@ -43,6 +43,7 @@ import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { DrawLayer } from './DrawLayer';
 import { motherRowY } from './motherRow';
+import { motherRowXs } from '../../../shared/motherLayout';
 import { DrawStrokeNode, STROKE_NODE_PREFIX, STROKE_Z, strokeBox } from './DrawStrokeNode';
 import type { DrawStroke } from '../../../shared/types/board';
 import { targetNodeIdAt } from './connectTarget';
@@ -99,6 +100,27 @@ function settleNodes(ids: readonly string[]): void {
       window.setTimeout(() => el.removeAttribute('data-settling'), 320);
     }
   });
+}
+
+// Decision 60 — a task card dragged over the Calendar: the Calendar shows
+// where it would land (WeekView listens), and the card shrinks a little as
+// it "goes in" (data-over-calendar on its wrapper).
+let calendarDragRaf = 0;
+function calendarDragOver(id: string, x: number, y: number): void {
+  if (calendarDragRaf) cancelAnimationFrame(calendarDragRaf);
+  calendarDragRaf = requestAnimationFrame(() => {
+    calendarDragRaf = 0;
+    const under = typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(x, y) : [];
+    const over = under.some((el) => el instanceof HTMLElement && (el.dataset['calDay'] || el.dataset['calAnytime']));
+    const el = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+    if (el) { if (over) el.setAttribute('data-over-calendar', '1'); else el.removeAttribute('data-over-calendar'); }
+    window.dispatchEvent(new CustomEvent('krnl:calendar:drag-over', { detail: { taskId: id, x, y, over } }));
+  });
+}
+function calendarDragEnd(id: string): void {
+  if (calendarDragRaf) { cancelAnimationFrame(calendarDragRaf); calendarDragRaf = 0; }
+  document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`)?.removeAttribute('data-over-calendar');
+  window.dispatchEvent(new CustomEvent('krnl:calendar:drag-end', { detail: { taskId: id } }));
 }
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
@@ -1458,9 +1480,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       .slice()
       .sort((a: KrnlNode, b: KrnlNode) => a.position.x - b.position.x);
     const rowStartX = Math.min(...motherNodes.map((n) => n.position.x), MOTHER_ROW_START_X);
-    const displayX = new Map<string, number>(
-      motherNodes.map((n, i) => [n.id, rowStartX + i * MOTHER_ROW_STEP]),
-    );
+    // Decision 60 — each window at its own width (the Calendar can be bigger):
+    // the next one starts a gap after it, so nothing overlaps.
+    void MOTHER_ROW_STEP;
+    const displayX = motherRowXs(motherNodes, rowStartX);
     const rowY = motherRowY(board.nodes);
     const slotTotal = motherNodes.length;
     const slotIndexMap = new Map<string, number>(
@@ -1558,6 +1581,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   //     sync becomes a no-op because the new position already matches.
   const [nodes, setNodes] = useState<KrnlRFNode[]>(derivedNodes);
   const isDraggingRef = useRef(false);
+  // Decision 60 — where the pointer is during a node drag (a task card let go over the Calendar).
+  const lastDragPointer = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!isDraggingRef.current) {
@@ -1765,6 +1790,25 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // Where the store had it before this drag (for hidden frame children).
     const before = useBoardStore.getState().board?.nodes.find((n) => n.id === draggedId)?.position;
 
+    // Decision 60 — a task card let go over a Calendar day is planned there;
+    // the card itself goes back to where it was on the canvas.
+    const ptr = lastDragPointer.current;
+    if (draggedKind === 'todo.task' && ptr && before && typeof document.elementsFromPoint === 'function') {
+      const under = document.elementsFromPoint(ptr.x, ptr.y);
+      const any = under.find((el) => el instanceof HTMLElement && el.dataset['calAnytime']) as HTMLElement | undefined;
+      const col = any ? undefined : under.find((el) => el instanceof HTMLElement && el.dataset['calDay']) as HTMLElement | undefined;
+      const day = any?.dataset['calAnytime'] ?? col?.dataset['calDay'];
+      if (day) {
+        window.dispatchEvent(new CustomEvent('krnl:calendar:drop-task', { detail: { taskId: draggedId, day, clientY: ptr.y, anyTime: !!any } }));
+        calendarDragEnd(draggedId);
+        // The card glides back to its place on the canvas (the plan is on the Calendar now).
+        settleNodes([draggedId]);
+        setNodes((prev) => prev.map((n) => (n.id === draggedId ? { ...n, position: { ...before } } : n)));
+        return;
+      }
+    }
+    if (draggedKind === 'todo.task') calendarDragEnd(draggedId);
+
     // Align to grid: the drop settles on the nearest free grid spot (a frame
     // only snaps; its children move with it). Others moving in the same
     // gesture don't count as in the way.
@@ -1925,6 +1969,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       edgeTypes={EDGE_TYPES}
       defaultViewport={initialViewport}
       onNodesChange={onNodesChange}
+      onNodeDrag={(e, n) => {
+        lastDragPointer.current = { x: e.clientX, y: e.clientY };
+        if ((n as KrnlRFNode).data?.node?.kind === 'todo.task') calendarDragOver(n.id, e.clientX, e.clientY);
+      }}
+      onNodeDragStart={(e) => { lastDragPointer.current = { x: e.clientX, y: e.clientY }; }}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       // Easier wiring: snap to a handle from further away, and dropping

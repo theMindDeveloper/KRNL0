@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { setPlanDragImage } from '../CalendarNode/DropGhost';
+import { beginTaskDragInfo } from '../../../store/taskDrag';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
@@ -514,6 +516,8 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
               e.stopPropagation();
               e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId, durationMin: state.plannedMin }));
               e.dataTransfer.effectAllowed = 'move';
+              beginTaskDragInfo({ taskId, durationMin: state.plannedMin });
+              setPlanDragImage(e, state.text, toneVarForTask(taskId));
             }}
             style={{
               width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'grab',

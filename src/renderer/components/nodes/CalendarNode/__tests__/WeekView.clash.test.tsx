@@ -82,7 +82,7 @@ describe('WeekView — clashing plans as letter bars (F28)', () => {
     expect(document.querySelector('[data-testid="task-block-t-c"]')!.getAttribute('title')).toContain('Call with Sam');
   });
 
-  it('every bar is draggable, and dragging one shows the unschedule zone; dropping there unschedules it', async () => {
+  it('every bar is draggable, and a drag shows no extra bars or outlines (Decision 60)', async () => {
     seed(three());
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
     const row = document.querySelector('[data-testid="task-block-t-c"]') as HTMLElement;
@@ -91,38 +91,9 @@ describe('WeekView — clashing plans as letter bars (F28)', () => {
     fireEvent.dragStart(row, { dataTransfer: d });
     expect(JSON.parse(d.data['application/krnl-task']!)).toEqual({ taskId: 't-c', durationMin: 90 });
     await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
-    const zone = document.querySelector('[data-testid="calendar-unschedule-drop"]') as HTMLElement;
-    expect(zone).toBeTruthy();
-    expect(zone.textContent).toContain('Drop here to unschedule');
-    fireEvent.dragOver(zone, { dataTransfer: d });
-    expect(zone.className).toContain('is-hot');
-    fireEvent.drop(zone, { dataTransfer: d });
-    expect(unscheduleTask).toHaveBeenCalledWith('t-c');
     expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeNull();
-  });
-
-  it('the zone also goes away when a drag ends anywhere else', async () => {
-    seed(three());
-    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const row = document.querySelector('[data-testid="task-block-t-a"]') as HTMLElement;
-    fireEvent.dragStart(row, { dataTransfer: dt() });
-    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
-    expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeTruthy();
+    expect(document.querySelector('.cal-anytime.is-target')).toBeNull();
     fireEvent.dragEnd(row);
-    expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeNull();
-  });
-
-  it('a drop anywhere else (the dragged row may be gone by then) also clears the zone', async () => {
-    seed(three());
-    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const row = document.querySelector('[data-testid="task-block-t-b"]') as HTMLElement;
-    const d = dt();
-    fireEvent.dragStart(row, { dataTransfer: d });
-    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
-    expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeTruthy();
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-15-09"]') as HTMLElement;
-    fireEvent.drop(cell, { dataTransfer: d });
-    expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeNull();
     expect(unscheduleTask).not.toHaveBeenCalled();
   });
 

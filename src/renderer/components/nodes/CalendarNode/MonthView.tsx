@@ -369,10 +369,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                 overflowX: 'auto',
                 overflowY: 'hidden',
                 scrollbarWidth: 'none',
-                // The strip scrolls sideways; its right edge fades to say so.
-                maskImage: 'linear-gradient(to right, #000 calc(100% - 18px), transparent)',
-                WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 18px), transparent)',
-                paddingRight: 14,
+                // Decision 60 — no fade (it read as a blur); the strip just scrolls.
+                paddingRight: 4,
                 flex: 1,
                 minWidth: 0,
               }}
@@ -588,7 +586,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     overflowY: 'auto',
                     overflowX: 'hidden',
                     scrollbarWidth: 'thin',
-                    ...(scrolls ? { maskImage: 'linear-gradient(to bottom, #000 calc(100% - 12px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 12px), transparent)', paddingBottom: 8 } : {}),
+                    // Decision 60 — no fade at the bottom (it read as a blur): the list scrolls, crisp.
+                    ...(scrolls ? { paddingBottom: 4 } : {}),
                     position: 'relative',
                     zIndex: 1,
                   }}

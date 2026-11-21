@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import { RESIZABLE_MOTHERS, motherSizeOf } from '../../../shared/motherLayout';
 import { Handle, Position } from '@xyflow/react';
 import type {
   Node as RFNode,
@@ -92,7 +93,7 @@ export function toRfNode(
   // older boards. Internal scroll handles overflow.
   const lockSize = node.kind === 'analytics';
   // Decision 60 — a window with its own size (the Calendar, resized on the canvas).
-  const canvasSize = node.isMother ? (node.config as { canvasSize?: { width: number; height: number } } | undefined)?.canvasSize : undefined;
+  const canvasSize = node.isMother && (RESIZABLE_MOTHERS.has(node.kind) || (node.config as { canvasSize?: unknown } | undefined)?.canvasSize) ? motherSizeOf(node) : undefined;
   const w = canvasSize ? canvasSize.width : lockSize ? initialDims?.width : stateAny.width ?? initialDims?.width;
   const h = canvasSize ? canvasSize.height : lockSize ? initialDims?.height : stateAny.height ?? initialDims?.height;
   const sizeFields =

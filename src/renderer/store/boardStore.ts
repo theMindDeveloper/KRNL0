@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { reflowMotherRow, resizeMotherIn } from '../../shared/motherLayout';
+import { resizeMotherIn } from '../../shared/motherLayout';
 import { presetOf, presetRows, swapInRows, withPreset } from '../../shared/stationLayouts';
 import { saveBoard, setLiveViewportSource } from './eventLog';
 import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig, CompletionRecord } from '../../shared/types';
@@ -96,7 +96,7 @@ interface BoardStore {
   removeEdge: (id: string) => void;
   swapMotherSlots: (idA: string, idB: string) => void;
   /** Decision 60 — resize a window on the Free canvas (the Calendar); the row makes room. */
-  resizeMother: (id: string, width: number, height: number) => void;
+  resizeMother: (id: string, width: number, height: number, opts?: { skipHistory?: boolean }) => void;
   reorderMotherSlots: (motherId: string, toSlotIndex: number) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setViewport: (v: BoardViewport) => void;
@@ -323,23 +323,23 @@ export const useBoardStore = create<BoardStore>((set) => ({
         ...pushHistory(s),
         board: {
           ...s.board,
-          // Decision 60 — windows of different widths: the row is laid out
-          // again after the swap, so a wide Calendar never covers a neighbour.
-          nodes: reflowMotherRow(s.board.nodes.map((n) => {
+          // (Decision 60 — the canvas draws the row at each window's own width,
+          // so a wide Calendar never covers a neighbour after a swap.)
+          nodes: s.board.nodes.map((n) => {
             if (n.id === idA) return { ...n, position: posB, config: { ...cfgA, stationSlot: slotB } };
             if (n.id === idB) return { ...n, position: posA, config: { ...cfgB, stationSlot: slotA } };
             return n;
-          })),
+          }),
         },
       };
     }),
 
-  resizeMother: (id, width, height) =>
+  resizeMother: (id, width, height, opts) =>
     set((s) => {
       if (!s.board) return s;
       const nodes = resizeMotherIn(s.board.nodes, id, width, height);
       if (nodes.every((n, i) => n === s.board!.nodes[i])) return s;
-      return { ...pushHistory(s), board: { ...s.board, nodes } };
+      return { ...(opts?.skipHistory ? {} : pushHistory(s)), board: { ...s.board, nodes } };
     }),
 
   // Drag-to-reorder: move motherId to the given 0-based toSlotIndex, shifting
@@ -373,11 +373,11 @@ export const useBoardStore = create<BoardStore>((set) => ({
         ...pushHistory(s),
         board: {
           ...s.board,
-          nodes: reflowMotherRow(s.board.nodes.map((n) => {
+          nodes: s.board.nodes.map((n) => {
             const newX = newXByNodeId.get(n.id);
             if (newX === undefined) return n;
             return { ...n, position: { x: newX, y: n.position.y } };
-          })),
+          }),
         },
       };
     }),

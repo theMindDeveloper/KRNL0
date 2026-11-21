@@ -381,7 +381,9 @@ describe('The Timer clock, the layout switch and a flat Analytics header (owner,
     const d = read('components/nodes/PomoNode/ObserveDash.tsx');
     expect(d).toContain("text.length > 5 ? 'clamp(44px, 14cqw, 112px)' : 'clamp(60px, 20cqw, 152px)'");
     expect(d).toContain("alignItems: 'center', fontFamily: 'var(--font-clock)'");
-    expect(d).toContain('data-testid="pomo-colon" role="presentation"');
+    expect(d).toContain("'pomo-colon' : 'pomo-colon-h'} role=\"presentation\"");
+    // Every colon is drawn, the one after the hours too (owner, 2026-11-21).
+    expect(d).toContain("text.split(':')");
   });
   it('Fit sits before the layout menu, so the menu never moves when Fit appears', () => {
     const bar = read('components/TopBar/index.tsx');

@@ -3,9 +3,9 @@ import { useState } from 'react';
 // Slice 1 shell upgraded: 'month' case now renders the real MonthView.
 // Week and year remain placeholder stubs for Slices 3/4.
 
-import { MotherFrame, MOTHER_WIDTH, MOTHER_HEIGHT, MOTHER_TOTAL } from '../MotherFrame';
+import { MotherFrame, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
-import { MOTHER_MAX, MOTHER_MIN } from '../../../../shared/motherLayout';
+import { MOTHER_MAX, MOTHER_MIN, motherSizeOf } from '../../../../shared/motherLayout';
 import type { NodeProps } from '../types';
 import type { CalendarConfig, CalendarState } from './types';
 import { defaultCalendarConfig } from './types';
@@ -69,9 +69,10 @@ export function CalendarNode({
       slotIndex={slotIndex}
       slotTotal={slotTotal}
       // Decision 60 — the Calendar can be resized on the Free canvas.
-      width={(node.config as { canvasSize?: { width: number } } | undefined)?.canvasSize?.width ?? MOTHER_WIDTH}
-      minHeight={(node.config as { canvasSize?: { height: number } } | undefined)?.canvasSize?.height ?? MOTHER_HEIGHT}
-      resizable={{ onResized: (w, h) => useBoardStore.getState().resizeMother(node.id, w, h), min: MOTHER_MIN, max: MOTHER_MAX }}
+      width={motherSizeOf(node).width}
+      minHeight={motherSizeOf(node).height}
+      // The size follows the pointer live (the windows beside it move with it).
+      resizable={{ onResize: (w, h, first) => useBoardStore.getState().resizeMother(node.id, w, h, { skipHistory: !first }), min: MOTHER_MIN, max: MOTHER_MAX }}
       position={node.position}
     >
       {/* window-frame.md — the standard header: name, then the views. */}

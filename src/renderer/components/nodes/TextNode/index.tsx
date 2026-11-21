@@ -321,10 +321,7 @@ export function TextNode({
             boxSizing: 'border-box',
             position: 'relative',
             ...(isShape ? { display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' } : {}),
-            ...(overflowing ? {
-              maskImage: 'linear-gradient(to bottom, #000 calc(100% - 28px), transparent)',
-              WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 28px), transparent)',
-            } : {}),
+            // Decision 60 — no fade at the bottom (it read as a blur); the note is clipped cleanly.
           }}
         >
           {text || (

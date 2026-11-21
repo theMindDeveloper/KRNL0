@@ -114,13 +114,12 @@ export function windowSize(ctx: WindowCtx, name: string | undefined, width: numb
   const cur = motherSizeOf(m as never);
   if (width === undefined && height === undefined) return { ok: true, message: `${label(m.kind)}: ${cur.width} × ${cur.height}`, data: cur };
   if (!RESIZABLE_MOTHERS.has(m.kind)) return { ok: false, message: `${label(m.kind)} keeps its size; only the calendar can be resized` };
-  const w = width ?? cur.width;
-  const h = height ?? cur.height;
-  if (!Number.isFinite(w) || !Number.isFinite(h)) return { ok: false, message: 'window size: width and height are numbers (e.g. krnl window size calendar 900 700)' };
-  board.nodes = resizeMotherIn(board.nodes as never, m.id, w, h) as never;
+  const side = Math.max(width ?? 0, height ?? 0);
+  if (!Number.isFinite(side) || side <= 0) return { ok: false, message: 'window size: give a size in px (e.g. krnl window size calendar 900)' };
+  board.nodes = resizeMotherIn(board.nodes as never, m.id, side) as never;
   save(ctx, board);
   const now = motherSizeOf(board.nodes.find((n) => n.id === m.id) as never);
-  return { ok: true, message: `${label(m.kind)}: ${now.width} × ${now.height} (on the Free canvas; the windows beside it moved along)`, data: now };
+  return { ok: true, message: `${label(m.kind)}: ${now.width} × ${now.height} on the Free canvas (it keeps its shape; 540 is the smallest; this device only)`, data: now };
 }
 
 /** `krnl window swap <a> <b>` — swap two windows' places (dragging one onto another). */
