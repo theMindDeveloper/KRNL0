@@ -3298,3 +3298,15 @@ Typecheck clean; all tests pass.
 **Files changed:** `src/renderer/components/TopBar/BoardSwitcher.tsx`, `src/renderer/components/TopBar/index.tsx`, `src/renderer/components/Mobile/MobileShell.tsx`, `tests/unit/renderer/BoardSwitcher.everywhere.test.tsx` (new), `docs/06-requirements/boards.md`, `docs/releases/v0.14.2.md`, `CHANGELOG.md`
 
 **Summary:** The owner started a board on the website of a new server, then connected the desktop app; in Easy mode the board menu was hidden while a window believed it had one board, and it read the list only when it opened, so the synced boards were out of reach on both sides. The menu now shows in Easy and Advanced alike (also on the phone) and reads the list again on every sync report, board change and window focus. Release notes for 0.14.2 written (owner asked for a release without per-step questions).
+
+## [2026-11-21] — Release v0.14.2
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.14.2`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.14.1 → 0.14.2`. Notes: `docs/releases/v0.14.2.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
