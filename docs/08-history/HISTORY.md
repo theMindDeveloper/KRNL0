@@ -3279,3 +3279,14 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-21] — v0.14.1 published, with KRNL0 server 0.2.2
+
+**Type:** Release (published)
+**PRs/Commits:** #270 (the change), #272 (notes), #273 (release PR), tag `v0.14.1`; server: theMindDeveloper/krnl0-server#17; website: theMindDeveloper/theminddeveloper.github.io#5
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:**
+- KRNL0 0.14.1 published at 01:35 UTC: between devices the change made last wins, an edit beats a delete, wrong clocks are corrected (Decision 53). The release script's fixed tag step waited for the v0.14.1 build itself.
+- Server 0.2.2 (website = KRNL0 0.14.1) came from the follow workflow. Its draft was verified (signature, 9 files, image runs 0.2.2; the website's code includes the edit stamps) and published at 01:41 UTC. `:latest` was checked against `release.json`.
+- The website's fallback version is 0.14.1.
