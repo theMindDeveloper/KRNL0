@@ -5,6 +5,7 @@
 // (node positions, pomo state, etc.) do not re-render this component.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { startCarry } from './DropGhost';
 import { useBoardStore } from '../../../store/boardStore';
 import { dayOnlyPlans } from './dayOnly';
 import { DueFlag } from './DueFlag';
@@ -602,6 +603,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                         e.stopPropagation();
                         e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: task.id }));
                         e.dataTransfer.effectAllowed = 'move';
+                        // Decision 61 — the one drag look: a small box in its colour.
+                        startCarry(e, toneVarForTask(task.id), 'always');
                       }}
                       onClick={(e) => { e.stopPropagation(); setTaskPopup({ taskId: task.id, x: e.clientX, y: e.clientY }); }}
                       style={{
@@ -634,6 +637,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                         if (d.kind === 'deadline') { e.preventDefault(); return; }
                         e.dataTransfer.setData('application/krnl-task', JSON.stringify(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin }));
                         e.dataTransfer.effectAllowed = 'move';
+                        startCarry(e, d.taskId ? toneVarForTask(d.taskId) : 'var(--acid)', 'always');
                       }}
                       style={{
                         fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0, borderRadius: 2, padding: '0 3px', lineHeight: '1.3',

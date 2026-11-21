@@ -68,11 +68,13 @@
 | F59 | (Decision 60) **Steady edits.** A resized plan or a dragged event never flashes back to its old place before it lands; letting go is not a click; the plan being resized keeps its tint; events light up under the pointer. |
 | F60 | (Decision 60) **A resizable Calendar on the Free canvas.** Its right edge, bottom edge and corner resize it (420 × 360 to 1800 × 1400); the windows beside it move along and notes under it move down, so nothing overlaps, also after a swap; `krnl window size calendar <width> <height>`. |
 | F61 | (Decision 61) **One lane plan.** A plan and a repeating event at the same time sit side by side, never on top of each other. |
-| F62 | (Decision 61) **One drag look.** Anything carried onto the Calendar (Todo row, task card, Calendar block, canvas card, event, habit) shows as the same solid block at its landing slot with its name and times; the original steps back; habits can be carried to another time. |
+| F62 | (Decision 61) **One drag look.** Anything carried onto the Calendar (Todo row, task card, Calendar block, canvas card, event, habit, an edge being pulled) shows as the same solid ghost at its landing slot with its name and times, gliding smoothly; what is moved or resized steps back; no browser drag picture anywhere; habits can be carried to another time. |
 | F63 | (Decision 61) **A canvas card onto the Calendar** is planned (or moved) where it is let go; the card glides back to its place. |
 | F64 | (Decision 61) **The day fits.** By default the whole day fits the Calendar (no scroll, no empty band); zoom only makes it taller; "Fit the day" goes back; small hours drop the half-hour marks. |
 | F65 | (Decision 61) **The canvas Calendar** starts at 1400 × 1400, keeps its shape, 540 to 1400 with snaps at both ends, resizes smoothly (written once on release); the row never jumps when notes are placed. |
 | F66 | (Decision 61) **Per device:** window places, visibility and canvas size never sync. No fade masks anywhere; the Year view fills its window. |
+| F67 | (Decision 61) **Carried from outside:** a small box in the plan's colour follows just below-right of the pointer; a canvas card shrinks into it while over the Calendar, so the hours stay in view. |
+| F68 | (Decision 61) **Pulling an edge** (plan or event) shows the new length as the ghost; the block steps back, with no tint or highlight on it. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin

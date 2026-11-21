@@ -7,6 +7,8 @@
  */
 
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { endCarry, moveCarry, startCarry } from '../nodes/CalendarNode/DropGhost';
+import { toneVarForTask } from '../../utils/taskColor';
 import { createPortal } from 'react-dom';
 import { scheduleBatch } from '../../utils/rafBatcher';
 import { rfToScreen, updateViewport, updateCanvasRect } from '../../utils/viewportBus';
@@ -102,10 +104,25 @@ function settleNodes(ids: readonly string[]): void {
   });
 }
 
-// Decision 60 — a task card dragged over the Calendar: the Calendar shows
-// where it would land (WeekView listens), and the card shrinks a little as
-// it "goes in" (data-over-calendar on its wrapper).
+// Decision 61 — a task card dragged over the Calendar: the Calendar shows
+// where it would land (the ghost; WeekView listens), and the card goes into
+// the small box at the pointer (data-over-calendar on its wrapper, shrinking
+// around the point it was grabbed by), so it never covers the hours.
 let calendarDragRaf = 0;
+function calendarDragStart(id: string, x: number, y: number): void {
+  const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+  if (el && el.offsetWidth > 0) {
+    // Each part of the card (the card, its connection dots) shrinks toward
+    // the pointer, measured in its own box.
+    const zoom = el.getBoundingClientRect().width / el.offsetWidth || 1;
+    for (const part of Array.from(el.children) as HTMLElement[]) {
+      const r = part.getBoundingClientRect();
+      part.style.setProperty('--grab-x', `${Math.round((x - r.left) / zoom)}px`);
+      part.style.setProperty('--grab-y', `${Math.round((y - r.top) / zoom)}px`);
+    }
+  }
+  startCarry(null, toneVarForTask(id), 'onCalendar');
+}
 function calendarDragOver(id: string, x: number, y: number): void {
   if (calendarDragRaf) cancelAnimationFrame(calendarDragRaf);
   calendarDragRaf = requestAnimationFrame(() => {
@@ -114,12 +131,14 @@ function calendarDragOver(id: string, x: number, y: number): void {
     const over = under.some((el) => el instanceof HTMLElement && (el.dataset['calDay'] || el.dataset['calAnytime']));
     const el = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
     if (el) { if (over) el.setAttribute('data-over-calendar', '1'); else el.removeAttribute('data-over-calendar'); }
+    moveCarry(x, y, over);
     window.dispatchEvent(new CustomEvent('krnl:calendar:drag-over', { detail: { taskId: id, x, y, over } }));
   });
 }
 function calendarDragEnd(id: string): void {
   if (calendarDragRaf) { cancelAnimationFrame(calendarDragRaf); calendarDragRaf = 0; }
   document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`)?.removeAttribute('data-over-calendar');
+  endCarry();
   window.dispatchEvent(new CustomEvent('krnl:calendar:drag-end', { detail: { taskId: id } }));
 }
 
@@ -1973,7 +1992,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         lastDragPointer.current = { x: e.clientX, y: e.clientY };
         if ((n as KrnlRFNode).data?.node?.kind === 'todo.task') calendarDragOver(n.id, e.clientX, e.clientY);
       }}
-      onNodeDragStart={(e) => { lastDragPointer.current = { x: e.clientX, y: e.clientY }; }}
+      onNodeDragStart={(e, n) => {
+        lastDragPointer.current = { x: e.clientX, y: e.clientY };
+        if ((n as KrnlRFNode).data?.node?.kind === 'todo.task') calendarDragStart(n.id, e.clientX, e.clientY);
+      }}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       // Easier wiring: snap to a handle from further away, and dropping

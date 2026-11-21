@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { setPlanDragImage } from '../CalendarNode/DropGhost';
+import { startCarry } from '../CalendarNode/DropGhost';
 import { beginTaskDragInfo } from '../../../store/taskDrag';
 import { useDismissOutside } from '../../ui/useDismissOutside';
 import { LineGlyph } from '../../ui/LineGlyph';
@@ -578,8 +578,9 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
           : { itemId: item.id, durationMin };
         e.dataTransfer.setData('application/krnl-task', JSON.stringify(payload));
         e.dataTransfer.effectAllowed = 'move';
-        // Decision 60 — the one drag look: a clean chip with the plan's name.
-        setPlanDragImage(e, item.text, item.taskNodeId ? toneVarForTask(item.taskNodeId) : 'var(--acid)');
+        // Decision 61 — the one drag look: a small box in its colour at the
+        // pointer; over the Calendar, the ghost shows where it lands.
+        startCarry(e, item.taskNodeId ? toneVarForTask(item.taskNodeId) : 'var(--acid)', 'always');
         beginTaskDragInfo(payload);
       }}
       onContextMenu={(e) =>

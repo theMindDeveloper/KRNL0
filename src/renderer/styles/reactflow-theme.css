@@ -280,10 +280,10 @@
 .cal-block { transition: transform 120ms ease-out; }
 .cal-block::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ink); opacity: 0; pointer-events: none; }
 .cal-block:hover::after { opacity: 0.06; }
-/* While a plan is resized its tint holds (the pointer leaves and re-enters the
-   growing block — it flickered) and no other block lights up under it. */
-body.cal-resizing .cal-block:hover::after { opacity: 0; }
-body.cal-resizing .cal-block.is-resizing::after, .cal-block.is-resizing::after { opacity: 0.06; }
+/* Decision 61 — while an edge is pulled nothing lights up and nothing presses
+   in: the block steps back and the ghost shows the new length. */
+body.cal-resizing .cal-block:hover::after, body.cal-resizing .cal-event.is-hot::after { opacity: 0; }
+body.cal-resizing .cal-block:active { transform: none; }
 /* Decision 60 — a repeating event lights up under the pointer too. */
 .cal-event::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ink); opacity: 0; pointer-events: none; }
 .cal-event.is-hot::after { opacity: 0.06; }
@@ -385,18 +385,33 @@ body.cal-resizing .cal-block.is-resizing::after, .cal-block.is-resizing::after {
 .cal-habit:not(:disabled):active { transform: scale(0.94); }
 @media (prefers-reduced-motion: reduce) { .cal-habit { transition: none; } .cal-habit:active { transform: none; } }
 
-/* Decision 60 — a canvas card dragged onto the Calendar. The preview glides
-   from slot to slot; the card shrinks a little as it goes in; the plan lands
-   with a short pop. Reduced motion: no glide, no pop. */
-.cal-drop-preview { transition: top 140ms cubic-bezier(0.22, 1, 0.36, 1), height 140ms cubic-bezier(0.22, 1, 0.36, 1); animation: cal-drop-in 160ms ease-out; }
-@keyframes cal-drop-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
-.react-flow__node[data-over-calendar] > * { transform: scale(0.9); opacity: 0.22; transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease; }
-.cal-block.is-carried { opacity: 0.35; }
-.cal-drop-ghost { transition: top 140ms cubic-bezier(0.22, 1, 0.36, 1), height 140ms cubic-bezier(0.22, 1, 0.36, 1); animation: cal-drop-in 160ms ease-out; }
-.react-flow__node > * { transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease; }
+/* Decision 61 — one drag look (DropGhost.tsx). The ghost glides from slot to
+   slot by transform only (90 ms) and fades in once per drag; what is moved or
+   resized on the Calendar steps back; a canvas card over the Calendar shrinks
+   into the small box at the pointer; a plan lands with a short pop. Reduced
+   motion: no glide, no shrink, no pop. */
+.cal-drop-ghost { transition: transform 90ms cubic-bezier(0.22, 1, 0.36, 1), height 90ms cubic-bezier(0.22, 1, 0.36, 1), width 90ms cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
+.cal-drop-ghost.is-shown { animation: cal-drop-in 120ms ease-out; }
+.cal-drop-ghost-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-drop-ghost-name:empty { display: none; }
+.cal-drop-ghost-times { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+@keyframes cal-drop-in { from { opacity: 0; } to { opacity: 1; } }
+.cal-block.is-carried, .cal-event.is-carried { opacity: 0.35; }
+/* The small box at the pointer: the thing carried, in its colour. */
+.krnl-carry-box {
+  position: fixed; left: 0; top: 0; width: 14px; height: 14px; z-index: 2147483000; pointer-events: none; box-sizing: border-box;
+  border-radius: 4px; border: 1.5px solid var(--carry-tone, var(--acid));
+  background: color-mix(in srgb, var(--carry-tone, var(--acid)) 70%, var(--paper));
+  box-shadow: 0 4px 12px -4px rgba(0,0,0,0.55);
+  opacity: 0; scale: 0.6; transition: opacity 110ms ease-out, scale 110ms cubic-bezier(0.22, 1, 0.36, 1); will-change: translate;
+}
+.krnl-carry-box.is-shown { opacity: 1; scale: 1; }
+/* A canvas card over the Calendar: it goes into the box (around the grab point). */
+.react-flow__node > * { transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease; }
+.react-flow__node[data-over-calendar] > * { transform: scale(0.04); opacity: 0 !important; transform-origin: var(--grab-x, 50%) var(--grab-y, 50%); }
 .cal-block.is-landed { animation: cal-landed 520ms cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes cal-landed { 0% { transform: scale(0.92); box-shadow: 0 0 0 2px var(--acid); } 60% { transform: scale(1.02); } 100% { transform: none; box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .cal-drop-preview, .cal-drop-ghost, .cal-block.is-landed { animation: none; transition: none; }
+  .cal-drop-ghost, .cal-drop-ghost.is-shown, .cal-block.is-landed, .krnl-carry-box { animation: none; transition: none; }
   .react-flow__node[data-over-calendar] > *, .react-flow__node > * { transition: none; }
 }
