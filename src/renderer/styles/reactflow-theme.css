@@ -280,6 +280,13 @@
 .cal-block { transition: transform 120ms ease-out; }
 .cal-block::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ink); opacity: 0; pointer-events: none; }
 .cal-block:hover::after { opacity: 0.06; }
+/* While a plan is resized its tint holds (the pointer leaves and re-enters the
+   growing block — it flickered) and no other block lights up under it. */
+body.cal-resizing .cal-block:hover::after { opacity: 0; }
+body.cal-resizing .cal-block.is-resizing::after, .cal-block.is-resizing::after { opacity: 0.06; }
+/* Decision 60 — a repeating event lights up under the pointer too. */
+.cal-event::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ink); opacity: 0; pointer-events: none; }
+.cal-event.is-hot::after { opacity: 0.06; }
 .cal-block:active { transform: scale(0.985); }
 @media (prefers-reduced-motion: reduce) { .cal-block { transition: none; } .cal-block:active { transform: none; } }
 .cal-block .cal-replan { opacity: 0; transition: opacity 120ms ease; }

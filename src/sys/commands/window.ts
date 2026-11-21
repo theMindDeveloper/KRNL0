@@ -3,6 +3,7 @@
 // label, the Analytics window's page and range, a media title, an image's alt
 // text. Each one writes the board the way the window does it.
 
+import { RESIZABLE_MOTHERS, motherSizeOf, resizeMotherIn } from '../../shared/motherLayout';
 import { layoutLabel, presetOf, presetRows, presetWindows, swapInRows, withPreset, withPresetWindow } from '../../shared/stationLayouts';
 import type { StationGeometry } from '../../shared/types/board';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
@@ -102,6 +103,24 @@ export function windowSetShown(ctx: WindowCtx, name: string | undefined, show: b
   save(ctx, board);
   const note = board['layoutMode'] === 'station' ? '' : ' (applies in Station layout; the canvas always shows every window)';
   return { ok: true, message: `${label(m.kind)} ${show ? 'shown' : 'hidden'}${note}`, data: { id: m.id, shown: show } };
+}
+
+/** `krnl window size <name> [width height]` — a window's size on the Free canvas (Decision 60: the Calendar). */
+export function windowSize(ctx: WindowCtx, name: string | undefined, width: number | undefined, height: number | undefined): SysResult {
+  const board = load(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const m = motherOf(board, name);
+  if (typeof m === 'string') return { ok: false, message: m };
+  const cur = motherSizeOf(m as never);
+  if (width === undefined && height === undefined) return { ok: true, message: `${label(m.kind)}: ${cur.width} × ${cur.height}`, data: cur };
+  if (!RESIZABLE_MOTHERS.has(m.kind)) return { ok: false, message: `${label(m.kind)} keeps its size; only the calendar can be resized` };
+  const w = width ?? cur.width;
+  const h = height ?? cur.height;
+  if (!Number.isFinite(w) || !Number.isFinite(h)) return { ok: false, message: 'window size: width and height are numbers (e.g. krnl window size calendar 900 700)' };
+  board.nodes = resizeMotherIn(board.nodes as never, m.id, w, h) as never;
+  save(ctx, board);
+  const now = motherSizeOf(board.nodes.find((n) => n.id === m.id) as never);
+  return { ok: true, message: `${label(m.kind)}: ${now.width} × ${now.height} (on the Free canvas; the windows beside it moved along)`, data: now };
 }
 
 /** `krnl window swap <a> <b>` — swap two windows' places (dragging one onto another). */

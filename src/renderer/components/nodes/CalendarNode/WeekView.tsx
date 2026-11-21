@@ -421,8 +421,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // hold a transient override (start-minute delta + duration) so the block
   // grows/shrinks under the cursor; commit on mouse-up, snapped to granularity.
   const [resizeDraft, setResizeDraft] = useState<
-    { taskId: string; durationMin: number; startMinDelta: number } | null
+    // Decision 60 — `committing`: the edge was let go; the block keeps the new
+    // start (`absStartMin`) and length until the board shows them, so it never
+    // snaps back to the old size for a frame.
+    { taskId: string; durationMin: number; startMinDelta: number; absStartMin?: number; committing?: boolean } | null
   >(null);
+  // The click that ends a resize is not "open this plan".
+  const resizeClickBlock = useRef(0);
 
   function startResize(
     edge: 'top' | 'bottom',
@@ -437,6 +442,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const scale = screenScale(e.currentTarget);
     const dayYMD = task.startISO.slice(0, 10);
     let last = { taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 };
+    document.body.classList.add('cal-resizing');
     const onMove = (ev: MouseEvent) => {
       const deltaMin = Math.round((((ev.clientY - originY) / scale / rowHeight) * 60) / gran) * gran;
       if (edge === 'bottom') {
@@ -451,10 +457,14 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-      setResizeDraft(null);
+      document.body.classList.remove('cal-resizing');
       // A press on the edge that did not move changes nothing.
-      if (last.startMinDelta === 0 && last.durationMin === origDurationMin) return;
+      if (last.startMinDelta === 0 && last.durationMin === origDurationMin) { setResizeDraft(null); return; }
+      resizeClickBlock.current = Date.now();
       const newStartMin = Math.max(0, sliceStartMin + last.startMinDelta);
+      setResizeDraft({ taskId: task.id, durationMin: last.durationMin, startMinDelta: 0, absStartMin: newStartMin, committing: true });
+      // Never stuck: whatever the board says after a moment is what shows.
+      window.setTimeout(() => setResizeDraft((d) => (d && d.committing && d.taskId === task.id ? null : d)), 1500);
       const h = Math.floor(newStartMin / 60);
       const m = newStartMin % 60;
       const scheduledFor = `${dayYMD}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -891,7 +901,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // edge: the event changes for every week, not just this one (owner,
   // 2026-11-21). The bands take no pointer events (drops on the hours under
   // them must still land), so the day column finds the event under the press.
-  const [rtDrag, setRtDrag] = useState<{ id: string; name: string; color: string; fromDay: string; toDay: string; startMin: number; endMin: number } | null>(null);
+  const [rtDrag, setRtDrag] = useState<{ id: string; name: string; color: string; fromDay: string; toDay: string; startMin: number; endMin: number; committing?: { timeOfDay: string; durationMin: number } } | null>(null);
   const rtSuppressClick = useRef(false);
   const RT_EDGE_PX = 6;
   const routineEdgeAt = (dayYMD: string, e: { clientX: number; clientY: number; currentTarget: HTMLElement }) => {
@@ -906,13 +916,17 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const mode: 'move' | 'top' | 'bottom' = relY >= botPx - RT_EDGE_PX ? 'bottom' : relY <= topPx + RT_EDGE_PX - 1 && botPx - topPx > 3 * RT_EDGE_PX ? 'top' : 'move';
     return { r, mode, rect, scale };
   };
+  // Decision 60 — the event under the pointer lights up like a plan does.
+  const [rtHover, setRtHover] = useState<string | null>(null);
   const onColumnPointerMove = (dayYMD: string, e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.buttons !== 0 || rtDrag) return;
     const t = e.target as HTMLElement;
-    if (t.closest?.('.cal-block, .cal-habit, button')) { if (e.currentTarget.style.cursor) e.currentTarget.style.cursor = ''; return; }
+    if (t.closest?.('.cal-block, .cal-habit, button')) { if (e.currentTarget.style.cursor) e.currentTarget.style.cursor = ''; if (rtHover) setRtHover(null); return; }
     const hit = layers.routines ? routineEdgeAt(dayYMD, e) : null;
     const cur = !hit ? '' : hit.mode === 'move' ? 'grab' : 'ns-resize';
     if (e.currentTarget.style.cursor !== cur) e.currentTarget.style.cursor = cur;
+    const key = hit ? `${hit.r.h.id}@${dayYMD}` : null;
+    if (key !== rtHover) setRtHover(key);
   };
   const onColumnPointerDown = (dayYMD: string, e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || !layers.routines) return;
@@ -953,8 +967,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
-      setRtDrag(null);
-      if (!moved || !last) return;
+      if (!moved || !last) { setRtDrag(null); return; }
       rtSuppressClick.current = true;
       window.setTimeout(() => { rtSuppressClick.current = false; }, 400);
       const hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -969,7 +982,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         const days = [...new Set([...sched.days.filter((d) => d !== fromDow), toDow])].sort((a, b) => a - b);
         next = { ...sched, days, timeOfDay, durationMin } as typeof sched;
       }
-      if (sched.timeOfDay === timeOfDay && sched.durationMin === durationMin && last.toDay === dayYMD) return;
+      if (sched.timeOfDay === timeOfDay && sched.durationMin === durationMin && last.toDay === dayYMD) { setRtDrag(null); return; }
+      // Decision 60 — the ghost stays until the event is drawn at its new time
+      // (no flash back to the old place); never longer than a moment.
+      const done = last;
+      setRtDrag({ id: r.h.id, name: r.h.name, color: r.h.color, fromDay: dayYMD, ...done, committing: { timeOfDay, durationMin } });
+      window.setTimeout(() => setRtDrag((d) => (d && d.committing && d.id === r.h.id ? null : d)), 1500);
       // A one-off moved occurrence follows the series again.
       if (r.occ.moved) void habitMotherCommand('routine.unskip', { id: r.h.id, date: r.occ.date });
       void habitMotherCommand('habit.setSchedule', { habitId: r.h.id, schedule: next });
@@ -980,6 +998,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     e.stopPropagation();
     e.preventDefault();
   };
+  useEffect(() => {
+    if (!rtDrag?.committing) return;
+    const h = routinesForCal.find((x) => x.id === rtDrag.id);
+    if (!h || (h.schedule?.timeOfDay === rtDrag.committing.timeOfDay && h.schedule?.durationMin === rtDrag.committing.durationMin)) setRtDrag(null);
+  }, [routinesForCal, rtDrag]);
   const renderRoutineDragGhost = (dayYMD: string) => {
     if (!rtDrag || rtDrag.toDay !== dayYMD) return null;
     const col = `var(--${rtDrag.color})`;
@@ -1097,6 +1120,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       { label: 'Delete event', icon: <MenuIcon name="delete" />, danger: true, onSelect: () => { void deleteRoutine(h.id); } },
     ];
   };
+
+  // Decision 60 — the committed resize gives way once the plan is drawn there.
+  useEffect(() => {
+    if (!resizeDraft?.committing) return;
+    const t = scheduledTasks.find((x) => x.id === resizeDraft.taskId);
+    if (!t) { setResizeDraft(null); return; }
+    const startMin = Number(t.startISO.slice(11, 13)) * 60 + Number(t.startISO.slice(14, 16));
+    if (startMin === resizeDraft.absStartMin && Math.abs(t.scheduledDurationMin - resizeDraft.durationMin) < 1) setResizeDraft(null);
+  }, [scheduledTasks, resizeDraft]);
 
   // Build a map from YYYY-MM-DD → TaskSlice[], splitting any task whose
   // duration crosses midnight into one slice per affected day.
@@ -1660,7 +1692,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // #7 — apply a live resize draft (if this block is being dragged) so it
       // grows/shrinks under the cursor before the commit on mouse-up.
       const draft = resizeDraft && resizeDraft.taskId === task.id ? resizeDraft : null;
-      const effStartMin = sliceStartMin + (draft?.startMinDelta ?? 0);
+      const effStartMin = draft?.absStartMin ?? sliceStartMin + (draft?.startMinDelta ?? 0);
       const effLenMin = draft ? draft.durationMin : Math.max(1, sliceEndMin - sliceStartMin);
 
       // Convert minutes-from-midnight to grid-row offsets (rowHeight per hour).
@@ -1794,6 +1826,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
 
       const handleBlockClick = (e: ReactMouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
+        // Decision 60 — letting go of a resize is not a click.
+        if (Date.now() - resizeClickBlock.current < 400) return;
         openTaskInfo(task, e.clientX, e.clientY);
       };
 
@@ -1900,7 +1934,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             (afterOf.has(task.id) ? ` · after ${afterOf.get(task.id)}` : '') +
             (isContinuation ? ' (continued from previous day)' : '')
           }
-          className="cal-block"
+          className={`cal-block${draft ? ' is-resizing' : ''}`}
           style={{
             position: 'absolute',
             // A fixed gap between stacked blocks so back-to-back tasks never
@@ -2395,7 +2429,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           data-testid={`calendar-routine-${h.id}${occ.spill ? '-spill' : ''}`}
           data-date={occ.date}
           data-skipped={occ.skipped ? 'true' : undefined}
-          className="cal-event"
+          className={`cal-event${rtHover === `${h.id}@${dayYMD}` || (rtDrag && rtDrag.id === h.id && !rtDrag.committing) ? ' is-hot' : ''}`}
           aria-label={`${h.name}, repeating event, ${time}${occ.skipped ? ', skipped this time' : ''}`}
           title={`${h.name} · ${time} · repeating event${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
           style={{
@@ -3072,6 +3106,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 onContextMenu={(e) => handleColumnContextMenu(dayYMD, e)}
                 onPointerDown={(e) => onColumnPointerDown(dayYMD, e)}
                 onPointerMove={(e) => onColumnPointerMove(dayYMD, e)}
+                onPointerLeave={() => { if (rtHover) setRtHover(null); }}
                 onClick={(e) => { if (rtSuppressClick.current) { rtSuppressClick.current = false; return; } handleColumnClick(dayYMD, e); }}
                 onDoubleClick={(e) => handleColumnDoubleClick(dayYMD, e)}
                 style={{

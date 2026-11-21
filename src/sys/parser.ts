@@ -3,6 +3,7 @@ export type SysCommand =
   | { kind: 'window'; sub: 'list'; json: boolean }
   | { kind: 'window'; sub: 'show' | 'hide'; name: string | undefined }
   | { kind: 'window'; sub: 'swap'; a: string | undefined; b: string | undefined }
+  | { kind: 'window'; sub: 'size'; name: string | undefined; width: number | undefined; height: number | undefined }
   | { kind: 'pomoLabel'; text: string | undefined; tag: string | undefined }
   | { kind: 'analyticsSet'; view: string | undefined; range: number | undefined; metric: string | undefined; year: number | undefined }
   | { kind: 'mediaTitle'; id: string | undefined; title: string | undefined }
@@ -322,6 +323,10 @@ export class SysParser {
       if (sub === 'list' || sub === undefined) return { kind: 'window', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'show' || sub === 'hide') return { kind: 'window', sub, name: rest[0] };
       if (sub === 'swap') return { kind: 'window', sub: 'swap', a: rest[0], b: rest[1] };
+      if (sub === 'size') {
+        const n = (v: string | undefined) => (v === undefined || v.trim() === '' ? undefined : Number(v));
+        return { kind: 'window', sub: 'size', name: rest[0], width: n(rest[1]), height: n(rest[2]) };
+      }
     }
     if (cmd === 'pomo' && sub === 'label') return { kind: 'pomoLabel', text: rest[0] !== undefined && !rest[0].startsWith('--') ? rest[0] : undefined, tag: flag(rest, 'tag') };
     if (cmd === 'analytics' && sub === 'set') {

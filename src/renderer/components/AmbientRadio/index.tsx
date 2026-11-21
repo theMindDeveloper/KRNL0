@@ -71,6 +71,17 @@ const PRESETS: readonly Preset[] = [
   { id: 'yt',    name: 'YouTube', sub: 'video stream',    col: '#e8697a', rgb: '232,105,122', mode: 'orbit'   },
 ];
 
+// Decision 60 — each sound as a line icon (one row of seven, owner 2026-11-21).
+const SOUND_ICONS: Record<LayerId, JSX.Element> = {
+  dark:  <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,
+  rain:  <><path d="M7 15a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 8a3.5 3.5 0 0 1 0 7" /><path d="M9 18l-1 2.5M13 18l-1 2.5M17 18l-1 2.5" /></>,
+  fire:  <path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.4 1.2-3.9 2.5-5 .2 1.6.9 2.6 2 3 0-2.8-.6-5.3.5-8z" />,
+  synth: <path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0" />,
+  white: <path d="M3 12l2-4 2 8 2-10 2 12 2-9 2 6 2-5 2 4 2-2" />,
+  brown: <><path d="M3 10c3-3 6-3 9 0s6 3 9 0" /><path d="M3 15.5c3-3 6-3 9 0s6 3 9 0" /></>,
+  yt:    <><rect x="3" y="6" width="18" height="12" rx="4" /><path d="M10.5 9.5v5l4-2.5z" /></>,
+};
+
 const PRESET_BY_ID: Record<LayerId, Preset> = PRESETS.reduce((acc, p) => {
   acc[p.id] = p;
   return acc;
@@ -1200,8 +1211,10 @@ export function AmbientRadio() {
           {/* Canvas — multi-layer particle field */}
           {/* Decision 60 — the particles play on a small dark screen set into
               the window (rounded, inset), like the Clock's face. */}
-          <div style={{ position: 'relative', height: HEIGHT - 28, overflow: 'hidden', margin: '0 10px', borderRadius: 10, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.04)' }}>
-            <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} style={{ display: 'block', width: '100%', height: HEIGHT, marginTop: -14 }} />
+          <div style={{ position: 'relative', overflow: 'hidden', margin: '0 10px', borderRadius: 10, clipPath: 'inset(0 round 10px)', isolation: 'isolate', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.04)' }}>
+            {/* Decision 60 — the canvas keeps its own shape and fills the frame
+                exactly: nothing overflows, so nothing pops out while dragging. */}
+            <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} style={{ display: 'block', width: '100%', height: 'auto' }} />
             {/* Decision 60 — the screen is seen through a fine speaker grille
                 in the window's own colour, with a soft inner shade: the
                 particles glow through the holes instead of floating on a slab. */}
@@ -1533,7 +1546,7 @@ export function AmbientRadio() {
                 <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 6, paddingLeft: 2 }}>
                   Sounds — tap to add or remove
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                <div role="group" aria-label="Sounds" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 5 }}>
                   {PRESETS.map((s) => {
                     const on = activeLayers.has(s.id);
                     const isFocused = s.id === focusedId;
@@ -1544,30 +1557,26 @@ export function AmbientRadio() {
                         data-testid={`ambient-radio-preset-${s.id}`}
                         onClick={() => toggleLayer(s.id)}
                         aria-pressed={on}
+                        aria-label={s.name}
+                        title={`${s.name} — ${s.sub}`}
                         style={{
                           fontFamily: 'inherit',
-                          fontSize: 12.5,
-                          fontWeight: on ? 600 : 500,
-                          height: 28,
-                          padding: '0 10px 0 8px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
+                          height: 36,
+                          padding: 0,
+                          display: 'grid',
+                          placeItems: 'center',
                           border: 'none',
                           boxShadow: isFocused && !on ? `inset 0 0 0 1px color-mix(in srgb, ${s.col} 45%, transparent)` : 'none',
-                          background: on ? `color-mix(in srgb, ${s.col} 20%, var(--paper-2))` : 'var(--paper-2)',
-                          color: on ? 'var(--ink)' : 'var(--ink-2)',
-                          borderRadius: 8,
+                          background: on ? `color-mix(in srgb, ${s.col} 22%, var(--paper-2))` : 'var(--paper-2)',
+                          color: on ? s.col : 'var(--ink-3)',
+                          borderRadius: 9,
                           cursor: 'pointer',
                           transition: 'background .12s, color .12s',
                         }}
                       >
-                        <span style={{
-                          width: 7, height: 7, borderRadius: '50%',
-                          background: on ? s.col : `color-mix(in srgb, ${s.col} 45%, transparent)`,
-                          transition: 'background .12s',
-                        }} />
-                        {s.name}
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          {SOUND_ICONS[s.id]}
+                        </svg>
                       </button>
                     );
                   })}

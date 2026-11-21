@@ -58,6 +58,9 @@ interface Props {
   // variant the badge is a normal absolute-positioned span inside the panel
   // (no ViewportPortal, no rfToScreen arithmetic).  Mother content is identical.
   variant?: 'canvas' | 'station';
+  /** Decision 60 — the window can be resized on the canvas (its right edge,
+   *  bottom edge and corner); `onResized` gets the size when you let go. */
+  resizable?: { onResized: (width: number, height: number) => void; min: { width: number; height: number }; max: { width: number; height: number } };
 }
 
 // Wave C (LifeOS UI refresh) — bumped to 500×500 so mothers read as the
@@ -79,6 +82,7 @@ export function MotherFrame({
   borderColor = 'var(--paper-3)',
   minHeight = MOTHER_HEIGHT,
   variant: variantProp = 'canvas',
+  resizable,
 }: Props) {
   // Context override: when this MotherFrame is rendered inside a StationCell,
   // the provider sets the context to true and we force 'station' variant —
@@ -152,6 +156,42 @@ export function MotherFrame({
   }, [position.x, position.y, variant]);
 
   const isStation = variant === 'station';
+  // Decision 60 — live size while an edge is dragged; it stays until the
+  // board has the new size (no snap back to the old one for a frame).
+  const [live, setLive] = useState<{ width: number; height: number } | null>(null);
+  useLayoutEffect(() => { setLive(null); }, [width, minHeight]);
+  const startResize = (axis: 'x' | 'y' | 'xy') => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizable || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const zoom = getZoom() || 1;
+    const w0 = width;
+    const h0 = minHeight;
+    let last = { width: w0, height: h0 };
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(v / 10) * 10));
+    const move = (ev: PointerEvent) => {
+      last = {
+        width: axis === 'y' ? w0 : clamp(w0 + (ev.clientX - x0) / zoom, resizable.min.width, resizable.max.width),
+        height: axis === 'x' ? h0 : clamp(h0 + (ev.clientY - y0) / zoom, resizable.min.height, resizable.max.height),
+      };
+      setLive(last);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (last.width === w0 && last.height === h0) { setLive(null); return; }
+      resizable.onResized(last.width, last.height);
+      window.setTimeout(() => setLive(null), 1500);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+  const shownW = live?.width ?? width;
+  const shownH = live?.height ?? minHeight;
   return (
     <div
       ref={frameRef}
@@ -163,8 +203,8 @@ export function MotherFrame({
         position: 'relative',
         // Canvas: fixed 540×540 (RF flow coords). Station: fill the resizable
         // panel so the user can shrink/grow it without content overflowing.
-        width: isStation ? '100%' : width,
-        height: isStation ? '100%' : minHeight,
+        width: isStation ? '100%' : shownW,
+        height: isStation ? '100%' : shownH,
         display: 'flex',
         flexDirection: 'column',
         background: background === 'var(--node-bg)'
@@ -208,6 +248,18 @@ export function MotherFrame({
           as a sibling, with the same MIME contract. */}
       {!isStation && (
         <MotherDragHandle nodeId={nodeId} />
+      )}
+
+      {/* Decision 60 — resize edges (canvas only): right, bottom, corner. */}
+      {!isStation && resizable && (
+        <>
+          <div className="nodrag nopan mother-resize mother-resize--x" data-testid={`mother-resize-x-${nodeId}`} title="Drag to resize" onPointerDown={startResize('x')}
+            style={{ position: 'absolute', top: 40, bottom: 14, right: -5, width: 10, cursor: 'ew-resize', zIndex: 6 }} />
+          <div className="nodrag nopan mother-resize mother-resize--y" data-testid={`mother-resize-y-${nodeId}`} title="Drag to resize" onPointerDown={startResize('y')}
+            style={{ position: 'absolute', left: 14, right: 14, bottom: -5, height: 10, cursor: 'ns-resize', zIndex: 6 }} />
+          <div className="nodrag nopan mother-resize mother-resize--xy" data-testid={`mother-resize-${nodeId}`} title="Drag to resize" onPointerDown={startResize('xy')}
+            style={{ position: 'absolute', right: -6, bottom: -6, width: 18, height: 18, cursor: 'nwse-resize', zIndex: 7 }} />
+        </>
       )}
 
       {children}

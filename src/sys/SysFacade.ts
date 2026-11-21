@@ -599,6 +599,7 @@ export class SysFacade {
         case 'window':
           if (command.sub === 'list') return windowCmd.windowList(wctx, command.json);
           if (command.sub === 'swap') return windowCmd.windowSwap(wctx, command.a, command.b);
+          if (command.sub === 'size') return windowCmd.windowSize(wctx, command.name, command.width, command.height);
           return windowCmd.windowSetShown(wctx, command.name, command.sub === 'show');
         case 'pomoLabel': return windowCmd.pomoLabel(wctx, command.text, command.tag);
         case 'analyticsSet': return windowCmd.analyticsSet(wctx, {

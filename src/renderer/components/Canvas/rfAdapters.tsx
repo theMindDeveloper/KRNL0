@@ -91,8 +91,10 @@ export function toRfNode(
   // initial 540×540 box regardless of any state.width/height left over from
   // older boards. Internal scroll handles overflow.
   const lockSize = node.kind === 'analytics';
-  const w = lockSize ? initialDims?.width : stateAny.width ?? initialDims?.width;
-  const h = lockSize ? initialDims?.height : stateAny.height ?? initialDims?.height;
+  // Decision 60 — a window with its own size (the Calendar, resized on the canvas).
+  const canvasSize = node.isMother ? (node.config as { canvasSize?: { width: number; height: number } } | undefined)?.canvasSize : undefined;
+  const w = canvasSize ? canvasSize.width : lockSize ? initialDims?.width : stateAny.width ?? initialDims?.width;
+  const h = canvasSize ? canvasSize.height : lockSize ? initialDims?.height : stateAny.height ?? initialDims?.height;
   const sizeFields =
     w !== undefined && h !== undefined
       ? { width: w, height: h, measured: { width: w, height: h } }
