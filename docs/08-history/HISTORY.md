@@ -3220,3 +3220,13 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-21] — Release script waits for the right build
+
+**Type:** Bug Fix
+**PRs/Commits:** `fix/release-tag-wait`
+**Files changed:** `scripts/release.mjs`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- `npm run release -- tag` asked GitHub for "the newest release build" right after pushing the tag. GitHub lists the new run a few seconds later, so during v0.14.0 it found v0.13.0's finished build and said the draft was ready. It now asks for the build of this tag by name, for up to 3 minutes.
+- `npm run release -- check` without a draft yet now says whether the tag exists and how its build is doing, instead of telling you to tag again.

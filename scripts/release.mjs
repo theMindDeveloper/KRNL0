@@ -35,6 +35,18 @@ const pkgVersion = () => JSON.parse(readFileSync(join(ROOT, 'package.json'), 'ut
 const today = () => new Date().toISOString().slice(0, 10)
 const gh = (args) => out('gh', args)
 const tryGh = (args) => { try { return gh(args) } catch { return null } }
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+
+/** The release build of this tag. GitHub lists it a few seconds after the push, so
+ *  ask by the tag's name until it shows: "the newest run" can still be the previous release's. */
+function buildOf(tagName, tries = 36) {
+  for (let i = 0; i < tries; i++) {
+    const id = tryGh(['run', 'list', '-R', REPO, '--workflow', 'release.yml', '--branch', tagName, '--limit', '1', '--json', 'databaseId', '--jq', '.[0].databaseId // empty'])
+    if (id) return id
+    if (i < tries - 1) sleep(5000)
+  }
+  return null
+}
 
 function checkTree() {
   if (out('git', ['status', '--porcelain'])) fail('the working tree has changes. Commit or put them aside first.')
@@ -123,8 +135,9 @@ function tag() {
   out('git', ['tag', `v${v}`, 'origin/main'])
   out('git', ['push', 'origin', `v${v}`])
   say(`Tagged v${v}. CI builds the draft (about 6 minutes):`)
-  const run = tryGh(['run', 'list', '-R', REPO, '--workflow', 'release.yml', '--limit', '1', '--json', 'databaseId', '--jq', '.[0].databaseId'])
-  if (run) { try { live('gh', ['run', 'watch', run, '-R', REPO, '--exit-status']) } catch { fail('the release build failed. Fix it on main, delete the tag (nothing was published), tag again.') } }
+  const run = buildOf(`v${v}`)
+  if (!run) fail(`no release build started for v${v} within 3 minutes. Look at github.com/${REPO}/actions, then: npm run release -- check`)
+  try { live('gh', ['run', 'watch', run, '-R', REPO, '--exit-status']) } catch { fail('the release build failed. Fix it on main, delete the tag (nothing was published), tag again.') }
   say('Next: npm run release -- check')
 }
 
@@ -137,7 +150,13 @@ function check() {
   out('git', ['fetch', 'origin', 'main', '--tags'])
   const v = JSON.parse(out('git', ['show', 'origin/main:package.json'])).version
   const d = draftOf(v)
-  if (!d) fail(`no release for v${v} yet. Run: npm run release -- tag`)
+  if (!d) {
+    const tagged = out('git', ['tag', '--list', `v${v}`])
+    if (!tagged) fail(`v${v} is not tagged yet. Run: npm run release -- tag`)
+    const run = buildOf(`v${v}`, 1)
+    const state = run ? tryGh(['run', 'view', run, '-R', REPO, '--json', 'status,conclusion', '--jq', '.status + " " + .conclusion']) : null
+    fail(`no draft for v${v} yet. Its build: ${state ?? 'not found'}${run ? ` (gh run watch ${run} -R ${REPO})` : ''}. Run check again when it has finished.`)
+  }
   const names = d.assets.map((a) => a.name)
   const want = [`KRNL0-Setup-${v}.exe`, `KRNL0-Setup-${v}.exe.blockmap`, 'latest.yml', `krnl0-web-${v}.tar.gz`, `krnl0-web-${v}.tar.gz.sha256`]
   const missing = want.filter((n) => !names.includes(n))
