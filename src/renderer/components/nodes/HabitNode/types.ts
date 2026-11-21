@@ -89,6 +89,9 @@ export interface Habit {
   kind?: 'routine';
   /** Routine only: last day it happens (YYYY-MM-DD). Absent = no end. */
   endsOn?: string;
+  /** Routine only (Decision 62): first day it happens (YYYY-MM-DD). With
+   *  `endsOn` on the same day it is a one-time event: it happens once. */
+  startsOn?: string;
   /** Routine only: stretches it was ended and later restarted (inclusive
    *  YYYY-MM-DD). Nothing happened then, so nothing is drawn there. */
   pauses?: Array<{ from: string; to: string }>;
@@ -135,6 +138,11 @@ export interface RoutineException {
 /** Decision 39 — the one guard every tick / count / flag consumer checks. */
 export function isRoutine(h: { kind?: string } | null | undefined): boolean {
   return h?.kind === 'routine';
+}
+
+/** Decision 62 — an event that happens once (its first and last day are the same day). */
+export function isOneTimeEvent(h: { kind?: string; startsOn?: string; endsOn?: string } | null | undefined): boolean {
+  return !!h && h.kind === 'routine' && !!h.startsOn && h.startsOn === h.endsOn;
 }
 
 /** A habit (or routine) that repeats at a set time of day. */
@@ -185,9 +193,10 @@ export function routineSpansOn(h: Habit, date: string): RoutineSpan[] {
 export function routineOccurrence(h: Habit, date: string): RoutineOccurrence | null {
   if (!isRoutine(h) || h.archived || !hasTimeOfDay(h)) return null;
   if (!isDayScheduled(h.schedule, date)) return null;
-  // From the start of the week it was added: a routine added on a Sunday still
-  // shows across that week, not only from next Monday.
-  if (date < toYMD(getMondayOf(new Date(h.createdAt)))) return null;
+  // From its first day (Decision 62), else from the start of the week it was
+  // added: a routine added on a Sunday still shows across that week.
+  if (h.startsOn) { if (date < h.startsOn) return null; }
+  else if (date < toYMD(getMondayOf(new Date(h.createdAt)))) return null;
   if (h.endsOn && date > h.endsOn) return null;
   if (h.pauses?.some((p) => date >= p.from && date <= p.to)) return null;
   const ex = h.exceptions?.find((e) => e.date === date);

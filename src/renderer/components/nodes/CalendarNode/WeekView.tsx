@@ -15,9 +15,8 @@ import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } fro
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
-import { useBoardStore, historyGroup } from '../../../store/boardStore';
+import { useBoardStore } from '../../../store/boardStore';
 import { effectiveDraft, type PlanDraft, type PlanOverrides } from '../TodoNode/PlanAddCard';
-import type { TodoState } from '../TodoNode/types';
 import { taskSetPlannedMin, taskSetSchedule } from '../TaskNode/commands';
 import { pomoDeleteSegment, pomoRetagSegment } from '../PomoNode/commands';
 import type { PomoState } from '../PomoNode/types';
@@ -40,12 +39,12 @@ import type { PomoBreakdown } from '../../../store/pomoSchedule';
 import type { TaskKind, TaskState } from '../TaskNode/types';
 import type { CalendarConfig, CalendarLayers, CalendarState } from './types';
 import { CAL_ZOOM_MIN, CAL_ZOOM_MAX, CAL_ZOOM_STEP, calendarLayersOf, granularityFor } from './types';
-import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, routineOccurrence, routineSpansOn, countOn, type RoutineOccurrence, type RoutineSpan } from '../HabitNode/types';
+import { getMondayOf, toYMD, hasTimeOfDay, isRoutine, isOneTimeEvent, routineOccurrence, routineSpansOn, countOn, type RoutineOccurrence, type RoutineSpan } from '../HabitNode/types';
 import { routineLanes } from './routineLanes';
 import { dayOnlyPlans } from './dayOnly';
 import { DueFlag } from './DueFlag';
 import { TimeField } from '../../ui/TimeField';
-import { addPlanAt, applyPlanWhen, deletePlanOfTask, deleteRoutine, habitMotherCommand, planWhenOf, putPlanOnDay, scheduleTaskAt, setTaskReminder, toggleTaskDone } from '../../../store/scheduleActions';
+import { applyPlanWhen, deletePlanOfTask, deleteRoutine, habitMotherCommand, planWhenOf, putPlanOnDay, toggleTaskDone } from '../../../store/scheduleActions';
 import { WhenPopover } from '../../ui/WhenPopover';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
@@ -993,6 +992,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // window-frame.md — the Calendar's one menu (header, last button): what it
   // shows besides your plans, the repeating events, the zoom.
   const [calMenu, setCalMenu] = useState<{ x: number; y: number } | null>(null);
+  const listedEvents = useMemo((): Habit[] => {
+    const today = todayYMD();
+    const nodes = boardForCal?.nodes ?? [];
+    const all: Habit[] = [];
+    for (const n of nodes) if (n.kind === 'habit') for (const h of ((n.state as { habits?: Habit[] } | null)?.habits ?? [])) if (isRoutine(h) && !h.archived) all.push(h);
+    const repeating = all.filter((h) => !isOneTimeEvent(h));
+    const once = all.filter((h) => isOneTimeEvent(h) && h.startsOn! >= today).sort((a, b) => `${a.startsOn}${a.schedule?.timeOfDay ?? ''}`.localeCompare(`${b.startsOn}${b.schedule?.timeOfDay ?? ''}`));
+    return [...repeating, ...once];
+  }, [boardForCal]);
   const routinesForCal = useMemo((): Habit[] => {
     const out: Habit[] = [];
     for (const n of boardForCal?.nodes ?? []) {
@@ -1130,6 +1138,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         next = { ...sched, days, timeOfDay, durationMin } as typeof sched;
       }
       if (sched.timeOfDay === timeOfDay && sched.durationMin === durationMin && last.toDay === dayYMD) { setRtDrag(null); clearRoutineGhost(); return; }
+      const movedOnce = isOneTimeEvent(r.h) && last.toDay !== dayYMD ? last.toDay : null;
       // Decision 60 — the ghost stays until the event is drawn at its new time
       // (no flash back to the old place); never longer than a moment.
       const done = last;
@@ -1141,6 +1150,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // A one-off moved occurrence follows the series again.
       if (r.occ.moved) void habitMotherCommand('routine.unskip', { id: r.h.id, date: r.occ.date });
       void habitMotherCommand('habit.setSchedule', { habitId: r.h.id, schedule: next });
+      // Decision 62 — a one-time event carried to another day happens there.
+      if (movedOnce) void habitMotherCommand('routine.setOn', { id: r.h.id, date: movedOnce });
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -1180,27 +1191,20 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const fromWords: PlanDraft = { day: q.day ?? calDefaultDay(), time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: q.deadline ?? null };
     return { text: q.text || raw, hint: !!q.hint, d: effectiveDraft(fromWords, calOv) };
   };
-  const addCalPlan = (text: string, d: PlanDraft) => {
-    // One Ctrl+Z, as in Todo (the scheduling lands after an await).
-    void historyGroup(async () => {
-      const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
-      if (!todo) return;
-      const { makeCommandHandler } = await import('../../Canvas/commandDispatch');
-      const run = makeCommandHandler(todo.id);
-      run('todo.add', d.lengthMin ? { text, durationMin: d.lengthMin } : { text });
-      const st = useBoardStore.getState().board?.nodes.find((n) => n.id === todo.id)?.state as TodoState | undefined;
-      const item = [...(st?.items ?? [])].filter((i) => i.text === text && !i.done).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-      if (!item) return;
-      if (d.deadline) run('todo.setDue', { id: item.id, dueOn: d.deadline });
-      if (d.day && d.time && item.taskNodeId) {
-        await scheduleTaskAt(item.taskNodeId, `${d.day}T${d.time}`);
-        if (d.remindMin !== undefined && d.remindMin !== null) await setTaskReminder(item.taskNodeId, d.remindMin);
-      } else if (d.day) run('todo.setOnDay', { id: item.id, onDay: d.day });
-    });
-    setCalAddText('');
-    setCalOv({});
-  };
   const calAddRowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const raw = calAdding ? calAddText.trim() : '';
+    const { text, hint, d } = raw ? calDraftOf(raw) : { text: '', hint: false, d: { day: null, time: null, lengthMin: null, deadline: null } as PlanDraft };
+    const day = d.day ?? calDefaultDay();
+    if (!raw || hint || !d.time || !weekDays.includes(day)) {
+      if (calendarGhost()?.testId === 'calendar-add-ghost') setCalendarGhost(null);
+      return;
+    }
+    const startMin = Number(d.time.slice(0, 2)) * 60 + Number(d.time.slice(3));
+    const endMin = Math.min(1440, startMin + (d.lengthMin ?? 60));
+    setCalendarGhost({ day, startMin, endMin, name: text, times: ghostTimes(startMin, endMin), tone: 'var(--acid)', testId: 'calendar-add-ghost' });
+  }, [calAdding, calAddText, weekDays.join(',')]);
+  useEffect(() => () => { if (calendarGhost()?.testId === 'calendar-add-ghost') setCalendarGhost(null); }, []);
   useDismissOutside(calAdding && calAddText.trim() !== '' && !calCardHidden, ['[data-testid="when-popover"]', calAddRowRef], () => setCalCardHidden(true));
   const calAddInputRef = useRef<HTMLInputElement>(null);
   const openNewAt = (dayYMD: string, minute: number, x: number, y: number) => {
@@ -1209,9 +1213,29 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const isoDow = ((new Date(`${dayYMD}T00:00:00`).getDay() + 6) % 7) + 1;
     setEventCard({ x, y, day: dayYMD, allowOnce: true, initial: { name: '', mode: 'once', days: [isoDow], time: at, lengthMin: 60 } });
   };
+  // Decision 62 — the Calendar makes only events (once or repeating); tasks
+  // come from the Todo node. "Once" is an event on that day, never a plan.
+  const isoDowOfYMD = (ymd: string): 1 | 2 | 3 | 4 | 5 | 6 | 7 => (((new Date(`${ymd}T00:00:00`).getDay() + 6) % 7) + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  const addOneTimeEvent = (name: string, day: string, time: string, lengthMin: number) => {
+    void habitMotherCommand('habit.add', { name, kind: 'routine', schedule: { kind: 'weekly', days: [isoDowOfYMD(day)], timeOfDay: time, durationMin: lengthMin }, on: day });
+  };
+  /** The event card for an event: Once or Repeats, as it is now. */
+  const editEventCard = (h: Habit, day: string, x: number, y: number, fallbackTime: string) => {
+    const once = isOneTimeEvent(h);
+    setEventCard({
+      x, y, day: once ? h.startsOn! : day, allowOnce: true, editId: h.id,
+      initial: { name: h.name, mode: once ? 'once' : 'repeat', days: daysOf(h), time: h.schedule?.timeOfDay ?? fallbackTime, lengthMin: h.schedule?.durationMin ?? 60 },
+    });
+  };
   const submitEvent = (card: NonNullable<typeof eventCard>, d: EventDraft) => {
     setEventCard(null);
-    if (d.mode === 'once') { void addPlanAt(d.name, card.day, d.time, d.lengthMin); return; }
+    if (d.mode === 'once') {
+      if (!card.editId) { addOneTimeEvent(d.name, card.day, d.time, d.lengthMin); return; }
+      void habitMotherCommand('habit.rename', { id: card.editId, name: d.name });
+      void habitMotherCommand('habit.setSchedule', { habitId: card.editId, schedule: { kind: 'weekly', days: [isoDowOfYMD(card.day)], timeOfDay: d.time, durationMin: d.lengthMin } });
+      void habitMotherCommand('routine.setOn', { id: card.editId, date: card.day });
+      return;
+    }
     const days = [...d.days].sort() as Array<1 | 2 | 3 | 4 | 5 | 6 | 7>;
     const schedule = days.length === 7
       ? { kind: 'daily' as const, timeOfDay: d.time, durationMin: d.lengthMin }
@@ -1219,6 +1243,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     if (card.editId) {
       void habitMotherCommand('habit.rename', { id: card.editId, name: d.name });
       void habitMotherCommand('habit.setSchedule', { habitId: card.editId, schedule });
+      // A one-time event made to repeat: no first or last day any more.
+      void habitMotherCommand('routine.setOn', { id: card.editId, date: null });
     } else {
       void habitMotherCommand('habit.add', { name: d.name, kind: 'routine', schedule });
     }
@@ -1229,6 +1255,14 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const s1 = 'fullEnd' in occ ? occ.fullEnd : occ.endMin;
     const dayHint = new Date(`${occ.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
     const days = daysOf(h);
+    if (isOneTimeEvent(h)) {
+      return [
+        { header: true, label: `${h.name} · ${hmOf(s0)}–${hmOf(s1)}${s1 > 1440 ? ' (next day)' : ''} · ${new Date(`${occ.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`, onSelect: () => {} },
+        { label: 'Edit event…', icon: <MenuIcon name="rename" />, onSelect: () => editEventCard(h, occ.date, x, y, hmOf(s0)) },
+        ...(easy && h.remindMin === undefined ? [] : [{ label: 'Remind me…', icon: <MenuIcon name="reminder" />, hint: h.remindMin === undefined ? 'Off' : h.remindMin === 0 ? 'at start' : `${h.remindMin} min`, onSelect: () => setEventRemind({ id: h.id, x, y, value: h.remindMin ?? null }) }]),
+        { label: 'Delete event', icon: <MenuIcon name="delete" />, danger: true, divider: true, onSelect: () => { void deleteRoutine(h.id); } },
+      ];
+    }
     return [
       { header: true, label: `${h.name} · ${hmOf(s0)}–${hmOf(s1)}${s1 > 1440 ? ' (next day)' : ''} · ${days.length === 7 ? 'every day' : days.map((n) => DAY_LETTER[n - 1]).join(' ')}`, onSelect: () => {} },
       occ.skipped
@@ -1242,7 +1276,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       ...(occ.skipped || !occ.moved ? [] : [{ label: 'Back to its usual time', icon: <MenuIcon name="undo" />, onSelect: () => { void habitMotherCommand('routine.unskip', { id: h.id, date: occ.date }); } }]),
       {
         label: 'Edit event…', icon: <MenuIcon name="rename" />,
-        onSelect: () => setEventCard({ x, y, day: occ.date, allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days, time: h.schedule?.timeOfDay ?? hmOf(s0), lengthMin: h.schedule?.durationMin ?? 60 } }),
+        onSelect: () => editEventCard(h, occ.date, x, y, hmOf(s0)),
       },
       // Reminders are Advanced (owner, 2026-11-09); a reminder set earlier still shows in Easy, to turn it off.
       ...((): ContextMenuItem[] => {
@@ -2572,13 +2606,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       const { title, place } = eventTitleAndPlace(h.name, h.note);
       const textW = laneW - 4 - lead - 6;
       const sideways = textW < 22 && blockH > 40;
-      const showIcon = textW >= 110;
+      // Decision 62 — a one-time event: no repeat mark, just its time.
+      const once = isOneTimeEvent(h);
+      const showIcon = !once && textW >= 110;
       const time = occ.spill
         ? `until ${fmtMinOfDay(occ.endMin)} · from last night`
         : `${fmtMinOfDay(occ.fullStart)}–${fmtMinOfDay(occ.fullEnd)}`;
       // Decision 60 — how often, in words, beside the time (small).
       const every = occ.skipped ? 'skipped' : occ.moved ? 'moved' : !h.schedule || h.schedule.kind === 'daily' ? 'every day' : h.schedule.kind === 'weekdays' ? 'weekdays' : 'every week';
-      const lines = sideways ? { titleLines: 0, showTime: false, metaLines: 0, showPlace: false } : eventLines(blockH, textW - (showIcon ? 15 : 0), title, !!place, `${time} · ${every}`);
+      const lines = sideways ? { titleLines: 0, showTime: false, metaLines: 0, showPlace: false } : eventLines(blockH, textW - (showIcon ? 15 : 0), title, !!place, once ? time : `${time} · ${every}`);
       out.push(
         <div
           key={`routine-${h.id}${occ.spill ? '-spill' : ''}`}
@@ -2623,7 +2659,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               {lines.showTime && (
                 // Decision 60 — the time and how often, small, wrapping in a narrow block.
                 <span data-testid={`calendar-routine-time-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-3)', whiteSpace: 'normal', overflow: 'hidden', maxHeight: lines.metaLines * EVENT_TEXT.metaLine, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
-                  {occ.spill ? time : <>{fmtMinOfDay(occ.fullStart)}–<wbr />{fmtMinOfDay(occ.fullEnd)}</>}<span style={{ whiteSpace: 'nowrap' }}>{` · ${every}`}</span>
+                  {occ.spill ? time : <>{fmtMinOfDay(occ.fullStart)}–<wbr />{fmtMinOfDay(occ.fullEnd)}</>}{!once && <span style={{ whiteSpace: 'nowrap' }}>{` · ${every}`}</span>}
                 </span>
               )}
               {lines.showPlace && place && (
@@ -3442,22 +3478,21 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           ]}
         />
       )}
-      {/* window-frame.md — the standard footer: the one thing you add here. Opens
-          the same card as a double-click on empty hours (a plan, or Repeats). */}
-      {/* Decision 58 — you add to the Calendar the way you add to Todo: you
-          type at the bottom. A time in the words ("Gym fri 18:00 1h") puts it
-          straight on the Calendar; without one, the plan card opens with the
-          name already in it, for the time (or Repeats). */}
+      {/* Decision 62 — the Calendar adds only events (once or repeating); tasks
+          come from the Todo node. You type at the bottom, as in Todo: a time in
+          the words ("Dentist fri 15:00 1h") adds the event at once (its ghost
+          shows where while you type); without one, the event card opens with
+          the name in it; "every …" opens it on Repeats. */}
       <div className="kw-foot" ref={calAddRowRef}>
         {calAdding ? (
           <>
             <input
               ref={calAddInputRef}
               data-testid="calendar-add-input"
-              aria-label="Add a plan to the Calendar"
+              aria-label="Add an event to the Calendar"
               autoFocus
               value={calAddText}
-              placeholder="Add a plan — try: Gym fri 18:00 1h"
+              placeholder="Add an event — try: Dentist fri 15:00 1h"
               onChange={(e) => { setCalAddText(e.target.value); setCalCardHidden(false); }}
               onFocus={() => setCalCardHidden(false)}
               onClick={() => setCalCardHidden(false)}
@@ -3468,52 +3503,38 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 const raw = calAddText.trim();
                 if (!raw) return;
                 const { text, hint, d } = calDraftOf(raw);
-                if (hint) {
-                  // "every Monday…": a repeating event, set on its own card.
+                const day = d.day ?? calDefaultDay();
+                const done = () => { setCalAddText(''); setCalOv({}); };
+                if (hint || !d.time) {
+                  // "every Monday…" (Repeats), or no time yet: the event card, the name in it.
                   const r = e.currentTarget.getBoundingClientRect();
-                  const day = d.day ?? calDefaultDay();
-                  const isoDow = ((new Date(`${day}T00:00:00`).getDay() + 6) % 7) + 1;
-                  setEventCard({ x: r.left, y: r.top - 340, day, allowOnce: true, initial: { name: raw, mode: 'repeat', days: [isoDow], time: d.time ?? '09:00', lengthMin: d.lengthMin ?? 60 } });
-                  setCalAddText('');
-                  setCalOv({});
+                  setEventCard({ x: r.left, y: r.top - 340, day, allowOnce: true, initial: { name: hint ? raw : text, mode: hint ? 'repeat' : 'once', days: [isoDowOfYMD(day)], time: d.time ?? '09:00', lengthMin: d.lengthMin ?? 60 } });
+                  done();
                   setCalAdding(false);
                   return;
                 }
-                addCalPlan(text, d);
+                addOneTimeEvent(text, day, d.time, d.lengthMin ?? 60);
+                done();
               }}
               onBlur={() => { if (!calAddText.trim()) setCalAdding(false); }}
               style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', caretColor: 'var(--acid)' }}
             />
             {calAddText.trim() !== '' && !calCardHidden && (() => {
               const raw = calAddText.trim();
-              const { text, hint, d } = calDraftOf(raw);
+              const { hint, d } = calDraftOf(raw);
               const r = calAddRowRef.current?.getBoundingClientRect();
-              if (hint) {
-                return createPortal(
-                  <div data-testid="calendar-add-preview" className="kw-card" style={{ position: 'fixed', left: (r?.left ?? 8) + 8, top: (r?.top ?? window.innerHeight) - 44, zIndex: Z.popover, padding: '8px 12px', fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-2)', background: 'var(--paper)', border: '1px solid var(--paper-3)', borderRadius: 10 }}>
-                    Repeats — press Enter to pick its days
-                  </div>,
-                  document.body,
-                );
-              }
-              const value = { day: d.day, time: d.time, lengthMin: d.lengthMin, deadline: d.deadline, remindMin: d.remindMin ?? null };
-              return (
-                <WhenPopover
-                  x={0}
-                  y={0}
-                  today={todayYMD()}
-                  value={value}
-                  title={{ text }}
-                  onChange={(next) => {
-                    const patch: PlanOverrides = {};
-                    (['day', 'time', 'lengthMin', 'deadline', 'remindMin'] as const).forEach((k) => { if (next[k] !== value[k]) (patch as Record<string, unknown>)[k] = next[k]; });
-                    setCalOv((cur) => ({ ...cur, ...patch }));
-                  }}
-                  onApply={(next) => addCalPlan(text, { day: next.day, time: next.time, lengthMin: next.lengthMin, deadline: next.deadline, remindMin: next.remindMin })}
-                  onClose={() => { setCalAddText(''); setCalOv({}); setCalAdding(false); }}
-                  anchorAbove={r ? { left: r.left + 8, top: r.top } : { left: 8, top: window.innerHeight - 60 }}
-                  primaryLabel="Add ↵"
-                />
+              const day = d.day ?? calDefaultDay();
+              const dayWords = new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+              const len = d.lengthMin ?? 60;
+              const startMin = d.time ? Number(d.time.slice(0, 2)) * 60 + Number(d.time.slice(3)) : 0;
+              const words = hint ? 'Repeats — press Enter to pick its days'
+                : d.time ? `Event · ${dayWords} · ${ghostTimes(startMin, startMin + len)} — Enter adds it`
+                : `Event · ${dayWords} — press Enter to pick its time`;
+              return createPortal(
+                <div data-testid="calendar-add-preview" className="kw-card" style={{ position: 'fixed', left: (r?.left ?? 8) + 8, top: (r?.top ?? window.innerHeight) - 44, zIndex: Z.popover, padding: '8px 12px', fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-2)', background: 'var(--paper)', border: '1px solid var(--paper-3)', borderRadius: 10 }}>
+                  {words}
+                </div>,
+                document.body,
               );
             })()}
           </>
@@ -3522,11 +3543,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             type="button"
             className="kw-add"
             data-testid="calendar-new"
-            title="Add a plan: type it here (or double-click empty hours)"
-            aria-label="Add to the Calendar"
+            title="Add an event: type it here (or double-click empty hours). Tasks come from Todo."
+            aria-label="Add an event to the Calendar"
             onClick={() => setCalAdding(true)}
           >
-            add a plan
+            add an event
           </button>
         )}
         <span className="kw-kbd" aria-hidden>↵</span>
@@ -3588,7 +3609,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             if (p.routine) {
               const { h } = p.routine;
               const hmOf = (m: number) => { const mm = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(mm / 60)).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}`; };
-              setEventCard({ x: p.x, y: p.y, day: p.routine.date, allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days: daysOf(h), time: h.schedule?.timeOfDay ?? hmOf(p.routine.startMin), lengthMin: h.schedule?.durationMin ?? 60 } });
+              editEventCard(h, p.routine.date, p.x, p.y, hmOf(p.routine.startMin));
             }
           }}
         />
@@ -3619,7 +3640,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           <div
             data-testid="calendar-events-popover"
             role="dialog"
-            aria-label="Repeating events"
+            aria-label="Events"
             onMouseDown={(e) => e.stopPropagation()}
             style={{
               position: 'fixed', left: Math.max(8, Math.min(eventsOpen.x - 150, window.innerWidth - 308)), top: Math.min(eventsOpen.y + 12, window.innerHeight - 260),
@@ -3627,9 +3648,27 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               boxShadow: '0 12px 32px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 4, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)',
             }}
           >
-            <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Repeating events</span>
-            {routinesForCal.length === 0 && <span style={{ color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.5 }}>None yet. A class or a shift: right-click empty hours → New here… → Repeats.</span>}
-            {routinesForCal.map((h) => {
+            <span style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Events</span>
+            {listedEvents.length === 0 && <span style={{ color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.5 }}>None yet. Type one at the bottom of the Calendar, or double-click empty hours.</span>}
+            {listedEvents.map((h) => {
+              // Decision 62 — a one-time event: its date and time, edit or delete.
+              if (isOneTimeEvent(h)) {
+                const t1 = h.schedule?.timeOfDay ?? '';
+                const e1 = t1 ? Number(t1.slice(0, 2)) * 60 + Number(t1.slice(3)) + (h.schedule?.durationMin ?? 60) : 0;
+                return (
+                  <div key={h.id} data-testid={`calendar-event-row-${h.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 26 }}>
+                    <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: `var(--${h.color})`, flexShrink: 0 }} />
+                    <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 96 }}>{h.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+                      {new Date(`${h.startsOn}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · {t1}–{`${String(Math.floor(e1 / 60) % 24).padStart(2, '0')}:${String(e1 % 60).padStart(2, '0')}`}
+                    </span>
+                    <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 2 }}>
+                      <button type="button" title="Edit" aria-label={`Edit ${h.name}`} onClick={(e) => { setEventsOpen(null); editEventCard(h, h.startsOn!, e.clientX - 140, e.clientY, t1 || '09:00'); }} style={iconBtn}><MenuIcon name="rename" size={13} /></button>
+                      <button type="button" title="Delete" aria-label={`Delete ${h.name}`} onClick={() => { void deleteRoutine(h.id); }} style={{ ...iconBtn, color: 'var(--rust)' }}><MenuIcon name="delete" size={13} /></button>
+                    </span>
+                  </div>
+                );
+              }
               const ended = !!(h.endsOn && h.endsOn < todayYMD());
               // Ended from today on: it still happens today, so say so (the row
               // looked unchanged after End, as if the button did nothing).
@@ -3649,7 +3688,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                   <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 2 }}>
                     {ended
                       ? <button type="button" title="Restart" aria-label={`Restart ${h.name}`} onClick={() => { void habitMotherCommand('routine.restart', { id: h.id }); }} style={iconBtn}><MenuIcon name="restart" size={13} /></button>
-                      : <button type="button" title="Edit" aria-label={`Edit ${h.name}`} onClick={(e) => { setEventsOpen(null); setEventCard({ x: e.clientX - 140, y: e.clientY, day: todayYMD(), allowOnce: false, editId: h.id, initial: { name: h.name, mode: 'repeat', days, time: t || '09:00', lengthMin: h.schedule?.durationMin ?? 60 } }); }} style={iconBtn}><MenuIcon name="rename" size={13} /></button>}
+                      : <button type="button" title="Edit" aria-label={`Edit ${h.name}`} onClick={(e) => { setEventsOpen(null); editEventCard(h, todayYMD(), e.clientX - 140, e.clientY, t || '09:00'); }} style={iconBtn}><MenuIcon name="rename" size={13} /></button>}
                     {ending
                       ? <button type="button" title="Keep it (don't end it)" aria-label={`Keep ${h.name}`} onClick={() => { void habitMotherCommand('routine.restart', { id: h.id }); }} style={iconBtn}><MenuIcon name="restart" size={13} /></button>
                       : !ended && <button type="button" title="End after today (keeps past)" aria-label={`End ${h.name}`} onClick={() => { void habitMotherCommand('routine.end', { id: h.id, date: todayYMD() }); }} style={iconBtn}><MenuIcon name="end" size={13} /></button>}
@@ -3665,11 +3704,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 setEventsOpen(null);
                 const day = todayYMD();
                 const isoDow = ((new Date(`${day}T00:00:00`).getDay() + 6) % 7) + 1;
-                setEventCard({ x: e.clientX - 140, y: e.clientY - 200, day, allowOnce: false, initial: { name: '', mode: 'repeat', days: [isoDow], time: '09:00', lengthMin: 60 } });
+                setEventCard({ x: e.clientX - 140, y: e.clientY - 200, day, allowOnce: true, initial: { name: '', mode: 'once', days: [isoDow], time: '09:00', lengthMin: 60 } });
               }}
               style={{ marginTop: 4, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 8px', borderRadius: 6, border: '1px dashed var(--paper-3)', background: 'transparent', color: 'var(--ink-2)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11.5 }}
             >
-              <MenuIcon name="plus" size={12} />New repeating event
+              <MenuIcon name="plus" size={12} />New event
             </button>
           </div>
         </>,

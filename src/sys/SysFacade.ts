@@ -850,7 +850,7 @@ export class SysFacade {
         ...(this.deps.cliDispatch ? { cliDispatch: this.deps.cliDispatch } : {}),
       };
       switch (command.sub) {
-        case 'add':     return habit.cliRoutineAdd(ctx, command.name, command.days, command.at, command.forMin);
+        case 'add':     return habit.cliRoutineAdd(ctx, command.name, command.days, command.at, command.forMin, command.on);
         case 'list':    return habit.cliRoutineList(ctx, command.json);
         case 'skip':    return habit.cliRoutineSkip(ctx, command.ref, command.on);
         case 'unskip':  return habit.cliRoutineUnskip(ctx, command.ref, command.on);

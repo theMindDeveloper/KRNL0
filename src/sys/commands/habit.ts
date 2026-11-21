@@ -901,9 +901,10 @@ export function parseRoutineDays(raw: string | undefined): { kind: 'daily' } | {
 
 function routineLine(h: Habit): string {
   const sch = h.schedule;
-  const when = !sch ? '' : sch.kind === 'daily' ? 'every day' : sch.kind === 'weekdays' ? 'weekdays' : sch.days.map((d) => DAY_NAMES[d - 1]).join(',');
+  const once = !!h.startsOn && h.startsOn === h.endsOn;
+  const when = once ? `on ${h.startsOn}` : !sch ? '' : sch.kind === 'daily' ? 'every day' : sch.kind === 'weekdays' ? 'weekdays' : sch.days.map((d) => DAY_NAMES[d - 1]).join(',');
   const len = sch?.durationMin ? ` for ${sch.durationMin} min` : '';
-  const end = h.endsOn ? ` · ends ${h.endsOn}` : '';
+  const end = h.endsOn && !once ? ` · ends ${h.endsOn}` : '';
   const ex = h.exceptions?.length ? ` · ${h.exceptions.map((e) => `${e.date} ${e.skip ? 'skipped' : `moved to ${e.at}`}`).join(', ')}` : '';
   return `${h.name} · ${when} ${sch?.timeOfDay ?? ''}${len}${end}${ex} · ${h.id}`;
 }
@@ -943,11 +944,13 @@ async function withRoutine(
 }
 
 export async function cliRoutineAdd(
-  ctx: HabitCtx, name: string | undefined, daysRaw: string | undefined, at: string | undefined, forMin: number | undefined,
+  ctx: HabitCtx, name: string | undefined, daysRaw: string | undefined, at: string | undefined, forMin: number | undefined, on?: string,
 ): Promise<SysResult> {
-  const usage = 'routine add "<name>" --days mon,wed --at HH:MM --for <minutes>';
+  const usage = 'event add "<name>" (--days mon,wed | --on YYYY-MM-DD) --at HH:MM --for <minutes>';
   if (!name?.trim()) return { ok: false, message: usage };
-  const days = parseRoutineDays(daysRaw);
+  // Decision 62 — `--on`: an event that happens once, on that day.
+  if (on !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(on)) return { ok: false, message: 'event add: --on needs a date, YYYY-MM-DD' };
+  const days = on !== undefined ? { kind: 'weekly' as const, days: [1 as const] } : parseRoutineDays(daysRaw);
   if ('error' in days) return { ok: false, message: `routine add: ${days.error}` };
   if (!at || !isValidTimeOfDay(at)) return { ok: false, message: `routine add: needs --at HH:MM (24-hour)` };
   const len = forMin ?? 60;
@@ -956,11 +959,11 @@ export async function cliRoutineAdd(
   const mother = findMother(board);
   if (!mother) return notFound();
   const before = new Set(mother.state.habits.map((h) => h.id));
-  mother.state = habitAdd(mother.state, { name: name.trim(), kind: 'routine', schedule: { ...days, timeOfDay: at, durationMin: len } });
+  mother.state = habitAdd(mother.state, { name: name.trim(), kind: 'routine', schedule: { ...days, timeOfDay: at, durationMin: len }, ...(on !== undefined ? { on } : {}) });
   const added = mother.state.habits.find((h) => !before.has(h.id));
   if (!added) return { ok: false, message: 'routine add: nothing added' };
   writeBoard(ctx, board, mother);
-  return { ok: true, message: `routine added: ${routineLine(added)}`, data: { id: added.id } };
+  return { ok: true, message: `${on !== undefined ? 'event' : 'routine'} added: ${routineLine(added)}`, data: { id: added.id } };
 }
 
 export async function cliRoutineList(ctx: HabitCtx, json = false): Promise<SysResult> {

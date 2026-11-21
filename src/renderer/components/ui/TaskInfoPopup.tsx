@@ -16,7 +16,7 @@ import { toneVarForTask } from '../../utils/taskColor';
 import type { TaskState } from '../nodes/TaskNode/types';
 import type { TodoState } from '../nodes/TodoNode/types';
 import { habitStreak } from '../nodes/HabitNode/commands';
-import { todayLocal, type HabitState } from '../nodes/HabitNode/types';
+import { isOneTimeEvent, todayLocal, type HabitState } from '../nodes/HabitNode/types';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { useEasyMode } from '../../store/uiMode';
 import { Z } from './layers';
@@ -185,7 +185,7 @@ function HabitInfo({ taskId, x, y, startMs, endMs, onClose, onDetails }: TaskInf
       const date = startMs !== undefined ? ymdOf(startMs) : today;
       return {
         name: h.name, color: h.color, doneToday: h.log.includes(today), streak: habitStreak(h, today).current, streakUnit: habitStreak(h, today).unit,
-        routine: h.kind === 'routine', date, skipped: !!h.exceptions?.some((e) => e.date === date && e.skip),
+        routine: h.kind === 'routine', once: isOneTimeEvent(h), date, skipped: !!h.exceptions?.some((e) => e.date === date && e.skip),
       };
     }),
   );
@@ -197,17 +197,19 @@ function HabitInfo({ taskId, x, y, startMs, endMs, onClose, onDetails }: TaskInf
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <span aria-hidden style={{ width: 9, height: 9, borderRadius: 999, flexShrink: 0, background: `var(--${info.color})` }} />
           <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
-          <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Repeats</span>
+          <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{info.once ? 'Event' : 'Repeats'}</span>
         </div>
         <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 12, paddingLeft: 19 }}>
-          {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''} · `}
-          {info.skipped ? 'skipped this time' : 'every week'}
+          {/* Decision 62 — a one-time event: its day and time. */}
+          {info.once && `${new Date(`${info.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · `}
+          {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''}`}
+          {!info.once && ` · ${info.skipped ? 'skipped this time' : 'every week'}`}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button type="button" data-testid="routine-info-skip" style={btn}
+          {!info.once && <button type="button" data-testid="routine-info-skip" style={btn}
             onClick={() => { void habitMotherCommand(info.skipped ? 'routine.unskip' : 'routine.skip', { id: habitId, date: info.date }); onClose(); }}>
             {info.skipped ? 'Undo skip' : 'Skip this one'}
-          </button>
+          </button>}
           {onDetails && <button type="button" data-testid="routine-info-details" title="Change its name, days, time or length" style={btn} onClick={() => { onDetails(); onClose(); }}>Details</button>}
         </div>
       </Shell>

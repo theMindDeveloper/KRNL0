@@ -1,6 +1,6 @@
 # One-time events: tasks and events, split by one question
 
-Decision 62 (proposed) · design: canvas "KRNL0 one-time events" (drafts, waiting for the owner's pick).
+Decision 62 (accepted 2026-11-22) · design: canvas "KRNL0 one-time events" — the owner's rule: **the Calendar adds only events (once or repeating); tasks come from the Todo node.**
 
 The owner asked what is right: "having scheduled to-do tasks and also events, or what makes more sense?" Both, split by one question: **do I have to do it, or does it just happen?**
 
@@ -15,11 +15,11 @@ Today only repeating events exist (Decision 39/40); a one-time thing has to be m
 |---|---|
 | F1 | **One-time events.** An event can happen once: a name, a day, a time, a length and an optional place. It is drawn like a repeating event (calm tinted card behind plans, shared lanes with plans, Decision 61) without the repeat mark; its meta line reads the time only ("15:00–16:00"), never "every week". |
 | F2 | **Never a task.** A one-time event is not in Todo, has no tick box, never reads "Missed", is not counted in plan-vs-actual or streaks, and is not a Pomo target. |
-| F3 | **The Calendar adds events.** The Calendar's add field (and double-clicking empty hours) makes an event; **Once** is the default and **Repeats** is one click away (or the words "every …"). How a task is made from the Calendar instead follows the picked draft. |
-| F4 | **Todo adds tasks.** Todo's field is unchanged; a task gets a time by dragging it onto the Calendar or through its When. |
+| F3 | **The Calendar adds only events.** Its add field ("add an event"), double-clicking empty hours and right-click "New here…" make an event; **Once** is the default and **Repeats** is one click away (or the words "every …"). A time in the words ("Dentist fri 15:00 1h") adds it at once; without one, the event card opens with the name in it. Nothing on the Calendar makes a task. |
+| F4 | **Tasks come from the Todo node.** Todo's field is unchanged; a task gets a time by dragging its row or its card onto the Calendar, or through its When. |
 | F5 | **Same handling as every event.** A one-time event is dragged, resized, opened (left click: its info card; right click: Edit, Delete) and laid out exactly like a repeating one; on the Clock it is the same outlined arc. |
-| F6 | **Turn one into the other.** An event's menu offers *Make it a task* (it moves to Todo with its time); a task's menu offers *Make it an event* (it leaves Todo; its time stays). *Make it repeat* turns a one-time event into a repeating one (its weekday preselected). |
-| F7 | **CLI** (rule 8): `krnl event add "<name>" --on <YYYY-MM-DD or day> --at HH:MM [--for 1h] [--place "<room>"]`; `krnl event list` shows one-time and repeating events; `krnl event move <ref> --on <date> --at HH:MM`; `krnl event repeat <ref> --days mon,wed`; `krnl event task <ref>` / `krnl task event <ref>` (F6). |
+| F6 | **Once or repeating, either way.** Editing a one-time event offers Once · Repeats: Repeats makes it repeat (its weekday preselected); editing a repeating event can make it once (on the day it was opened from). Moving a one-time event to another day moves its date. |
+| F7 | **CLI** (rule 8): `krnl event add "<name>" --on <YYYY-MM-DD> --at HH:MM [--for 1h]`; `krnl event list` shows one-time events with their date. |
 | F8 | **Tutorial:** the Calendar tour gains a step: add a one-time event from the Calendar, and see that Todo is unchanged. |
 
 ## Non-Functional Requirements
@@ -58,12 +58,17 @@ Feature: One-time events (F1, F2, F3)
     When it is Saturday
     Then "Dentist" does not read "Missed"
 
-Feature: Kinds can change (F6)
-  Scenario: Make an event a task
-    Given the one-time event "Return library books" on Thursday 10:00
-    When I choose "Make it a task" in its menu
-    Then Todo has "Return library books" planned Thursday 10:00
-    And the Calendar shows it as a task block
+Feature: The Calendar makes no tasks (F3, F4)
+  Scenario: Double-click empty hours
+    When I double-click Thursday 10:00 and add "Return library books" with Once
+    Then Thursday shows "Return library books" at 10:00 as an event
+    And Todo has no "Return library books" row
+
+Feature: Once or repeating (F6)
+  Scenario: A one-time event starts repeating
+    Given the one-time event "Choir" on Wednesday 19:00
+    When I edit it and choose Repeats
+    Then "Choir" is on every Wednesday at 19:00
 
 Feature: CLI (F7)
   Scenario: Add a one-time event from the terminal

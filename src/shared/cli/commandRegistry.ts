@@ -89,7 +89,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     group: 'routine',
     summary: 'Repeating events (a class, a shift): set days, a set time, never ticked. `krnl event …` is the same command',
     subcommands: [
-      { name: 'add', usage: 'routine add "<name>" --days mon,wed --at HH:MM --for <minutes>', summary: 'Add a routine (days: mon..sun, 1..7, daily, weekdays)' },
+      { name: 'add', usage: 'routine add "<name>" (--days mon,wed | --on YYYY-MM-DD) --at HH:MM --for <minutes>', summary: 'Add an event: repeating (--days: mon..sun, 1..7, daily, weekdays) or once (--on a date)' },
       { name: 'list', usage: 'routine list [--json]', summary: 'List routines with their next date' },
       { name: 'skip', usage: 'routine skip <id|name> [--on YYYY-MM-DD]', summary: 'Skip one occurrence (default: the next one)' },
       { name: 'unskip', usage: 'routine unskip <id|name> --on YYYY-MM-DD', summary: 'Undo a skip or a move' },

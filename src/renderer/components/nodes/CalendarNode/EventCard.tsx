@@ -1,7 +1,7 @@
-// Decision 40 — make something on the Calendar (double-click empty hours, the
-// + button, or right-click → "New here…"). Once adds a
-// plan at that time; Repeats adds a repeating event (a class, a shift — never
-// ticked). The same card edits an event.
+// Decision 40/62 — make an event on the Calendar (its field, double-click empty
+// hours, or right-click → "New here…"). Once: an event on that day; Repeats: a
+// repeating event (a class, a shift). Events are never ticked; tasks come from
+// the Todo node, never from here. The same card edits an event, either way.
 //
 // Same look as the habit card (HabitAddAsk, draft A): the name on top, a
 // switch, the days as circles, labelled Time and Length rows, one full-width
@@ -31,7 +31,7 @@ interface Props {
   /** "Wed 11", the day it was made on (Once). */
   dayLabel: string;
   initial: EventDraft;
-  /** False when editing an event (it always repeats). */
+  /** Show the Once · Repeats switch. */
   allowOnce: boolean;
   submitLabel?: string;
   onSubmit: (d: EventDraft) => void;
@@ -60,7 +60,7 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
     : d.days.length <= 2 ? [...d.days].sort().map((n) => SHORT[n - 1]).join(' ') : [...d.days].sort().map((n) => LETTERS[n - 1]).join(' ');
   const valid = d.name.trim() !== '' && !!time && (d.mode === 'once' || d.days.length > 0);
   const summary = d.mode === 'once' ? `${dayLabel} ${time ?? ''}` : d.days.length ? `${dayWords} ${time ?? ''}` : '';
-  const label = submitLabel ?? (d.mode === 'once' ? 'Add plan' : d.days.length ? 'Add event' : 'Pick a day');
+  const label = submitLabel ?? (d.mode === 'once' || d.days.length ? 'Add event' : 'Pick a day');
   const submit = () => { if (valid && time) onSubmit({ ...d, name: d.name.trim(), time }); };
 
   const W = CARD_W;

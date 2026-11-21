@@ -3,7 +3,7 @@
 // Time and id sources are injected so tests can pin them.
 
 import type { Habit, HabitColor, HabitConfig, HabitSchedule, HabitState, HabitView, IsoDow } from './types';
-import { countOn, isHabitColor, isHabitView, isValidTimeOfDay, isDayScheduled, todayLocal } from './types';
+import { countOn, isHabitColor, isHabitView, isValidTimeOfDay, isDayScheduled, isoDowOf, todayLocal } from './types';
 
 export interface HabitEnv {
   uuid: () => string;
@@ -24,14 +24,18 @@ function sortedLog(log: string[]): string[] {
 
 export function habitAdd(
   state: HabitState,
-  args: { name: string; color?: HabitColor; schedule?: unknown; kind?: unknown; perWeek?: unknown },
+  args: { name: string; color?: HabitColor; schedule?: unknown; kind?: unknown; perWeek?: unknown; on?: unknown },
   env: HabitEnv = defaultEnv,
 ): HabitState {
   const trimmed = args.name.trim();
-  const schedule = parseAddSchedule(args.schedule);
+  let schedule = parseAddSchedule(args.schedule);
   if (!trimmed) return state;
   // Decision 39 — a routine needs days and a time; without them it is a habit.
   const routine = args.kind === 'routine' && schedule !== undefined && schedule.timeOfDay !== undefined;
+  // Decision 62 — an event that happens once, on `on`: its weekday, first and
+  // last day (a shape an older KRNL0 still reads).
+  const on = routine && typeof args.on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.on) ? args.on : null;
+  if (on && schedule?.timeOfDay) schedule = { kind: 'weekly', days: [isoDowOf(on)], timeOfDay: schedule.timeOfDay, ...(schedule.durationMin !== undefined ? { durationMin: schedule.durationMin } : {}) };
   const color: HabitColor = args.color && isHabitColor(args.color) ? args.color : 'acid';
   const habit: Habit = {
     id: env.uuid(),
@@ -42,6 +46,7 @@ export function habitAdd(
     color,
     ...(schedule ? { schedule } : {}),
     ...(routine ? { kind: 'routine' as const } : {}),
+    ...(on ? { startsOn: on, endsOn: on } : {}),
     ...(!routine && validPerWeek(args.perWeek) ? { perWeek: args.perWeek } : {}),
   };
   return { ...state, habits: [...state.habits, habit] };
@@ -596,9 +601,36 @@ export function habitSetKind(state: HabitState, args: { id: string; kind: 'routi
       return { ...h, kind: 'routine' };
     }
     if (h.kind !== 'routine') return h;
-    const { kind: _k, endsOn: _e, exceptions: _x, ...rest } = h;
-    void _k; void _e; void _x;
+    const { kind: _k, endsOn: _e, startsOn: _s, exceptions: _x, ...rest } = h;
+    void _k; void _e; void _s; void _x;
     return rest as Habit;
+  });
+}
+
+/**
+ * Decision 62 — an event happens once on `date` (its weekday, first and last
+ * day), or, with `date: null`, a one-time event starts repeating (no first or
+ * last day; its days and time stay).
+ */
+export function routineSetOn(state: HabitState, args: { id: string; date: string | null }): HabitState {
+  if (args.date !== null && !YMD_RE.test(args.date)) return state;
+  return mapHabit(state, args.id, (h) => {
+    if (h.kind !== 'routine') return h;
+    if (args.date === null) {
+      if (!(h.startsOn && h.startsOn === h.endsOn)) return h;
+      const { startsOn: _s, endsOn: _e, ...rest } = h;
+      void _s; void _e;
+      return rest as Habit;
+    }
+    const timeOfDay = h.schedule?.timeOfDay;
+    if (!timeOfDay) return h;
+    const durationMin = h.schedule?.durationMin;
+    return {
+      ...h,
+      startsOn: args.date,
+      endsOn: args.date,
+      schedule: { kind: 'weekly', days: [isoDowOf(args.date)], timeOfDay, ...(durationMin !== undefined ? { durationMin } : {}) },
+    };
   });
 }
 

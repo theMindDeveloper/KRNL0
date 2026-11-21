@@ -153,6 +153,7 @@ import {
   routineUnskip,
   routineMove,
   routineEnd,
+  routineSetOn,
   routineRestart,
 } from '../nodes/HabitNode/commands';
 import type { HabitState } from '../nodes/HabitNode/types';
@@ -457,6 +458,7 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'routine.unskip':    return { state: routineUnskip(s as never, args as never) };
         case 'routine.move':      return { state: routineMove(s as never, args as never) };
         case 'routine.end':       return { state: routineEnd(s as never, args as never) };
+        case 'routine.setOn':     return { state: routineSetOn(s as never, args as never) };
         case 'routine.restart':   return { state: routineRestart(s as never, args as never) };
       }
       break;
