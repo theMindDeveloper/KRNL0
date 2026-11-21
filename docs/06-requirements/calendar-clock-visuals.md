@@ -45,10 +45,26 @@
 | F36 | (Owner, 2026-11-21 — Decision 58) **Smooth hours.** The hour grid scrolls smoothly with the wheel, a trackpad or a finger; the arrows glide by most of a screen; dragging near the top or bottom edge keeps it moving. (Replaces whole-hour windows.) |
 | F37 | (Decision 58) **Zoom by gesture.** Pinch on a trackpad, Ctrl/⌘ + wheel, two fingers on a touch screen, or dragging the hour gutter up and down zooms the hours; the hour under the pointer stays under it; the zoom is saved once the gesture rests (`calendar.setZoom`, `krnl cal zoom`). No zoom buttons. |
 | F38 | (Decision 58) **Depth.** Every other hour is a shade deeper; plans float with a soft shadow and a tick box before the name; repeating events lie flat (tint and border, no box). The hour labels sit on their lines in a 48 px gutter with room above 00:00. |
-| F39 | (Decision 58) **No recorded rail.** Recorded time is not drawn on the Calendar (the Clock shows it); plans use the whole day column. |
+| F39 | ~~(Decision 58) No recorded rail.~~ Replaced by F43 (Decision 59): the line is back, restyled. |
 | F40 | (Decision 58) **Habits are tick boxes.** A habit set for a time is a small box centred on its time line at the right of the day, in its colour, filled with a check when done; its name beside it when there is room; a click ticks it. |
 | F41 | (Decision 58) **Add by typing at the bottom.** The Calendar's "add a plan" opens a field in the footer, as in Todo. "Gym fri 18:00 1h" adds the plan at once (the parsed day and time show beside the field); a name without a time opens the plan card with the name filled in. Escape closes the field. |
 | F42 | (Decision 58) **A bigger Clock.** The dial takes the room the list does not need; the day's list sits at the bottom, about four rows tall, and scrolls beyond that (the row going on now stays in view). The big clock is a quiet icon at the end of the header. |
+| F43 | (Decision 59) **The recorded line, calm.** Recorded time is a thin line at each day's left (4 px, 5 in a day view, 3 px from the day line; plans start 3 px after it); spans that follow each other touch; a running span is a solid fill (no stripes); the now line's dot sits centred on it; only the line itself (3 px either side) takes a click, never a plan beside it. "Recorded time" is back in the Calendar's menu. |
+| F44 | (Decision 59) **Drag a repeating event.** Drag an event to another time (a weekly one also to another weekday), or pull its top or bottom edge: the event changes for every week (`habit.setSchedule`). While dragging, a ghost shows the new time; the menu has no "Move this one…". |
+| F45 | (Decision 59) **Click to see, Details to change.** A left click on a plan or an event opens its info card (time, length, recorded; Start, Done, Details); Details there, or Details in the right-click menu, opens the card that changes it. |
+| F46 | (Decision 59) **Lines meet.** The day-name row and the ANY TIME row leave the same room at their right as the hours' scrollbar, so every day line runs straight down. |
+| F47 | (Decision 59) **Zoom you can find.** The Calendar's menu has "Bigger hours" and "Smaller hours" (it stays open between presses), with the gestures named beside them. |
+| F48 | (Decision 59) **A task's mark.** A task shows a small list mark at its top right (a done one the check, a repeating event ⟳); there is no tick box before its name. Day chips say "Tmrw". |
+| F49 | (Decision 59) **Habits you can tell apart.** A narrow day's habit box carries the habit's icon (or its first letter) in its colour; a habit on a day still ahead is faded with a dashed box and says "not yet"; a double-click on a habit never opens the new-plan card. |
+| F50 | (Decision 59) **Edges where they are drawn.** A task's top and bottom edges are found in screen pixels on the block, so a resize starts at its drawn edge at any canvas zoom; a press on an edge that does not move changes nothing. |
+| F51 | (Decision 59) **The same Clock in Free.** The dial grows with the window in Free as in the Station. A habit on the dial is a small tick box on its lane at its time, filled with a check when done; a click ticks it (not on a day still ahead). |
+| F52 | (Decision 59) **One rule for adding.** While you type in the Calendar's field the plan card shows above it, filled from the words (day, time, length, deadline), as in Todo and Habits; Enter adds what it shows; "every…" opens the repeating-event card. |
+| F53 | (Decision 60) **No habits on the Clock.** Habits are not drawn on the Clock's dial or in its list; repeating events are. The outer ring (the day's planned blocks ticked) shows its fill only once something is done. |
+| F54 | (Decision 60) **Steady blocks.** Pointing at a block tints it; nothing else on the Calendar moves or re-renders its text. |
+| F55 | (Decision 60) **One block style.** A block's mark sits at its top right whenever the block is at least ~22 px tall; names are 13 px in a full block, 12.5 px in a narrow one; events 13 px. |
+| F56 | (Decision 60) **Overlaps stay as placed.** No "Fix overlap" tab over overlapping plans. |
+| F57 | (Decision 60) **One look at every size.** A block 40 px or taller shows its name (up to three lines), then its time small (mono 10 px) — for an event with how often ("every week") — wrapping when narrow, then the rest of the name and the place. |
+| F58 | (Decision 60) **Cards behave alike.** The Calendar's add card hides on a click away; a plan's Details card renames it on a double-click of its name; only one card or menu shows at a time; the info card shows name, when, category, planned, recorded and its buttons, nothing more. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin
@@ -166,4 +182,36 @@ Feature: Calm grid and clear today (F33, F34)
   Then the gutter shows "13", "14" and no ":30"
   And today's date is in the accent circle
   And the time now is in the gutter on the now line
+
+Feature: The recorded line (F43)
+  Given I recorded 09:00–09:25 and 09:25–09:50 today
+  Then today's column shows one unbroken line from 09:00 to 09:50 at its left
+  And the now dot sits on that line
+  When I click a plan right beside the line
+  Then the plan's card opens, not the recorded span's
+
+Feature: Drag a repeating event (F44)
+  Given "Lab" repeats on Tuesdays 14:00–16:00
+  When I drag it down an hour and over to Wednesday
+  Then "Lab" repeats on Wednesdays 15:00–17:00, every week
+  When I pull its bottom edge down 30 minutes
+  Then it lasts 2h 30m every week
+
+Feature: Click to see (F45)
+  When I click a plan
+  Then its info card shows its time and length with Start, Done and Details
+  When I press Details
+  Then the card that changes it opens
+
+Feature: Habits (F49)
+  Given tomorrow has "Gym" at 11:00
+  Then its box is faded and dashed and says "not yet"
+  When I double-click today's "Gym" box
+  Then it is ticked and unticked, and no new-plan card opens
+
+Feature: One rule for adding (F52)
+  When I type "Gym fri 18:00" in the Calendar's field
+  Then the plan card shows Fri 18:00 above the field before I press Enter
+  When I press Enter
+  Then "Gym" is on Friday at 18:00
 ```

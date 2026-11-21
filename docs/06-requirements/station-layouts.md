@@ -1,13 +1,16 @@
-# Layouts (Classic, Grid, Planner, Free)
+# Layouts (My layout, Free canvas)
+
+*Decision 60 (2026-11-21): the owner kept two layouts, **My layout** (with Reset) and **Free canvas**. The ready-made Calendar & Clock (`grid`) and Wide Calendar (`planner`) described below were retired; a board saved on one opens as My layout. F2, F3, F4 and F8 below describe the retired presets.*
 
 *ADR: [Decision 54](../03-architecture/decisions.md). The owner asked (2026-11-21) for one dropdown that lists the layouts instead of the Station / Free switch, with the arrangement from their screenshot (Timer, Todos and Clock on top, a full-width Calendar below) as one of them.*
 
-The top bar has one **layout menu**. It names the layout in use and lists four, each with a line drawing of its arrangement:
+The top bar has one **layout menu**. It names the layout in use and lists four, each with a line drawing of its arrangement (names since Decision 59; the ids stay):
 
-- **Classic** — Timer, Todos, Habits and Calendar across the top; canvas, terminal, analytics and clock along the bottom. Windows can be swapped by dragging (and `krnl window swap`).
-- **Grid** — Timer, Todos and Habits across the top; Calendar (two thirds) and Clock below.
-- **Planner** — Timer, Todos, Habits and Clock across the top; the Calendar the full width below.
-- **Free** — the canvas: put anything anywhere.
+- *Yours* — **My layout** (`classic`) — Timer, Todos, Habits and Calendar across the top; canvas, terminal, analytics and clock along the bottom. Arrange it your way (drag to swap, resize, show and hide); it stays as you leave it. **Reset** puts every window back in its first place and size.
+- *Ready-made* — back exactly as shown each time you pick one:
+  - **Calendar & Clock** (`grid`) — Timer, Todos and Habits across the top; Calendar (two thirds) and Clock below.
+  - **Wide Calendar** (`planner`) — Timer, Clock, Todos and Habits across the top; the Calendar the full width below.
+- **Free canvas** (`free`) — the canvas: put anything anywhere.
 
 Classic, Grid and Planner are the Station (`layoutMode: 'station'`) with a preset (`layoutGeometry.station.preset`); Free is `layoutMode: 'canvas'`. The names live in `src/shared/stationLayouts.ts`, used by the app and the CLI.
 
@@ -22,6 +25,11 @@ Classic, Grid and Planner are the Station (`layoutMode: 'station'`) with a prese
 | F5 | CLI: `krnl settings layout [classic\|grid\|planner\|free]` shows (with the list) or picks the layout; the older words `station` (the Station with its last preset) and `canvas` (Free) still work. `krnl settings station-layout [classic\|grid\|planner]` sets the preset without leaving Free. |
 | F6 | ⌘/Ctrl+Shift+L flips between the Station (its last preset) and Free. |
 | F7 | The choice belongs to the device (part of `layoutGeometry`): with sync, each computer keeps its own layout. |
+| F8 | (Decision 59) **Ready-made comes back.** Picking Calendar & Clock or Wide Calendar (also the one in use) restores its own windows, places and sizes; you can still change it while you use it. A ready-made layout shows its own set of windows (`station.<preset>.windows`): the toolbar and `krnl window show|hide` change that set there, not My layout's. |
+| F9 | (Decision 59) **Reset.** My layout's row has Reset: every window in its first place and size, all shown but the terminal. `krnl settings layout reset` resets the layout in use (My layout, or the ready-made one as designed). The menu's names work in the CLI (`mine`, `wide`, `calendar-clock`). |
+| F12 | (Decision 60) **Reset is the owner's arrangement.** Reset (menu or `krnl settings layout reset`) puts Timer, Clock and Todos across the top and the Calendar the full width below; Habits, Analytics, the terminal and the canvas hidden. |
+| F11 | (Decision 60) **Two layouts.** The menu lists My layout (with Reset) and Free canvas only; `krnl settings layout` takes `classic`, `free` or `reset`; `grid` and `planner` are refused. |
+| F10 | (Decision 59) **Real minimums.** A Station window keeps at least 240 × 150 px, never more than a fair share of its row, so a full row still fits. |
 
 ## Non-Functional Requirements
 
@@ -70,6 +78,14 @@ Feature: Rearrange a preset (F4)
   When I drag the Clock onto the Calendar
   Then they trade places in Planner
   And Classic's places are unchanged
+
+Feature: Ready-made comes back (F8, F9)
+  Given I am in Wide Calendar
+  When I drag the Clock onto the Calendar and hide Habits
+  And pick Wide Calendar again
+  Then Timer, Clock, Todos and Habits are on top and the Calendar below, at their first sizes
+  When I rearrange My layout and press Reset
+  Then every window is back in its first place
 
 Feature: CLI (F5)
   When I run "krnl settings layout planner"
