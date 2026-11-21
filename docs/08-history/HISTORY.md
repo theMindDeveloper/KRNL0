@@ -3209,3 +3209,14 @@ Typecheck clean; all tests pass.
 
 Typecheck clean; all tests pass.
 
+## [2026-11-21] — Release v0.14.0
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.14.0`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.13.0 → 0.14.0`. Notes: `docs/releases/v0.14.0.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
