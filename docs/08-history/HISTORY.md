@@ -3310,3 +3310,11 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-21] — v0.14.2 published, with KRNL0 server 0.2.3
+
+**Type:** Release (published)
+**PRs/Commits:** #275 (the fix), #276 (release PR), tag `v0.14.2`; server: theMindDeveloper/krnl0-server#19; website: theMindDeveloper/theminddeveloper.github.io fallback version
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:** The board menu in Easy mode too, following sync. The owner asked for the release without per-step questions. Full suite green in the release PR (2856), draft checked by `npm run release -- check`, published. The follow workflow opened server 0.2.3 (website = KRNL0 0.14.2), which was merged, built, verified (signature from release.yml@v0.2.3, 9 files, image runs 0.2.3 with the 0.14.2 website) and published. `:latest` was checked against `release.json`, and the website's fallback version is 0.14.2.
