@@ -144,6 +144,7 @@ function FitOnFirstOpen({ phone }: { phone: boolean }) {
 }
 
 const CAL_VIEW_KEY = 'krnl0-web-calendar-view';
+const CAL_TODAY_KEY = 'krnl0-web-calendar-today';
 type CalView = 'day' | 'week' | 'month' | 'year';
 
 function CalendarView({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
@@ -165,6 +166,15 @@ function CalendarView({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
       return true;
     },
   } : {};
+  // A phone opens the Calendar on today, once a visit (after that it stays
+  // where you went). The date it shows is the board's, as on the desktop.
+  useEffect(() => {
+    try { if (sessionStorage.getItem(CAL_TODAY_KEY) === '1') return; sessionStorage.setItem(CAL_TODAY_KEY, '1'); } catch { /* private window: every time */ }
+    const cal = useBoardStore.getState().board?.nodes.find((n) => n.isMother && n.kind === 'calendar');
+    const anchor = (cal?.state as { anchorDate?: string } | undefined)?.anchorDate;
+    const todayYmd = ymd(new Date());
+    if (cal && anchor !== todayYmd) makeCommandHandler(cal.id)('calendar.setAnchor', { date: todayYmd });
+  }, []);
   // Decision 56 - the phone gives the Calendar the whole screen (the Clock is
   // on Today); an iPad has room for both side by side.
   if (ff === 'phone') return <div className="m-fill m-cal m-enter" data-testid="m-calendar"><MotherWindow kind="calendar" label="Calendar" {...phoneCal} /></div>;
