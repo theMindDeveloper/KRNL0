@@ -13,7 +13,7 @@ import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import { calendarGhost, setCalendarGhost } from '../DropGhost';
-import { mockCalendarLayout, nextFrame } from './calendarLayout';
+import { carryIn, mockCalendarLayout, nextFrame, planItem } from './calendarLayout';
 import type { CalendarState, CalendarConfig } from '../types';
 
 const state: CalendarState = { selectedDate: null, anchorDate: '2026-05-11', zoom: 1 };
@@ -132,26 +132,29 @@ describe('one ghost, no browser picture (Decision 61)', () => {
 });
 
 describe('a plan keeps the spot it was grabbed by (Decision 61, like an event)', () => {
-  const dtWith = (payload: object) => {
-    const data: Record<string, string> = { 'application/krnl-task': JSON.stringify(payload) };
-    return { data, setData: () => undefined, getData: (k: string) => data[k] ?? '', get types() { return Object.keys(data); }, setDragImage: () => undefined, effectAllowed: 'move', dropEffect: 'move' };
-  };
-
-  it('grabbed 30 minutes into it and let go on 10:00: it starts at 09:30', () => {
+  it('grabbed 10 minutes into it, let go at 10:55: it moves by whole steps from where it was (11:00), not to the pointer (10:00)', async () => {
     seed([task('t-plan', 'Read chapter', '2026-05-14T15:00', 60)]);
     const onCommand = vi.fn();
     render(<WeekView state={state} config={config} onCommand={onCommand} />);
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-14-10"]')!;
-    fireEvent.drop(cell, { dataTransfer: dtWith({ taskId: 't-plan', durationMin: 60, grabMin: 30 }) });
-    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't-plan', scheduledFor: '2026-05-14T09:30', scheduledDurationMin: 60 });
+    const restore = mockCalendarLayout();
+    try {
+      // At this zoom the step is one hour.
+      fireEvent.pointerDown(document.querySelector('[data-testid="task-block-t-plan"]')!, { button: 0, clientX: 350, clientY: (15 + 10 / 60) * 40 });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: (10 + 55 / 60) * 40 }));
+      await act(async () => { await nextFrame(); });
+      act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 350, clientY: (10 + 55 / 60) * 40 })); });
+      expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't-plan', scheduledFor: '2026-05-14T11:00', scheduledDurationMin: 60 });
+    } finally { restore(); }
   });
 
-  it('from Todo (no grab spot): it starts where it is let go', () => {
+  it('from Todo (no grab spot): it starts where it is let go', async () => {
     seed([task('t-plan', 'Read chapter', '2026-05-14T15:00', 60)]);
     const onCommand = vi.fn();
     render(<WeekView state={state} config={config} onCommand={onCommand} />);
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-14-10"]')!;
-    fireEvent.drop(cell, { dataTransfer: dtWith({ taskId: 't-plan', durationMin: 60 }) });
-    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't-plan', scheduledFor: '2026-05-14T10:00', scheduledDurationMin: 60 });
+    const restore = mockCalendarLayout();
+    try {
+      await act(async () => { await carryIn(planItem('t-plan', 60), { x: 350, y: 10 * 40 }); });
+      expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't-plan', scheduledFor: '2026-05-14T10:00', scheduledDurationMin: 60 });
+    } finally { restore(); }
   });
 });

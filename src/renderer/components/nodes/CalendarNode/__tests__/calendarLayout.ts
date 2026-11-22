@@ -5,6 +5,7 @@
  * given element) under a point.
  */
 import { vi } from 'vitest';
+import { beginCalendarDrag, type DragItem } from '../calendarDrag';
 
 export const HOUR_PX = 40;
 export const COL_PX = 100;
@@ -33,3 +34,20 @@ export function mockCalendarLayout(opts: { outside?: () => Element | null } = {}
 
 /** Lets the engine's animation frame run. */
 export const nextFrame = () => new Promise((r) => setTimeout(r, 40));
+
+/**
+ * Carries something in from outside the Calendar (a Todo row, a task card's
+ * grip) and lets go at a point, through the one drag engine.
+ */
+export async function carryIn(item: DragItem, to: { x: number; y: number }): Promise<void> {
+  beginCalendarDrag({ clientX: -50, clientY: -50, button: 0 }, { item });
+  window.dispatchEvent(new MouseEvent('pointermove', { clientX: to.x, clientY: to.y }));
+  await nextFrame();
+  window.dispatchEvent(new MouseEvent('pointerup', { clientX: to.x, clientY: to.y }));
+  // The browser's click that follows a release (the engine swallows it).
+  window.dispatchEvent(new MouseEvent('click', { clientX: to.x, clientY: to.y }));
+}
+
+/** A plan as the engine carries it. */
+export const planItem = (id: string, minutes: number, extra: Partial<DragItem> = {}): DragItem =>
+  ({ kind: 'task', id, name: id, tone: 'var(--acid)', lenMin: minutes, plannedMin: minutes, ...extra });

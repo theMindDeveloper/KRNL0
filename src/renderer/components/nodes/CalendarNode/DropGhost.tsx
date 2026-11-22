@@ -239,7 +239,7 @@ export type CarryShow = 'always' | 'offCalendar' | 'onCalendar';
 /** The package sits just below and right of the pointer, so the arrow's tip and the ghost's name stay in view. */
 const BOX_OFFSET = { x: 8, y: 8 };
 let box: HTMLDivElement | null = null;
-let carry: { show: CarryShow; html5: boolean } | null = null;
+let carry: { show: CarryShow } | null = null;
 let boxRaf = 0;
 let boxAt: { x: number; y: number; over: boolean } | null = null;
 
@@ -260,20 +260,8 @@ const PACKAGE_SVG = `<svg class="krnl-pkg" viewBox="0 0 32 32" width="30" height
   </g>
 </svg>`;
 
-// A transparent picture, loaded once: a hidden element is not a reliable
-// "no picture" in Chromium (it falls back to a faded copy of the element).
-let emptyImg: HTMLImageElement | null = null;
-function emptyImage(): HTMLImageElement | null {
-  if (typeof Image === 'undefined') return null;
-  if (!emptyImg) {
-    emptyImg = new Image(1, 1);
-    emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-  }
-  return emptyImg;
-}
-// Decoded, and the package in the page, long before the first drag (nothing
-// is added to the page while a drag starts).
-emptyImage();
+// The package is in the page long before the first drag (nothing is added
+// to the page while a drag starts).
 boxEl();
 
 function boxEl(): HTMLDivElement | null {
@@ -311,62 +299,21 @@ export function moveCarry(x: number, y: number, overCalendar: boolean): void {
   if (!boxRaf) boxRaf = frame(paintBox);
 }
 
-/** Is this point over a Calendar's hours (where the ghost shows)? */
-export function overHoursAt(target: EventTarget | null): boolean {
-  return target instanceof Element && !!target.closest('[data-cal-day]');
-}
-
-function onWindowDragOver(e: DragEvent): void {
-  // Some browsers report 0,0 on the last event of a drag.
-  if (e.clientX === 0 && e.clientY === 0) return;
-  const hours = overHoursAt(e.target);
-  // Off the hours a plan's ghost never stays behind on a slot it would not
-  // land on (the hours set it again; this runs first, in the capture phase).
-  if (!hours && ghost?.testId === 'calendar-snap-band') setCalendarGhost(null);
-  // The package stands in for the ghost wherever there is none (ANY TIME too).
-  moveCarry(e.clientX, e.clientY, hours);
-}
-
-function onWindowDrop(e: DragEvent): void {
-  // Let go on the Calendar: the package opens where it was.
-  const onCalendar = e.target instanceof Element && !!e.target.closest('[data-cal-day], [data-cal-anytime]');
-  endCarry({ unpack: onCalendar });
-}
-
-function onWindowDragEnd(): void {
-  endCarry();
-}
-
 /**
- * Starts carrying a plan. With a drag event (HTML drag and drop), the browser's
- * own picture is replaced by nothing; the package follows the pointer instead.
+ * Starts carrying (Decision 63: only the drag engine calls this). The
+ * package follows the pointer; `show` says where it is drawn.
  */
-export function startCarry(e: { dataTransfer: DataTransfer | null; clientX?: number; clientY?: number } | null, tone: string, show: CarryShow): void {
-  if (e?.dataTransfer && typeof e.dataTransfer.setDragImage === 'function') {
-    const img = emptyImage();
-    if (img) e.dataTransfer.setDragImage(img, 0, 0);
-  }
+export function startCarry(tone: string, show: CarryShow): void {
   endCarry();
   const el = boxEl();
   if (!el) return;
   el.classList.remove('is-unpacking');
   el.style.setProperty('--carry-tone', tone);
-  carry = { show, html5: !!e?.dataTransfer };
-  if (carry.html5 && typeof window !== 'undefined') {
-    window.addEventListener('dragover', onWindowDragOver, true);
-    window.addEventListener('dragend', onWindowDragEnd, true);
-    window.addEventListener('drop', onWindowDrop, true);
-  }
-  if (typeof e?.clientX === 'number' && typeof e.clientY === 'number' && (e.clientX !== 0 || e.clientY !== 0)) moveCarry(e.clientX, e.clientY, false);
+  carry = { show };
 }
 
 /** Ends the carry; `unpack`: it was let go on the Calendar, so the package opens there. */
 export function endCarry(opts: { unpack?: boolean } = {}): void {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('dragover', onWindowDragOver, true);
-    window.removeEventListener('dragend', onWindowDragEnd, true);
-    window.removeEventListener('drop', onWindowDrop, true);
-  }
   if (!carry) return;
   if (boxRaf) { cancelFrame(boxRaf); paintBox(); }
   const shown = !!box?.classList.contains('is-shown');
@@ -380,8 +327,3 @@ export function endCarry(opts: { unpack?: boolean } = {}): void {
   }
 }
 
-/** No browser drag picture, and no box (a drag that only the Calendar draws). */
-export function setNoDragImage(e: { dataTransfer: DataTransfer | null }): void {
-  const img = emptyImage();
-  if (img && e.dataTransfer && typeof e.dataTransfer.setDragImage === 'function') e.dataTransfer.setDragImage(img, 0, 0);
-}

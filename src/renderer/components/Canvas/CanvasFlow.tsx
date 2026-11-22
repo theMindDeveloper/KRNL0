@@ -7,7 +7,8 @@
  */
 
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { endCarry, moveCarry, startCarry } from '../nodes/CalendarNode/DropGhost';
+import { externalDragEnd } from '../nodes/CalendarNode/calendarDrag';
+import { calendarCarryEnd, calendarCarryMove, calendarCarryStart, canvasDragItem } from './calendarCarry';
 import { toneVarForTask } from '../../utils/taskColor';
 import { createPortal } from 'react-dom';
 import { scheduleBatch } from '../../utils/rafBatcher';
@@ -102,49 +103,6 @@ function settleNodes(ids: readonly string[]): void {
       window.setTimeout(() => el.removeAttribute('data-settling'), 320);
     }
   });
-}
-
-// Decision 61 — a task card dragged over the Calendar: the Calendar shows
-// where it would land (the ghost; WeekView listens), and the card goes into
-// the small box at the pointer (data-over-calendar on its wrapper, shrinking
-// around the point it was grabbed by), so it never covers the hours.
-let calendarDragRaf = 0;
-function calendarDragStart(id: string, x: number, y: number): void {
-  const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
-  // Only this card animates into the package (a transition on every card cost the whole canvas).
-  el?.setAttribute('data-calendar-carry', '1');
-  if (el && el.offsetWidth > 0) {
-    // Each part of the card (the card, its connection dots) shrinks toward
-    // the pointer, measured in its own box.
-    const zoom = el.getBoundingClientRect().width / el.offsetWidth || 1;
-    for (const part of Array.from(el.children) as HTMLElement[]) {
-      const r = part.getBoundingClientRect();
-      part.style.setProperty('--grab-x', `${Math.round((x - r.left) / zoom)}px`);
-      part.style.setProperty('--grab-y', `${Math.round((y - r.top) / zoom)}px`);
-    }
-  }
-  startCarry(null, toneVarForTask(id), 'onCalendar');
-}
-function calendarDragOver(id: string, x: number, y: number): void {
-  if (calendarDragRaf) cancelAnimationFrame(calendarDragRaf);
-  calendarDragRaf = requestAnimationFrame(() => {
-    calendarDragRaf = 0;
-    const under = typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(x, y) : [];
-    const over = under.some((el) => el instanceof HTMLElement && (el.dataset['calDay'] || el.dataset['calAnytime']));
-    const el = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
-    if (el) { if (over) el.setAttribute('data-over-calendar', '1'); else el.removeAttribute('data-over-calendar'); }
-    moveCarry(x, y, over);
-    window.dispatchEvent(new CustomEvent('krnl:calendar:drag-over', { detail: { taskId: id, x, y, over } }));
-  });
-}
-function calendarDragEnd(id: string, dropped = false): void {
-  if (calendarDragRaf) { cancelAnimationFrame(calendarDragRaf); calendarDragRaf = 0; }
-  const node = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
-  node?.removeAttribute('data-over-calendar');
-  window.setTimeout(() => node?.removeAttribute('data-calendar-carry'), 220);
-  // Let go on the Calendar: the package opens there.
-  endCarry({ unpack: dropped });
-  window.dispatchEvent(new CustomEvent('krnl:calendar:drag-end', { detail: { taskId: id } }));
 }
 
 // ── MiniMap node color — module-level to avoid per-paint inline allocation ───
@@ -1806,6 +1764,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // and persists them through the store. For a frame: also persists all child
   // positions. For a non-frame: recomputes which frame (if any) contains the
   // dragged node's center and rewrites the affected frames' childIds.
+  // The card being carried toward a Calendar in this gesture (Decision 63).
+  const carriedCard = useRef<string | null>(null);
   const commitDragEnd = useCallback((draggedId: string) => {
     const all = getNodes() as KrnlRFNode[];
     const dragged = all.find((n) => n.id === draggedId);
@@ -1814,24 +1774,20 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     // Where the store had it before this drag (for hidden frame children).
     const before = useBoardStore.getState().board?.nodes.find((n) => n.id === draggedId)?.position;
 
-    // Decision 60 — a task card let go over a Calendar day is planned there;
-    // the card itself goes back to where it was on the canvas.
+    // Decisions 60, 63 — a card let go over a Calendar is planned there (the
+    // one drag engine lands it); the card itself goes back to where it was.
     const ptr = lastDragPointer.current;
-    if (draggedKind === 'todo.task' && ptr && before && typeof document.elementsFromPoint === 'function') {
-      const under = document.elementsFromPoint(ptr.x, ptr.y);
-      const any = under.find((el) => el instanceof HTMLElement && el.dataset['calAnytime']) as HTMLElement | undefined;
-      const col = any ? undefined : under.find((el) => el instanceof HTMLElement && el.dataset['calDay']) as HTMLElement | undefined;
-      const day = any?.dataset['calAnytime'] ?? col?.dataset['calDay'];
-      if (day) {
-        window.dispatchEvent(new CustomEvent('krnl:calendar:drop-task', { detail: { taskId: draggedId, day, clientY: ptr.y, anyTime: !!any } }));
-        calendarDragEnd(draggedId, true);
-        // The card glides back to its place on the canvas (the plan is on the Calendar now).
+    if (carriedCard.current === draggedId) {
+      carriedCard.current = null;
+      const landed = !!ptr && externalDragEnd(ptr.x, ptr.y);
+      calendarCarryEnd(draggedId);
+      if (landed && before) {
+        // The card glides back to its place on the canvas (it is on the Calendar now).
         settleNodes([draggedId]);
         setNodes((prev) => prev.map((n) => (n.id === draggedId ? { ...n, position: { ...before } } : n)));
         return;
       }
     }
-    if (draggedKind === 'todo.task') calendarDragEnd(draggedId);
 
     // Align to grid: the drop settles on the nearest free grid spot (a frame
     // only snaps; its children move with it). Others moving in the same
@@ -2004,11 +1960,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       onNodesChange={onNodesChange}
       onNodeDrag={(e, n) => {
         lastDragPointer.current = { x: e.clientX, y: e.clientY };
-        if ((n as KrnlRFNode).data?.node?.kind === 'todo.task') calendarDragOver(n.id, e.clientX, e.clientY);
+        const item = carriedCard.current === n.id ? canvasDragItem((n as KrnlRFNode).data?.node) : null;
+        if (item) calendarCarryMove(n.id, item, e.clientX, e.clientY);
       }}
       onNodeDragStart={(e, n) => {
         lastDragPointer.current = { x: e.clientX, y: e.clientY };
-        if ((n as KrnlRFNode).data?.node?.kind === 'todo.task') calendarDragStart(n.id, e.clientX, e.clientY);
+        if (canvasDragItem((n as KrnlRFNode).data?.node)) { carriedCard.current = n.id; calendarCarryStart(n.id, e.clientX, e.clientY); }
       }}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}

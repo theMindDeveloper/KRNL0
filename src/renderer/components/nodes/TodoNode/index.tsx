@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { startCarry } from '../CalendarNode/DropGhost';
-import { beginTaskDragInfo } from '../../../store/taskDrag';
+import { beginCalendarDrag } from '../CalendarNode/calendarDrag';
 import { useDismissOutside } from '../../ui/useDismissOutside';
 import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
-import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TodoConfig, TodoItem, TodoState } from './types';
 import { todoBuckets, todoReclassify, todoTagLibrary, visibleItems } from './commands';
@@ -567,21 +566,19 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       key={item.id}
       data-item-id={item.id}
       className={`todo-item${item.done ? ' done' : ''}`}
-      draggable={true}
-      onDragStart={(e: DragEvent<HTMLDivElement>) => {
-        if (item.done) { e.preventDefault(); return; }
+      onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
+        // Decision 63 — the one drag engine carries it to the Calendar (no
+        // browser drag: no system box beside the pointer, no 50 ms steps).
+        if (item.done || e.button !== 0) return;
+        if ((e.target as HTMLElement).closest('button, input, textarea, select, a, [contenteditable="true"]')) return;
         const durationMin = item.taskNodeId !== null
           ? (taskPlannedMin.get(item.taskNodeId) ?? 25)
           : 25;
-        const payload = item.taskNodeId !== null
-          ? { taskId: item.taskNodeId, durationMin }
-          : { itemId: item.id, durationMin };
-        e.dataTransfer.setData('application/krnl-task', JSON.stringify(payload));
-        e.dataTransfer.effectAllowed = 'move';
-        // Decision 61 — the one drag look: a small box in its colour at the
-        // pointer; over the Calendar, the ghost shows where it lands.
-        startCarry(e, item.taskNodeId ? toneVarForTask(item.taskNodeId) : 'var(--acid)', 'always');
-        beginTaskDragInfo(payload);
+        beginCalendarDrag(e, {
+          item: item.taskNodeId !== null
+            ? { kind: 'task', id: item.taskNodeId, name: item.text, tone: toneVarForTask(item.taskNodeId), lenMin: durationMin, plannedMin: durationMin }
+            : { kind: 'task', id: item.id, itemOnly: true, name: item.text, tone: 'var(--acid)', lenMin: durationMin, plannedMin: durationMin },
+        });
       }}
       onContextMenu={(e) =>
         handleRowContextMenu(e, item.id, item.taskNodeId !== null)

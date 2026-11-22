@@ -40,7 +40,7 @@ describe('the package (Decision 61)', () => {
   const box = () => document.querySelector('[data-testid="carry-box"]') as HTMLElement;
 
   it('is a parcel, shown while carried', async () => {
-    startCarry(null, 'var(--acid)', 'always');
+    startCarry('var(--acid)', 'always');
     moveCarry(200, 200, false);
     await wait();
     expect(box().querySelector('svg.krnl-pkg')).toBeTruthy();
@@ -48,13 +48,13 @@ describe('the package (Decision 61)', () => {
   });
 
   it('let go on the Calendar: it unpacks; let go elsewhere: it just goes', async () => {
-    startCarry(null, 'var(--acid)', 'always');
+    startCarry('var(--acid)', 'always');
     moveCarry(200, 200, true);
     await wait();
     endCarry({ unpack: true });
     expect(box().classList.contains('is-unpacking')).toBe(true);
     expect(box().classList.contains('is-shown')).toBe(false);
-    startCarry(null, 'var(--acid)', 'always');
+    startCarry('var(--acid)', 'always');
     expect(box().classList.contains('is-unpacking')).toBe(false);
     moveCarry(200, 200, false);
     await wait();
@@ -63,7 +63,7 @@ describe('the package (Decision 61)', () => {
   });
 
   it('a canvas card only becomes a package over the Calendar', async () => {
-    startCarry(null, 'var(--acid)', 'onCalendar');
+    startCarry('var(--acid)', 'onCalendar');
     moveCarry(200, 200, false);
     await wait();
     expect(box().classList.contains('is-shown')).toBe(false);

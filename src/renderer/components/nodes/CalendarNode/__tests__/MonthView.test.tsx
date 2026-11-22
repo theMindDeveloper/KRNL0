@@ -14,7 +14,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import { carryIn, planItem } from './calendarLayout';
 import React from 'react';
 import { MonthView } from '../MonthView';
 import { useBoardStore } from '../../../../store/boardStore';
@@ -401,15 +402,31 @@ describe('MonthView — picking a day', () => {
   });
 });
 
-describe('MonthView — drops (ADR 0001 §9)', () => {
-  const drop = (cell: Element, payload: unknown) => {
-    const data = JSON.stringify(payload);
-    const dataTransfer = { types: ['application/krnl-task'], getData: () => data, dropEffect: '' };
-    fireEvent.dragOver(cell, { dataTransfer });
-    fireEvent.drop(cell, { dataTransfer });
+describe('MonthView — drops (ADR 0001 §9, Decision 63)', () => {
+  // jsdom has no layout: the month's days sit 7 per row, 100 x 80 px each.
+  let restore: () => void = () => undefined;
+  beforeEach(() => {
+    const cells = (): HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>('[data-month-day]'));
+    const at = (i: number) => ({ left: (i % 7) * 100, top: Math.floor(i / 7) * 80, width: 100, height: 80, right: (i % 7) * 100 + 100, bottom: Math.floor(i / 7) * 80 + 80, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const i = cells().indexOf(this);
+      return i >= 0 ? at(i) : at(-1000);
+    });
+    const d = document as unknown as { elementsFromPoint?: ((x: number, y: number) => Element[]) | undefined };
+    const before = d.elementsFromPoint;
+    d.elementsFromPoint = (x: number, y: number) => {
+      const c = cells().find((el, i) => { const r = at(i); return x >= r.left && x < r.right && y >= r.top && y < r.bottom; });
+      return c ? [c] : [];
+    };
+    restore = () => { spy.mockRestore(); d.elementsFromPoint = before; };
+  });
+  afterEach(() => restore());
+  const centre = (ymd: string) => {
+    const i = Array.from(document.querySelectorAll<HTMLElement>('[data-month-day]')).findIndex((c) => c.dataset['monthDay'] === ymd);
+    return { x: (i % 7) * 100 + 50, y: Math.floor(i / 7) * 80 + 40 };
   };
 
-  it('a scheduled task keeps its time of day on the new date; a Todo row is not given a made-up 09:00 (Decision 40: any time that day)', () => {
+  it('a scheduled task keeps its time of day on the new date; a Todo row is not given a made-up 09:00 (Decision 40: any time that day)', async () => {
     useBoardStore.setState({
       board: {
         version: 1, schemaVersion: 2, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 }, edges: [], layoutMode: 'canvas',
@@ -418,9 +435,9 @@ describe('MonthView — drops (ADR 0001 §9)', () => {
     });
     const onCommand = vi.fn();
     render(<MonthView state={makeState()} config={makeConfig()} onCommand={onCommand} />);
-    drop(document.querySelector('[data-testid="month-cell-2026-05-12"]')!, { taskId: 't1' });
+    await act(async () => { await carryIn(planItem('t1', 60), centre('2026-05-12')); });
     expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't1', scheduledFor: '2026-05-12T14:30' });
-    drop(document.querySelector('[data-testid="month-cell-2026-05-13"]')!, { itemId: 'row1', durationMin: 25 });
+    await act(async () => { await carryIn(planItem('row1', 25, { itemOnly: true }), centre('2026-05-13')); });
     expect(onCommand).not.toHaveBeenCalledWith('calendar.schedule', expect.objectContaining({ itemId: 'row1' }));
   });
 });

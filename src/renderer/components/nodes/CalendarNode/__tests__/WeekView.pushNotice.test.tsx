@@ -4,7 +4,8 @@
  * after the predecessor; the calendar must say so instead of silently moving it.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, cleanup, act } from '@testing-library/react';
+import { carryIn, mockCalendarLayout, planItem } from './calendarLayout';
 import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
@@ -27,7 +28,7 @@ function task(id: string, extra: Partial<TaskState> = {}): Board['nodes'][number
 }
 
 describe('WeekView — push notice', () => {
-  it('a chained plan dropped on a time lands exactly there: nothing is pushed, so there is no notice', () => {
+  it('a chained plan dropped on a time lands exactly there: nothing is pushed, so there is no notice', async () => {
     useBoardStore.setState({
       board: {
         version: 1, schemaVersion: 2, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 },
@@ -51,12 +52,11 @@ describe('WeekView — push notice', () => {
         onCommand={onCommand}
       />,
     );
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-12-9"], [data-testid="week-cell-2026-05-12-09"]');
-    expect(cell).toBeTruthy();
-    const payload = JSON.stringify({ taskId: 'b', durationMin: 60 });
-    fireEvent.drop(cell!, {
-      dataTransfer: { getData: (t: string) => (t === 'application/krnl-task' ? payload : ''), types: ['application/krnl-task'] },
-    });
+    const restore = mockCalendarLayout();
+    try {
+      // Tuesday (2026-05-12), 09:00.
+      await act(async () => { await carryIn(planItem('b', 60), { x: 150, y: 9 * 40 + 5 }); });
+    } finally { restore(); }
     expect(document.querySelector('[data-testid="calendar-push-notice"]')).toBeNull();
     const b = useBoardStore.getState().board!.nodes.find((n) => n.id === 'b')!;
     expect(String((b.state as TaskState).scheduledFor)).toContain('T09:00');

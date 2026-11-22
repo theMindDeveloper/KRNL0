@@ -21,6 +21,7 @@ import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import type { CalendarState, CalendarConfig } from '../types';
 import { setHabitDrag, clearHabitDrag } from '../../../../dnd/habitDrag';
+import { carryIn, mockCalendarLayout, planItem } from './calendarLayout';
 
 afterEach(() => {
   cleanup();
@@ -289,7 +290,7 @@ describe('WeekView — navigation arrows', () => {
 describe('WeekView — drop to schedule', () => {
   beforeEach(() => setEmptyBoard());
 
-  it('drop with valid krnl-task payload fires calendar.schedule with correct scheduledFor', () => {
+  it('a plan carried in (Decision 63) fires calendar.schedule with the time it is let go on', async () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -298,28 +299,19 @@ describe('WeekView — drop to schedule', () => {
         onCommand={onCommand}
       />,
     );
-    // Cell for Tuesday (2026-05-12) at 14:00
-    const cell = document.querySelector(
-      '[data-testid="week-cell-2026-05-12-14"]',
-    );
-    expect(cell).toBeTruthy();
-
-    const payload = JSON.stringify({ taskId: 'task-abc', durationMin: 50 });
-    fireEvent.drop(cell!, {
-      dataTransfer: {
-        getData: (type: string) => (type === 'application/krnl-task' ? payload : ''),
-        types: ['application/krnl-task'],
-      },
-    });
-
-    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', {
-      taskId: 'task-abc',
-      scheduledFor: '2026-05-12T14:00',
-      scheduledDurationMin: 50,
-    });
+    const restore = mockCalendarLayout();
+    try {
+      // Tuesday (2026-05-12) is the 2nd column; 14:00.
+      await act(async () => { await carryIn(planItem('task-abc', 50), { x: 150, y: 14 * 40 + 5 }); });
+      expect(onCommand).toHaveBeenCalledWith('calendar.schedule', {
+        taskId: 'task-abc',
+        scheduledFor: '2026-05-12T14:00',
+        scheduledDurationMin: 50,
+      });
+    } finally { restore(); }
   });
 
-  it('drop of a Todo row with no task yet fires calendar.schedule with its itemId', () => {
+  it('a Todo row with no task yet fires calendar.schedule with its itemId', async () => {
     const onCommand = vi.fn();
     render(
       <WeekView
@@ -328,19 +320,15 @@ describe('WeekView — drop to schedule', () => {
         onCommand={onCommand}
       />,
     );
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-12-09"]');
-    const payload = JSON.stringify({ itemId: 'item-1', durationMin: 25 });
-    fireEvent.drop(cell!, {
-      dataTransfer: {
-        getData: (type: string) => (type === 'application/krnl-task' ? payload : ''),
-        types: ['application/krnl-task'],
-      },
-    });
-    expect(onCommand).toHaveBeenCalledWith('calendar.schedule', {
-      itemId: 'item-1',
-      scheduledFor: '2026-05-12T09:00',
-      scheduledDurationMin: 25,
-    });
+    const restore = mockCalendarLayout();
+    try {
+      await act(async () => { await carryIn(planItem('item-1', 25, { itemOnly: true }), { x: 150, y: 9 * 40 + 5 }); });
+      expect(onCommand).toHaveBeenCalledWith('calendar.schedule', {
+        itemId: 'item-1',
+        scheduledFor: '2026-05-12T09:00',
+        scheduledDurationMin: 25,
+      });
+    } finally { restore(); }
   });
 
   it('drop with non-matching MIME type does nothing', () => {

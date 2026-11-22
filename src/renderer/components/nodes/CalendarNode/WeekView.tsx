@@ -7,8 +7,7 @@
 import { pickerOpen } from '../../ui/Popover';
 import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragMode } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
-import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost, startCarry } from './DropGhost';
-import { beginTaskDragInfo, endTaskDragInfo, taskDragInfo } from '../../../store/taskDrag';
+import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost } from './DropGhost';
 import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
 import { CALENDAR_LAYOUT_EVENT, CALENDAR_REVEAL_EVENT, showTask, unscheduleTask } from '../../../store/scheduleActions';
 import { highlightElement } from '../../../store/highlight';
@@ -454,41 +453,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // Decision 60 — one preview for every drag onto the Calendar (Todo row,
   // task card, Calendar block, canvas card): the plan as a soft block with its
   // name and times at the slot it would land on.
-  const previewOf = (ref: { taskId?: string; itemId?: string; durationMin?: number } | null): { name: string; len: number; tone: string } => {
-    const nodes = useBoardStore.getState().board?.nodes ?? [];
-    if (ref?.taskId) {
-      const ts = nodes.find((n) => n.id === ref.taskId)?.state as { text?: string; plannedMin?: number; durationMin?: number } | undefined;
-      return { name: ts?.text ?? 'Plan', len: ref.durationMin ?? ts?.plannedMin ?? ts?.durationMin ?? 30, tone: toneVarForTask(ref.taskId) };
-    }
-    if (ref?.itemId) {
-      const items = (nodes.find((n) => n.kind === 'todo' && n.isMother)?.state as { items?: Array<{ id: string; text: string }> } | undefined)?.items ?? [];
-      return { name: items.find((i) => i.id === ref.itemId)?.text ?? 'Plan', len: ref.durationMin ?? 30, tone: 'var(--acid)' };
-    }
-    return { name: '', len: ref?.durationMin ?? 60, tone: 'var(--acid)' };
-  };
-  // Decision 61 — the plan's ghost at a slot (DropGhost.tsx: moved without
-  // re-drawing the week, so it glides instead of stuttering).
-  const showPlanGhost = (day: string, pointerMin: number, ref: { taskId?: string; itemId?: string; durationMin?: number; grabMin?: number } | null = taskDragInfo()) => {
-    const minute = Math.max(0, pointerMin - (ref?.grabMin ?? 0));
-    const cur = calendarGhost();
-    if (cur && cur.testId === 'calendar-snap-band' && cur.day === day && cur.startMin === minute) return;
-    const p = previewOf(ref);
-    const len = Math.max(gran, Math.min(1440 - minute, p.len));
-    setCalendarGhost({ day, startMin: minute, endMin: minute + len, name: p.name, times: ghostTimes(minute, minute + len), tone: p.tone, testId: 'calendar-snap-band', ...(ref?.taskId ? { refId: ref.taskId, refKind: 'task' as const } : {}) });
-  };
-  // The band must never outlive the drag: a drop on a task block stops
-  // propagation before the cell can clear it, and a cancelled drag (Esc, drop
-  // outside the grid) never reaches a cell at all.
-  useEffect(() => {
-    const clear = () => { if (calendarGhost()?.testId === 'calendar-snap-band') setCalendarGhost(null); };
-    window.addEventListener('dragend', clear, true);
-    window.addEventListener('drop', clear, true);
-    return () => {
-      window.removeEventListener('dragend', clear, true);
-      window.removeEventListener('drop', clear, true);
-    };
-  }, []);
-
   // Sub-header nav handlers — step a day in day view, a week otherwise.
   const handlePrev = () => {
     onCommand('calendar.setAnchor', { date: addDays(baseYMD, -dayCount) });
@@ -668,6 +632,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     commit: (item, result, origin, mode) => surfaceImpl.current?.commit(item, result, origin, mode) ?? null,
     setCarried: (id) => surfaceImpl.current?.setCarried?.(id),
     preview: (item, target, origin) => surfaceImpl.current?.preview?.(item, target, origin),
+    hover: (slot) => surfaceImpl.current?.hover?.(slot),
   }), []);
   useEffect(() => registerCalendarSurface(surface), [surface]);
   useEffect(() => {
@@ -738,7 +703,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   const [layerDragging, setLayerDragging] = useState(false);
   // Decision 40 — the ANY TIME cell a plan is dragged over (browser drags that remain: agenda and picker rows).
   const [anyHot, setAnyHot] = useState<string | null>(null);
-  const endTaskDrag = () => { setAnyHot(null); };
   // Right-click menu (shared with the Clock — ContextMenu/scheduleMenus.ts).
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   // Decision 59 — a left click shows what it is (the info card, as on the
@@ -1108,6 +1072,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     slotAt: (x, y) => {
       const root = rootRef.current;
       if (!root) return null;
+      // The list (agenda): it goes after the row under the pointer.
+      let after: { day: string; min: number } | null = null;
+      for (const row of Array.from(root.querySelectorAll<HTMLElement>('[data-agenda-min]'))) {
+        const r = row.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) after = { day: row.dataset['agendaDay']!, min: Number(row.dataset['agendaMin']) };
+      }
+      if (after) return after;
       for (const cell of Array.from(root.querySelectorAll<HTMLElement>('[data-cal-anytime]'))) {
         const r = cell.getBoundingClientRect();
         if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return { anyTime: cell.dataset['calAnytime']! };
@@ -1122,7 +1093,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       }
       return null;
     },
-    gran: () => gran,
+    // The list has no hour grid: a plan goes right after the row it is let go on.
+    gran: () => (useAgenda ? 5 : gran),
+    hover: (slot) => setAnyHot(slot && 'anyTime' in slot ? slot.anyTime : null),
     setCarried: (id) => { setCarriedId(id); if (id) setTaskPopup(null); },
     preview: (item, target, origin) => {
       if (item.kind !== 'habit') return;
@@ -1545,16 +1518,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           return;
         }
 
-        if (!types.includes('application/krnl-task')) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        // #8 — instead of lighting the whole hour cell, track the exact snapped
-        // slot under the cursor and render a thin band there (see snapPreview).
-        const rect = e.currentTarget.getBoundingClientRect();
-        const rectH = rect.height > 0 ? rect.height : rowHeight;
-        const within = Math.max(0, Math.min(59, Math.floor(((Number.isFinite(e.clientY) ? e.clientY : 0) - rect.top) / rectH * 60)));
-        const minute = hour * 60 + Math.floor(within / gran) * gran;
-        showPlanGhost(dayYMD, minute);
       },
       onDragLeave: (e: DragEvent<HTMLDivElement>) => {
         e.currentTarget.removeAttribute('data-drop-target');
@@ -1562,7 +1525,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       onDrop: (e: DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.currentTarget.removeAttribute('data-drop-target');
-        setCalendarGhost(null);
 
         // A1: habit drop — capture cell context AND habit payload at drop time,
         // then open HabitSwapModal. We snapshot the habit here because `dragend`
@@ -1580,37 +1542,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           return;
         }
 
-        const raw = e.dataTransfer.getData('application/krnl-task');
-        if (!raw) return;
-        const payload = JSON.parse(raw) as {
-          taskId?: string;
-          itemId?: string;
-          durationMin: number;
-          grabMin?: number;
-        };
-        if (!payload.taskId && !payload.itemId) return;
-        // #11 — snap to the zoom-driven granularity (60/30/15/5), not a fixed 15.
-        // Guard against jsdom (clientY undefined, rect.height = 0) so the
-        // computed minute is always a finite integer in [0, 60-gran].
-        const rect = e.currentTarget.getBoundingClientRect();
-        const clientY = Number.isFinite(e.clientY) ? e.clientY : 0;
-        const rectTop = Number.isFinite(rect.top) ? rect.top : 0;
-        const rectH = rect.height > 0 ? rect.height : 60;
-        const relY = Math.max(0, clientY - rectTop);
-        const minuteRaw = Math.floor((relY / rectH) * 60);
-        const safeMinute = Number.isFinite(minuteRaw) ? minuteRaw : 0;
-        const snappedMinute = Math.max(0, Math.min(60 - gran, Math.floor(safeMinute / gran) * gran));
-        // Where it was grabbed stays under the pointer (Decision 61).
-        const startAbs = Math.max(0, hour * 60 + snappedMinute - (Number.isFinite(payload.grabMin) ? payload.grabMin! : 0));
-        const scheduledFor = `${dayYMD}T${String(Math.floor(startAbs / 60)).padStart(2, '0')}:${String(startAbs % 60).padStart(2, '0')}`;
-        if (payload.taskId) { scheduleTask(payload.taskId, scheduledFor, payload.durationMin); setLandedTaskId(payload.taskId); }
-        // A Todo row with no task node yet: the dispatcher creates and links
-        // one, then schedules it (so both Todo rows and canvas tasks drop here).
-        else onCommand('calendar.schedule', { itemId: payload.itemId, scheduledFor, scheduledDurationMin: payload.durationMin });
-        // 240ms acid flash.
-        e.currentTarget.classList.add('calendar-cell--just-dropped');
-        const el = e.currentTarget;
-        setTimeout(() => el.classList.remove('calendar-cell--just-dropped'), 240);
       },
     };
   }
@@ -2280,21 +2211,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const parallelCount = (it: Item) =>
       items.filter((o) => o !== it && !o.habit && !it.habit && o.startMin < it.endMin && it.startMin < o.endMin).length;
 
-    const dropAfter = (it: Item | null) => (e: DragEvent<HTMLDivElement>) => {
-      const raw = e.dataTransfer.getData('application/krnl-task');
-      if (!raw) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const payload = JSON.parse(raw) as { taskId?: string; durationMin: number };
-      if (!payload.taskId) return;
-      const base = it ? it.endMin : Math.ceil((isToday ? nowMin : 9 * 60) / 15) * 15;
-      const m = Math.min(1440 - 15, base);
-      scheduleTask(payload.taskId, `${dayYMD}T${fmtMinOfDay(m)}`, payload.durationMin);
-    };
-    const allowDrop = (e: DragEvent<HTMLDivElement>) => {
-      if (Array.from(e.dataTransfer.types).includes('application/krnl-task')) e.preventDefault();
-    };
-
     const rows: ReactNode[] = [];
     let nowPlaced = !isToday;
     const nowDivider = (
@@ -2323,16 +2239,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         <div
           key={it.key}
           data-testid={`agenda-row-${it.key}`}
-          draggable={!!it.task}
-          onDragStart={(e) => {
-            if (!it.task) return;
-            e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: it.task.id, durationMin: it.task.plannedMin }));
-            e.dataTransfer.effectAllowed = 'move';
-            beginTaskDragInfo({ taskId: it.task.id, durationMin: it.task.plannedMin });
-            startCarry(e, toneVarForTask(it.task.id), 'always');
-          }}
-          onDragOver={allowDrop}
-          onDrop={dropAfter(it)}
+          data-agenda-day={dayYMD}
+          data-agenda-min={Math.min(1440 - 15, it.endMin)}
+          onPointerDown={it.task ? (e) => {
+            const t = it.task!;
+            beginCalendarDrag(e, {
+              item: { kind: 'task', id: t.id, name: t.text, tone: toneVarForTask(t.id), lenMin: Math.max(1, it.endMin - it.startMin), plannedMin: t.plannedMin },
+              home: surface,
+            });
+          } : undefined}
           onClick={(e) => { if (it.task) openTaskInfo(it.task, e.clientX, e.clientY); }}
           style={{
             display: 'grid', gridTemplateColumns: '42px 1fr', gap: 8, alignItems: 'start',
@@ -2401,7 +2316,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           </div>
         </div>
 
-        <div onDragOver={allowDrop} onDrop={dropAfter(null)} style={{ minHeight: 40, flex: '1 1 0', display: 'flex', flexDirection: 'column' }}>
+        <div data-agenda-day={dayYMD} data-agenda-min={Math.min(1440 - 15, Math.ceil((isToday ? nowMin : 9 * 60) / 15) * 15)} style={{ minHeight: 40, flex: '1 1 0', display: 'flex', flexDirection: 'column' }}>
           {items.length === 0 && (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', padding: '16px 4px' }}>
               Nothing planned. Drag a task here to plan it next.
@@ -2976,23 +2891,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               data-testid={`calendar-anytime-${dayYMD}`}
               data-cal-anytime={dayYMD}
               className={`cal-anytime${anyHot === dayYMD ? ' is-hot' : ''}`}
-              onDragOver={(e) => {
-                if (!Array.from(e.dataTransfer.types).includes('application/krnl-task')) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                if (anyHot !== dayYMD) setAnyHot(dayYMD);
-              }}
-              onDragLeave={() => setAnyHot((h) => (h === dayYMD ? null : h))}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setAnyHot(null);
-                const raw = e.dataTransfer.getData('application/krnl-task');
-                endTaskDrag();
-                let payload: { taskId?: string; itemId?: string } = {};
-                try { payload = raw ? (JSON.parse(raw) as { taskId?: string; itemId?: string }) : {}; } catch { return; }
-                if (payload.taskId || payload.itemId) void putPlanOnDay(payload, dayYMD);
-              }}
               style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 3px', boxShadow: 'inset 1px 0 0 var(--paper-3)' }}
             >
               {(dueByDay.get(dayYMD) ?? []).map((d) => d.kind === 'deadline' ? (
@@ -3665,15 +3563,16 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                   key={i}
                   type="button"
                   data-testid={`calendar-layer-item-${item.kind}`}
-                  draggable={isTask}
-                  onDragStart={isTask ? (e) => {
-                    e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: item.task.id, durationMin: item.task.plannedMin }));
-                    e.dataTransfer.effectAllowed = 'move';
-                    beginTaskDragInfo({ taskId: item.task.id, durationMin: item.task.plannedMin });
-                    startCarry(e, toneVarForTask(item.task.id), 'offCalendar');
-                    setLayerDragging(true);
+                  onPointerDown={isTask ? (e) => {
+                    const t = item.task;
+                    beginCalendarDrag(e, {
+                      item: { kind: 'task', id: t.id, name: t.text, tone: toneVarForTask(t.id), lenMin: Math.max(1, t.scheduledDurationMin), plannedMin: t.plannedMin },
+                      home: surface,
+                      show: 'offCalendar',
+                      onStart: () => setLayerDragging(true),
+                      onEnd: () => { setLayerDragging(false); setLayerMenu(null); },
+                    });
                   } : undefined}
-                  onDragEnd={isTask ? () => { setLayerDragging(false); setLayerMenu(null); } : undefined}
                   onClick={() => {
                     if (layerMenu.open === 'details') openItemDetails(item, layerMenu.x, layerMenu.y);
                     else openItemMenu(item, layerMenu.x, layerMenu.y);

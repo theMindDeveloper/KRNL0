@@ -61,6 +61,8 @@ export interface CalendarSurface {
   setCarried?(id: string | null): void;
   /** Things that move themselves (a habit's boxes): show them at `target`, or back (null). */
   preview?(item: DragItem, target: Target | null, origin: DragOrigin | null): void;
+  /** The slot under the pointer while carried (a day's strip or a month cell lights up), or none. */
+  hover?(slot: Slot | null): void;
 }
 
 // ── The target rule (pure, tested) ───────────────────────────────────────────
@@ -146,6 +148,8 @@ interface Active {
   raf: number;
   over: CalendarSurface | null;
   onOutside?: (item: DragItem) => void;
+  onStart?: () => void;
+  onEnd?: () => void;
 }
 
 let active: Active | null = null;
@@ -183,8 +187,9 @@ function paint(): void {
   a.raf = 0;
   const s = surfaceAt(a.x, a.y);
   const slot = s?.slotAt(a.x, a.y) ?? null;
-  if (a.over && a.over !== s) a.over.preview?.(a.item, null, a.origin);
+  if (a.over && a.over !== s) { a.over.preview?.(a.item, null, a.origin); a.over.hover?.(null); }
   a.over = s;
+  s?.hover?.(slot);
   if (s && slot && 'min' in slot) {
     const t = targetAt(a, s, slot);
     setCalendarGhost(ghostFor(a.item, t, a.mode));
@@ -206,12 +211,15 @@ function begin(a: Active): void {
   a.started = true;
   if (typeof document !== 'undefined') document.body.classList.add('krnl-cal-dragging');
   a.home?.setCarried?.(a.item.id);
-  startCarry(null, a.item.tone, a.show);
+  startCarry(a.item.tone, a.show);
+  a.onStart?.();
 }
 
 function finishVisuals(a: Active, keep: boolean): void {
   if (typeof document !== 'undefined') document.body.classList.remove('krnl-cal-dragging');
   if (a.raf) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(a.raf); a.raf = 0; }
+  a.over?.hover?.(null);
+  a.onEnd?.();
   if (keep) return;
   if (ours()) setCalendarGhost(null);
   a.over?.preview?.(a.item, null, a.origin);
@@ -235,11 +243,21 @@ export function checkCalendarDragLanded(): void {
   if (holding && holding.check()) releaseHold();
 }
 
+/**
+ * The click the browser sends right after a drag's release (same input
+ * event) is not a click on what is under it. Only that one: the guard is
+ * gone by the next task or the next press.
+ */
 function stopClickOnce(): void {
   if (typeof window === 'undefined') return;
-  const stop = (e: Event) => { e.stopPropagation(); e.preventDefault(); };
-  window.addEventListener('click', stop, { capture: true, once: true });
-  window.setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 400);
+  const stop = (e: Event) => { e.stopPropagation(); e.preventDefault(); off(); };
+  const off = () => {
+    window.removeEventListener('click', stop, true);
+    window.removeEventListener('pointerdown', off, true);
+  };
+  window.addEventListener('click', stop, true);
+  window.addEventListener('pointerdown', off, true);
+  window.setTimeout(off, 0);
 }
 
 function drop(a: Active, x: number, y: number): boolean {
@@ -335,7 +353,17 @@ function onKey(e: KeyboardEvent): void {
  */
 export function beginCalendarDrag(
   e: { clientX: number; clientY: number; button?: number },
-  spec: { item: DragItem; origin?: DragOrigin | null; mode?: DragMode; home?: CalendarSurface | null; onOutside?: (item: DragItem) => void },
+  spec: {
+    item: DragItem;
+    origin?: DragOrigin | null;
+    mode?: DragMode;
+    home?: CalendarSurface | null;
+    /** When the small box shows (default: off the Calendar when moved on it, always when carried in). */
+    show?: CarryShow;
+    onOutside?: (item: DragItem) => void;
+    onStart?: () => void;
+    onEnd?: () => void;
+  },
 ): void {
   if (e.button !== undefined && e.button !== 0) return;
   if (active) cancel();
@@ -344,11 +372,13 @@ export function beginCalendarDrag(
   const startSlot = origin && home ? home.slotAt(e.clientX, e.clientY) : null;
   active = {
     item: spec.item, origin, mode: spec.mode ?? 'move', home,
-    show: origin ? 'offCalendar' : 'always', external: false,
+    show: spec.show ?? (origin ? 'offCalendar' : 'always'), external: false,
     x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
     startMin: startSlot && 'min' in startSlot ? startSlot.min : null,
     started: false, raf: 0, over: null,
     ...(spec.onOutside ? { onOutside: spec.onOutside } : {}),
+    ...(spec.onStart ? { onStart: spec.onStart } : {}),
+    ...(spec.onEnd ? { onEnd: spec.onEnd } : {}),
   };
   if (typeof window === 'undefined') return;
   window.addEventListener('pointermove', onMove, true);
