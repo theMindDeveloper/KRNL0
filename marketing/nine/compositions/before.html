@@ -1,0 +1,172 @@
+<template>
+  <style>
+    
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "KGeist", sans-serif; }
+    #b-ground { position: absolute; inset: 0; background: #141414; }
+    #b-flood { position: absolute; inset: 0; background: #c9f158; clip-path: circle(0px at 540px 900px); }
+    #b-head { position: absolute; left: 120px; top: 330px; font-weight: 800; font-size: 150px; letter-spacing: -0.055em; line-height: 0.92; color: #f4efe2; white-space: nowrap; }
+    #b-face { position: absolute; left: 240px; top: 600px; width: 600px; height: 600px; border-radius: 30px; background: #070707; opacity: 0; }
+    .b-slot { position: absolute; width: 256px; height: 256px; }
+    .b-jit { position: absolute; inset: 0; }
+    .b-card { position: absolute; inset: 0; padding: 24px 22px; box-shadow: 0 30px 60px rgba(0,0,0,.35); }
+    .b-name { font-weight: 700; font-size: 36px; letter-spacing: -0.03em; line-height: 1.02; }
+    .b-nag { margin-top: 12px; font-family: "KMono", monospace; font-weight: 500; font-size: 28px; line-height: 1.25; opacity: 0.9; }
+    .b-badge { position: absolute; right: 16px; bottom: 16px; min-width: 54px; height: 54px; padding: 0 12px; border-radius: 27px; background: #e5484d; color: #fff;
+      font-weight: 700; font-size: 32px; display: flex; align-items: center; justify-content: center; }
+    
+  .tile { position: absolute; width: 176px; height: 176px; border-radius: 22px; background: #232323; overflow: hidden; }
+  .g-time { position: absolute; left: 0; right: 0; top: 52px; text-align: center; font-family: "KMono", monospace; font-weight: 800; font-size: 46px; color: #f4efe2; letter-spacing: -0.02em; }
+  .g-bar { position: absolute; left: 30px; right: 30px; bottom: 34px; height: 14px; border-radius: 7px; }
+  .g-row { position: relative; height: 34px; margin: 22px 0 -6px 22px; }
+  .g-row i { position: absolute; left: 0; top: 10px; width: 12px; height: 12px; border-radius: 6px; }
+  .g-row b { position: absolute; left: 22px; top: 4px; width: 22px; height: 22px; border-radius: 6px; border: 3px solid #8a8a8a; box-sizing: border-box; }
+  .g-row s { position: absolute; left: 54px; top: 11px; width: 78px; height: 10px; border-radius: 5px; background: #6a6a6a; }
+  .g-grid { position: absolute; left: 22px; top: 34px; display: grid; grid-template-columns: repeat(4, 26px); gap: 8px; }
+  .g-grid i { width: 26px; height: 26px; border-radius: 7px; display: block; }
+  .g-cal { position: absolute; left: 26px; right: 26px; top: 26px; display: flex; flex-direction: column; gap: 10px; }
+  .g-cal i { display: block; border-radius: 8px; opacity: 0.95; }
+  .g-svg { position: absolute; left: 18px; top: 18px; width: 140px; height: 140px; }
+  .g-wave { position: absolute; left: 24px; right: 24px; top: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; }
+  .g-wave i { display: block; width: 12px; border-radius: 6px; background: #22d3ee; }
+  .g-notes i { position: absolute; width: 64px; height: 64px; border-radius: 6px; display: block; }
+  .g-bars { position: absolute; left: 24px; right: 24px; bottom: 30px; height: 100px; display: flex; align-items: flex-end; justify-content: space-between; }
+  .g-bars i { display: block; width: 18px; border-radius: 5px; }
+  .g-track { position: absolute; left: 22px; right: 22px; top: 62px; height: 28px; border-radius: 8px; background: #3a3a3a; display: flex; gap: 6px; padding: 0 8px; align-items: center; }
+  .g-track i { display: block; height: 14px; border-radius: 5px; }
+  .g-ticks { position: absolute; left: 22px; right: 22px; top: 104px; display: flex; justify-content: space-between; }
+  .g-ticks s { display: block; width: 3px; height: 14px; background: #6a6a6a; }
+
+    .b-tile { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="before" data-width="1080" data-height="1920">
+    <div id="b-ground"></div>
+    <div id="b-flood"></div>
+    <div id="b-head">Nine apps.</div>
+    <div id="b-face"></div>
+    
+      <div class="b-slot" id="b-slot0" style="left:129.0px; top:524.0px">
+        <div class="b-jit" id="b-jit0">
+          <div class="b-card" id="b-card0" style="background:#ff6b5b; color:#0a0908; border-radius:8px">
+            <div class="b-name">Timer</div>
+            <div class="b-nag">Break over</div>
+            <div class="b-badge" id="b-badge0">3</div>
+          </div>
+          <div class="tile b-tile" id="b-tile0" style="left:40.0px; top:40.0px"><div class="g-time">25:00</div><div class="g-bar" style="background:#c9f158"></div></div>
+        </div>
+      </div>
+      <div class="b-slot" id="b-slot1" style="left:408.0px; top:524.0px">
+        <div class="b-jit" id="b-jit1">
+          <div class="b-card" id="b-card1" style="background:#ffffff; color:#0a0908; border-radius:28px">
+            <div class="b-name">To-dos</div>
+            <div class="b-nag">7 overdue</div>
+            <div class="b-badge" id="b-badge1">7</div>
+          </div>
+          <div class="tile b-tile" id="b-tile1" style="left:40.0px; top:40.0px"><div class="g-row"><i style="background:#22d3ee"></i><b></b><s></s></div><div class="g-row"><i style="background:#ee8466"></i><b></b><s></s></div><div class="g-row"><i style="background:#c9f158"></i><b></b><s></s></div></div>
+        </div>
+      </div>
+      <div class="b-slot" id="b-slot2" style="left:687.0px; top:524.0px">
+        <div class="b-jit" id="b-jit2">
+          <div class="b-card" id="b-card2" style="background:#ffd66b; color:#0a0908; border-radius:16px">
+            <div class="b-name">Habits</div>
+            <div class="b-nag">Streak lost</div>
+            <div class="b-badge" id="b-badge2">1</div>
+          </div>
+          <div class="tile b-tile" id="b-tile2" style="left:40.0px; top:40.0px"><div class="g-grid"><i style="background:#c9f158"></i><i style="background:#c9f158"></i><i style="background:#c9f158"></i><i style="background:#3a3a3a"></i><i style="background:#22d3ee"></i><i style="background:#22d3ee"></i><i style="background:#3a3a3a"></i><i style="background:#3a3a3a"></i><i style="background:#ee8466"></i><i style="background:#ee8466"></i><i style="background:#ee8466"></i><i style="background:#ee8466"></i></div></div>
+        </div>
+      </div>
+      <div class="b-slot" id="b-slot3" style="left:129.0px; top:803.0px">
+        <div class="b-jit" id="b-jit3">
+          <div class="b-card" id="b-card3" style="background:#7aa7ff; color:#0a0908; border-radius:12px">
+            <div class="b-name">Calendar</div>
+            <div class="b-nag">Sync in 5 min</div>
+            <div class="b-badge" id="b-badge3">2</div>
+          </div>
+          <div class="tile b-tile" id="b-tile3" style="left:40.0px; top:40.0px"><div class="g-cal"><i style="background:#ee8466;height:26px"></i><i style="background:#a98bf6;height:40px"></i><i style="background:#c9f158;height:30px"></i></div></div>
+        </div>
+      </div>
+      <div class="b-slot" id="b-slot4" style="left:408.0px; top:803.0px">
+        <div class="b-jit" id="b-jit4">
+          <div class="b-card" id="b-card4" style="background:#262626; color:#ffffff; border-radius:40px">
+            <div class="b-name">Clock</div>
+            <div class="b-nag">Alarm 06:30</div>
+            <div class="b-badge" id="b-badge4">1</div>
+          </div>
+          <div class="tile b-tile" id="b-tile4" style="left:40.0px; top:40.0px"><svg class="g-svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" fill="none" stroke="#4a4a4a" stroke-width="7"/><path d="M50 12 A38 38 0 0 1 86 40" fill="none" stroke="#c9f158" stroke-width="7" stroke-linecap="round"/><line x1="50" y1="50" x2="50" y2="26" stroke="#f4efe2" stroke-width="6" stroke-linecap="round"/><line x1="50" y1="50" x2="68" y2="60" stroke="#ee8466" stroke-width="4" stroke-linecap="round"/></svg></div>
+        </div>
+      </div>
+      <div class="b-slot" id="b-slot5" style="left:687.0px; top:803.0px">
+        <div class="b-jit" id="b-jit5">
+          <div class="b-card" id="b-card5" style="background:#b9f5a8; color:#0a0908; border-radius:4px">
+            <div class="b-name">Focus sounds</div>
+            <div class="b-nag">Rain stopped</div>
+            <div class="b-badge" id="b-badge5">4</div>
+          </div>
+          <div class="tile b-tile" id="b-tile5" style="left:40.0px; top:40.0px"><div class="g-wave"><i style="height:22px"></i><i style="height:46px"></i><i style="height:70px"></i><i style="height:38px"></i><i style="height:58px"></i><i style="height:28px"></i><i style="height:50px"></i></div></div>
+        </div>
+      </div>
+      <div class="b-slot" id="b-slot6" style="left:129.0px; top:1082.0px">
+        <div class="b-jit" id="b-jit6">
+          <div class="b-card" id="b-card6" style="background:#f4efe2; color:#0a0908; border-radius:20px">
+            <div class="b-name">Whiteboard</div>
+            <div class="b-nag">3 unsaved</div>
+            <div class="b-badge" id="b-badge6">3</div>
+          </div>
+          <div class="tile b-tile" id="b-tile6" style="left:40.0px; top:40.0px"><div class="g-notes"><i style="background:#ffe28a;left:18px;top:26px;rotate:-6deg"></i><i style="background:#ffb3c7;left:66px;top:18px;rotate:4deg"></i><i style="background:#a8e6ff;left:44px;top:66px;rotate:-2deg"></i></div></div>
+        </div>
+      </div>
+      <div class="b-slot" id="b-slot7" style="left:408.0px; top:1082.0px">
+        <div class="b-jit" id="b-jit7">
+          <div class="b-card" id="b-card7" style="background:#d9c2ff; color:#0a0908; border-radius:24px">
+            <div class="b-name">Analytics</div>
+            <div class="b-nag">Report ready</div>
+            <div class="b-badge" id="b-badge7">5</div>
+          </div>
+          <div class="tile b-tile" id="b-tile7" style="left:40.0px; top:40.0px"><div class="g-bars"><i style="height:30px;background:#5a5a5a"></i><i style="height:52px;background:#5a5a5a"></i><i style="height:40px;background:#5a5a5a"></i><i style="height:78px;background:#c9f158"></i><i style="height:60px;background:#5a5a5a"></i></div></div>
+        </div>
+      </div>
+      <div class="b-slot" id="b-slot8" style="left:687.0px; top:1082.0px">
+        <div class="b-jit" id="b-jit8">
+          <div class="b-card" id="b-card8" style="background:#ffb3c7; color:#0a0908; border-radius:10px">
+            <div class="b-name">Time tracking</div>
+            <div class="b-nag">Still running</div>
+            <div class="b-badge" id="b-badge8">9</div>
+          </div>
+          <div class="tile b-tile" id="b-tile8" style="left:40.0px; top:40.0px"><div class="g-track"><i style="width:34px;background:#22d3ee"></i><i style="width:22px;background:#ee8466"></i><i style="width:46px;background:#c9f158"></i></div><div class="g-ticks"><s></s><s></s><s></s><s></s></div></div>
+        </div>
+      </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const pings = [[4,0.28],[0,0.6],[8,0.856],[2,1.061],[6,1.225],[1,1.356],[5,1.461],[3,1.544],[7,1.612],[0,1.667],[4,1.722],[8,1.777],[2,1.832],[1,1.887],[6,1.942],[3,1.997],[5,2.052],[7,2.107]];
+    const moves = [[89.0,54.0],[4.0,54.0],[-81.0,54.0],[89.0,-31.0],[4.0,-31.0],[-81.0,-31.0],[89.0,-116.0],[4.0,-116.0],[-81.0,-116.0]];
+    // Badges start hidden and pop on their card's first ping; every ping jolts the card.
+    const seen = new Set();
+    pings.forEach(([i, t], k) => {
+      if (!seen.has(i)) {
+        seen.add(i);
+        tl.fromTo(`#b-badge${i}`, { scale: 0 }, { scale: 1, duration: 0.22, ease: "back.out(2.2)" }, t);
+      }
+      tl.fromTo(`#b-jit${i}`, { rotation: 0, x: 0 }, { keyframes: [{ rotation: k % 2 ? 2.2 : -2.2, x: k % 2 ? 7 : -7, duration: 0.05 }, { rotation: k % 2 ? -1.4 : 1.4, x: k % 2 ? -4 : 4, duration: 0.06 }, { rotation: 0, x: 0, duration: 0.08 }], immediateRender: false }, t);
+    });
+    // Collapse (2.75 → 3.3): the headline leaves; each card flies to its tile on the cube face and becomes it.
+    tl.fromTo("#b-head", { y: 0, opacity: 1 }, { y: -260, opacity: 0, duration: 0.32, ease: "power3.in" }, 2.65);
+    moves.forEach(([dx, dy], i) => {
+      const t0 = 2.75 + (i % 3) * 0.02 + Math.floor(i / 3) * 0.02;
+      tl.fromTo(`#b-slot${i}`, { x: 0, y: 0 }, { x: dx, y: dy, duration: 0.5, ease: "power3.inOut" }, t0);
+      tl.fromTo(`#b-card${i}`, { scale: 1, opacity: 1 }, { scale: 0.6875, opacity: 0, duration: 0.5, ease: "power3.inOut" }, t0);
+      tl.fromTo(`#b-tile${i}`, { scale: 1.4545, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.inOut" }, t0);
+    });
+    // The cube face's dark backing forms under the landing tiles, so the cut into the cube is seamless.
+    tl.fromTo("#b-face", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.3, ease: "power2.out" }, 3.05);
+    // Impact: the ground floods acid from the face's centre.
+    tl.fromTo("#b-flood", { clipPath: "circle(0px at 540px 900px)" }, { clipPath: "circle(1400px at 540px 900px)", duration: 0.42, ease: "power2.inOut" }, 3.25);
+    window.__timelines["before"] = tl;
+  </script>
+</template>

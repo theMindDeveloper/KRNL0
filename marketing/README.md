@@ -8,6 +8,7 @@ headlines, JetBrains Mono time chips, and the coloured K·R·N·L·0 tiles.
 | --- | --- | --- |
 | [`reels/`](reels/) | [Remotion](https://remotion.dev) (React) | **Reel A**, ~29 s: a walk through one day (Plan → Calendar → Focus → Habits → Canvas → end card), each section showing the real app doing the thing |
 | [`teaser/`](teaser/) | [HyperFrames](https://hyperframes.heygen.com) (HTML + GSAP) | **Reel B**, ~15 s: kinetic slot-machine words, the KRNL0 cube built in 3D, a deck of real app windows, the end card |
+| [`nine/`](nine/) | HyperFrames | **"Nine become one"**, 26 s with sound effects: nine noisy tools collapse into the cube's nine tiles; Todos, Calendar, Timer and Habits open whole from their tiles and do their real job. Storyline B of [`STORYLINES.md`](STORYLINES.md); `SPEC.md` and `REVIEW.md` inside |
 
 Both are silent for now; the voiceover (ElevenLabs) and captions come next.
 
@@ -41,6 +42,16 @@ npm run capture                # all shots; or: npm run capture -- cal,habit
 `scripts/capture/board.js` is the board it films: a calm day (four plans, three habits, a launch frame
 with sticky notes) injected through the preview bridge — no app code is changed. The canvas is
 the Free canvas, the calendar is the Day view zoomed in, and each shot frames one window.
+
+### "Nine become one" (`nine/`)
+
+```bash
+# renderer preview running (see above), then:
+cd marketing/nine
+node scripts/capture.cjs        # films the four windows → assets/windows/*.mp4
+python3 scripts/build.py        # writes the scenes and the sound placement
+npx hyperframes render --quality delivery -o out/krnl0-nine-become-one.mp4
+```
 
 ## 3. Preview and render
 
