@@ -86,11 +86,12 @@ export function WhatsNewDialog() {
           </div>
         </div>
         <div className="ln-wn__main">
+          <div className="ln-wn__scroll" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="ln-row">
             <span className="ln-chip" data-testid="whatsnew-chip">{from}</span>
             <span className="ln-meta" style={{ marginLeft: 'auto' }}>{step + 1} of {release.items.length}</span>
           </div>
-          <h2 id="ln-wn-title" className="ln-display" style={{ marginTop: 24, fontSize: 46 }}>{item.title}</h2>
+          <h2 id="ln-wn-title" className="ln-display" style={{ marginTop: 24, fontSize: 'clamp(32px, 9vw, 46px)' }}>{item.title}</h2>
           <p className="ln-body" style={{ marginTop: 16, maxWidth: 400 }}>{item.body}</p>
           <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {release.items.map((it, i) => (
@@ -100,7 +101,8 @@ export function WhatsNewDialog() {
               </button>
             ))}
           </div>
-          <div className="ln-row" style={{ marginTop: 'auto', gap: 8 }}>
+          </div>
+          <div className="ln-row ln-wn__foot" style={{ marginTop: 'auto', gap: 8 }}>
             <button type="button" className="ln-link" onClick={() => { void window.krnl?.appOpenExternal?.(RELEASES_URL); }}>full release notes</button>
             <span style={{ flex: 1 }} />
             <button type="button" className="ln-btn" onClick={() => closeWhatsNew()} data-testid="whatsnew-later">Later</button>
