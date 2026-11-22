@@ -116,7 +116,7 @@ Habits (things you tick), streaks, the time log, Pomo sessions, notes, drawings 
 - A place set from the phone shows on the Calendar's blocks and the phone's Today; the event card and the canvas card do not show or edit it yet.
 - Outside events are not on the Clock.
 - Google sign-in is in "Testing" (one test user, signed out every 7 days) until there is a privacy page and the app is published.
-- Every two-way path is verified against a fake calendar; real Google and iCloud have been used for sign-in and reading. Section 11 is the real-account check.
+- Every two-way path is tested against a fake calendar. On 2026-11-22 the real-account check (section 11) was run against the owner's real Google account (KRNL0 side through `krnl`, phone side through Google's Calendar API, the same calls Google's apps make): all passed (see below). iCloud ran alongside it on the same board and stayed in step; its phone side was not edited by hand.
 
 ## 11. Check with the real Google account (owner, 10 minutes)
 
@@ -134,3 +134,5 @@ On the board that shows Google Calendar (hrthtrh), with "both ways" on:
 | 8 | Change the same event on both sides within a minute | after 2 min both show the phone's version |
 | 9 | Calendars › turn "Put KRNL0 on your phone" off, then on | nothing old comes back as an event |
 | 10 | Switch to Main while an edit is syncing, then back | Main shows nothing of hrthtrh's calendar |
+
+**Run on 2026-11-22 (real Google):** 1 ✓ (once event out); 2 ✓ (moved to 11:00 on Google → 11:00 in KRNL0); 3 ✓ (made on Google → a KRNL0 event, not a task); 4 ✓ (task out; renamed on Google → the Todo row renamed; ticked done → gone from Google); 5 ✓ (Dec 1 moved to 20:00 → Google holds a changed occurrence of the series, the other Tuesdays stay); 6 ✓; 7 ✓; 8 ✓ (KRNL0 moved one day while Google renamed the series → the phone's version on both sides); 9 ✓ (an item deleted while sending was off did not come back, and its leftover left Google); 10: covered by the board-switch tests, not run by hand. Every test item was removed afterwards; both sides were empty.
