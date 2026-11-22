@@ -25,7 +25,7 @@ The owner's other calendars show up in KRNL0, and KRNL0's events and timed tasks
 Google needs an OAuth client of the owner's Google Cloud project; without one the app says Google sign-in is not set up and offers a calendar link instead.
 
 1. console.cloud.google.com, a project (for example "KRNL0"), **APIs & Services › Library**: enable **Google Calendar API**.
-2. **OAuth consent screen**: External, app name KRNL0, the owner's email, scopes `openid`, `email`, `.../auth/calendar`. Publishing status **In production** (in Testing, Google's tokens expire after 7 days). Until Google reviews the app, sign-in shows "Google hasn't verified this app" and at most 100 accounts can link; the review (free) needs a privacy policy, a homepage (the KRNL0 website) and a short video.
+2. **OAuth consent screen**: External, app name KRNL0, the owner's email, scopes `openid`, `email`, `.../auth/calendar.calendarlist.readonly`, `.../auth/calendar.events.readonly`, `.../auth/calendar.app.created` (the narrowest that works: read the owner's calendars, change only the ones KRNL0 makes). Publishing status **In production** (in Testing, Google's tokens expire after 7 days). Until Google reviews the app, sign-in shows "Google hasn't verified this app" and at most 100 accounts can link; the review (free) needs a privacy policy, a homepage (the KRNL0 website) and a short video.
 3. **Credentials › Create credentials › OAuth client ID › Desktop app**. Its client ID and secret go in the repository's GitHub secrets `KRNL0_GOOGLE_CLIENT_ID` and `KRNL0_GOOGLE_CLIENT_SECRET` (the release build reads them), or the same environment variables for `npm run dev`. For an installed app Google treats the secret as not secret.
 
 ## Functional Requirements
