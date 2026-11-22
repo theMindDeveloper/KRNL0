@@ -6,6 +6,7 @@
 
 import { pickerOpen } from '../../ui/Popover';
 import { useOneOverlay } from '../../ui/oneOverlay';
+import { KindIcon, KIND_LABEL } from '../../ui/kindIcons';
 import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragMode } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
 import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost } from './DropGhost';
@@ -1968,7 +1969,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
             position: 'absolute',
             // A fixed gap between stacked blocks so back-to-back tasks never
             // read as one slab.
-            top: rh(effStartMin / 60, BLOCK_GAP / 2),
+            // On its start line (the owner: centred on the line); the gap is at the bottom.
+            top: rh(effStartMin / 60),
             // The tracked-time rail keeps the left edge; plans fill the rest.
             // Letter bars sit 1 px apart on each side (a 2 px gap) so narrow
             // lanes keep their width; named blocks keep the roomier inset.
@@ -2152,6 +2154,19 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
               block the question too. REPLAN shows how to drag it. */}
           {/* Only where it fits beside the title: in a small block the dashed
               outline says "missed" and the click popup offers the move. */}
+          {!isMissed && !isContinuation && textual && widthPx >= 60 && blockH >= 14 && (
+            <span
+              aria-hidden
+              data-testid={`task-kind-${task.id}`}
+              data-kind="task"
+              style={{
+                position: 'absolute', top: blockH >= 24 ? 4 : '50%', transform: blockH >= 24 ? undefined : 'translateY(-50%)', right: 4, zIndex: 2,
+                display: 'inline-flex', pointerEvents: 'none', color: `color-mix(in srgb, ${taskTone} 45%, var(--ink-3))`,
+              }}
+            >
+              <KindIcon kind="task" size={11} strokeWidth={2.4} />
+            </span>
+          )}
           {isMissed && !isContinuation && textual && (
             <button
               type="button"
@@ -2165,10 +2180,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
               style={{
                 position: 'absolute', top: blockH >= 24 ? 3 : '50%', transform: blockH >= 24 ? undefined : 'translateY(-50%)', right: 3, zIndex: 4,
                 width: 18, height: 18, padding: 0, borderRadius: 5, cursor: 'pointer', display: 'grid', placeItems: 'center',
-                border: 0, background: 'var(--paper)', color: 'var(--ink-2)',
+                border: 0, background: 'var(--paper)', color: 'var(--rust)',
               }}
             >
-              <CalIcon name="replan" />
+              <KindIcon kind="replan" size={11} strokeWidth={2.4} />
             </button>
           )}
           {/* Overrun is said in words ("+5m over" in the time line, and the
@@ -2420,7 +2435,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       const sideways = textW < 22 && blockH > 40;
       // Decision 62 — a one-time event: no repeat mark, just its time.
       const once = isOneTimeEvent(h);
-      const showIcon = !once && textW >= 110;
+      // Its kind in the corner: a one-time event, or a repeating one.
+      const showIcon = textW >= 110;
       const time = occ.spill
         ? `until ${fmtMinOfDay(occ.endMin)} · from last night`
         : `${fmtMinOfDay(occ.fullStart)}–${fmtMinOfDay(occ.fullEnd)}`;
@@ -2438,7 +2454,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
           aria-label={`${h.name}, repeating event, ${time}${occ.skipped ? ', skipped this time' : ''}`}
           title={`${h.name} · ${time} · repeating event${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
           style={{
-            position: 'absolute', left: `calc(${railPx}px + (100% - ${railPx}px) * ${lane / lanes} + 2px)`, width: `calc((100% - ${railPx}px) / ${lanes} - 4px)`, top: rh(occ.startMin / 60, 1), height: rhMax(5, (occ.endMin - occ.startMin) / 60, -2),
+            position: 'absolute', left: `calc(${railPx}px + (100% - ${railPx}px) * ${lane / lanes} + 2px)`, width: `calc((100% - ${railPx}px) / ${lanes} - 4px)`, top: rh(occ.startMin / 60), height: rhMax(5, (occ.endMin - occ.startMin) / 60, -BLOCK_GAP),
             zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 6, overflow: 'hidden',
             opacity: carriedId === h.id ? 0.35 : 1,
             ...(occ.skipped
@@ -2480,7 +2496,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
                 >
                   {title}
                 </span>
-                {showIcon && <span aria-hidden style={{ flexShrink: 0, display: 'inline-flex', marginTop: 2, color: `color-mix(in srgb, ${col} 45%, var(--ink-3))` }}><CalIcon name="repeat" size={11} /></span>}
+                {showIcon && <span aria-hidden data-testid={`calendar-routine-kind-${h.id}`} data-kind={once ? 'event' : 'repeat'} title={KIND_LABEL[once ? 'event' : 'repeat']} style={{ flexShrink: 0, display: 'inline-flex', marginTop: 2, color: `color-mix(in srgb, ${col} 45%, var(--ink-3))` }}><KindIcon kind={once ? 'event' : 'repeat'} size={11} strokeWidth={2.4} /></span>}
               </div>
               {lines.showTime && (
                 // Decision 60 — the time and how often, small, wrapping in a narrow block.

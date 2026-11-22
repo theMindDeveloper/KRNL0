@@ -289,9 +289,8 @@ body.cal-resizing .cal-block:active { transform: none; }
 .cal-event.is-hot::after { opacity: 0.06; }
 .cal-block:active { transform: scale(0.985); }
 @media (prefers-reduced-motion: reduce) { .cal-block { transition: none; } .cal-block:active { transform: none; } }
-.cal-block .cal-replan { opacity: 0; transition: opacity 120ms ease; }
-.cal-block:hover .cal-replan,
-.cal-block .cal-replan:focus-visible { opacity: 1; }
+/* A missed plan's mark (red replan) is always there, in its corner. */
+.cal-block .cal-replan:hover { background: color-mix(in srgb, var(--rust) 14%, var(--paper)) !important; }
 
 /* Clashing plans (calendar-clock-visuals.md F28): slim bars side by side, each
    named by a letter; a clash still ahead gets a Line up tab. */

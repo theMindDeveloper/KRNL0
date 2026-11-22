@@ -23,7 +23,8 @@ import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
 import type { Habit, HabitColor, HabitSchedule } from '../HabitNode/types';
 import { habitStreak } from '../HabitNode/commands';
-import { HABIT_COLORS, countOn, isDayScheduled, isRoutine, routineOccurrence, toYMD, weeklyTarget } from '../HabitNode/types';
+import { HABIT_COLORS, countOn, isDayScheduled, isOneTimeEvent, isRoutine, routineOccurrence, toYMD, weeklyTarget } from '../HabitNode/types';
+import { KindIcon } from '../../ui/kindIcons';
 import { routineStatus } from '../HabitNode/RoutineShelf';
 import { useBoardStore } from '../../../store/boardStore';
 import { useLocalDay } from '../../../hooks/useLocalDay';
@@ -154,7 +155,8 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
     <button type="button" data-testid="habit-card-menu" className="nodrag task-card-action" aria-label={`${habit.name}: options`} title="Days, time, name, colour…"
       onClick={openMenu} onMouseDown={(e) => e.stopPropagation()}
       style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'pointer', border: 'none', padding: 0, color: 'var(--ink-3)', background: 'var(--paper-2)' }}>
-      <MenuIcon name="edit" size={13} />
+      {/* Its kind in the corner: a habit, a one-time event or a repeating one. */}
+      <KindIcon kind={!event ? 'habit' : isOneTimeEvent(habit) ? 'event' : 'repeat'} size={13} />
     </button>
   );
   const title = (

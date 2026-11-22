@@ -14,6 +14,7 @@
 // by transform in an animation frame; the box is one element on the page.
 // Re-drawing the whole week on every slot change is what made drags stutter.
 
+import { kindIconSvg } from '../../ui/kindIcons';
 import { useEffect, useRef, type CSSProperties } from 'react';
 
 // ── The ghost on the Calendar ────────────────────────────────────────────────
@@ -130,8 +131,9 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       const lead = Math.max(0, pl(g.day));
       const x = col.offsetLeft + lead + 2;
       const w = Math.max(12, col.offsetWidth - lead - 4);
-      const y = (g.startMin / 60) * rh + 1;
-      const h = Math.max(18, ((Math.min(1440, g.endMin) - g.startMin) / 60) * rh - 2);
+      // On its start line, like the block it stands for (the gap is at the bottom).
+      const y = (g.startMin / 60) * rh;
+      const h = Math.max(18, ((Math.min(1440, g.endMin) - g.startMin) / 60) * rh - 3);
       // The first frame of a drag lands in place; after that it glides.
       if (!shown) { el.style.transition = 'none'; if (rule) rule.style.transition = 'none'; }
       el.style.width = `${w}px`;
@@ -158,7 +160,7 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       }
       if (rule) {
         const atEnd = g.edge === 'bottom';
-        const ly = atEnd ? y + h : y - 1;
+        const ly = atEnd ? y + h : y;
         // A habit moves on every day it is on: its line crosses the whole
         // week, under the habit boxes (they ride on it).
         const parent = el.parentElement;
@@ -204,10 +206,11 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
 }
 
 /** The kind marks the blocks draw at their top right (the ghost keeps them). Static markup. */
+// The same marks as the blocks and cards (ui/kindIcons.tsx).
 const MARK_SVG: Record<'list' | 'repeat' | 'event', string> = {
-  list: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>',
-  repeat: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>',
-  event: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  list: kindIconSvg('task'),
+  repeat: kindIconSvg('repeat'),
+  event: kindIconSvg('event'),
 };
 
 /** How far into the hour column (left of the days) the time line starts. */

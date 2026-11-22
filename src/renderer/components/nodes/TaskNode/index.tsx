@@ -18,6 +18,7 @@ import type { PomoState } from '../PomoNode/types';
 import { trackedSecondsForTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { DoneCard } from './DoneCard';
 import { CardIcon, CardMetaRow, CardMeter, cardFrameStyle, fmtDayAnyTime, fmtDur, fmtWhen } from './CardParts';
+import { KindIcon } from '../../ui/kindIcons';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
 import { archiveDoneTask, bringBackTask, doneLabel, markDoneAsPlanned, plannedEndMs, wontDoTask } from '../../../store/planActions';
@@ -517,11 +518,12 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             }}
             style={{
               width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'grab',
-              color: planCol,
-              background: isPastScheduled || when ? `color-mix(in srgb, ${planCol} 14%, transparent)` : 'var(--paper-2)',
+              color: isPastScheduled ? 'var(--rust)' : planCol,
+              background: isPastScheduled ? 'color-mix(in srgb, var(--rust) 14%, transparent)' : when ? `color-mix(in srgb, ${planCol} 14%, transparent)` : 'var(--paper-2)',
             }}
           >
-            <CardIcon name={isPastScheduled ? 'replan' : 'grip'} size={13} />
+            {/* Its kind in the corner (a task), or replan when it was missed. */}
+            <KindIcon kind={isPastScheduled ? 'replan' : 'task'} size={13} />
           </span>
       </div>
 
