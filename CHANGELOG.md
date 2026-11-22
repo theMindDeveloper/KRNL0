@@ -5,6 +5,27 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] — unreleased
+
+### Added
+- A Calendar you can read: calm cards with the whole name, time and room; the day fits the window; zoom by pinch, Ctrl + wheel or the hour numbers; click for a card, right-click to change it; kind marks on blocks and cards; the menu button in every view (Decisions 58-61).
+- Events that happen once: the Calendar's field adds events ("Dentist fri 15:00"), Once or Repeats; plans come from the Todo; `krnl event add --on YYYY-MM-DD --at HH:MM` (Decision 62).
+- One way to move everything onto the Calendar: Todo rows, plan, habit and event cards, Habit rows and Month chips, with a time line; edge pulls show their new times; the Clock follows (Decision 63).
+- Your day on your phone: Today lists the day in order with Focus on what's next; full-screen Calendar, Habits, Insights and board; long-press menus.
+- The layout menu: My layout (with Reset) and the Free canvas; a resizable Calendar on the Free canvas; window places and sizes per device; `krnl settings layout`, `krnl window size`.
+- The Calendar and Events tutorials rewritten; a new Your layout tutorial.
+
+### Changed
+- Lines between cards only show an order; they no longer move, push or unschedule plans. Boards that open keep every time as it was (Decision 63).
+- The Clock's dial fills its window; Analytics in plain words with lists and bars; the ambient radio in the app's window style.
+- One card or menu at a time, everywhere.
+
+### Fixed
+- Drags and drops: no page-wide restyle, no layout reads while moving, drops on screen at once, no canvas pan under a card over the Calendar.
+- An event card's Show lands on the event; an ended event goes to its last date.
+- Events over 8 hours keep their length; impossible dates are refused by `krnl event add`; quick add reads "22:00-02:00" and leaves "at 9:60" alone.
+- The Calendar opens at the right hour when zoomed in; the phone's Canvas tab opens on your plan cards.
+
 ## [0.14.2] — 2026-11-21
 
 ### Fixed

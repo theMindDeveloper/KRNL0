@@ -7,7 +7,7 @@
 
 import { minorOf } from './appState';
 
-export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone' | 'update';
+export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone' | 'update' | 'calendar' | 'events' | 'move';
 /** What "Show me" does for a highlight. */
 export type WhatsNewAction = 'pomo' | 'feedback' | 'settings' | 'tour' | 'none';
 
@@ -40,6 +40,57 @@ export interface WhatsNewRelease {
 }
 
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    // Designed on the canvas "KRNL0 0.15 · What's new and tours", Direction A
+    // (picked by the owner, 2026-11-22).
+    minor: '0.15',
+    date: 'Nov 2026',
+    summary: 'A Calendar you can read, events that happen once, one way to move',
+    items: [
+      {
+        label: 'A Calendar you can read',
+        kicker: 'New · Calendar',
+        caption: 'Whole names, times and rooms. The day fits the window.',
+        title: 'A Calendar\nyou can read.',
+        body: 'Events and plans are calm cards with their whole name, time and room, and the day fits the window. Pinch, Ctrl + wheel or drag the hour numbers to zoom in. Click anything for its card; right-click to change it.',
+        art: 'calendar',
+        action: 'tour',
+        tour: 'calendar',
+      },
+      {
+        label: 'Events that happen once',
+        kicker: 'New · Events',
+        caption: 'Type it the way you say it.',
+        title: 'Events that\nhappen once.',
+        body: 'A dentist, an exam, a train: type it into the Calendar\'s field, like "Dentist fri 15:00", and it is there. Leave out the time to pick Once or Repeats yourself. Plans still come from your Todo: drag them onto a time.',
+        art: 'events',
+        action: 'tour',
+        tour: 'routines',
+      },
+      {
+        label: 'Move anything onto the Calendar',
+        kicker: 'New · One way to move',
+        caption: 'The exact time shows while you carry it.',
+        title: 'Pick it up,\nput it anywhere.',
+        body: 'Todo rows, cards on the board, habits and events all move the same way. A line shows the exact time while you carry it, the Clock follows along, and nothing jumps when you let go.',
+        art: 'move',
+        action: 'tour',
+        tour: 'calendar',
+      },
+    ],
+    more: [
+      'Your day on your phone: Today lists it in order, with Focus on what\'s next.',
+      'The layout menu: My layout (with Reset) or the Free canvas. Each computer keeps its own.',
+      'Lines between cards only show an order now; they never move times. Add next plans the new one right after.',
+      'Click for a card, right-click to change it. One card or menu at a time.',
+      'Blocks and cards show what they are in the corner: plan, event, repeating event or habit.',
+      'The Clock\'s dial fills its window.',
+      'Analytics in plain words, with lists and bars.',
+      'Show on an event card goes straight to the event.',
+      'The radio in the app\'s own window style.',
+      'Commands: krnl event add --on, krnl settings layout, krnl window size.',
+    ],
+  },
   {
     minor: '0.14',
     date: 'Nov 2026',

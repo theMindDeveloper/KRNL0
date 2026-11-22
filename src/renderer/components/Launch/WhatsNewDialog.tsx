@@ -24,6 +24,9 @@ import artCards from '../../assets/launch/plate-cards.webp';
 import artSync from '../../assets/launch/plate-sync.webp';
 import artPhone from '../../assets/launch/plate-phone.webp';
 import artUpdate from '../../assets/launch/plate-update.webp';
+import artCalendar from '../../assets/launch/plate-calendar.webp';
+import artEvents from '../../assets/launch/plate-events.webp';
+import artMove from '../../assets/launch/plate-move.webp';
 import { startTour } from '../Tour/TourHost';
 import { tourById } from '../Tour/tours';
 import { useEasyMode } from '../../store/uiMode';
@@ -31,6 +34,7 @@ import { useEasyMode } from '../../store/uiMode';
 const ART: Record<WhatsNewArt, string> = {
   mini: artMini, menubar: artMenubar, feedback: artFeedback, streak: artStreak, sessions: artSessions, guide: artGuide, board: artBoard,
   boards: artBoards, windows: artWindows, cards: artCards, sync: artSync, phone: artPhone, update: artUpdate,
+  calendar: artCalendar, events: artEvents, move: artMove,
 };
 
 function runAction(item: WhatsNewItem): void {
