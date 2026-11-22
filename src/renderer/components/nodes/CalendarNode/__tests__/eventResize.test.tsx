@@ -56,6 +56,37 @@ describe('a repeating event pulled by its bottom edge', () => {
     } finally { restore(); }
   });
 
+  it('pulled into the next event, it takes its lane beside it while pulled: nothing changes on release', async () => {
+    const seminar = { ...lecture, id: 'ev-seminar', name: 'Seminar', schedule: { kind: 'weekly', days: [4], timeOfDay: '16:00', durationMin: 60 } };
+    const withHabits = (habits: unknown[]) => {
+      const b = useBoardStore.getState().board!;
+      useBoardStore.setState({ board: { ...b, nodes: b.nodes.map((n) => (n.id === 'mother-habit' ? { ...n, state: { habits } } : n)) } as never });
+    };
+    withHabits([lecture, seminar]);
+    habitCmd.mockImplementation(async (cmd: string, args: Record<string, unknown>) => {
+      if (cmd === 'habit.setSchedule') withHabits([{ ...lecture, schedule: args['schedule'] }, seminar]);
+      return undefined;
+    });
+    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
+    const restore = mockCalendarLayout();
+    try {
+      const band = () => document.querySelector<HTMLElement>('[data-cal-day="2026-05-14"] [data-testid="calendar-routine-ev-lecture"]')!;
+      const col = document.querySelector('[data-cal-day="2026-05-14"]')!;
+      const rowH = parseFloat(getComputedStyle(document.querySelector('[data-cal-surface]')!).getPropertyValue('--rh')) || 28;
+      const w0 = band().style.width;
+      const y = 15.5 * rowH - 2;
+      fireEvent.pointerDown(col, { button: 0, clientX: 350, clientY: y });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: y + 1.5 * rowH }));
+      await act(async () => { await nextFrame(); });
+      // It now overlaps the seminar: two lanes, while still being pulled.
+      const pulled = band().style.width;
+      expect(pulled).not.toBe(w0);
+      expect(pulled).toMatch(/0\.5 \*|\/ 2/);
+      await act(async () => { await release(350, y + 1.5 * rowH); await new Promise((r) => setTimeout(r, 30)); });
+      expect(band().style.width).toBe(pulled);
+    } finally { restore(); }
+  });
+
   it('gets the new length for every week', async () => {
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
     const restore = mockCalendarLayout();

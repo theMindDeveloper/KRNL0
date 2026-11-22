@@ -886,7 +886,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   const routineHitsOn = (dayYMD: string): Array<{ h: Habit; occ: RoutineSpan }> => {
     const hits: Array<{ h: Habit; occ: RoutineSpan }> = [];
     // Its own time that day, and the after-midnight part of last night's (a night shift).
-    if (layers.routines) for (const h of routinesForCal) for (const occ of routineSpansOn(h, dayYMD)) hits.push({ h, occ });
+    if (layers.routines) for (const h of routinesForCal) for (const occ0 of routineSpansOn(h, dayYMD)) {
+      // Decision 63 — an edge being pulled: the event is at its new times
+      // here, so its lane (beside what it now overlaps) is the one it will
+      // have when let go; its width and text do not change on release.
+      const occ = pull && pull.kind === 'event' && pull.id === h.id && pull.day === dayYMD && !occ0.spill
+        ? { ...occ0, startMin: pull.startMin, endMin: Math.min(1440, pull.endMin), fullStart: pull.startMin, fullEnd: pull.endMin }
+        : occ0;
+      hits.push({ h, occ });
+    }
     return hits;
   };
   const routineKey = (r: { h: Habit; occ: RoutineSpan }) => `rt:${r.h.id}${r.occ.spill ? ':spill' : ''}`;
@@ -2398,11 +2406,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     const out: ReactNode[] = [];
     const colPxB = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
     const railPx = railPxFor(dayYMD);
-    for (const { h, occ: occ0, lane, lanes } of routinesOnDay(dayYMD)) {
-      // An edge being pulled: the event is drawn at its new times (Decision 63).
-      const occ = pull && pull.kind === 'event' && pull.id === h.id && pull.day === dayYMD && !(occ0 as RoutineSpan).spill
-        ? { ...occ0, startMin: pull.startMin, endMin: Math.min(1440, pull.endMin), fullStart: pull.startMin, fullEnd: pull.endMin }
-        : occ0;
+    for (const { h, occ, lane, lanes } of routinesOnDay(dayYMD)) {
       const top = (occ.startMin / 60) * rowHeight;
       const height = Math.max(6, ((occ.endMin - occ.startMin) / 60) * rowHeight);
       const col = `var(--${h.color})`;
