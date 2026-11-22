@@ -107,9 +107,32 @@
 | NF2 | (Decision 63) **No page-wide restyle** at the start or end of a drag: no style rule reads the drag marker. |
 | NF3 | (Decision 63) **A drop is drawn where it lands** in the first frame after letting go; the board changes after it. |
 | NF4 | (Decision 63) **A move does not redraw the moved card** or the canvas's own layers. |
-| NF5 | (Decision 63) **Pulling an edge keeps the block's text as it is** (the block stretches itself). |
+| NF5 | (Decision 63) **Pulling an edge shows the block as it will be:** the Calendar draws it at its new times while pulled (same text, same style); nothing changes when it is let go. |
+| NF6 | (Decision 63) **Nothing pops when it lands:** no landing or press-in animation on a plan, like a repeating event. |
+| NF7 | (Decision 63) **The canvas holds still under a carried card:** no auto-pan over a Calendar or outside the canvas; the hidden card is not redrawn on every move; a carried card lands in the same moment as a move on the Calendar and goes home unseen, then fades in; the package fades (no bounce or spin). |
 
 ## Gherkin Scenarios (ATDD)
+
+```gherkin
+Feature: Carrying a canvas card onto the Calendar is as calm as moving a repeating event (NF6, NF7)
+  Scenario: The canvas holds still while a card is held over the Calendar
+    Given a task card on the canvas and the Calendar docked beside it (or reaching past the window edge)
+    When I carry the card over the hours and hold it there
+    Then the canvas does not pan and the card is not redrawn
+    And the ghost follows the hours under the pointer
+
+  Scenario: Letting go lands it like a move on the Calendar
+    When I let go over a slot
+    Then the ghost stands where it lands and the block appears there with no pop
+    And the card is back in its own place on the canvas, fading in (it never grows over the hours)
+    And the package fades into the slot
+
+  Scenario: Pulling an edge shows the block as it will be (NF5)
+    Given a repeating event from 14:00 to 15:30
+    When I pull its bottom edge down three steps
+    Then the block is drawn longer and its times read "14:00–15:50" in the same style
+    And when I let go nothing changes
+```
 
 ```gherkin
 Feature: Plan and reality stay readable when tasks overlap
