@@ -3,7 +3,7 @@
 // planned time, time actually tracked on it, and quick actions. Mirrors the
 // tracked-span popup so tasks, habits and observed time behave the same on click.
 
-import { useOneOverlay } from './oneOverlay';
+import { passRightClick, useOneOverlay } from './oneOverlay';
 import { LineGlyph } from './LineGlyph';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -66,7 +66,7 @@ function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () 
   }, [onClose]);
   return createPortal(
     <>
-      <div onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
+      <div onClick={onClose} onContextMenu={(e) => passRightClick(e, onClose)} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
       <div
         data-testid="task-info-popup"
         className="kw-card"

@@ -27,3 +27,16 @@ export function useOneOverlay(open: boolean, close: () => void): void {
     return claimOverlay(() => closeRef.current());
   }, [open]);
 }
+
+/**
+ * A right-click on a card's backdrop: the card closes and the right-click
+ * reaches what is under it, so one right-click opens that menu (it took two).
+ */
+export function passRightClick(e: { preventDefault: () => void; currentTarget: EventTarget; clientX: number; clientY: number }, close: () => void): void {
+  e.preventDefault();
+  const backdrop = e.currentTarget as Element;
+  close();
+  if (typeof document === 'undefined' || typeof document.elementsFromPoint !== 'function') return;
+  const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el !== backdrop && !backdrop.contains(el));
+  under?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY, button: 2 }));
+}

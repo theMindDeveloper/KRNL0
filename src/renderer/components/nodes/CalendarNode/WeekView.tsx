@@ -5,7 +5,7 @@
 // HabitSwapModal. NowLine is rendered as an overlay.
 
 import { pickerOpen } from '../../ui/Popover';
-import { useOneOverlay } from '../../ui/oneOverlay';
+import { passRightClick, useOneOverlay } from '../../ui/oneOverlay';
 import { KindIcon, KIND_LABEL } from '../../ui/kindIcons';
 import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragMode } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
@@ -3557,7 +3557,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
           cursor; the user picks which to inspect. */}
       {layerMenu && createPortal(
         <>
-          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => { e.preventDefault(); setLayerMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.layerMenuBackdrop, pointerEvents: layerDragging ? 'none' : undefined }} />
+          <div onClick={() => setLayerMenu(null)} onContextMenu={(e) => passRightClick(e, () => setLayerMenu(null))} style={{ position: 'fixed', inset: 0, zIndex: Z.layerMenuBackdrop, pointerEvents: layerDragging ? 'none' : undefined }} />
           <div
             data-testid="calendar-layer-menu"
             style={{
