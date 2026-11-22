@@ -10,6 +10,7 @@ import * as pty from 'node-pty';
 import { SysFacade } from '../../sys/SysFacade';
 import { getUpdater } from '../updater';
 import { getSync } from '../sync';
+import { getCalendars } from '../calendars/registry';
 import { loadBoardFrom, saveBoardTo, seedBoard, migrateBoard, RendererRevGuard, BoardCorruptError } from '../persistence/board';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
 import { ackBoardsNotice, BOARDS_DIRNAME, createBoard, deleteBoard, listBoards, readBoardsIndex, renameBoard, switchBoard } from '../persistence/boards';
@@ -259,6 +260,8 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     saveBoard(data);
     rendererRev.sync();
     rendererBase = asBoard(data);
+    // Decision 64: a change here reaches the KRNL0 calendar on the phone in a few seconds.
+    getCalendars()?.nudge();
   });
 
   // Factory reset — overwrite board.json with a fresh canonical seed and return
@@ -325,8 +328,10 @@ export function registerHandlers(rpcServer?: RpcServer): void {
     const updater = getUpdater();
     const pocket = getPocket();
     const sync = getSync();
+    const calendars = getCalendars();
     const facade = new SysFacade({
       ...(sync ? { sync } : {}),
+      ...(calendars ? { calendars } : {}),
       boardPath: BOARD_PATH,
       hasOpenRenderer,
       onBoardChanged: notifyBoardChanged,

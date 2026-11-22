@@ -15,6 +15,7 @@ import type { CliDispatchFn } from '../../sys/SysFacade';
 import { notifyBoardChanged, windowViewSize } from '../boardIo';
 import { getUpdater } from '../updater';
 import { getSync } from '../sync';
+import { getCalendars } from '../calendars/registry';
 
 export interface RpcServer {
   socketPath: string;
@@ -106,6 +107,7 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
           const dispatch = getDispatch?.() ?? null;
           const updater = getUpdater();
           const sync = getSync();
+          const calendars = getCalendars();
           const pocket = getPocket();
           const facade = new SysFacade({
             boardPath,
@@ -115,6 +117,7 @@ export function createRpcServer(boardPath: string, getDispatch?: () => CliDispat
             ...(dispatch ? { cliDispatch: dispatch } : {}),
             ...(updater ? { updater } : {}),
             ...(sync ? { sync } : {}),
+      ...(calendars ? { calendars } : {}),
             ...(pocket ? { pocket } : {}),
             appState: appStatePort,
           });
