@@ -92,7 +92,7 @@ import { undoable } from '../../store/undoNotice';
 const MOTHER_ROW_START_X = -1400;
 const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
-import { FIT_NODES_EVENT, FOCUS_NODE_EVENT } from '../../store/scheduleActions';
+import { FIT_NODES_EVENT, FOCUS_NODE_EVENT, REVEAL_ELEMENT_EVENT } from '../../store/scheduleActions';
 import { activeCanvasOf, edgesOnCanvas, isOnCanvas, isSharedNode, isStrokeOnCanvas, visibleNodeIds } from '../../../shared/canvas';
 import { alignAll, gridScopeOf, landing, onGrid, snap as snapGrid, type Box } from './alignGrid';
 
@@ -577,8 +577,24 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       ensureVisible(detail);
     };
     window.addEventListener('krnl:ensure-visible', onEnsureVisible);
-    return () => window.removeEventListener('krnl:ensure-visible', onEnsureVisible);
-  }, [ensureVisible]);
+    // "Show" on an event (and anything drawn inside a canvas window): the
+    // camera goes to the thing itself, not to the window's middle (a large
+    // Calendar's middle left the event off screen).
+    const onReveal = (e: Event) => {
+      const el = (e as CustomEvent<{ el?: Element }>).detail?.el;
+      if (!el || !el.isConnected || !el.closest('.react-flow__node')) return;
+      if (isStationShown(useBoardStore.getState().board?.layoutMode)) return;
+      const r = el.getBoundingClientRect();
+      const a = screenToFlowPosition({ x: r.left, y: r.top });
+      const b = screenToFlowPosition({ x: r.right, y: r.bottom });
+      ensureVisible({ x: a.x, y: a.y, width: Math.max(1, b.x - a.x), height: Math.max(1, b.y - a.y) }, { padding: 90 });
+    };
+    window.addEventListener(REVEAL_ELEMENT_EVENT, onReveal);
+    return () => {
+      window.removeEventListener('krnl:ensure-visible', onEnsureVisible);
+      window.removeEventListener(REVEAL_ELEMENT_EVENT, onReveal);
+    };
+  }, [ensureVisible, screenToFlowPosition]);
 
   // While a mouse button is held (dragging nodes, a marquee, panning), embedded
   // pages (YouTube, websites) must not catch the mouse: an iframe swallows the

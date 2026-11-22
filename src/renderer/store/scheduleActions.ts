@@ -242,6 +242,13 @@ export const FOCUS_NODE_EVENT = 'krnl:focus-node';
 /** Window event the canvas listens for to fit several nodes on screen (`detail.nodeIds`). */
 export const FIT_NODES_EVENT = 'krnl:fit-nodes';
 
+/** Window event: the canvas moves its camera so this element (drawn on the canvas) is in view. detail: { el }. */
+export const REVEAL_ELEMENT_EVENT = 'krnl:reveal-element';
+/** Moves the camera onto something drawn inside a canvas window (a block in the Calendar); nothing in a docked window. */
+export function revealElement(el: Element): void {
+  window.dispatchEvent(new CustomEvent(REVEAL_ELEMENT_EVENT, { detail: { el } }));
+}
+
 export function focusNode(nodeId: string): void {
   window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { nodeId } }));
 }

@@ -4,10 +4,10 @@
 
 import { useBoardStore } from './boardStore';
 import { clearHighlights, highlightElement, nodeElement } from './highlight';
-import { focusNode, showTask } from './scheduleActions';
+import { focusNode, revealElement, showTask } from './scheduleActions';
 import { resolveNodeRef, resolveTodoItemRef } from '../../shared/dispatch/resolveRef';
 import type { BoardShape } from '../../shared/dispatch/types';
-import { routineOccurrence, toYMD, type Habit } from '../components/nodes/HabitNode/types';
+import { lastRoutineDate, routineOccurrence, toYMD, type Habit } from '../components/nodes/HabitNode/types';
 
 export type ShowScope = 'auto' | 'plan' | 'node' | 'day' | 'ui';
 
@@ -106,24 +106,56 @@ function showDay(day: string, note: string | undefined, ms: number | undefined):
  * A repeating event on the Calendar: opens the week holding `date`, shows the
  * events layer and rings that day's block (or the day, if the block is hidden).
  */
-export function showEventOnCalendar(habitId: string, date: string, note?: string): ShowResult {
+/**
+ * Shows a repeating or one-time event on the Calendar (owner, 2026-11-22:
+ * "Show" moved the camera so the event was out of sight, and on an ended
+ * event it lit up today). The Calendar opens on its day, the hours scroll to
+ * it, the camera moves onto the event itself (not the window's middle), and
+ * then it is highlighted. With no date (it never happened), the Calendar
+ * itself is shown; never a day it is not on.
+ */
+export function showEventOnCalendar(habitId: string, date: string | null, note?: string): ShowResult {
   const board = useBoardStore.getState().board;
   const cal = board?.nodes.find((n) => n.kind === 'calendar' && n.isMother);
   if (!cal) return { ok: false, message: 'No Calendar on the board' };
+  if (!date) {
+    if (canvasMode()) focusNode(cal.id);
+    window.setTimeout(() => { const el = nodeElement(cal.id); if (el) highlightElement(el, { note }); }, 450);
+    return { ok: true, message: 'It has no date: showed the Calendar' };
+  }
   void import('../components/Canvas/commandDispatch').then(({ makeCommandHandler }) => {
     const send = makeCommandHandler(cal.id);
     const view = (cal.config as { view?: string }).view;
     if (view !== 'week' && view !== 'day') send('calendar.setView', { view: 'week' });
     send('calendar.setAnchor', { date });
-    if (canvasMode()) focusNode(cal.id);
-    window.dispatchEvent(new CustomEvent('krnl:calendar-show-routines'));
-    window.setTimeout(() => {
-      const band = document.querySelector<HTMLElement>(`[data-testid="calendar-routine-${CSS.escape(habitId)}"][data-date="${CSS.escape(date)}"]`);
-      const el = band ?? document.querySelector<HTMLElement>(`[data-testid="calendar-anytime-${CSS.escape(date)}"]`) ?? nodeElement(cal.id);
-      if (el) highlightElement(el, { note });
-    }, 500);
+    // Wait until the Calendar draws that week (a moment; never for long).
+    const t0 = Date.now();
+    const find = () => document.querySelector<HTMLElement>(`[data-testid="calendar-routine-${CSS.escape(habitId)}"][data-date="${CSS.escape(date)}"]`);
+    const show = () => {
+      const band = find();
+      if (!band && Date.now() - t0 < 1500) { window.setTimeout(show, 80); return; }
+      // Not drawn (its layer is off): the Calendar itself, not some other day.
+      const el = band ?? nodeElement(cal.id);
+      if (!el) return;
+      if (band) scrollHoursTo(band);
+      // After the hours moved, the camera goes to where it now is.
+      requestAnimationFrame(() => { revealElement(el); highlightElement(el, { note }); });
+    };
+    window.setTimeout(show, 60);
   });
   return { ok: true, message: `Highlighted it on the Calendar (${date})` };
+}
+
+/** Scrolls the Calendar's hours so the element sits in the upper part of the view (no outer element is scrolled). */
+function scrollHoursTo(el: HTMLElement): void {
+  const grid = el.closest<HTMLElement>('[data-testid="calendar-grid-body"]');
+  if (!grid || grid.scrollHeight <= grid.clientHeight + 1) return;
+  const gr = grid.getBoundingClientRect();
+  const br = el.getBoundingClientRect();
+  // Screen sizes are scaled by the canvas zoom; scrolling is in layout pixels.
+  const scale = grid.offsetHeight > 0 && gr.height > 0 ? gr.height / grid.offsetHeight : 1;
+  const within = (br.top - gr.top) / scale + grid.scrollTop;
+  grid.scrollTop = Math.max(0, within - grid.clientHeight / 4);
 }
 
 /** A repeating event by exact name, or a unique part of it. */
@@ -139,7 +171,7 @@ function findEvent(board: BoardShape, ref: string): { id: string; name: string }
   return parts.length > 1 ? 'ambiguous' : null;
 }
 
-/** The next date (today included) a repeating event happens, not skipped. */
+/** The next date (today included) a repeating event happens, not skipped; else the last time it happened (an ended event). */
 function nextEventDate(board: BoardShape, id: string): string | null {
   for (const n of board.nodes) {
     if (n.kind !== 'habit' || !n.isMother) continue;
@@ -152,6 +184,7 @@ function nextEventDate(board: BoardShape, id: string): string | null {
       if (occ && !occ.skipped) return ymd;
       d.setDate(d.getDate() + 1);
     }
+    return lastRoutineDate(h, toYMD(new Date()));
   }
   return null;
 }

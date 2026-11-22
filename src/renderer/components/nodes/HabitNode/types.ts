@@ -207,6 +207,24 @@ export function routineOccurrence(h: Habit, date: string): RoutineOccurrence | n
   return { date, startMin, endMin: Math.min(24 * 60, startMin + len), skipped: ex?.skip === true, moved: !!ex?.at };
 }
 
+/**
+ * The last date a routine happened on or before `day` (not skipped), or null
+ * (looks back a year). An event that has ended is shown there: its card's
+ * page and its "Show" (owner, 2026-11-22: Show on an ended event lit up today).
+ */
+export function lastRoutineDate(h: Habit, day: string): string | null {
+  let d = h.endsOn && h.endsOn < day ? h.endsOn : day;
+  for (let i = 0; i < 400; i++) {
+    const occ = routineOccurrence(h, d);
+    if (occ && !occ.skipped) return d;
+    if (h.startsOn && d <= h.startsOn) return null;
+    const x = new Date(`${d}T00:00:00`);
+    x.setDate(x.getDate() - 1);
+    d = toYMD(x);
+  }
+  return null;
+}
+
 // Built-in icon ids (drawn as theme-aware SVGs by HabitNode/HabitIcon.tsx —
 // no emoji). Old glyph/emoji values still render via its legacy map.
 export const HABIT_ICONS: readonly string[] = [
