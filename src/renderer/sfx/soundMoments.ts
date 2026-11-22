@@ -46,7 +46,8 @@ export function soundSnapshot(board: Pick<Board, 'nodes'> | null | undefined): S
         // same sound as moving a task). A tick never changes this.
         const sch = asObj(habit['schedule']);
         if (typeof habit['id'] === 'string' && typeof sch['timeOfDay'] === 'string') {
-          snap.scheduled[`habit:${habit['id']}`] = `${sch['timeOfDay']}|${String(sch['durationMin'] ?? '')}|${JSON.stringify(sch['days'] ?? sch['kind'])}`;
+          // A one-time event moved to another week keeps its weekday: its date counts too.
+          snap.scheduled[`habit:${habit['id']}`] = `${sch['timeOfDay']}|${String(sch['durationMin'] ?? '')}|${JSON.stringify(sch['days'] ?? sch['kind'])}|${String(habit['startsOn'] ?? '')}`;
         }
       }
     } else if (node.kind === 'pomo') {
