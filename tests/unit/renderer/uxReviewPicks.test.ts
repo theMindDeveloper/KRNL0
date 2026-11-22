@@ -57,7 +57,7 @@ describe('plan actions on the board', () => {
     expect(useBoardStore.getState().board!.nodes.some((n) => n.id === 'quiz')).toBe(true);
   }, 20_000);
 
-  it('F22 — Archive takes one done card of an unfinished chain off the board, mirrored to its row', () => {
+  it('F22 — Archive takes one done card off the board, mirrored to its row (it leaves on its own)', () => {
     useBoardStore.setState({
       board: {
         nodes: [todo([item('a', { done: true }), item('b')]), task('a', { done: true, completedAt: '2026-11-17T10:00:00.000Z' }), task('b')],
@@ -65,7 +65,6 @@ describe('plan actions on the board', () => {
       } as never,
     });
     const board = () => useBoardStore.getState().board!;
-    expect(finishedTaskIds(board(), 'overnight', Date.now()).has('a')).toBe(false);
     archiveDoneTask('a');
     expect(typeof stateOf('a')['archivedAt']).toBe('string');
     expect(((stateOf('todo')['items'] as Array<Loose>)[0]!)['archivedAt']).toBe(stateOf('a')['archivedAt']);
@@ -81,15 +80,20 @@ describe('plan actions on the board', () => {
   });
 });
 
-describe('waitingOnChain (engagement F20)', () => {
+describe('waitingOnChain (engagement F20; Decision 63: only steps hold a card)', () => {
   const now = new Date('2026-11-18T08:00').getTime();
   const board = {
-    nodes: [task('a', { done: true, completedAt: '2026-11-16T10:00:00.000Z' }), task('b'), task('solo', { done: true, completedAt: '2026-11-18T07:00:00.000Z' })],
+    nodes: [
+      task('a', { done: true, completedAt: '2026-11-16T10:00:00.000Z' }), task('b'),
+      task('p', { done: true, completedAt: '2026-11-16T10:00:00.000Z' }), task('step', { parentTaskId: 'p' }),
+      task('solo', { done: true, completedAt: '2026-11-18T07:00:00.000Z' }),
+    ],
     edges: [edge('a', 'b')],
   } as never;
 
-  it('reports a done card that would have left, held by an open task of its chain', () => {
-    expect(waitingOnChain(board, 'overnight', now).get('a')).toBe('b');
+  it('a done card is held by an open step of its own; a connection holds nothing', () => {
+    expect(waitingOnChain(board, 'overnight', now).get('p')).toBe('step');
+    expect(waitingOnChain(board, 'overnight', now).has('a')).toBe(false);
   });
   it('says nothing for a card that has not reached its time yet, or under "keep"', () => {
     expect(waitingOnChain(board, 'overnight', now).has('solo')).toBe(false);

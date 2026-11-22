@@ -10,7 +10,6 @@
 //
 // All writes go through the node commands or the board store (rule 5).
 
-import type { Edge } from '@shared/types/edge';
 import { archiveTask } from '../../shared/dispatch/task';
 import type { BoardShape } from '../../shared/dispatch/types';
 import { historyGroup, pushHistory, useBoardStore } from './boardStore';
@@ -86,8 +85,8 @@ export function todoRowOf(taskId: string): { todoId: string; itemId: string } | 
 
 /**
  * Won't do: drop the Todo row and take its plan off the Calendar, as one undo
- * step. The notice's UNDO puts the row back, the "next" links into the task
- * and its own time (a chained plan has none: it follows the one before).
+ * step. The notice's UNDO puts the row back and its time. Its connections are
+ * never touched (Decision 63: they are only drawn).
  */
 export function wontDoItem(todoId: string, itemId: string): void {
   const board0 = useBoardStore.getState().board;
@@ -97,7 +96,6 @@ export function wontDoItem(todoId: string, itemId: string): void {
   const taskId = item.taskNodeId;
   const node0 = taskId ? board0.nodes.find((n) => n.id === taskId) : undefined;
   const was = (node0?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor ?? null;
-  const links: Edge[] = taskId ? board0.edges.filter((e) => e.from.event === 'task.next' && e.to.nodeId === taskId) : [];
   void historyGroup(async () => {
     await command(todoId, 'todo.drop', { id: itemId });
     if (taskId) await unscheduleTask(taskId);
@@ -105,16 +103,6 @@ export function wontDoItem(todoId: string, itemId: string): void {
   revertible(`Won't do "${item.text}"`, () => {
     void historyGroup(async () => {
       await command(todoId, 'todo.undrop', { id: itemId });
-      if (links.length) {
-        useBoardStore.setState((st) => {
-          if (!st.board) return st;
-          const ids = new Set(st.board.nodes.map((n) => n.id));
-          const add = links.filter((l) => ids.has(l.from.nodeId) && !st.board!.edges.some((e) => e.id === l.id));
-          return add.length ? { ...pushHistory(st), board: { ...st.board, edges: [...st.board.edges, ...add] } } : st;
-        });
-        const b = useBoardStore.getState().board;
-        if (b) void saveBoard(b);
-      }
       if (taskId && was) await scheduleTaskAt(taskId, was);
     });
   });

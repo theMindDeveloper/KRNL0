@@ -67,12 +67,8 @@ export function computeCatchup(board: CatchupBoard, today: string, nowMs: number
 
   const nexts = new Map<string, string[]>();
   const prevs = new Map<string, string[]>();
-  for (const e of board.edges) {
-    if (e.from.event !== 'task.next') continue;
-    if (!tasks.has(e.from.nodeId) || !tasks.has(e.to.nodeId)) continue;
-    nexts.set(e.from.nodeId, [...(nexts.get(e.from.nodeId) ?? []), e.to.nodeId]);
-    prevs.set(e.to.nodeId, [...(prevs.get(e.to.nodeId) ?? []), e.from.nodeId]);
-  }
+  // Decision 63: connections are only drawn, so a slipped task is listed on
+  // its own (it no longer moves with the one before it): nothing follows.
 
   // Slipped: planned before today and not done.
   const isSlipped = (id: string): boolean => {

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
- * Unschedule / Show on calendar for chain successors: a successor stores no
- * time of its own, so its actions resolve through the chain's anchor.
+ * Unschedule / Show on calendar with connected tasks (Decision 63: connections
+ * are only drawn). Each task has its own time (a board with chain-placed tasks
+ * gives them their times when it opens); its actions are its own.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
@@ -29,16 +30,22 @@ beforeEach(() => {
     nodes: [
       { id: TODO, kind: 'todo', position: { x: 0, y: 0 }, isMother: true, state: { items: [] }, config: {} },
       task('a', { scheduledFor: '2026-11-03T09:00' }),
-      task('b'),
+      task('b', { scheduledFor: '2026-11-03T09:30' }),
     ],
     edges: [{ id: 'e1', from: { nodeId: 'a', event: 'task.next' }, to: { nodeId: 'b', command: 'task.activate' }, enabled: true }],
   } as unknown as Board);
 });
 
-describe('chain successor schedule actions', () => {
-  it('resolves the anchor and the real placement', () => {
+describe('connected tasks: their own schedule actions', () => {
+  it('each task is its own anchor at its own time', () => {
     expect(scheduleAnchorOf('a')).toBe('a');
-    expect(scheduleAnchorOf('b')).toBe('a');
+    expect(scheduleAnchorOf('b')).toBe('b');
+    expect(placementOf('b')?.startISO).toBe('2026-11-03T09:30');
+  });
+
+  it('unscheduling keeps the connection (it is only drawn)', async () => {
+    await unscheduleTask('a');
+    expect(useBoardStore.getState().board!.edges).toHaveLength(1);
     expect(placementOf('b')?.startISO).toBe('2026-11-03T09:30');
   });
 

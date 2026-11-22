@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { resizeMotherIn } from '../../shared/motherLayout';
 import { presetOf, presetRows, swapInRows, withPreset } from '../../shared/stationLayouts';
 import { saveBoard, setLiveViewportSource } from './eventLog';
+import { selectSchedule } from './scheduleSelector';
 import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig, CompletionRecord } from '../../shared/types';
 import type { DrawStroke } from '../../shared/types/board';
 import type { TaskState } from '../components/nodes/TaskNode/types';
@@ -668,6 +669,11 @@ export const useBoardStore = create<BoardStore>((set) => ({
       const newItemId = crypto.randomUUID();
       const newNodeId = `task-${crypto.randomUUID()}`;
 
+      // Decision 63: connections are only drawn, so the parallel task gets its
+      // own time: the same start as the task it was added beside.
+      const srcStart = selectSchedule(s.board).placements.get(taskNodeId)?.startISO ?? '';
+      const twinAt = /T\d{2}:\d{2}/.test(srcStart) ? srcStart.slice(0, 16) : null;
+
       // Build new task state — parallel fork, same layer / parentTodoId / parentTaskId
       const newTaskState: TaskState = {
         text,
@@ -690,6 +696,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
         // or the calendar selector (which renders kind==='event' only) drops it,
         // so "2.1" never appears on the calendar/clock even after scheduling.
         kind: 'event',
+        ...(twinAt ? { scheduledFor: twinAt } : {}),
       };
 
       const newNode: Node = {
@@ -737,6 +744,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
         createdAt: new Date().toISOString(),
         completedAt: null,
         taskNodeId: newNodeId,
+        ...(twinAt ? { scheduledFor: twinAt } : {}),
       };
 
       const updatedNodes = s.board.nodes.map((n) => {

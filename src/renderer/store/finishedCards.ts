@@ -68,7 +68,7 @@ type Loose = Record<string, unknown>;
 
 /**
  * Ids of done task cards to hide now. Tasks are grouped by subtask links
- * (`parentTaskId`) and by edges between task cards (chains); a group leaves
+ * (`parentTaskId`; connections between cards do not group them, Decision 63); a group leaves
  * only when all of it is done, timed from its last completion. A done task
  * without `completedAt` (legacy) counts as done long ago.
  */
@@ -93,7 +93,7 @@ export function finishedTaskIds(board: Pick<Board, 'nodes' | 'edges'> | null | u
 
 interface FinishedGroup { allDone: boolean; lastMs: number; members: string[]; open: string[] }
 
-/** Task cards grouped by subtask links and by edges between cards (chains). */
+/** Task cards grouped by subtask links (a task and its steps leave together). */
 function finishedGroups(board: Pick<Board, 'nodes' | 'edges'>): FinishedGroup[] {
   const tasks = board.nodes.filter((n) => n.kind === 'todo.task');
   if (tasks.length === 0) return [];
@@ -110,7 +110,7 @@ function finishedGroups(board: Pick<Board, 'nodes' | 'edges'>): FinishedGroup[] 
     const p = (t.state as Loose)['parentTaskId'];
     if (typeof p === 'string') join(t.id, p);
   }
-  for (const e of board.edges ?? []) join(e.from.nodeId, e.to.nodeId);
+  // Decision 63: connections are only drawn; they do not hold cards together.
 
   // A Won't-do plan is closed: it never holds its chain on the board.
   const dropped = droppedTaskIds(board.nodes);

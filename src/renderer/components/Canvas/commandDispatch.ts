@@ -25,7 +25,6 @@
  * per-task session checkpoint, extended task.toggle and task.delete cascades.
  */
 
-import { detachIfPushed } from '../../store/chainSchedule';
 import { useBoardStore, pushHistory } from '../../store/boardStore';
 import { blockedByOtherBoard } from '../../store/boardsInfo';
 import { emit, saveBoard } from '../../store/eventLog';
@@ -48,7 +47,6 @@ import type { Board } from '@shared/types';
 import { selectSchedule } from '../../store/scheduleSelector';
 import { spanTagFor } from '../../store/spanTags';
 import { isEasyBoard } from '../../store/uiMode';
-import { parallelizeChainEdges } from '../../store/chainWalker';
 import type { Edge } from '@shared/types/edge';
 import {
   deleteTaskCascade,
@@ -1147,9 +1145,13 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         enabled: true,
       };
 
+      // Decision 63: the connection is only drawn, so the new task gets its
+      // own time where this one ends (when this one is on the Calendar).
+      const srcEnd = selectSchedule(freshBoard).placements.get(nodeId)?.endISO ?? '';
       const { addNode, addEdge } = useBoardStore.getState();
       addNode(newNode);
       addEdge(edge);
+      if (/T\d{2}:\d{2}/.test(srcEnd)) makeCommandHandler(newNodeId)('task.setSchedule', { scheduledFor: srcEnd.slice(0, 16) });
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       emit('task.created', `next task ${shortId(newNodeId)} after ${shortId(nodeId)}`, { refId: newNodeId });
@@ -1329,8 +1331,6 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
         itemId?: string;
         scheduledFor: string;
         scheduledDurationMin?: number;
-        /** Dropped onto this task's block: run in parallel with it. */
-        parallelWith?: string;
       };
       if (!scheduleArgs.scheduledFor) return;
       // A Todo row dragged before it has a task node: create the task (linked
@@ -1344,32 +1344,8 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       if (!targetTask || targetTask.kind !== 'todo.task') return;
       const prevTask = targetTask.state as TaskState;
 
-      // Parallel drop: unlink the moved task from the chain that would push
-      // it behind the target, and fork it alongside the target instead.
-      const withId = scheduleArgs.parallelWith;
-      const withTask = withId ? currentBoard.nodes.find((n) => n.id === withId) : undefined;
-      if (withTask && withTask.kind === 'todo.task' && withTask.id !== taskId) {
-        const sameTodo = (withTask.state as TaskState).parentTodoId === prevTask.parentTodoId;
-        const edges = parallelizeChainEdges(currentBoard.edges, taskId, withTask.id, sameTodo, (from, to) => ({
-          id: `edge-${crypto.randomUUID()}`,
-          from: { nodeId: from, event: 'task.next' },
-          to: { nodeId: to, command: 'task.activate' },
-          enabled: true,
-        }));
-        useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges } } : s));
-      }
-
-      // Put somewhere its chain would push it away from (before the task
-      // before it ends, or another day): it leaves the chain and lands where
-      // it was put; the tasks after it still follow it.
-      if (!withTask) {
-        const b0 = useBoardStore.getState().board;
-        if (b0) {
-          const edges = detachIfPushed(b0, taskId, scheduleArgs.scheduledFor);
-          if (edges !== b0.edges) useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges } } : s));
-        }
-      }
-
+      // Decision 63: connections are only drawn. Putting a task at a time
+      // changes that task only; its connections stay as they are.
       const schedPatch: { scheduledFor: string | null; scheduledDurationMin?: number } = {
         scheduledFor: scheduleArgs.scheduledFor,
       };

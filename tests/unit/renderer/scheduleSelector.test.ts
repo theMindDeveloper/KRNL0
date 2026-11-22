@@ -22,14 +22,22 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  selectSchedule,
-  selectScheduledTasksForRange,
-} from '../../../src/renderer/store/scheduleSelector';
 import type { Board } from '../../../src/shared/types';
 import type { Node } from '../../../src/shared/types/node';
 import type { Edge } from '../../../src/shared/types/edge';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
+import { buildWithChains, selectSchedule as liveSelectSchedule, type ScheduleResult, type ScheduledTaskPlacement } from '../../../src/renderer/store/scheduleSelector';
+import { defaultPomoConfig, type PomoConfig as LegacyPomoConfig } from '../../../src/renderer/components/nodes/PomoNode/types';
+
+// Decision 63: connections no longer place tasks. These tests pin the old
+// chain rule, which stays only to give chain-placed tasks their time as their
+// own, once, when a board opens (chainTimes.ts; see chainTimes.test.ts).
+const legacyCfg = (b: Board | null): LegacyPomoConfig =>
+  (b?.nodes.find((n) => n.kind === 'pomo')?.config as LegacyPomoConfig | undefined) ?? defaultPomoConfig();
+const selectSchedule = (b: Board | null): ScheduleResult => (b ? buildWithChains(b, legacyCfg(b)) : { placements: new Map(), computedAt: 0 });
+const selectScheduledTasksForRange = (b: Board | null, fromISO: string, toISO: string): ScheduledTaskPlacement[] =>
+  [...selectSchedule(b).placements.values()].filter((p) => p.endISO > fromISO && p.startISO < toISO);
+
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -352,15 +360,16 @@ describe('Test 8 — selectScheduledTasksForRange', () => {
 
 // ── Test 9 — Memoization on (nodes, edges) reference identity ─────────────
 
-describe('Test 9 — Reference-identity memoization', () => {
-  it('returns the same placements Map when nodes+edges are unchanged', () => {
+describe('Test 9 — Reference-identity memoization (the live selector)', () => {
+  it('returns the same placements Map when the nodes are unchanged; a new connection does not recompute (Decision 63)', () => {
     _taskSeq = 0;
     const todoId = 'todo-memo';
     const t1 = makeTaskNode('t1', todoId, 25, { scheduledFor: '2026-05-20T10:00' });
     const board = makeBoard([makeTodoNode(todoId), t1]);
-    const a = selectSchedule(board);
-    const b = selectSchedule(board);
+    const a = liveSelectSchedule(board);
+    const b = liveSelectSchedule(board);
     expect(a.placements).toBe(b.placements);
+    expect(liveSelectSchedule({ ...board, edges: [makeEdge('t1', 't1')] }).placements).toBe(a.placements);
   });
 });
 

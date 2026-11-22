@@ -40,8 +40,8 @@ import {
 } from '../../shared/dispatch/resolveRef';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
 import { TASK_STEP_X, TASK_STEP_Y, MOTHER_OFFSET_Y } from '../layout';
-import { wouldCreateChainCycle, parallelizeChainEdges } from '../../renderer/store/chainWalker';
-import { detachIfPushed, unscheduleOne } from '../../renderer/store/chainSchedule';
+import { wouldCreateChainCycle } from '../../renderer/store/chainWalker';
+import { unscheduleOne } from '../../renderer/store/chainSchedule';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
 
@@ -610,8 +610,11 @@ export async function taskSibling(
     todoNode.state = { ...todoState, items: [...todoState.items, newItem] };
   }
 
+  // Decision 63: drawn only; the parallel task gets the source's start as its own time.
+  const srcStart = selectSchedule(board as unknown as Board).placements.get(taskId)?.startISO ?? '';
   board.nodes = [...board.nodes, newNode];
   board.edges = [...edgesArr, ...forkEdges];
+  if (/T\d{2}:\d{2}/.test(srcStart)) writeSchedule(board, newNodeId, srcStart.slice(0, 16));
 
   // Renumber siblings (same parentTodoId + parentTaskId) by createdAt
   renumberSiblings(board, sourceTs.parentTodoId, sourceTs.parentTaskId);
@@ -692,7 +695,7 @@ export async function taskChain(ctx: TaskCtx, refs: string[]): Promise<SysResult
   saveBoard(ctx, board);
   return {
     ok: true,
-    message: `Chained ${ids.length} tasks (${added} new edge${added === 1 ? '' : 's'}).`,
+    message: `Connected ${ids.length} tasks (${added} new line${added === 1 ? '' : 's'}; drawn only, their times stay).`,
     data: { count: ids.length, edgesAdded: added },
   };
 }
@@ -729,9 +732,7 @@ export async function taskSchedule(
     return { ok: false, message: `"${(taskNode.state as TaskState).text}" is a step inside another task; schedule the task it belongs to` };
   }
 
-  // A time its chain would push it away from (before the task before it
-  // ends): it leaves the chain and lands where it was put (chainSchedule.ts).
-  (board as { edges: unknown[] }).edges = detachIfPushed(board as unknown as Board, taskId, at);
+  // Decision 63: connections are only drawn; this task's time is its own.
   const ts = taskNode.state as TaskState;
   const nextState = fsmTaskSetSchedule(ts, {
     scheduledFor: at,
@@ -790,19 +791,16 @@ export async function taskUnschedule(
   if (!taskNode) return { ok: false, message: noTaskMessage(taskId) };
   taskId = taskNode.id;
 
-  // Only this task leaves the calendar; tasks timed by its chain keep the
-  // times they have now, and it stops following its predecessor
-  // (renderer/store/chainSchedule.ts — the Calendar does the same).
-  const plan = unscheduleOne(board as unknown as Board, taskId);
-  if (!plan) return { ok: true, message: `Task "${taskId.slice(0, 8)}" was not scheduled.` };
-  (board as { edges: unknown[] }).edges = plan.edges;
-  for (const w of plan.writes) writeSchedule(board, w.taskId, w.scheduledFor);
+  // Only this task leaves the calendar; its connections stay as drawn
+  // (Decision 63; renderer/store/chainSchedule.ts, the Calendar does the same).
+  const writes = unscheduleOne(board as unknown as Board, taskId);
+  if (!writes) return { ok: true, message: `Task "${taskId.slice(0, 8)}" was not scheduled.` };
+  for (const w of writes) writeSchedule(board, w.taskId, w.scheduledFor);
 
   saveBoard(ctx, board);
-  const pinned = plan.writes.length - 1;
   return {
     ok: true,
-    message: `Task "${taskId.slice(0, 8)}" unscheduled${pinned > 0 ? ` (${pinned} task${pinned === 1 ? '' : 's'} after it keep their times)` : ''}.`,
+    message: `Task "${taskId.slice(0, 8)}" unscheduled.`,
     data: { id: taskId },
   };
 }
@@ -914,9 +912,13 @@ export async function taskAddNext(
   });
   updateNode(board, todoNode.id, { ...todoNode, state: linkedTodoState });
 
+  // Decision 63: the connection is only drawn; the new task gets its own time
+  // where the source ends (when the source is on the Calendar).
+  const srcEnd = selectSchedule(board as unknown as Board).placements.get(sourceNode.id)?.endISO ?? '';
   board.nodes = [...board.nodes, newNode];
+  if (/T\d{2}:\d{2}/.test(srcEnd)) writeSchedule(board, newNodeId, srcEnd.slice(0, 16));
 
-  // Wire task.next → task.activate from source to new node.
+  // Wire task.next → task.activate from source to new node (drawn only).
   board.edges = [
     ...board.edges,
     {
@@ -945,9 +947,8 @@ export const taskParallel = taskSibling;
 
 /**
  * `krnl task parallel <ref> --with <ref2>` — run an existing task in parallel
- * with another (the calendar's drop-a-task-onto-a-task). Unlinks <ref> from
- * the chain that would push it behind <ref2>, forks it alongside <ref2>, and
- * schedules it at <ref2>'s start.
+ * with another: it is put at <ref2>'s start (Decision 63: connections are only
+ * drawn, so nothing is rewired).
  */
 export async function taskParallelWith(
   ctx: TaskCtx,
@@ -963,14 +964,7 @@ export async function taskParallelWith(
   if (moved.id === target.id) return { ok: false, message: 'task parallel: a task cannot run in parallel with itself.' };
   const start = selectSchedule(board as unknown as Board).placements.get(target.id)?.startISO.slice(0, 16);
   if (!start) return { ok: false, message: `task parallel: "${target.id.slice(0, 8)}" is not on the calendar.` };
-  const sameTodo = (moved.state as TaskState).parentTodoId === (target.state as TaskState).parentTodoId;
-  board.edges = parallelizeChainEdges(board.edges, moved.id, target.id, sameTodo, (from, to) => ({
-    id: `edge-${randomUUID()}`,
-    from: { nodeId: from, event: 'task.next' },
-    to: { nodeId: to, command: 'task.activate' },
-    enabled: true,
-  }));
-  saveBoard(ctx, board);
+  // Decision 63: connections are only drawn; running in parallel is the same start.
   const res = await taskSchedule(ctx, moved.id, start);
   if (!res.ok) return res;
   return {

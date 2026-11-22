@@ -14,6 +14,7 @@
  *   - Link UI when linkedTodoId === null
  */
 
+import { migrateChainTimes } from '../../../src/renderer/store/chainTimes';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import React from 'react';
@@ -142,7 +143,8 @@ function seedBoard(nodes: Node[], edges: Edge[] = [], pomoCfg: Partial<PomoConfi
     nodes: [makePomoNode(pomoCfg), ...nodes],
     edges,
   };
-  useBoardStore.setState({ board });
+  // As the board opens (Decision 63): chained tasks keep their times as their own.
+  useBoardStore.setState({ board: migrateChainTimes(board) as Board });
 }
 
 function renderClockNode(

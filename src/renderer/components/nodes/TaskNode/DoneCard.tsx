@@ -71,8 +71,8 @@ export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onCon
     ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
     : '';
   const tone = toneVarForTask(taskId);
-  // engagement.md F20 — would have left the board by now, but its chain (or
-  // subtasks) is not all done: say so, and name the task that holds it.
+  // engagement.md F20 — would have left the board by now, but its steps are
+  // not all done (Decision 63: connections hold nothing): say so, and name the step.
   const board = useBoardStore((st) => st.board);
   const policy = useFinishedCards((st) => st.policy);
   const holderId = useMemo(() => waitingOnChain(board, policy, Date.now()).get(taskId), [board, policy, taskId]);
@@ -147,7 +147,7 @@ export function DoneCard({ taskId, state, trackedSec, celebrate, onReopen, onCon
           tag={easy ? '' : state.tag ?? ''}
           tone={tone}
           icon={holderText ? 'follows' : 'check'}
-          when={holderText ? 'waits on chain' : atLabel ? `Done ${atLabel}` : 'Done'}
+          when={holderText ? 'waits on its steps' : atLabel ? `Done ${atLabel}` : 'Done'}
           whenColor={holderText ? 'var(--ink-3)' : 'var(--acid-ink, var(--acid))'}
         />
       </div>

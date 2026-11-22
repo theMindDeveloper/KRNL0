@@ -602,23 +602,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     return spanTaskName(seg) ?? (seg.label || fallback);
   };
 
-  // #168/#172 — when a drop lands later than requested (the chain pushes a
-  // task after its predecessor), say so instead of silently moving it.
-  const [pushNotice, setPushNotice] = useState<string | null>(null);
-  useEffect(() => {
-    if (!pushNotice) return;
-    const id = setTimeout(() => setPushNotice(null), 4500);
-    return () => clearTimeout(id);
-  }, [pushNotice]);
-  const scheduleTask = (taskId: string, scheduledFor: string, scheduledDurationMin: number, parallelWith?: string) => {
-    onCommand('calendar.schedule', { taskId, scheduledFor, scheduledDurationMin, ...(parallelWith ? { parallelWith } : {}) });
-    const board = useBoardStore.getState().board;
-    const placed = board ? selectSchedule(board).placements.get(taskId) : undefined;
-    if (placed && placed.startISO.slice(0, 16) !== scheduledFor.slice(0, 16)) {
-      const task = board?.nodes.find((n) => n.id === taskId);
-      const name = task ? (task.state as TaskState).text : 'Task';
-      setPushNotice(`“${name}” placed at ${placed.startISO.slice(11, 16)} — after the task before it in its chain`);
-    }
+  // Decision 63: a task lands exactly where it is put (connections are only
+  // drawn, nothing pushes it), so there is nothing to explain after a drop.
+  const scheduleTask = (taskId: string, scheduledFor: string, scheduledDurationMin: number) => {
+    onCommand('calendar.schedule', { taskId, scheduledFor, scheduledDurationMin });
   };
   scheduleTaskRef.current = scheduleTask;
 
@@ -802,17 +789,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       return out;
   }, [boardForCal, weekRangeFromISO, weekRangeToISO]);
 
-  // calendar-clock-visuals F30 — a chained plan names the task it follows.
-  const afterOf = useMemo(() => {
-    const out = new Map<string, string>();
-    const textOf = new Map((boardForCal?.nodes ?? []).filter((n) => n.kind === 'todo.task').map((n) => [n.id, String((n.state as { text?: string }).text ?? '')]));
-    for (const e of boardForCal?.edges ?? []) {
-      if (e.from.event !== 'task.next') continue;
-      const t = textOf.get(e.from.nodeId);
-      if (t !== undefined && textOf.has(e.to.nodeId) && !out.has(e.to.nodeId)) out.set(e.to.nodeId, t || 'Untitled');
-    }
-    return out;
-  }, [boardForCal]);
+  // Decision 63: no "after …" line (a connection says nothing about time).
 
   // Read scheduled habits from the board store (ADR 0002 §6).
   const scheduledHabits = useMemo((): ScheduledHabit[] => {
@@ -1961,7 +1938,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
             (overrunMin > 0 ? ` (${fmtDur(overrunMin)} over plan)` : '') +
             (overlapRoutines.length ? ` · overlaps ${overlapRoutines.join(', ')}` : '') +
             (isMissed ? ' · missed' : '') +
-            (afterOf.has(task.id) ? ` · after ${afterOf.get(task.id)}` : '') +
+
             (isContinuation ? ' (continued from previous day)' : '')
           }
           className={`cal-block${landedTaskId === task.id ? ' is-landed' : ''}${carried ? ' is-carried' : ''}`}
@@ -2139,11 +2116,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
               </span>
               {startNote && <span data-testid={`task-start-delta-${task.id}`} style={{ whiteSpace: 'nowrap' }}>{startNote.replace(/^ · /, '')}</span>}
               {isMissed && !isContinuation && <span style={{ whiteSpace: 'nowrap', color: 'var(--ink-2)', fontWeight: 600 }}>Missed</span>}
-              {afterOf.has(task.id) && !isContinuation && (
-                <span data-testid={`task-after-${task.id}`} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', color: 'var(--ink-3)' }}>
-                  after {afterOf.get(task.id)}
-                </span>
-              )}
               {overrunMin > 0
                 ? <span data-testid={`task-overrun-${task.id}`} style={{ whiteSpace: 'nowrap', color: 'var(--rust)', fontWeight: 700 }}>+{fmtDur(overrunMin)} over</span>
                 : trackedMin > 0 ? <span style={{ whiteSpace: 'nowrap' }}>{task.done ? `took ${fmtDur(trackedMin)}` : `${fmtDur(trackedMin)} tracked`}</span> : null}
@@ -3356,7 +3328,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
             y={taskPopup.y}
             today={todayYMD()}
             value={plan.value}
-            title={{ text: plan.text, tone: toneVarForTask(taskPopup.task.id), ...(afterOf.has(taskPopup.task.id) ? { sub: `after ${afterOf.get(taskPopup.task.id)}` } : {}) }}
+            title={{ text: plan.text, tone: toneVarForTask(taskPopup.task.id) }}
             // Decision 60 — double-click the name to rename the plan (its Todo row and task follow).
             onRename={(text) => {
               const todo = useBoardStore.getState().board?.nodes.find((n) => n.kind === 'todo' && n.isMother);
@@ -3636,22 +3608,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       )}
 
       {/* #168/#172 — tell the user when a drop was pushed later by its chain. */}
-      {pushNotice && createPortal(
-        <div
-          role="status"
-          data-testid="calendar-push-notice"
-          onClick={() => setPushNotice(null)}
-          style={{
-            position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)', zIndex: Z.notice,
-            background: 'var(--paper)', border: '1px solid var(--acid)', borderRadius: 6,
-            padding: '8px 14px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)',
-            boxShadow: 'var(--shadow-1)', cursor: 'pointer', maxWidth: 520,
-          }}
-        >
-          {pushNotice}
-        </div>,
-        document.body,
-      )}
 
       {/* #6 — tracked-reality (pomo) segment info popup. */}
       {realityPopup && createPortal(

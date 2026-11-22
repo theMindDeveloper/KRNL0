@@ -3,6 +3,8 @@
 // Moved from src/main/persistence/board.ts, which re-exports them.
 
 import { normalizeCanvases, DEFAULT_CANVAS_ID, DEFAULT_CANVAS_NAME } from './canvas';
+// Decision 63: tasks placed only by a chain get that time as their own (once).
+import { migrateChainTimes } from '../renderer/store/chainTimes';
 import type { CanvasBoardLike } from './canvas';
 
 // ADR 0001 — local helper; mirrors HabitNode/types.ts toYMD but kept here to
@@ -741,6 +743,8 @@ export function migrateBoard(parsed: unknown): unknown {
   // validateBoardInvariants runs last to heal any orphaned TodoItems before
   // the board is handed to the renderer.
   return validateBoardInvariants(
+    // Decision 63: runs on the settled nodes (kind, plannedMin, Pomo config).
+    migrateChainTimes(
     // Decision 33: canvas stamping runs after every node-level migration
     // (including the analytics-mother adoption) so only settled free nodes
     // are stamped.
@@ -792,5 +796,6 @@ export function migrateBoard(parsed: unknown): unknown {
     ),
     ),
     ),
+  ),
   );
 }

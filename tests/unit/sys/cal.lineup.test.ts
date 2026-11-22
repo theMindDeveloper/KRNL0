@@ -61,19 +61,19 @@ describe('krnl cal lineup', () => {
     expect((await calLineup({ boardPath }, ['t-email', 't-rent', 't-plan'], false, NOW)).message).toBe('Already lined up.');
   });
 
-  it('a chain moves as one: its follower comes along behind its anchor', async () => {
+  it('each task moves on its own: a connection does not move the one before it (Decision 63)', async () => {
     seed([
       task('t-anchor', 'Outline', '2099-01-05T09:00', 30),
-      task('t-follow', 'Draft', null, 30),
+      task('t-follow', 'Draft', '2099-01-05T09:30', 30),
       task('t-other', 'Call', '2099-01-05T09:00', 60),
     ], [{ id: 'e1', from: { nodeId: 't-anchor', event: 'task.next' }, to: { nodeId: 't-follow', command: 'task.activate' }, enabled: true }]);
     const res = await calLineup({ boardPath }, ['t-follow', 't-other'], false, NOW);
     expect(res.ok).toBe(true);
     const p = placements();
-    // The Outline→Draft chain (60m) and Call (60m) tie on start and length: id order.
     expect(p.get('t-anchor')!.startISO).toBe('2099-01-05T09:00');
-    expect(p.get('t-follow')!.startISO).toBe('2099-01-05T09:30');
-    expect(p.get('t-other')!.startISO).toBe('2099-01-05T10:00');
+    // Call (09:00) first, Draft right after it.
+    expect(p.get('t-other')!.startISO).toBe('2099-01-05T09:00');
+    expect(p.get('t-follow')!.startISO).toBe('2099-01-05T10:00');
   });
 
   it('done plans stay; unknown or unscheduled refs are an error', async () => {
