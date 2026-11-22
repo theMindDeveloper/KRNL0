@@ -9,6 +9,7 @@
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { externalDragEnd } from '../nodes/CalendarNode/calendarDrag';
 import { calendarCarryEnd, calendarCarryMove, calendarCarryStart, canvasDragItem } from './calendarCarry';
+import { afterPaint } from '../../utils/afterPaint';
 import { toneVarForTask } from '../../utils/taskColor';
 import { createPortal } from 'react-dom';
 import { scheduleBatch } from '../../utils/rafBatcher';
@@ -1751,7 +1752,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
                 strokeMoves.push({ id: sid, dx: change.position.x - b.x, dy: change.position.y - b.y });
               }
             } else if (change.position) {
-              commitDragEnd(change.id);
+              // Decision 63 (performance) — the card is already drawn where it
+              // was let go (React Flow's own state); the board, which redraws
+              // every window, changes after that frame is on screen.
+              const id = change.id;
+              afterPaint(() => commitDragEnd(id));
             }
           }
         }

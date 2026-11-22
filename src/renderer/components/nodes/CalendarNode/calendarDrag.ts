@@ -16,6 +16,7 @@
 // everything else here is shared.
 
 import { calendarGhost, endCarry, ghostTimes, moveCarry, setCalendarGhost, startCarry, type CarryShow, type GhostSpec } from './DropGhost';
+import { afterPaint } from '../../../utils/afterPaint';
 
 export type DragKind = 'task' | 'event' | 'habit';
 export type DragMode = 'move' | 'top' | 'bottom';
@@ -247,17 +248,7 @@ function surfaceAt(x: number, y: number): CalendarSurface | null {
   return best;
 }
 
-/**
- * After this frame is drawn (what the user sees first), then `fn`, once. A
- * hidden or minimised window draws no frames: a short timer makes sure a drop
- * is never left waiting (or lost when the app quits).
- */
-function afterPaint(fn: () => void): void {
-  let done = false;
-  const run = () => { if (!done) { done = true; fn(); } };
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { setTimeout(run, 0); });
-  setTimeout(run, 100);
-}
+
 
 function targetAt(a: Active, s: CalendarSurface, slot: { day: string; min: number }): Target {
   const fromHome = s === a.home;
