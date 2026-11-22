@@ -30,7 +30,9 @@ export function chainOnlyTimes(board: Board): Map<string, string> {
 /**
  * The migration: each task placed only by its chain gets that start as its
  * own `scheduledFor`. A length it had stored but the chain ignored is dropped,
- * so its block keeps the length it was drawn with.
+ * so its block keeps the length it was drawn with. Its Todo row gets the same
+ * time, as every time a task is scheduled (todoSetItemSchedule: a time is its
+ * When, so an any-time day goes).
  */
 export function migrateChainTimes(raw: unknown): unknown {
   if (!isRec(raw) || !Array.isArray(raw['nodes']) || !Array.isArray(raw['edges'])) return raw;
@@ -43,7 +45,20 @@ export function migrateChainTimes(raw: unknown): unknown {
   }
   if (times.size === 0) return raw;
   const nodes = (raw['nodes'] as unknown[]).map((n) => {
-    if (!isRec(n) || typeof n['id'] !== 'string' || !times.has(n['id']) || !isRec(n['state'])) return n;
+    if (!isRec(n) || !isRec(n['state'])) return n;
+    // A Todo row of such a task: the same time.
+    if (n['kind'] === 'todo' && Array.isArray(n['state']['items'])) {
+      let changed = false;
+      const items = (n['state']['items'] as unknown[]).map((it) => {
+        if (!isRec(it) || typeof it['taskNodeId'] !== 'string' || !times.has(it['taskNodeId'])) return it;
+        changed = true;
+        const { onDay: _anyDay, ...timed } = it;
+        void _anyDay;
+        return { ...timed, scheduledFor: times.get(it['taskNodeId']) };
+      });
+      return changed ? { ...n, state: { ...n['state'], items } } : n;
+    }
+    if (typeof n['id'] !== 'string' || !times.has(n['id'])) return n;
     const { scheduledDurationMin: _ignored, ...state } = n['state'];
     void _ignored;
     return { ...n, state: { ...state, scheduledFor: times.get(n['id']) } };

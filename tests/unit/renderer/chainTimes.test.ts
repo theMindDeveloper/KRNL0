@@ -79,6 +79,20 @@ describe('nothing moves when connections stop placing tasks (F90)', () => {
 });
 
 describe('the migration', () => {
+  it('gives the Todo row the same time (as every scheduled task)', () => {
+    const b = board([{ id: 'a', at: '2026-05-14T09:00', min: 60 }, { id: 'b', min: 30 }], [next('a', 'b')]);
+    const todo = b.nodes.find((n) => n.id === 'todo-1')!;
+    (todo.state as { items: unknown[] }).items = [
+      { id: 'it-a', text: 'a', done: false, createdAt: '', completedAt: null, taskNodeId: 'a', scheduledFor: '2026-05-14T09:00' },
+      { id: 'it-b', text: 'b', done: false, createdAt: '', completedAt: null, taskNodeId: 'b', onDay: '2026-05-14' },
+    ];
+    const once = migrateChainTimes(b) as Board;
+    const items = (once.nodes.find((n) => n.id === 'todo-1')!.state as { items: Array<{ id: string; scheduledFor?: string; onDay?: string }> }).items;
+    expect(items.find((i) => i.id === 'it-b')).toMatchObject({ scheduledFor: '2026-05-14T10:00' });
+    expect(items.find((i) => i.id === 'it-b')!.onDay).toBeUndefined();
+    expect(items.find((i) => i.id === 'it-a')).toMatchObject({ scheduledFor: '2026-05-14T09:00' });
+  });
+
   it('gives the chained task its time as its own, once', () => {
     const b = board([{ id: 'a', at: '2026-05-14T09:00', min: 60 }, { id: 'b', min: 30 }], [next('a', 'b')]);
     const once = migrateChainTimes(b) as Board;

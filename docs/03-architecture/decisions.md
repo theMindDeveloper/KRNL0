@@ -1831,6 +1831,8 @@ You are unblocked. Implement against the contract above. Two reminders:
 
 ## Decision 25 — Cascade scheduling: one anchor per chain, derive successors (2026-05-14)
 
+> **Superseded by Decision 63 (2026-11-22):** connections between cards are only drawn. A task is placed only at its own time; chains no longer place, push, unschedule, group or hold tasks. The rule below is kept only to give chain-placed tasks their time as their own, once, when a board opens (`src/renderer/store/chainTimes.ts`).
+
 **Date:** 2026-05-14
 **Status:** Partially superseded by Decision 27 (ADR 0005) on 2026-05-15 — the "one anchor per chain" invariant and the mid-chain-drop predecessor-unscheduling rule no longer apply. The selector architecture, dual-selector pattern, shared `chainWalker.ts` extraction, calendar-vs-clock break divergence, and "no new persisted fields" all remain in force.
 **Author:** architect
@@ -1884,6 +1886,8 @@ Full Q-resolutions, alternatives, and file-line-level contract in ADR 0004.
 ---
 
 ## Decision 27 — Multi-anchor cascade scheduling (supersedes Decision 25 §invariant) (2026-05-15)
+
+> **Superseded by Decision 63 (2026-11-22):** connections between cards are only drawn. A task is placed only at its own time; chains no longer place, push, unschedule, group or hold tasks. The rule below is kept only to give chain-placed tasks their time as their own, once, when a board opens (`src/renderer/store/chainTimes.ts`).
 
 **Date:** 2026-05-15
 **Status:** Accepted
@@ -2343,6 +2347,8 @@ Documenting unbuilt commands is how AI agents learn to hallucinate them. The gat
 ---
 
 ## Decision 30 — Chains stay sequential: anchors are earliest-start constraints (#168) (2026-11-01)
+
+> **Superseded by Decision 63 (2026-11-22):** connections between cards are only drawn. A task is placed only at its own time; chains no longer place, push, unschedule, group or hold tasks. The rule below is kept only to give chain-placed tasks their time as their own, once, when a board opens (`src/renderer/store/chainTimes.ts`).
 
 **Status:** Accepted (maintainer choice, 2026-11-01). Amends Decision 27 / ADR 0005 and ADR 0003 §3.7.
 

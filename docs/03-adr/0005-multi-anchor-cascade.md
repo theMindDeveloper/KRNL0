@@ -1,5 +1,7 @@
 # ADR 0005 — Multi-anchor cascade scheduling
 
+> **Superseded by Decision 63 (2026-11-22):** connections between cards are only drawn. A task is placed only at its own time; chains no longer place, push, unschedule, group or hold tasks. The rule below is kept only to give chain-placed tasks their time as their own, once, when a board opens (`src/renderer/store/chainTimes.ts`).
+
 **Status**: Accepted (2026-05-15)
 **Supersedes**: ADR 0003 §1 (one-anchor-per-chain invariant), ADR 0003 §3.7 (mid-chain drop unschedules predecessors), ADR 0003 §8 (`migrateNormalizeChainAnchors`).
 

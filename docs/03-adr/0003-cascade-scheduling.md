@@ -1,5 +1,7 @@
 # ADR 0003 — Cascade scheduling: one anchor per chain, derive successors
 
+> **Superseded by Decision 63 (2026-11-22):** connections between cards are only drawn. A task is placed only at its own time; chains no longer place, push, unschedule, group or hold tasks. The rule below is kept only to give chain-placed tasks their time as their own, once, when a board opens (`src/renderer/store/chainTimes.ts`).
+
 **Date:** 2026-05-14
 **Status:** Partially superseded by [ADR 0005](0005-multi-anchor-cascade.md) on 2026-05-15. Sections affected: §1 (one-anchor invariant), §3.7 (mid-chain drop unschedules predecessors), §8 (`migrateNormalizeChainAnchors`). Sections still in force: selector module structure, dual-selector pattern with `timelineSelector`, shared `chainWalker.ts` extraction, calendar-vs-clock break-visibility divergence, no `BoardSchema.version` bump, no new persisted fields.
 **Author:** architect

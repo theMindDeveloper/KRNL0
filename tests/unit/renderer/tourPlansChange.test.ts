@@ -24,11 +24,11 @@ const tour = tourById('plans-change')!;
 const waits = tour.steps.filter((s) => s.waitFor && 'board' in s.waitFor).map((s) => (s.waitFor as { board: (a: Board, c: Board) => boolean }).board);
 
 describe('When plans change — steps', () => {
-  it('Easy gets the missed plan, the Calendar, tick, archive, Welcome back; Advanced adds finished cards, chains and canvases', () => {
+  it('Easy gets the missed plan, the Calendar, tick, archive, Welcome back; Advanced adds finished cards and canvases (no chains, Decision 63)', () => {
     const easy = stepsFor(tour, 'easy');
     const adv = stepsFor(tour, 'advanced');
     expect(easy).toHaveLength(7);
-    expect(adv).toHaveLength(11);
+    expect(adv).toHaveLength(9);
     expect(easy.some((s) => s.target?.includes('settings-finished') || s.target?.includes('canvas-switcher'))).toBe(false);
     expect(adv.some((s) => s.target?.includes('settings-finished'))).toBe(true);
     expect(adv.some((s) => s.target?.includes('topbar-canvas-switcher'))).toBe(true);
