@@ -86,6 +86,19 @@
 | F77 | (Decision 61) **A habit moves as itself:** all its boxes glide, the time line shows the time, no jump when let go. |
 | F78 | (Decision 61) **The Clock follows:** while something is carried on the Calendar, the Clock (same day and half) shows it at the ghost's time. |
 | F79 | (Decision 61) **A small Calendar still reads:** short events and plans keep a small one-line name. |
+| F80 | (Decision 63) **One drag engine:** a task, an event and a habit are carried the same way from every place (Todo rows, card corners, canvas cards, list and layer rows, Month chips, on the Calendar): the ghost follows the pointer every frame, with no system drag box. |
+| F81 | (Decision 63) **The same rules for every kind:** the step, the day (a habit and a daily event keep their days), the edges, the grab spot; Esc cancels; letting a task go elsewhere in the app takes it off the Calendar. |
+| F82 | (Decision 63) **Canvas cards onto the Calendar:** a task card is planned there; a habit card gets that time; a weekly event card gets that time on its days; a one-time event card moves to that date and time. The card glides back to its place. |
+| F83 | (Decision 63) **The ghost keeps its mark** (task, event, repeating event) while carried; a habit shows only its time line, across the whole week and under the habit boxes; the cursor stays "grabbing" the whole time. |
+| F84 | (Decision 63) **One sound for every move:** moving a task, an event or a habit plays the move sound. |
+| F85 | (Decision 63) **One overlay at a time:** opening a right-click menu closes an open info card and the other way round, anywhere in the app; one right-click with a card open opens the menu. |
+| F86 | (Decision 63) **The menu button in every view:** Day, Week, Month and Year have it in the same place; Month has Habits and the events list, Year the events list. |
+| F87 | (Decision 63) **Kind marks:** each Calendar block and canvas card shows its kind in its top-right corner (task, event, repeating event, habit); a missed task shows the red replan instead. |
+| F88 | (Decision 63) **On the line:** a block, an event and the ghost start exactly on their time line. |
+| F89 | (Decision 63) **Connections are only drawn:** a connection never moves, unschedules, groups or finishes another task. |
+| F90 | (Decision 63) **Nothing moves when connections stop placing tasks:** a task placed by a chain keeps that time as its own. |
+| F91 | (Decision 63) **"Add next" gives a time:** a task made after another starts where that one ends (the card and the CLI). |
+| F92 | (Decision 63) **Small connection dots:** smaller, shown on hover, as easy to drag from as before; no line from a hidden card. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin
@@ -235,4 +248,25 @@ Feature: One rule for adding (F52)
   Then the plan card shows Fri 18:00 above the field before I press Enter
   When I press Enter
   Then "Gym" is on Friday at 18:00
+
+Feature: One drag for everything (F80-F84)
+  Given "Write report" is a row in Todo
+  When I drag the row onto Wednesday at 10:00
+  Then a ghost with the task mark follows the pointer to 10:00, and no grey box shows
+  When I let go
+  Then "Write report" is on Wednesday at 10:00 and the move sound plays
+  When I drag the "Run" habit card from the canvas onto 18:00
+  Then "Run" is at 18:00 on its days, and the card glides back to its place
+
+Feature: One overlay at a time (F85)
+  Given a plan's info card is open
+  When I right-click another plan
+  Then the info card closes and that plan's menu opens
+
+Feature: Connections are only drawn (F89-F91)
+  Given "Draft" (09:00-10:00) is connected to "Review", which has no time of its own
+  When KRNL0 opens this board
+  Then "Review" is at 10:00 as its own time
+  When I move "Draft" to 14:00
+  Then "Review" stays at 10:00
 ```
