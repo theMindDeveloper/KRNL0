@@ -409,6 +409,8 @@ describe('MonthView — drops (ADR 0001 §9, Decision 63)', () => {
     const cells = (): HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>('[data-month-day]'));
     const at = (i: number) => ({ left: (i % 7) * 100, top: Math.floor(i / 7) * 80, width: 100, height: 80, right: (i % 7) * 100 + 100, bottom: Math.floor(i / 7) * 80 + 80, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
     const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      // The month (a drop surface) covers its days.
+      if (this.hasAttribute('data-cal-surface')) return { left: 0, top: 0, right: 700, bottom: 480, width: 700, height: 480, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
       const i = cells().indexOf(this);
       return i >= 0 ? at(i) : at(-1000);
     });

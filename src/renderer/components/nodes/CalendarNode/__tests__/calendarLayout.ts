@@ -17,6 +17,8 @@ export function mockCalendarLayout(opts: { outside?: () => Element | null } = {}
     const i = cols().indexOf(this);
     if (i >= 0) return rect(i * COL_PX, 0, COL_PX, 24 * HOUR_PX);
     if (this.hasAttribute('data-cal-anytime')) return rect(-1000, -1000, 0, 0);
+    // The Calendar (a drop surface) and its hours: the columns' area.
+    if (this.hasAttribute('data-cal-surface') || this.getAttribute('data-testid') === 'calendar-grid-body') return rect(0, 0, Math.max(1, cols().length) * COL_PX, 24 * HOUR_PX);
     // A plan block: tall enough that a grab is never on its resize edges.
     if (this.getAttribute('data-testid')?.startsWith('task-block-')) return rect(-10000, -10000, 20000, 20000);
     return rect(0, 0, 0, 0);
@@ -46,6 +48,32 @@ export async function carryIn(item: DragItem, to: { x: number; y: number }): Pro
   window.dispatchEvent(new MouseEvent('pointerup', { clientX: to.x, clientY: to.y }));
   // The browser's click that follows a release (the engine swallows it).
   window.dispatchEvent(new MouseEvent('click', { clientX: to.x, clientY: to.y }));
+  // The board changes after the landed frame is drawn (Decision 63).
+  await afterLanding();
+}
+
+/**
+ * Waits as the engine does after a release (a frame, then a task), and a
+ * little more: queued after the engine's own step, so it always runs after it.
+ */
+export async function afterLanding(): Promise<void> {
+  await new Promise<void>((r) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => setTimeout(r, 0)) : setTimeout(r, 0)));
+  await new Promise<void>((r) => setTimeout(r, 0));
+}
+
+/** A release, its click, and the frame after which the board changes. */
+export async function release(x: number, y: number): Promise<void> {
+  window.dispatchEvent(new MouseEvent('pointerup', { clientX: x, clientY: y }));
+  window.dispatchEvent(new MouseEvent('click', { clientX: x, clientY: y }));
+  await afterLanding();
+}
+
+/** A stand-in drop surface covering the page (for sources tested without a Calendar). */
+export function pageSurfaceEl(): HTMLElement {
+  const el = document.createElement('div');
+  el.getBoundingClientRect = () => ({ left: 0, top: 0, right: 5000, bottom: 5000, width: 5000, height: 5000, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+  document.body.appendChild(el);
+  return el;
 }
 
 /** A plan as the engine carries it. */

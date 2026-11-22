@@ -14,7 +14,7 @@ import { useBoardStore } from '../../../../store/boardStore';
 import { calendarGhost, setCalendarGhost } from '../DropGhost';
 import { withCarried, type TaskEntry } from '../../ClockNode/dayModel';
 import type { CalendarState, CalendarConfig } from '../types';
-import { mockCalendarLayout, nextFrame } from './calendarLayout';
+import { mockCalendarLayout, nextFrame, release } from './calendarLayout';
 
 const unscheduleTask = vi.fn(async (_id: string) => undefined);
 vi.mock('../../../../store/scheduleActions', async (orig) => ({
@@ -62,7 +62,7 @@ describe('carried out of the Calendar (Decision 61)', () => {
       fireEvent.pointerDown(document.querySelector('[data-testid="task-block-t-a"]')!, { button: 0, clientX: 350, clientY: 10.25 * 40 });
       window.dispatchEvent(new MouseEvent('pointermove', { clientX: 900, clientY: 300 }));
       await act(async () => { await nextFrame(); });
-      act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 900, clientY: 300 })); });
+      await act(async () => { await release(900, 300); });
       expect(unscheduleTask).toHaveBeenCalledWith('t-a');
     } finally { restore(); }
   });
@@ -75,7 +75,7 @@ describe('carried out of the Calendar (Decision 61)', () => {
       fireEvent.pointerDown(document.querySelector('[data-testid="task-block-t-a"]')!, { button: 0, clientX: 350, clientY: 10.25 * 40 });
       window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: 12.25 * 40 }));
       await act(async () => { await nextFrame(); });
-      act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 350, clientY: 12.25 * 40 })); });
+      await act(async () => { await release(350, 12.25 * 40); });
       expect(unscheduleTask).not.toHaveBeenCalled();
     } finally { restore(); }
   });

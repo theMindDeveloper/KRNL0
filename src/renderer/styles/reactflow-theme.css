@@ -436,6 +436,9 @@ body.krnl-cal-dragging, body.krnl-cal-dragging * { cursor: grabbing !important; 
 .cal-drop-ghost-times { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 @keyframes cal-drop-in { from { opacity: 0; } to { opacity: 1; } }
 .cal-block.is-carried, .cal-event.is-carried { opacity: 0.35; }
+/* Decision 63 — let go: the original's place empties in the same frame (the
+   ghost already stands where it landed). */
+.is-landing .cal-block.is-carried, .is-landing .cal-event.is-carried { opacity: 0 !important; transition: none !important; }
 /* The package at the pointer (DropGhost.tsx): a small parcel in the plan's
    colour. It packs as it is carried onto the Calendar (pops in, the lid comes
    down) and unpacks where it is let go (the lid lifts off, it gives way). */

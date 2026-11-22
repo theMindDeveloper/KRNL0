@@ -298,12 +298,17 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [hotDay, setHotDay] = useState<string | null>(null);
   const monthImpl = useRef<CalendarSurface | null>(null);
+  // The days' boxes, measured once per drag (no layout read per move).
+  const cellBoxes = useRef<Array<{ l: number; t: number; r: number; b: number; day: string }> | null>(null);
+  const readCells = () => Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-month-day]') ?? []).map((cell) => {
+    const r = cell.getBoundingClientRect();
+    return { l: r.left, t: r.top, r: r.right, b: r.bottom, day: cell.dataset['monthDay']! };
+  });
   monthImpl.current = {
     el: rootRef.current,
     slotAt: (x, y) => {
-      for (const cell of Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-month-day]') ?? [])) {
-        const r = cell.getBoundingClientRect();
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return { monthDay: cell.dataset['monthDay']! };
+      for (const c of cellBoxes.current ?? readCells()) {
+        if (x >= c.l && x <= c.r && y >= c.t && y <= c.b) return { monthDay: c.day };
       }
       return null;
     },
@@ -322,6 +327,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
     gran: () => 15,
     hover: (slot) => monthImpl.current?.hover?.(slot),
     commit: (item, result, origin, mode) => monthImpl.current?.commit(item, result, origin, mode) ?? null,
+    measure: () => { cellBoxes.current = readCells(); },
+    release: () => { cellBoxes.current = null; },
   }), []);
   useEffect(() => registerCalendarSurface(monthSurface), [monthSurface]);
 
@@ -341,6 +348,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
   return (
     <div
       ref={rootRef}
+      data-cal-surface="month"
       style={{
         display: 'flex',
         flexDirection: 'column',

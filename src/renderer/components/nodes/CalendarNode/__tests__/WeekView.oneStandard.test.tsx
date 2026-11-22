@@ -13,7 +13,7 @@ import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import { calendarGhost, setCalendarGhost } from '../DropGhost';
-import { carryIn, mockCalendarLayout, nextFrame, planItem } from './calendarLayout';
+import { carryIn, mockCalendarLayout, nextFrame, planItem, release } from './calendarLayout';
 import type { CalendarState, CalendarConfig } from '../types';
 
 const state: CalendarState = { selectedDate: null, anchorDate: '2026-05-11', zoom: 1 };
@@ -132,18 +132,18 @@ describe('one ghost, no browser picture (Decision 61)', () => {
 });
 
 describe('a plan keeps the spot it was grabbed by (Decision 61, like an event)', () => {
-  it('grabbed 10 minutes into it, let go at 10:55: it moves by whole steps from where it was (11:00), not to the pointer (10:00)', async () => {
+  it('grabbed 10 minutes into it, let go at 10:55: it keeps the spot it was grabbed by (10:45), in 15-minute steps like the old event drag', async () => {
     seed([task('t-plan', 'Read chapter', '2026-05-14T15:00', 60)]);
     const onCommand = vi.fn();
     render(<WeekView state={state} config={config} onCommand={onCommand} />);
     const restore = mockCalendarLayout();
     try {
-      // At this zoom the step is one hour.
+      // A 15-minute step (Decision 63: like the old repeating-event drag), whatever the zoom.
       fireEvent.pointerDown(document.querySelector('[data-testid="task-block-t-plan"]')!, { button: 0, clientX: 350, clientY: (15 + 10 / 60) * 40 });
       window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: (10 + 55 / 60) * 40 }));
       await act(async () => { await nextFrame(); });
-      act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 350, clientY: (10 + 55 / 60) * 40 })); });
-      expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't-plan', scheduledFor: '2026-05-14T11:00', scheduledDurationMin: 60 });
+      await act(async () => { await release(350, (10 + 55 / 60) * 40); });
+      expect(onCommand).toHaveBeenCalledWith('calendar.schedule', { taskId: 't-plan', scheduledFor: '2026-05-14T10:45', scheduledDurationMin: 60 });
     } finally { restore(); }
   });
 

@@ -17,7 +17,7 @@ import { useBoardStore } from '../../../../store/boardStore';
 import { setCalendarGhost } from '../DropGhost';
 import { registerCalendarSurface, type CalendarSurface } from '../calendarDrag';
 import { canvasDragItem } from '../../../Canvas/calendarCarry';
-import { carryIn, mockCalendarLayout } from './calendarLayout';
+import { carryIn, mockCalendarLayout, pageSurfaceEl, release } from './calendarLayout';
 import type { CalendarState, CalendarConfig } from '../types';
 import type { Node } from '../../../../../shared/types/node';
 
@@ -100,7 +100,7 @@ describe('what a carried card lands as on the week', () => {
 describe('a Todo row starts the one drag', () => {
   const surface = () => {
     const commit = vi.fn<Parameters<CalendarSurface['commit']>, ReturnType<CalendarSurface['commit']>>(() => null);
-    const off = registerCalendarSurface({ el: document.body, slotAt: () => ({ day: '2026-05-12', min: 600 }), gran: () => 15, commit });
+    const off = registerCalendarSurface({ el: pageSurfaceEl(), slotAt: () => ({ day: '2026-05-12', min: 600 }), gran: () => 15, commit });
     const d = document as unknown as { elementsFromPoint?: ((x: number, y: number) => Element[]) | undefined };
     const before = d.elementsFromPoint;
     d.elementsFromPoint = () => [document.body];
@@ -121,7 +121,7 @@ describe('a Todo row starts the one drag', () => {
     fireEvent.pointerDown(el, { button: 0, clientX: 10, clientY: 10 });
     window.dispatchEvent(new MouseEvent('pointermove', { clientX: 200, clientY: 200 }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-    act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 200, clientY: 200 })); });
+    await act(async () => { await release(200, 200); });
   };
 
   it('from the row: carried as a plan of that row (no browser drag)', async () => {

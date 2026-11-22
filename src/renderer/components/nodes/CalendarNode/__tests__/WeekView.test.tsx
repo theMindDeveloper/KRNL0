@@ -21,7 +21,7 @@ import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import type { CalendarState, CalendarConfig } from '../types';
 import { beginCalendarDrag } from '../calendarDrag';
-import { carryIn, mockCalendarLayout, planItem } from './calendarLayout';
+import { carryIn, mockCalendarLayout, planItem, release } from './calendarLayout';
 
 afterEach(() => {
   cleanup();
@@ -463,11 +463,7 @@ describe('WeekView — a habit from the Habit window: letting go opens the swap 
     // Let go on Wednesday 09:00.
     window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 9 * 40 + 5 }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-    act(() => {
-      window.dispatchEvent(new MouseEvent('pointerup', { clientX: 250, clientY: 9 * 40 + 5 }));
-      // The browser's click that follows a release (the engine swallows it).
-      window.dispatchEvent(new MouseEvent('click', { clientX: 250, clientY: 9 * 40 + 5 }));
-    });
+    await act(async () => { await release(250, 9 * 40 + 5); });
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
     act(() => { pickSwapOption('daily'); });
     act(() => { confirmSwapModal(30); });
@@ -498,11 +494,7 @@ describe('WeekView — a habit from the Habit window: letting go opens the swap 
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 14 * 40 + 5 }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-    act(() => {
-      window.dispatchEvent(new MouseEvent('pointerup', { clientX: 250, clientY: 14 * 40 + 5 }));
-      // The browser's click that follows a release (the engine swallows it).
-      window.dispatchEvent(new MouseEvent('click', { clientX: 250, clientY: 14 * 40 + 5 }));
-    });
+    await act(async () => { await release(250, 14 * 40 + 5); });
     act(() => { pickSwapOption('weekly'); });
     act(() => { confirmSwapModal(15); });
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {

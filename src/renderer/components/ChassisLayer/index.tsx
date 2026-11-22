@@ -6,6 +6,7 @@
  * render nothing — otherwise we'd get duplicate dock chrome.
  */
 
+import { memo } from 'react';
 import { useBoardStore } from '../../store/boardStore';
 import { useDockStyle } from './useDockStyle';
 import { CanvasChassis } from './CanvasChassis';
@@ -25,10 +26,14 @@ function ChassisLayerInner({ dockStyleProp }: { dockStyleProp?: DockStyle }) {
   return <CanvasChassis dockStyle={dockStyle} />;
 }
 
-export function ChassisLayer({ dockStyle }: Props = {}) {
+function ChassisLayerImpl({ dockStyle }: Props = {}) {
   return dockStyle !== undefined
     ? <ChassisLayerInner dockStyleProp={dockStyle} />
     : <ChassisLayerInner />;
 }
 
 export { useDockStyle } from './useDockStyle';
+
+// Decision 63 (performance) — the canvas re-renders on every pointer move of a
+// drag; this part does not need to (its props do not change).
+export const ChassisLayer = memo(ChassisLayerImpl);

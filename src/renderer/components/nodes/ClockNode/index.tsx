@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useState, useEffect, useMemo, useRef, useSyncExternalStore, useDeferredValue } from 'react';
 import { calendarGhost, subscribeCalendarGhost } from '../CalendarNode/DropGhost';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { createPortal } from 'react-dom';
@@ -302,7 +302,9 @@ export function ClockNode({
   );
   // Decision 61 — what is being moved on the Calendar moves here too, live
   // (the ghost changes only when the slot does: a few redraws, never per move).
-  const carried = useSyncExternalStore(subscribeCalendarGhost, calendarGhost, calendarGhost);
+  // Decision 63 (performance) — the Clock follows what is carried, but at low
+  // priority: the drag's own frames are never held up by redrawing the Clock.
+  const carried = useDeferredValue(useSyncExternalStore(subscribeCalendarGhost, calendarGhost, calendarGhost));
   const tasks: TaskEntry[] = useMemo(() => withCarried(planned, carried, selectedDate, viewWindow), [planned, carried, selectedDate, viewWindow]);
 
   // Issue #166 — tracked REALITY segments for the selected day, clipped to the

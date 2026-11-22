@@ -34,6 +34,8 @@ export interface GhostSpec {
   edge?: 'top' | 'bottom';
   /** Only the time line (the thing moves itself, e.g. a habit's boxes). */
   ruleOnly?: boolean;
+  /** An edge pulled: the block stretches itself; only the time line shows. */
+  boxless?: boolean;
   /** The kind mark the block draws at its top right (kept while carried). */
   mark?: 'list' | 'repeat' | 'event';
   /** Decision 61 — what is carried, so the Clock can show it moving too: a task's id, or a repeating/one-time event's habit id. */
@@ -101,14 +103,30 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
   useEffect(() => {
     let raf = 0;
     let shown = false;
+    // Decision 63 (performance) — the day columns' places, read once per
+    // carry (reading them at every step forced a layout each time).
+    const cols = new Map<string, { x: number; w: number; h: number } | null>();
+    let parentW = -1;
+    const colOf = (el: HTMLElement, day: string) => {
+      if (!cols.has(day)) {
+        const c = el.parentElement?.querySelector<HTMLElement>(`[data-cal-day="${day}"]`);
+        cols.set(day, c ? { x: c.offsetLeft, w: c.offsetWidth, h: c.offsetHeight } : null);
+      }
+      return cols.get(day) ?? null;
+    };
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { cols.clear(); parentW = -1; }) : null;
+    let observed = false;
     const apply = () => {
       raf = 0;
       const el = ref.current;
       const rule = ruleRef.current;
       if (!el) return;
+      if (ro && el.parentElement && !observed) { ro.observe(el.parentElement); observed = true; }
       const g = ghost;
-      const col = g ? el.parentElement?.querySelector<HTMLElement>(`[data-cal-day="${g.day}"]`) : null;
+      const col = g ? colOf(el, g.day) : null;
       if (!g || !col) {
+        cols.clear();
+        parentW = -1;
         if (shown) {
           // Hidden and out of the way: a hidden box far down still made the hours scroll.
           for (const x of [el, rule]) {
@@ -127,10 +145,10 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       }
       const { rowHeight: jsRh, rowCount: rows, planLeft: pl } = geo.current;
       // One hour as the browser drew it (the columns follow the window by CSS).
-      const rh = col.offsetHeight > 0 && rows > 0 ? col.offsetHeight / rows : jsRh;
+      const rh = col.h > 0 && rows > 0 ? col.h / rows : jsRh;
       const lead = Math.max(0, pl(g.day));
-      const x = col.offsetLeft + lead + 2;
-      const w = Math.max(12, col.offsetWidth - lead - 4);
+      const x = col.x + lead + 2;
+      const w = Math.max(12, col.w - lead - 4);
       // On its start line, like the block it stands for (the gap is at the bottom).
       const y = (g.startMin / 60) * rh;
       const h = Math.max(18, ((Math.min(1440, g.endMin) - g.startMin) / 60) * rh - 3);
@@ -140,7 +158,7 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       el.style.height = `${h}px`;
       el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       el.style.setProperty('--ghost-tone', g.tone);
-      if (shown) el.style.visibility = g.ruleOnly ? 'hidden' : 'visible';
+      if (shown) el.style.visibility = g.ruleOnly || g.boxless ? 'hidden' : 'visible';
       el.setAttribute('data-testid', g.testId);
       el.setAttribute('data-day', g.day);
       el.setAttribute('data-start-min', String(g.startMin));
@@ -164,7 +182,8 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
         // A habit moves on every day it is on: its line crosses the whole
         // week, under the habit boxes (they ride on it).
         const parent = el.parentElement;
-        rule.style.width = g.ruleOnly && parent ? `${parent.clientWidth + RULE_LEFT}px` : `${x + w + RULE_LEFT}px`;
+        if (g.ruleOnly && parent && parentW < 0) parentW = parent.clientWidth;
+        rule.style.width = g.ruleOnly && parent ? `${parentW + RULE_LEFT}px` : `${x + w + RULE_LEFT}px`;
         rule.style.zIndex = g.ruleOnly ? '2' : '9';
         rule.style.transform = `translate3d(${-RULE_LEFT}px, ${ly}px, 0)`;
         rule.style.setProperty('--ghost-tone', g.tone);
@@ -173,7 +192,7 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       if (!shown) {
         void el.offsetWidth;
         el.style.transition = '';
-        el.style.visibility = g.ruleOnly ? 'hidden' : 'visible';
+        el.style.visibility = g.ruleOnly || g.boxless ? 'hidden' : 'visible';
         el.classList.add('is-shown');
         if (rule) { rule.style.transition = ''; rule.style.visibility = 'visible'; rule.classList.add('is-shown'); }
         shown = true;
@@ -186,9 +205,10 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
     return () => {
       ghostSubs.delete(onChange);
       if (raf) cancelFrame(raf);
+      ro?.disconnect();
     };
   }, []);
-  // A zoom while carrying: the ghost keeps its minutes.
+  // A zoom while carrying: the ghost keeps its minutes (measured again).
   useEffect(() => { applyRef.current(); }, [rowHeight]);
 
   return (

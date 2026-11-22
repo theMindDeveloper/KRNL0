@@ -7,7 +7,7 @@
 import { pickerOpen } from '../../ui/Popover';
 import { passRightClick, useOneOverlay } from '../../ui/oneOverlay';
 import { KindIcon, KIND_LABEL } from '../../ui/kindIcons';
-import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragMode } from './calendarDrag';
+import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragItem, type DragMode, type DragOrigin, type Target } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
 import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost } from './DropGhost';
 import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
@@ -618,15 +618,81 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   // The habit boxes that glide while a habit is carried (DOM only).
   const glide = useRef<{ id: string; els: HTMLElement[] } | null>(null);
   const surfaceImpl = useRef<CalendarSurface | null>(null);
+  // Decision 63 — an edge pulled: the block itself follows (DOM only, no
+  // redraw), so its text keeps its form, during the pull and after it.
+  const stretch = useRef<{ key: string; els: Array<{ el: HTMLElement; top: string; height: string; setTop: string; setH: string }> } | null>(null);
+  const stretchBlock = (item: DragItem, target: Target | null, origin: DragOrigin | null, mode?: DragMode) => {
+    const cur = stretch.current;
+    if (!target || !mode || mode === 'move') {
+      // Cancelled (origin given): back as it was, unless the Calendar has
+      // drawn it since. Landed (no origin): the Calendar draws it now.
+      if (cur && origin) for (const s of cur.els) {
+        if (s.el.style.top === s.setTop) s.el.style.top = s.top;
+        if (s.el.style.height === s.setH) s.el.style.height = s.height;
+      }
+      stretch.current = null;
+      return;
+    }
+    if (!origin) return;
+    const key = `${item.id}@${origin.day}`;
+    let els = cur && cur.key === key ? cur.els : null;
+    if (!els) {
+      const col = rootRef.current?.querySelector(`[data-cal-day="${origin.day}"]`);
+      const sel = item.kind === 'task' ? `[data-testid="task-block-${item.id}"]` : `[data-testid="calendar-routine-${item.id}"]`;
+      els = Array.from(col?.querySelectorAll<HTMLElement>(sel) ?? []).map((el) => ({ el, top: el.style.top, height: el.style.height, setTop: '', setH: '' }));
+      stretch.current = { key, els };
+    }
+    // The Calendar's own sizes (the same as the block gets when it lands: no jump).
+    const css = (v: number | string) => (typeof v === 'number' ? `${v}px` : v);
+    const top = css(rh(target.startMin / 60));
+    const h = css(rhMax(item.kind === 'task' ? MIN_BLOCK_PX : 5, (target.endMin - target.startMin) / 60, -BLOCK_GAP));
+    for (const s of els) {
+      s.el.style.top = top;
+      s.el.style.height = h;
+      s.setTop = s.el.style.top;
+      s.setH = s.el.style.height;
+    }
+  };
+  // Decision 63 (performance) — where the slots are, measured once per drag
+  // (the engine calls measure / release): moving the pointer reads no layout.
+  type Box = { l: number; t: number; r: number; b: number };
+  const geom = useRef<{
+    agenda: Array<{ box: Box; day: string; min: number }>;
+    any: Array<{ box: Box; day: string }>;
+    cols: Array<{ box: Box; day: string }>;
+    clip: Box | null;
+    hourPx: number;
+    /** One hour in the Calendar's own pixels (the canvas zoom taken out). */
+    hourCss: number;
+  } | null>(null);
+  const readGeom = () => {
+    const root = rootRef.current;
+    const boxOf = (el: Element): Box => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+    if (!root) return { agenda: [], any: [], cols: [], clip: null, hourPx: 0, hourCss: 0 };
+    const cols = Array.from(root.querySelectorAll<HTMLElement>('[data-cal-day]')).map((el) => ({ box: boxOf(el), day: el.dataset['calDay']! }));
+    const first = cols[0];
+    return {
+      agenda: Array.from(root.querySelectorAll<HTMLElement>('[data-agenda-min]')).map((el) => ({ box: boxOf(el), day: el.dataset['agendaDay']!, min: Number(el.dataset['agendaMin']) })),
+      any: Array.from(root.querySelectorAll<HTMLElement>('[data-cal-anytime]')).map((el) => ({ box: boxOf(el), day: el.dataset['calAnytime']! })),
+      cols,
+      // The hours scroll: only their visible part takes a drop.
+      clip: gridBodyRef.current ? boxOf(gridBodyRef.current) : null,
+      // One hour as the browser drew it (CSS-sized hours, any canvas zoom).
+      hourPx: first ? (first.box.b - first.box.t) / rowCount : 0,
+      hourCss: first ? (first.box.b - first.box.t) / rowCount / screenScale(root) : 0,
+    };
+  };
   // Stable, registered once; it reads this render's functions through the ref.
   const surface = useMemo<CalendarSurface>(() => ({
     get el() { return rootRef.current; },
     slotAt: (x, y) => surfaceImpl.current?.slotAt(x, y) ?? null,
     gran: () => surfaceImpl.current?.gran() ?? 15,
     commit: (item, result, origin, mode) => surfaceImpl.current?.commit(item, result, origin, mode) ?? null,
-    setCarried: (id) => surfaceImpl.current?.setCarried?.(id),
-    preview: (item, target, origin) => surfaceImpl.current?.preview?.(item, target, origin),
+    setCarried: (id, mode) => surfaceImpl.current?.setCarried?.(id, mode),
+    preview: (item, target, origin, mode) => surfaceImpl.current?.preview?.(item, target, origin, mode),
     hover: (slot) => surfaceImpl.current?.hover?.(slot),
+    measure: () => { geom.current = readGeom(); },
+    release: () => { geom.current = null; },
   }), []);
   useEffect(() => registerCalendarSurface(surface), [surface]);
   useEffect(() => {
@@ -1074,35 +1140,28 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   surfaceImpl.current = {
     el: rootRef.current,
     slotAt: (x, y) => {
-      const root = rootRef.current;
-      if (!root) return null;
+      const g = geom.current ?? readGeom();
+      const inBox = (b: Box) => x >= b.l && x <= b.r && y >= b.t && y <= b.b;
       // The list (agenda): it goes after the row under the pointer.
       let after: { day: string; min: number } | null = null;
-      for (const row of Array.from(root.querySelectorAll<HTMLElement>('[data-agenda-min]'))) {
-        const r = row.getBoundingClientRect();
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) after = { day: row.dataset['agendaDay']!, min: Number(row.dataset['agendaMin']) };
-      }
+      for (const row of g.agenda) if (inBox(row.box)) after = { day: row.day, min: row.min };
       if (after) return after;
-      for (const cell of Array.from(root.querySelectorAll<HTMLElement>('[data-cal-anytime]'))) {
-        const r = cell.getBoundingClientRect();
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return { anyTime: cell.dataset['calAnytime']! };
-      }
-      for (const col of Array.from(root.querySelectorAll<HTMLElement>('[data-cal-day]'))) {
-        const r = col.getBoundingClientRect();
-        if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
-        // One hour as the browser drew it (CSS-sized hours, any canvas zoom).
-        const hourPx = r.height / rowCount;
-        if (!(hourPx > 0)) return null;
-        return { day: col.dataset['calDay']!, min: Math.max(0, Math.min(1439, ((y - r.top) / hourPx) * 60 + hourRange.start * 60)) };
+      for (const cell of g.any) if (inBox(cell.box)) return { anyTime: cell.day };
+      if (g.clip && !inBox(g.clip)) return null;
+      for (const col of g.cols) {
+        if (!inBox(col.box)) continue;
+        if (!(g.hourPx > 0)) return null;
+        return { day: col.day, min: Math.max(0, Math.min(1439, ((y - col.box.t) / g.hourPx) * 60 + hourRange.start * 60)) };
       }
       return null;
     },
     // The list has no hour grid: a plan goes right after the row it is let go on.
     gran: () => (useAgenda ? 5 : gran),
     hover: (slot) => setAnyHot(slot && 'anyTime' in slot ? slot.anyTime : null),
-    setCarried: (id) => { setCarriedId(id); if (id) setTaskPopup(null); },
-    preview: (item, target, origin) => {
-      if (item.kind !== 'habit') return;
+    // An edge pulled: the block is not stepped back (it stretches itself).
+    setCarried: (id, mode) => { setCarriedId(mode && mode !== 'move' ? null : id); if (id) setTaskPopup(null); },
+    preview: (item, target, origin, mode) => {
+      if (item.kind !== 'habit') { stretchBlock(item, target, origin, mode); return; }
       const g = glide.current;
       if (!target || !origin) {
         if (g) { for (const el of g.els) { el.style.transition = 'none'; el.style.transform = ''; el.classList.remove('is-moving'); } requestAnimationFrame(() => { for (const el of g.els) el.style.transition = ''; }); }
@@ -1111,8 +1170,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       }
       const els = g && g.id === item.id ? g.els : Array.from(rootRef.current?.querySelectorAll<HTMLElement>(`[data-habit-id="${item.id}"]`) ?? []);
       glide.current = { id: item.id, els };
-      const col = rootRef.current?.querySelector<HTMLElement>('[data-cal-day]');
-      const hourPx = col && col.offsetHeight > 0 ? col.offsetHeight / rowCount : rowHeight;
+      const hourPx = geom.current && geom.current.hourCss > 0 ? geom.current.hourCss : rowHeight;
       const dy = ((target.startMin - origin.startMin) / 60) * hourPx;
       for (const el of els) { el.classList.add('is-moving'); el.style.transform = dy ? `translateY(${dy}px)` : ''; }
     },
@@ -2394,13 +2452,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
           data-date={occ.date}
           data-lane={`${lane}/${lanes}`}
           data-skipped={occ.skipped ? 'true' : undefined}
-          className={`cal-event${rtHover === `${h.id}@${dayYMD}` && carriedId === null ? ' is-hot' : ''}`}
+          className={`cal-event${rtHover === `${h.id}@${dayYMD}` && carriedId === null ? ' is-hot' : ''}${carriedId === h.id ? ' is-carried' : ''}`}
           aria-label={`${h.name}, repeating event, ${time}${occ.skipped ? ', skipped this time' : ''}`}
           title={`${h.name} · ${time} · repeating event${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
           style={{
             position: 'absolute', left: `calc(${railPx}px + (100% - ${railPx}px) * ${lane / lanes} + 2px)`, width: `calc((100% - ${railPx}px) / ${lanes} - 4px)`, top: rh(occ.startMin / 60), height: rhMax(5, (occ.endMin - occ.startMin) / 60, -BLOCK_GAP),
             zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 6, overflow: 'hidden',
-            opacity: carriedId === h.id ? 0.35 : 1,
             ...(occ.skipped
               ? { border: `1px dashed color-mix(in srgb, ${col} 55%, transparent)`, background: 'transparent' }
               : { border: `1px solid color-mix(in srgb, ${col} 30%, transparent)`, background: `color-mix(in srgb, ${col} 13%, var(--paper))` }),
@@ -2702,6 +2759,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   return (
     <div
       ref={rootRef}
+      data-cal-surface="week"
       style={{
         display: 'flex',
         flexDirection: 'column',

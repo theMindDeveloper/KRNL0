@@ -59,12 +59,23 @@ export interface CalendarSurface {
   gran(): number;
   /** Lands it; returns "has the board got it?" to hold the ghost until then, or null. */
   commit(item: DragItem, result: DropResult, origin: DragOrigin | null, mode: DragMode): (() => boolean) | null;
-  /** The original steps back while carried (null: back to normal). */
-  setCarried?(id: string | null): void;
-  /** Things that move themselves (a habit's boxes): show them at `target`, or back (null). */
-  preview?(item: DragItem, target: Target | null, origin: DragOrigin | null): void;
+  /** The original steps back while carried (null: back to normal). Not for an edge pulled. */
+  setCarried?(id: string | null, mode?: DragMode): void;
+  /**
+   * Things that move themselves: a habit's boxes, and a block whose edge is
+   * pulled (it stretches itself, its text as it is). At `target`, or back (null).
+   */
+  preview?(item: DragItem, target: Target | null, origin: DragOrigin | null, mode?: DragMode): void;
   /** The slot under the pointer while carried (a day's strip or a month cell lights up), or none. */
   hover?(slot: Slot | null): void;
+  /**
+   * Takes the measurements `slotAt` needs, once per drag (and again after a
+   * scroll, a wheel or a resize), so nothing reads the page's layout while
+   * the pointer moves.
+   */
+  measure?(): void;
+  /** The drag is over: drop those measurements. */
+  release?(): void;
 }
 
 // ── The target rule (pure, tested) ───────────────────────────────────────────
@@ -120,6 +131,8 @@ export function ghostFor(item: DragItem, t: Target, mode: DragMode): GhostSpec {
     edge: mode === 'bottom' ? 'bottom' : 'top',
     ...(item.kind === 'task' ? { mark: 'list' as const } : item.kind === 'event' ? { mark: item.repeat === 'once' ? 'event' as const : 'repeat' as const } : {}),
     ...(item.kind === 'habit' ? { ruleOnly: true } : {}),
+    // An edge pulled: the block itself stretches; only the time line shows.
+    ...(mode !== 'move' ? { boxless: true } : {}),
     ...(item.itemOnly || item.kind === 'habit' ? {} : { refId: item.id, refKind: item.kind === 'event' ? 'event' as const : 'task' as const }),
   };
 }
@@ -155,17 +168,62 @@ interface Active {
 }
 
 let active: Active | null = null;
-let holding: { check: () => boolean; clear: () => void; timer: number } | null = null;
+let holding: { check: () => boolean; clear: (landed: boolean) => void; timer: number } | null = null;
 
 export function isCalendarDragging(): boolean {
   return !!active?.started;
 }
 
+// ── Where the Calendars are (measured once per drag) ─────────────────────────
+// Hit-testing the page on every pointer event (elementsFromPoint) forced a
+// layout each time and was the main cost of a drag. The Calendars do not move
+// while something is carried, so their boxes (and their slots) are measured
+// when it starts, and again only after a scroll, a wheel or a resize.
+
+let boxes: Map<CalendarSurface, DOMRect> | null = null;
+let geomDirty = false;
+const onGeomChange = () => { geomDirty = true; };
+
+function measureAll(): void {
+  boxes = new Map();
+  for (const s of surfaces) {
+    if (!s.el || !s.el.isConnected) continue;
+    s.measure?.();
+    boxes.set(s, s.el.getBoundingClientRect());
+  }
+  geomDirty = false;
+}
+
+function watchGeometry(on: boolean): void {
+  if (typeof window === 'undefined') return;
+  const f = on ? window.addEventListener.bind(window) : window.removeEventListener.bind(window);
+  f('scroll', onGeomChange, true);
+  f('wheel', onGeomChange, true);
+  f('resize', onGeomChange, true);
+}
+
+function releaseGeometry(): void {
+  watchGeometry(false);
+  if (boxes) for (const s of boxes.keys()) s.release?.();
+  boxes = null;
+}
+
 function surfaceAt(x: number, y: number): CalendarSurface | null {
-  if (typeof document === 'undefined') return null;
-  const els = typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(x, y) : [];
-  for (const el of els) for (const s of surfaces) if (s.el && s.el.contains(el)) return s;
-  return null;
+  if (!boxes || geomDirty) measureAll();
+  let best: CalendarSurface | null = null;
+  let area = Infinity;
+  for (const [s, r] of boxes!) {
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    const a = r.width * r.height;
+    if (a < area) { best = s; area = a; }
+  }
+  return best;
+}
+
+/** After this frame is drawn (what the user sees first), then `fn`. */
+function afterPaint(fn: () => void): void {
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { setTimeout(fn, 0); });
+  else setTimeout(fn, 0);
 }
 
 function targetAt(a: Active, s: CalendarSurface, slot: { day: string; min: number }): Target {
@@ -176,7 +234,10 @@ function targetAt(a: Active, s: CalendarSurface, slot: { day: string; min: numbe
     startMin: fromHome ? a.startMin : null,
     now: slot,
     lenMin: a.item.lenMin,
-    gran: s.gran(),
+    // The owner's pick, the old repeating-event drag: a 15-minute step
+    // whatever the zoom (finer when zoomed in), so it moves with the pointer
+    // instead of jumping an hour at a time.
+    gran: Math.min(15, s.gran()),
     dayChange: canChangeDay(a.item),
   });
 }
@@ -195,7 +256,7 @@ function paint(): void {
   if (s && slot && 'min' in slot) {
     const t = targetAt(a, s, slot);
     setCalendarGhost(ghostFor(a.item, t, a.mode));
-    s.preview?.(a.item, t, s === a.home ? a.origin : null);
+    s.preview?.(a.item, t, s === a.home ? a.origin : null, a.mode);
     moveCarry(a.x, a.y, true);
   } else {
     if (ours()) setCalendarGhost(null);
@@ -212,13 +273,16 @@ function schedulePaint(): void {
 function begin(a: Active): void {
   a.started = true;
   if (typeof document !== 'undefined') document.body.classList.add('krnl-cal-dragging');
-  a.home?.setCarried?.(a.item.id);
+  measureAll();
+  watchGeometry(true);
+  a.home?.setCarried?.(a.item.id, a.mode);
   startCarry(a.item.tone, a.show);
   a.onStart?.();
 }
 
 function finishVisuals(a: Active, keep: boolean): void {
   if (typeof document !== 'undefined') document.body.classList.remove('krnl-cal-dragging');
+  releaseGeometry();
   if (a.raf) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(a.raf); a.raf = 0; }
   a.over?.hover?.(null);
   a.onEnd?.();
@@ -228,12 +292,13 @@ function finishVisuals(a: Active, keep: boolean): void {
   a.home?.setCarried?.(null);
 }
 
-function releaseHold(): void {
+/** `landed`: the board has it where it was let go (else it is given up after a while). */
+function releaseHold(landed = false): void {
   const h = holding;
   if (!h) return;
   holding = null;
   clearTimeout(h.timer);
-  h.clear();
+  h.clear(landed);
 }
 
 /**
@@ -242,7 +307,7 @@ function releaseHold(): void {
  * has it there, then hands over in the same frame (no flash back, no jump).
  */
 export function checkCalendarDragLanded(): void {
-  if (holding && holding.check()) releaseHold();
+  if (holding && holding.check()) releaseHold(true);
 }
 
 /**
@@ -281,18 +346,34 @@ function drop(a: Active, x: number, y: number): boolean {
       // The ghost shows exactly where it lands while the board catches up.
       setCalendarGhost(ghostFor(a.item, t, a.mode));
     } else result = slot;
-    const landed = s.commit(a.item, result, s === a.home ? a.origin : null, a.mode);
     endCarry({ unpack: !a.origin });
-    if (landed) {
-      finishVisuals(a, true);
-      releaseHold();
-      const clear = () => {
-        if (ours()) setCalendarGhost(null);
-        s.preview?.(a.item, null, a.origin);
-        a.home?.setCarried?.(null);
-      };
-      holding = { check: landed, clear, timer: window.setTimeout(releaseHold, 1500) };
-    } else finishVisuals(a, false);
+    finishVisuals(a, true);
+    releaseHold();
+    // It has landed for the eye at once: the original's place empties now
+    // (no copy left behind), and the board (which redraws every window) is
+    // changed after this frame is on screen, not before it.
+    const home = a.home;
+    home?.el?.classList.add('is-landing');
+    const origin = s === home ? a.origin : null;
+    // Landed: what moved itself (a habit's boxes, a stretched block) is now
+    // drawn by the Calendar at its new place (origin null: nothing to put back).
+    const clear = (landed: boolean) => {
+      if (ours()) setCalendarGhost(null);
+      s.preview?.(a.item, null, landed ? null : a.origin);
+      home?.setCarried?.(null);
+      home?.el?.classList.remove('is-landing');
+    };
+    const token = { check: () => false, clear, timer: 0 };
+    holding = token;
+    afterPaint(() => {
+      const landed = s.commit(a.item, result, origin, a.mode);
+      if (holding !== token) return; // a newer drop owns the screen (this one is saved)
+      if (!landed) { holding = null; clear(true); return; }
+      // The surface checks after it has redrawn (a layout effect), so the
+      // ghost hands over to the real block in the same frame.
+      token.check = landed;
+      token.timer = window.setTimeout(() => releaseHold(false), 1500);
+    });
     return true;
   }
   finishVisuals(a, false);
@@ -405,6 +486,7 @@ export function externalDragMove(item: DragItem, x: number, y: number): boolean 
   active.x = x;
   active.y = y;
   schedulePaint();
+  // Measured boxes only (no layout read per move).
   const s = surfaceAt(x, y);
   return !!(s && s.slotAt(x, y));
 }

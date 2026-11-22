@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, act } from '@testing-library/react';
 import { registerCalendarSurface, type CalendarSurface } from '../../../src/renderer/components/nodes/CalendarNode/calendarDrag';
+import { pageSurfaceEl, release } from '../../../src/renderer/components/nodes/CalendarNode/__tests__/calendarLayout';
 import React from 'react';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
 import { makeCommandHandler } from '../../../src/renderer/components/Canvas/commandDispatch';
@@ -79,7 +80,7 @@ describe('Calendar drop — canvas task grip', () => {
     expect(grip.getAttribute('draggable')).toBeNull();
     // A Calendar covering the page, at 09:00 on 20 May.
     const commit = vi.fn<Parameters<CalendarSurface['commit']>, ReturnType<CalendarSurface['commit']>>(() => null);
-    const off = registerCalendarSurface({ el: document.body, slotAt: () => ({ day: '2026-05-20', min: 540 }), gran: () => 15, commit });
+    const off = registerCalendarSurface({ el: pageSurfaceEl(), slotAt: () => ({ day: '2026-05-20', min: 540 }), gran: () => 15, commit });
     const d = document as unknown as { elementsFromPoint?: ((x: number, y: number) => Element[]) | undefined };
     const before = d.elementsFromPoint;
     d.elementsFromPoint = () => [document.body];
@@ -88,7 +89,7 @@ describe('Calendar drop — canvas task grip', () => {
       window.dispatchEvent(new MouseEvent('pointermove', { clientX: 200, clientY: 200 }));
       await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
       expect(document.body.classList.contains('krnl-cal-dragging')).toBe(true);
-      act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 200, clientY: 200 })); });
+      await act(async () => { await release(200, 200); });
       expect(commit).toHaveBeenCalledWith(
         expect.objectContaining({ kind: 'task', id: 'task-x', plannedMin: 50, lenMin: 50 }),
         { day: '2026-05-20', startMin: 540, endMin: 590 },

@@ -229,5 +229,9 @@ export function createNodeAdapter<S = unknown, C = unknown>(
   }
 
   NodeAdapter.displayName = `NodeAdapter(${Inner.displayName ?? Inner.name ?? 'Unknown'})`;
-  return React.memo(NodeAdapter) as ComponentType<RFNodeProps<KrnlRFNode>>;
+  // Decision 63 (performance) — React Flow hands a dragged node new position
+  // props on every pointer move; the card draws only from its data and its
+  // selection, so a move does not redraw it (it was re-rendered, dates and
+  // all, at every step of a drag).
+  return React.memo(NodeAdapter, (a, b) => a.data === b.data && a.selected === b.selected) as ComponentType<RFNodeProps<KrnlRFNode>>;
 }
