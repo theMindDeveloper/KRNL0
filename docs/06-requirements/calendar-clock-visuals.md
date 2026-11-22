@@ -109,6 +109,7 @@
 | NF4 | (Decision 63) **A move does not redraw the moved card** or the canvas's own layers. |
 | NF5 | (Decision 63) **Pulling an edge shows the block as it will be:** the Calendar draws it at its new times while pulled (same text, same style); nothing changes when it is let go. |
 | NF6 | (Decision 63) **Nothing pops when it lands:** no landing or press-in animation on a plan, like a repeating event. |
+| NF8 | (Decision 63) **The Clock follows a carried item smoothly:** one arc of its own glides with the ghost; the Clock window is not drawn again on every step; the original steps back while carried. |
 | NF7 | (Decision 63) **The canvas holds still under a carried card:** no auto-pan over a Calendar or outside the canvas; the hidden card is not redrawn on every move; a carried card lands in the same moment as a move on the Calendar and goes home unseen, then fades in; the package fades (no bounce or spin). |
 
 ## Gherkin Scenarios (ATDD)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useSyncExternalStore, useDeferredValue } from 'react';
+import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { calendarGhost, subscribeCalendarGhost } from '../CalendarNode/DropGhost';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { createPortal } from 'react-dom';
@@ -35,8 +35,9 @@ import { SPACE, popupColumn } from '../../ui/spacing';
 import { msAtWallHours } from './wallHours';
 import { localYMD } from '../../../../shared/ymd';
 import { CX, CY, R_FACE, pt, arcPath, sectorPath } from './dialGeometry';
+import { ClockCarriedArc } from './ClockCarriedArc';
 import {
-  planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, withCarried, type TaskEntry,
+  planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, carriedClockId, type TaskEntry,
 } from './dayModel';
 import { halfOf, startupFollow, rolloverFollow, claimStartup, type ClockNowMark } from './follow';
 import { LineGlyph } from '../../ui/LineGlyph';
@@ -96,6 +97,9 @@ function Hand({ kind, back, len, width }: { kind: 'line' | 'sword' | 'block'; ba
     />
   );
 }
+
+/** Which item is carried on the Calendar, as the Clock names it (a string: the Clock redraws only when it changes). */
+const carriedIdNow = (): string | null => carriedClockId(calendarGhost());
 
 export function ClockNode({
   node,
@@ -300,12 +304,15 @@ export function ClockNode({
     () => (placementsMap ? planForDay(placementsMap.values(), taskInfo, scheduledHabits, selectedDate, viewWindow) : []),
     [placementsMap, taskInfo, viewWindow, scheduledHabits, selectedDate],
   );
-  // Decision 61 — what is being moved on the Calendar moves here too, live
-  // (the ghost changes only when the slot does: a few redraws, never per move).
-  // Decision 63 (performance) — the Clock follows what is carried, but at low
-  // priority: the drag's own frames are never held up by redrawing the Clock.
-  const carried = useDeferredValue(useSyncExternalStore(subscribeCalendarGhost, calendarGhost, calendarGhost));
-  const tasks: TaskEntry[] = useMemo(() => withCarried(planned, carried, selectedDate, viewWindow), [planned, carried, selectedDate, viewWindow]);
+  // Decision 61 — what is being moved on the Calendar moves here too, live.
+  // Decision 63 (owner, 2026-11-22: "too slow and too stuttery") — the Clock
+  // window is drawn again only when a drag starts and ends (which item is
+  // carried: its original steps back); the carried item itself is one small
+  // arc of its own that follows every step and glides (ClockCarriedArc). It
+  // used to redraw the whole window on every step, at low priority, so it
+  // fell behind and jumped.
+  const carriedId = useSyncExternalStore(subscribeCalendarGhost, carriedIdNow, carriedIdNow);
+  const tasks: TaskEntry[] = planned;
 
   // Issue #166 — tracked REALITY segments for the selected day, clipped to the
   // 12-hour window. These are the filled "what actually happened" arcs (work +
@@ -625,7 +632,7 @@ export function ClockNode({
               }
 
               // ── Task arcs riding their lane's track ──
-              const arcs = tasks.flatMap((t, i) => {
+              const arcOf = (t: TaskEntry, i: number): React.ReactElement[] => {
                 // `ended` (faded arc) only makes sense for today — a 9am task
                 // on tomorrow is not "ended" at 3pm today.
                 const ended = isToday && nowFloat >= t.realEnd;
@@ -761,10 +768,16 @@ export function ClockNode({
                   segCursor = segEnd;
                 }
                 return out;
-              });
+              };
+              // What is carried on the Calendar steps back here, as it does
+              // there; its new place is the carried arc drawn below.
+              const arcs = tasks.flatMap((t, i) => (t.id === carriedId
+                ? [<g key={`${t.id}-carried-from`} data-testid="clock-carried-from" opacity={0.35}>{arcOf(t, i)}</g>]
+                : arcOf(t, i)));
 
               return [...tracks, ...arcs];
             })()}
+            <ClockCarriedArc planned={planned} ymd={selectedDate} half={viewWindow} baseR={trackBaseR} laneStep={TRACK_STROKE + TRACK_LANE_GAP} stroke={TRACK_STROKE} />
 
             {/* #180 — tracked reality moved to a dial-face wash (drawn above,
                 under the ticks). The old lane-ring stroke is gone so reality
@@ -1018,8 +1031,9 @@ export function ClockNode({
                   alignItems: 'center',
                   gap: 8,
                   padding: '4px 0',
-                  // Over: quieter ink, never faded below readable.
-                  opacity: 1,
+                  // Over: quieter ink, never faded below readable. Carried on
+                  // the Calendar: it steps back, as there.
+                  opacity: t.id === carriedId ? 0.45 : 1,
                   position: 'relative',
                 }}
               >

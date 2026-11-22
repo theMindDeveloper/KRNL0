@@ -356,6 +356,15 @@ function localYMDOf(iso: string): string {
 }
 
 /**
+ * Decision 63 — the Clock's id for what is carried (its entry in withCarried),
+ * or null when nothing the Clock shows is carried (a habit's time line).
+ */
+export function carriedClockId(g: GhostSpec | null): string | null {
+  if (!g || g.ruleOnly) return null;
+  return g.refId ? (g.refKind === 'event' ? `habit-${g.refId}` : g.refId) : 'calendar-carried';
+}
+
+/**
  * Decision 61 — what is being carried on the Calendar, shown on the Clock too:
  * the carried task or event leaves its place and is drawn at the ghost's time
  * when the ghost is on this day and half (a new one from the Calendar's field
