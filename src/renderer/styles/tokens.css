@@ -799,17 +799,7 @@ input[type="number"]::-webkit-outer-spin-button {
   .krnl-topbar-btn:active, .krnl-panel-toggle:active { transform: none; }
 }
 
-/* "◆ live" breathes slowly; the floor stays readable (never under 0.75). */
-.krnl-live-badge {
-  animation: krnl-live-breathe 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-@keyframes krnl-live-breathe {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.75; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .krnl-live-badge { animation: none; }
-}
+/* The saved / synced badge stays still: no breathing, no width change (owner, 2026-11-22). */
 
 /* Native <select> lists inherit the OS colours (white on white in dark themes). */
 select option { background: var(--paper); color: var(--ink); }

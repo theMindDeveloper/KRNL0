@@ -153,9 +153,11 @@ export function TopBar() {
         width: '100%',
         background: 'var(--paper-2)',
         borderBottom: '1px solid var(--paper-3)',
-        display: 'flex',
+        // Three fixed columns: the centre toggles stay in place whatever the
+        // left side says ("saved", "syncing", "saved · synced"…).
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
         alignItems: 'center',
-        justifyContent: 'space-between',
         // Left padding clears the macOS traffic-light cluster so the brand
         // mark and breadcrumb never sit underneath the red/yellow/green
         // controls. Windows/Linux render controls on the right, so the
@@ -171,7 +173,7 @@ export function TopBar() {
       } as React.CSSProperties}
     >
       {/* Left: brand + breadcrumb + live badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ gridColumn: 1, display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
         {/* Brand mark — the "Lit Core" app icon (build/icon.svg): a dark 3×3
             voxel cube on a near-black tile, centre voxel lit acid on each
             face. The tile is dark in every theme so the mark matches the
@@ -213,13 +215,13 @@ export function TopBar() {
       {/* Centre: panel toggles (ADR 0009 F9) — in Station AND Canvas mode; a
           hidden mother disappears and the rest close the gap. */}
       {MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
-        <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center' }}>
+        <div data-testid="topbar-panel-toggles" style={{ gridColumn: 2, display: 'flex', alignItems: 'center' }}>
           <StationToolbar variant="inline" />
         </div>
       )}
 
       {/* Right: action buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ gridColumn: 3, justifySelf: 'end', display: 'flex', alignItems: 'center', gap: 6 }}>
         {/* window-frame.md, top bar — Fit only where it does something (the Free
             layout; Station's small canvas has its own fit control). It sits
             before the switch, so the switch never moves when it appears. The
