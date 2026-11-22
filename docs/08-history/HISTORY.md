@@ -3354,3 +3354,11 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-22] — v0.15.0 published, with KRNL0 server 0.2.4
+
+**Type:** Release (published)
+**PRs/Commits:** #278 (the feature work), #279 (release PR), tag `v0.15.0`; server: theMindDeveloper/krnl0-server#21; website: theMindDeveloper/theminddeveloper.github.io#7
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:** A Calendar you can read, events that happen once, one drag engine for everything that goes onto the Calendar, the phone website and the layout menu (notes: `docs/releases/v0.15.0.md`, What's new Direction A). The owner asked for the release without per-step questions. Full suite green in the release PR (2984), draft checked by `npm run release -- check` (installer, blockmap, `latest.yml` 0.15.0, web app checksum) and published at 09:44 UTC. The follow workflow opened server 0.2.4 (website = KRNL0 0.15.0), which was merged, built, verified (`krnl0 updater verify`: signature from release.yml@v0.2.4, 9 files; the Linux bundle is 0.2.4 with the 0.15.0 website) and published at 09:52 UTC. `:latest` was checked against `release.json`. The website shows "New in v0.15" and the fallback version 0.15.0.
