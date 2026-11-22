@@ -78,9 +78,9 @@ export function SaveSyncBadge() {
   // No sync service in this window (tests, old builds): the plain badge.
   if (!info) {
     return (
-      <span data-testid="topbar-live-badge" title={SAVED_TITLE} style={{ ...badgeStyle, color: TONE.acid }}>
+      <span data-testid="topbar-live-badge" className="krnl-sync-badge" title={SAVED_TITLE} style={{ ...badgeStyle, color: TONE.acid }}>
         <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor' }} />
-        saved
+        <span className="krnl-badge-label">saved</span>
       </span>
     );
   }
@@ -104,6 +104,7 @@ export function SaveSyncBadge() {
         ref={ref}
         type="button"
         data-testid="topbar-live-badge"
+        className="krnl-sync-badge"
         aria-haspopup="dialog"
         aria-expanded={open}
         title={title}
@@ -111,7 +112,7 @@ export function SaveSyncBadge() {
         style={{ ...badgeStyle, color: TONE[look.tone], height: 26, padding: '0 6px', margin: '0 4px 0 -6px', border: 0, borderRadius: 6, background: open ? 'var(--paper-3)' : 'transparent', cursor: 'pointer' }}
       >
         <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor' }} />
-        {look.label}
+        <span className="krnl-badge-label">{look.label}</span>
         {updatePip && <span data-testid="server-update-pip" aria-label="Server update available" style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--amber)', marginLeft: 2 }} />}
       </button>
 

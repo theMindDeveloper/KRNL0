@@ -801,6 +801,20 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* The saved / synced badge stays still: no breathing, no width change (owner, 2026-11-22). */
 
+/* A narrow window: the top bar folds down step by step, never overlapping (owner, 2026-11-22).
+   Every hidden word stays in its button's tooltip. Widths are the bar's inner width. */
+@container topbar (max-width: 1300px) {
+  .krnl-panel-toggle__label { display: none; }
+  .krnl-panel-toggle { padding: 4px 6px !important; }
+}
+@container topbar (max-width: 900px) {
+  .krnl-topbar-word, .krnl-layout-label, .krnl-badge-label { display: none; }
+  .krnl-sync-badge { min-width: 0 !important; }
+}
+@container topbar (max-width: 700px) {
+  [data-testid="topbar-panel-toggles"] { display: none !important; }
+}
+
 /* Native <select> lists inherit the OS colours (white on white in dark themes). */
 select option { background: var(--paper); color: var(--ink); }
 [data-theme="dark"] select { color-scheme: dark; }

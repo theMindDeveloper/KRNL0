@@ -148,6 +148,7 @@ export function TopBar() {
   return (
     <div
       data-testid="topbar"
+      className="krnl-topbar"
       style={{
         height: 44,
         width: '100%',
@@ -155,8 +156,13 @@ export function TopBar() {
         borderBottom: '1px solid var(--paper-3)',
         // Three fixed columns: the centre toggles stay in place whatever the
         // left side says ("saved", "syncing", "saved · synced"…).
+        // Never narrower than what they hold, so nothing overlaps; as the window
+        // narrows, the bar folds down instead (container queries in tokens.css).
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+        gridTemplateColumns: 'minmax(max-content, 1fr) auto minmax(max-content, 1fr)',
+        containerType: 'inline-size',
+        containerName: 'topbar',
+        overflow: 'hidden',
         alignItems: 'center',
         // Left padding clears the macOS traffic-light cluster so the brand
         // mark and breadcrumb never sit underneath the red/yellow/green
@@ -189,6 +195,7 @@ export function TopBar() {
         >
           <BrandMark />
           <span
+            className="krnl-topbar-word"
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 13,
