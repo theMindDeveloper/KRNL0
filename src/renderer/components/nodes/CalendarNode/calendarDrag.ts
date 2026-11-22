@@ -165,9 +165,36 @@ interface Active {
   onOutside?: (item: DragItem) => void;
   onStart?: () => void;
   onEnd?: () => void;
+  /** The element it was picked up from (it keeps the pointer, and its cursor shows everywhere). */
+  cap?: { el: Element; id: number; cursor: string };
 }
 
 let active: Active | null = null;
+
+// ── The cursor and text selection while carrying ─────────────────────────────
+// Decision 63 (performance) — no page-wide style changes: a cursor set on
+// <body> (or on every element) made the browser restyle the whole page at the
+// start and the end of each drag (3,000 elements, ~0.37 s on a slow machine).
+// The element it was picked up from keeps the pointer (pointer capture): the
+// browser shows its cursor wherever the pointer goes, and nothing under the
+// pointer lights up or changes its cursor on the way. Text selection is off
+// on <body> (user-select is not inherited: nothing else is restyled).
+
+function holdPointer(a: Active): void {
+  const c = a.cap;
+  if (!c) return;
+  const el = c.el as HTMLElement & { setPointerCapture?: (id: number) => void };
+  try { el.setPointerCapture?.(c.id); } catch { /* the pointer may be gone already */ }
+  if (el.style) { c.cursor = el.style.cursor; el.style.cursor = 'grabbing'; }
+}
+
+function letPointerGo(a: Active): void {
+  const c = a.cap;
+  if (!c) return;
+  const el = c.el as HTMLElement & { releasePointerCapture?: (id: number) => void; hasPointerCapture?: (id: number) => boolean };
+  try { if (el.hasPointerCapture?.(c.id)) el.releasePointerCapture?.(c.id); } catch { /* released with the pointer */ }
+  if (el.style) el.style.cursor = c.cursor;
+}
 let holding: { check: () => boolean; clear: (landed: boolean) => void; timer: number } | null = null;
 
 export function isCalendarDragging(): boolean {
@@ -272,16 +299,28 @@ function schedulePaint(): void {
 
 function begin(a: Active): void {
   a.started = true;
-  if (typeof document !== 'undefined') document.body.classList.add('krnl-cal-dragging');
+  // Measured before anything changes the page's style (no forced restyle).
   measureAll();
   watchGeometry(true);
+  if (typeof document !== 'undefined') {
+    // A marker only: no style rule reads it (see holdPointer).
+    document.body.classList.add('krnl-cal-dragging');
+    if (!a.external) {
+      holdPointer(a);
+      document.body.style.userSelect = 'none';
+      try { window.getSelection()?.removeAllRanges(); } catch { /* none */ }
+    }
+  }
   a.home?.setCarried?.(a.item.id, a.mode);
   startCarry(a.item.tone, a.show);
   a.onStart?.();
 }
 
 function finishVisuals(a: Active, keep: boolean): void {
-  if (typeof document !== 'undefined') document.body.classList.remove('krnl-cal-dragging');
+  if (typeof document !== 'undefined') {
+    document.body.classList.remove('krnl-cal-dragging');
+    if (!a.external) { letPointerGo(a); document.body.style.userSelect = ''; }
+  }
   releaseGeometry();
   if (a.raf) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(a.raf); a.raf = 0; }
   a.over?.hover?.(null);
@@ -453,6 +492,8 @@ export function beginCalendarDrag(
   const origin = spec.origin ?? null;
   const home = spec.home ?? null;
   const startSlot = origin && home ? home.slotAt(e.clientX, e.clientY) : null;
+  const from = (e as { currentTarget?: unknown }).currentTarget;
+  const pointerId = (e as { pointerId?: unknown }).pointerId;
   active = {
     item: spec.item, origin, mode: spec.mode ?? 'move', home,
     show: spec.show ?? (origin ? 'offCalendar' : 'always'), external: false,
@@ -462,6 +503,7 @@ export function beginCalendarDrag(
     ...(spec.onOutside ? { onOutside: spec.onOutside } : {}),
     ...(spec.onStart ? { onStart: spec.onStart } : {}),
     ...(spec.onEnd ? { onEnd: spec.onEnd } : {}),
+    ...(typeof Element !== 'undefined' && from instanceof Element && typeof pointerId === 'number' ? { cap: { el: from, id: pointerId, cursor: '' } } : {}),
   };
   if (typeof window === 'undefined') return;
   window.addEventListener('pointermove', onMove, true);

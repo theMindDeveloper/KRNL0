@@ -143,3 +143,35 @@ describe('pulling an edge stretches the block itself', () => {
     } finally { restore(); }
   });
 });
+
+describe('no page-wide restyle at the start and end of a drag', () => {
+  it('the cursor comes from the element it was picked up from (it keeps the pointer); <body> only turns selection off', async () => {
+    const from = document.createElement('div');
+    document.body.appendChild(from);
+    const setCap = vi.fn();
+    const relCap = vi.fn();
+    Object.assign(from, { setPointerCapture: setCap, releasePointerCapture: relCap, hasPointerCapture: () => true });
+    const off = registerCalendarSurface({ el: pageSurfaceEl(), slotAt: () => ({ day: '2026-05-12', min: 600 }), gran: () => 15, commit: () => null });
+    try {
+      beginCalendarDrag({ clientX: 0, clientY: 0, button: 0, currentTarget: from, pointerId: 7 } as never, { item: { kind: 'task', id: 't', name: 't', tone: 'x', lenMin: 30 } });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 50, clientY: 50 }));
+      await nextFrame();
+      expect(setCap).toHaveBeenCalledWith(7);
+      expect(from.style.cursor).toBe('grabbing');
+      expect(document.body.style.userSelect).toBe('none');
+      expect(document.body.style.cursor).toBe('');
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      expect(relCap).toHaveBeenCalledWith(7);
+      expect(from.style.cursor).toBe('');
+      expect(document.body.style.userSelect).toBe('');
+    } finally { off(); }
+  });
+
+  it('no style rule reads the drag marker (it restyled every element at each drag start and end)', async () => {
+    const { readdirSync, readFileSync } = await import('fs');
+    const { join } = await import('path');
+    const dir = join(__dirname, '..', '..', '..', '..', 'styles');
+    const hits = readdirSync(dir).filter((f) => f.endsWith('.css') && readFileSync(join(dir, f), 'utf8').includes('krnl-cal-dragging'));
+    expect(hits).toEqual([]);
+  });
+});

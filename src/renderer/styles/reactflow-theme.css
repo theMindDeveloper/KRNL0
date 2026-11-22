@@ -430,7 +430,10 @@ body.cal-resizing .cal-block:active { transform: none; }
 .cal-drop-ghost-mark { position: absolute; top: 5px; right: 6px; color: var(--ink-2); line-height: 0; }
 .cal-drop-ghost-mark ~ .cal-drop-ghost-name { padding-right: 14px; }
 /* Decision 63 — while anything is carried on the Calendar: one cursor, no flicker, no text selection. */
-body.krnl-cal-dragging, body.krnl-cal-dragging * { cursor: grabbing !important; user-select: none !important; }
+/* Decision 63 (performance) — no style rule for "something is carried": a
+   cursor rule on <body> or on every element made the browser restyle the
+   whole page at the start and the end of each drag. The carried item's own
+   element keeps the pointer and shows "grabbing" (calendarDrag.ts). */
 .cal-drop-ghost-name { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
 .cal-drop-ghost-name:empty { display: none; }
 .cal-drop-ghost-times { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
