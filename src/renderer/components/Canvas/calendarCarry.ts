@@ -56,13 +56,36 @@ export function calendarCarryStart(id: string, x: number, y: number): void {
     }
   }
 }
-export function calendarCarryMove(id: string, item: DragItem, x: number, y: number): void {
+/** Moves the carried card; true while it is over a Calendar's slots (then it is in the box, unseen). */
+export function calendarCarryMove(id: string, item: DragItem, x: number, y: number): boolean {
   const over = externalDragMove(item, x, y);
   const el = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
-  if (el) { if (over) el.setAttribute('data-over-calendar', '1'); else el.removeAttribute('data-over-calendar'); }
+  // Only when it changes (no style work on every move).
+  if (el && el.hasAttribute('data-over-calendar') !== over) {
+    if (over) el.setAttribute('data-over-calendar', '1'); else el.removeAttribute('data-over-calendar');
+  }
+  return over;
 }
 export function calendarCarryEnd(id: string): void {
   const node = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
   node?.removeAttribute('data-over-calendar');
   window.setTimeout(() => node?.removeAttribute('data-calendar-carry'), 220);
+}
+/**
+ * Decision 63 (owner, 2026-11-22) — landed on a Calendar: the card stays
+ * unseen while the canvas puts it back in its own place (no growing back over
+ * the hours, no flight across the canvas), like a repeating event that is
+ * simply where it was let go. Call calendarCarryShowHome once it is drawn there.
+ */
+export function calendarCarryLanded(id: string): void {
+  // No transition while it goes home (it stays in the box, unseen).
+  document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`)?.removeAttribute('data-calendar-carry');
+}
+/** The card is drawn in its own place again: it fades in there. */
+export function calendarCarryShowHome(id: string): void {
+  const node = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+  if (!node) return;
+  node.removeAttribute('data-over-calendar');
+  node.setAttribute('data-calendar-back', '1');
+  window.setTimeout(() => node.removeAttribute('data-calendar-back'), 220);
 }

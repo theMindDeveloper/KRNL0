@@ -3,7 +3,11 @@
  * Decision 63 (performance, owner 2026-11-22: "stuttery and laggy … find the
  * root cause"): moving the pointer reads no page layout; a drop is drawn
  * where it lands before the board changes; the step is 15 minutes like the
- * old repeating-event drag; pulling an edge stretches the block itself.
+ * old repeating-event drag; pulling an edge redraws the block at its new
+ * times (owner, same day: "resizing is messing up the time" — the text must
+ * be what it will be when let go, and nothing may change on release).
+ * Nothing pops when a plan lands; a canvas card carried onto the Calendar is
+ * as calm as a repeating event and the canvas holds still under it.
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
@@ -11,7 +15,8 @@ import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import { calendarGhost, setCalendarGhost } from '../DropGhost';
-import { beginCalendarDrag, registerCalendarSurface, type CalendarSurface } from '../calendarDrag';
+import { beginCalendarDrag, calendarGeometryMoved, externalDragMove, isOverCalendar, registerCalendarSurface, type CalendarSurface } from '../calendarDrag';
+import { calendarCarryLanded, calendarCarryShowHome } from '../../../Canvas/calendarCarry';
 import { afterLanding, mockCalendarLayout, nextFrame, pageSurfaceEl, release } from './calendarLayout';
 import type { CalendarState, CalendarConfig } from '../types';
 
@@ -120,35 +125,105 @@ describe('the step is 15 minutes, like the old repeating-event drag', () => {
   });
 });
 
-describe('pulling an edge stretches the block itself', () => {
-  it('the block keeps its text and is not stepped back; only the time line shows; Esc puts it back', async () => {
+describe('pulling an edge redraws the block at its new times', () => {
+  const blockEl = () => document.querySelector<HTMLElement>('[data-testid="task-block-t-a"]')!;
+  const grabBottom = () => vi.spyOn(blockEl(), 'getBoundingClientRect').mockReturnValue({ left: 300, right: 400, top: 400, bottom: 440, width: 100, height: 40, x: 300, y: 400, toJSON: () => ({}) } as DOMRect);
+
+  it('while pulled the Calendar draws it longer, with the times it will have; it is not stepped back; Esc puts it back', async () => {
     seed([task('t-a', '2026-05-14T10:00', 60)]);
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
     const restore = mockCalendarLayout();
     try {
-      const block = document.querySelector<HTMLElement>('[data-testid="task-block-t-a"]')!;
       // The block is tall in the fake layout: grab its bottom edge as the engine would see it.
-      vi.spyOn(block, 'getBoundingClientRect').mockReturnValue({ left: 300, right: 400, top: 400, bottom: 440, width: 100, height: 40, x: 300, y: 400, toJSON: () => ({}) } as DOMRect);
-      const text0 = block.textContent;
-      const h0 = block.style.height;
-      fireEvent.pointerDown(block, { button: 0, clientX: 350, clientY: 439 });
+      grabBottom();
+      const text0 = blockEl().textContent ?? '';
+      const h0 = blockEl().style.height;
+      fireEvent.pointerDown(blockEl(), { button: 0, clientX: 350, clientY: 439 });
       window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: 12 * 40 }));
       await act(async () => { await nextFrame(); });
-      // Its own sizes are not written: an attribute stretches it (the Calendar's sizes stay underneath).
-      expect(block.hasAttribute('data-stretch')).toBe(true);
-      expect(block.style.getPropertyValue('--stretch-h')).not.toBe('');
-      expect(block.style.height).toBe(h0);
-      expect(block.classList.contains('is-carried')).toBe(false);
-      expect(block.textContent).toBe(text0);
-      // Its times follow the pull (drawn from an attribute), where the block shows them.
-      const times = block.querySelector('[data-cal-times]');
-      if (times) expect(times.getAttribute('data-live-times')).toBe('10:00–12:00');
+      expect(blockEl().style.height).not.toBe(h0);
+      expect(blockEl().classList.contains('is-carried')).toBe(false);
+      // The same text, with the new end time where the block shows its times.
+      if (text0.includes('10:00–11:00')) expect(blockEl().textContent).toContain('10:00–12:00');
+      expect(blockEl().textContent?.split('10:00–')[0]).toBe(text0.split('10:00–')[0]);
+      // The old stretch-by-attribute is gone (it drew the times in a second, different style).
+      expect(blockEl().hasAttribute('data-stretch')).toBe(false);
+      expect(document.querySelector('[data-live-times]')).toBeNull();
       expect(calendarGhost()).toMatchObject({ boxless: true, edge: 'bottom', endMin: 12 * 60 });
       act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); });
-      expect(block.hasAttribute('data-stretch')).toBe(false);
-      if (times) expect(times.hasAttribute('data-live-times')).toBe(false);
-      expect(block.style.height).toBe(h0);
+      expect(blockEl().style.height).toBe(h0);
+      expect(blockEl().textContent).toBe(text0);
     } finally { restore(); }
+  });
+
+  it('let go: what it showed while pulled is what it shows after (nothing changes on release)', async () => {
+    seed([task('t-a', '2026-05-14T10:00', 60)]);
+    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
+    const restore = mockCalendarLayout();
+    try {
+      grabBottom();
+      fireEvent.pointerDown(blockEl(), { button: 0, clientX: 350, clientY: 439 });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: 12 * 40 }));
+      await act(async () => { await nextFrame(); });
+      const pulledH = blockEl().style.height;
+      const pulledText = blockEl().textContent;
+      await act(async () => { await release(350, 12 * 40); });
+      expect(blockEl().style.height).toBe(pulledH);
+      expect(blockEl().textContent).toBe(pulledText);
+    } finally { restore(); }
+  });
+});
+
+describe('a plan has no motion of its own (like a repeating event)', () => {
+  it('no landing pop, no press-in; the package fades (no bounce, no spin, no lid)', async () => {
+    const { readFileSync } = await import('fs');
+    const { join } = await import('path');
+    const css = readFileSync(join(__dirname, '..', '..', '..', '..', 'styles', 'reactflow-theme.css'), 'utf8');
+    expect(css).not.toMatch(/is-landed/);
+    expect(css).not.toMatch(/@keyframes cal-landed/);
+    expect(css).not.toMatch(/\.cal-block:active/);
+    expect(css).not.toMatch(/krnl-pkg-pack|krnl-pkg-unpack|krnl-pkg-lid/);
+    expect(css).not.toMatch(/rotate\(-10deg\)/);
+  });
+});
+
+describe('a canvas card carried onto the Calendar', () => {
+  it('landed: it goes home unseen (no transition), then fades in there', () => {
+    // jsdom has no CSS.escape.
+    if (typeof CSS === 'undefined' || !CSS.escape) vi.stubGlobal('CSS', { escape: (v: string) => v });
+    const node = document.createElement('div');
+    node.className = 'react-flow__node';
+    node.setAttribute('data-id', 'card-1');
+    node.setAttribute('data-calendar-carry', '1');
+    node.setAttribute('data-over-calendar', '1');
+    document.body.appendChild(node);
+    try {
+      calendarCarryLanded('card-1');
+      // Still in the box (unseen), and nothing animates it on its way home.
+      expect(node.hasAttribute('data-over-calendar')).toBe(true);
+      expect(node.hasAttribute('data-calendar-carry')).toBe(false);
+      calendarCarryShowHome('card-1');
+      expect(node.hasAttribute('data-over-calendar')).toBe(false);
+      expect(node.hasAttribute('data-calendar-back')).toBe(true);
+    } finally { node.remove(); vi.unstubAllGlobals(); }
+  });
+
+  it('the canvas can ask whether the point is over a Calendar (measured boxes only), and a pan of the canvas measures again', async () => {
+    const el = pageSurfaceEl();
+    const measure = vi.fn();
+    const off = registerCalendarSurface({ el, slotAt: () => ({ day: '2026-05-12', min: 600 }), gran: () => 15, commit: () => null, measure });
+    try {
+      expect(isOverCalendar(50, 50)).toBe(false); // nothing carried
+      externalDragMove({ kind: 'task', id: 'c', name: 'c', tone: 'x', lenMin: 30 }, 50, 50);
+      expect(measure).toHaveBeenCalledTimes(1);
+      const rect = vi.spyOn(el, 'getBoundingClientRect');
+      expect(isOverCalendar(50, 50)).toBe(true);
+      expect(rect).not.toHaveBeenCalled();
+      calendarGeometryMoved();
+      externalDragMove({ kind: 'task', id: 'c', name: 'c', tone: 'x', lenMin: 30 }, 60, 50);
+      expect(measure).toHaveBeenCalledTimes(2);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    } finally { off(); }
   });
 });
 

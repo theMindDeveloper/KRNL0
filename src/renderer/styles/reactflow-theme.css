@@ -306,23 +306,20 @@
 .krnl-pointer-held iframe { pointer-events: none !important; }
 
 /* Calendar: a missed block's replan button shows on hover or focus only. */
-/* Decision 55 — a plan answers the hand at once: it lifts a step on hover and
-   presses in on pointer-down (transform only, 120 ms; still for reduced motion). */
+/* Decision 63 (owner, 2026-11-22) — a plan has no motion of its own, like a
+   repeating event: no press-in, no pop when it lands (it grew "into its slot",
+   which read as buggy). Hover is a plain tint. */
 /* Decision 60 — hover is a plain tint on top, never a filter: a filter moved
    the block onto its own GPU layer and the text re-rasterised, so every
    block seemed to shift a hair when you pointed at one (owner, 2026-11-21). */
-.cal-block { transition: transform 120ms ease-out; }
 .cal-block::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ink); opacity: 0; pointer-events: none; }
 .cal-block:hover::after { opacity: 0.06; }
 /* Decision 61 — while an edge is pulled nothing lights up and nothing presses
    in: the block steps back and the ghost shows the new length. */
 body.cal-resizing .cal-block:hover::after, body.cal-resizing .cal-event.is-hot::after { opacity: 0; }
-body.cal-resizing .cal-block:active { transform: none; }
 /* Decision 60 — a repeating event lights up under the pointer too. */
 .cal-event::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ink); opacity: 0; pointer-events: none; }
 .cal-event.is-hot::after { opacity: 0.06; }
-.cal-block:active { transform: scale(0.985); }
-@media (prefers-reduced-motion: reduce) { .cal-block { transition: none; } .cal-block:active { transform: none; } }
 /* A missed plan's mark (red replan) is always there, in its corner. */
 .cal-block .cal-replan:hover { background: color-mix(in srgb, var(--rust) 14%, var(--paper)) !important; }
 
@@ -423,8 +420,8 @@ body.cal-resizing .cal-block:active { transform: none; }
 /* Decision 61 — one drag look (DropGhost.tsx). The ghost glides from slot to
    slot by transform only (90 ms) and fades in once per drag; what is moved or
    resized on the Calendar steps back; a canvas card over the Calendar shrinks
-   into the small box at the pointer; a plan lands with a short pop. Reduced
-   motion: no glide, no shrink, no pop. */
+   into the small box at the pointer. Nothing pops when it lands (Decision 63).
+   Reduced motion: no glide, no shrink. */
 .cal-drop-ghost { transition: transform 90ms cubic-bezier(0.22, 1, 0.36, 1), height 90ms cubic-bezier(0.22, 1, 0.36, 1), width 90ms cubic-bezier(0.22, 1, 0.36, 1); }
 .cal-drop-ghost.is-shown { animation: cal-drop-in 120ms ease-out; }
 .cal-drop-ghost-mark { position: absolute; top: 5px; right: 6px; color: var(--ink-2); line-height: 0; }
@@ -439,20 +436,16 @@ body.cal-resizing .cal-block:active { transform: none; }
 .cal-drop-ghost-times { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 @keyframes cal-drop-in { from { opacity: 0; } to { opacity: 1; } }
 .cal-block.is-carried, .cal-event.is-carried { opacity: 0.35; }
-/* Decision 63 — an edge pulled: the block's times follow live (drawn from an
-   attribute; the block's own text is not touched). */
-[data-stretch] { top: var(--stretch-top) !important; height: var(--stretch-h) !important; }
-[data-live-times] { font-size: 0 !important; }
-[data-live-times]::after { content: attr(data-live-times); font-size: 10px; }
 /* Decision 63 — let go: the original's place empties in the same frame (the
    ghost already stands where it landed). */
 .is-landing .cal-block.is-carried, .is-landing .cal-event.is-carried { opacity: 0 !important; transition: none !important; }
 /* The package at the pointer (DropGhost.tsx): a small parcel in the plan's
-   colour. It packs as it is carried onto the Calendar (pops in, the lid comes
-   down) and unpacks where it is let go (the lid lifts off, it gives way). */
+   colour. Decision 63 (owner, 2026-11-22) — it moves like a repeating event:
+   it fades in over the Calendar and fades into the slot where it is let go.
+   No bounce, no spin, no lid coming down or lifting off. */
 .krnl-carry-box {
   position: fixed; left: 0; top: 0; width: 30px; height: 30px; z-index: 2147483000; pointer-events: none;
-  opacity: 0; scale: 0.5; transition: opacity 120ms ease-out, scale 120ms ease-out;
+  opacity: 0; scale: 0.8; transition: opacity 120ms ease-out, scale 120ms cubic-bezier(0.22, 1, 0.36, 1);
   filter: drop-shadow(0 5px 6px rgba(0, 0, 0, 0.45));
 }
 .krnl-carry-box .krnl-pkg { display: block; overflow: visible; }
@@ -461,15 +454,8 @@ body.cal-resizing .cal-block:active { transform: none; }
 .krnl-carry-box .pkg-right { fill: color-mix(in srgb, var(--carry-tone, var(--acid)) 66%, #000); }
 .krnl-carry-box .pkg-tape { fill: rgba(255, 255, 255, 0.45); }
 .krnl-carry-box .pkg-edge { fill: none; stroke: color-mix(in srgb, var(--carry-tone, var(--acid)) 40%, #000); stroke-width: 0.9; stroke-linejoin: round; stroke-linecap: round; }
-.krnl-carry-box .krnl-pkg-lid, .krnl-carry-box .krnl-pkg-body { transform-box: fill-box; transform-origin: 50% 100%; }
-.krnl-carry-box.is-shown { opacity: 1; scale: 1; animation: krnl-pkg-pack 340ms cubic-bezier(0.2, 0.9, 0.3, 1.25); }
-.krnl-carry-box.is-shown .krnl-pkg-lid { animation: krnl-pkg-lid-close 340ms cubic-bezier(0.2, 0.9, 0.3, 1.2); }
-@keyframes krnl-pkg-pack { from { scale: 0.45; rotate: -10deg; } to { scale: 1; rotate: 0deg; } }
-@keyframes krnl-pkg-lid-close { 0% { transform: translateY(-9px) rotate(-18deg); opacity: 0; } 55% { opacity: 1; } 100% { transform: none; opacity: 1; } }
-.krnl-carry-box.is-unpacking { opacity: 1; animation: krnl-pkg-unpack 420ms ease-out forwards; }
-.krnl-carry-box.is-unpacking .krnl-pkg-lid { animation: krnl-pkg-lid-open 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
-@keyframes krnl-pkg-unpack { 0% { scale: 1; opacity: 1; } 45% { scale: 1.12; opacity: 1; } 100% { scale: 1.3; opacity: 0; } }
-@keyframes krnl-pkg-lid-open { 0% { transform: none; opacity: 1; } 100% { transform: translate(-6px, -12px) rotate(-28deg); opacity: 0; } }
+.krnl-carry-box.is-shown { opacity: 1; scale: 1; }
+.krnl-carry-box.is-unpacking { opacity: 0; scale: 0.8; }
 /* The time line of what is carried: across the hours to its edge, the exact time in the hour column. */
 .cal-drop-rule { transition: transform 90ms cubic-bezier(0.22, 1, 0.36, 1), width 90ms cubic-bezier(0.22, 1, 0.36, 1); }
 .cal-drop-rule::after { content: ''; position: absolute; left: 44px; right: 0; top: -0.75px; height: 1.5px; background: var(--ghost-tone, var(--acid)); opacity: 0.9; }
@@ -481,13 +467,16 @@ body.cal-resizing .cal-block:active { transform: none; }
 .cal-drop-rule.is-shown { animation: cal-drop-in 120ms ease-out; }
 /* A canvas card over the Calendar: it goes into the box (around the grab point). */
 .react-flow__node[data-calendar-carry] > * { transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease; }
+/* Decision 63 — landed on the Calendar: the card is back in its own place on
+   the canvas, unseen, and fades in there (it never grows over the hours or
+   flies across the canvas). */
+.react-flow__node[data-calendar-back] > * { animation: cal-drop-in 160ms ease-out; }
 /* Decision 61 — panning or zooming: the canvas moves as one picture (GPU), sharp again after. */
 .is-canvas-moving .react-flow__viewport { will-change: transform; }
 .react-flow__node[data-over-calendar] > * { transform: scale(0.04); opacity: 0 !important; transform-origin: var(--grab-x, 50%) var(--grab-y, 50%); }
-.cal-block.is-landed { animation: cal-landed 520ms cubic-bezier(0.22, 1, 0.36, 1); }
-@keyframes cal-landed { 0% { transform: scale(0.92); box-shadow: 0 0 0 2px var(--acid); } 60% { transform: scale(1.02); } 100% { transform: none; box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .cal-drop-ghost, .cal-drop-ghost.is-shown, .cal-drop-rule, .cal-drop-rule.is-shown, .cal-block.is-landed, .krnl-carry-box, .krnl-carry-box * { animation: none !important; transition: none; }
+  .cal-drop-ghost, .cal-drop-ghost.is-shown, .cal-drop-rule, .cal-drop-rule.is-shown, .krnl-carry-box, .krnl-carry-box * { animation: none !important; transition: none; }
   .krnl-carry-box.is-unpacking { opacity: 0; }
   .react-flow__node[data-over-calendar] > *, .react-flow__node[data-calendar-carry] > * { transition: none; }
+  .react-flow__node[data-calendar-back] > * { animation: none; }
 }

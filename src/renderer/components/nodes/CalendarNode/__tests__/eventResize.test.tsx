@@ -51,7 +51,8 @@ describe('a repeating event pulled by its bottom edge', () => {
       await act(async () => { await nextFrame(); });
       await act(async () => { await release(350, y + 60); await new Promise((r) => setTimeout(r, 30)); });
       expect(calendarGhost()).toBeNull();
-      expect(document.querySelector('[data-stretch]')).toBeNull();
+      // Drawn from the board again (the pulled drawing is let go with the ghost).
+      expect(document.querySelector('[data-testid="calendar-routine-ev-lecture"]')).toBeTruthy();
     } finally { restore(); }
   });
 

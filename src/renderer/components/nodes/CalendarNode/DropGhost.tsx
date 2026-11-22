@@ -295,10 +295,6 @@ function boxEl(): HTMLDivElement | null {
     box.setAttribute('aria-hidden', 'true');
     box.setAttribute('data-testid', 'carry-box');
     box.innerHTML = PACKAGE_SVG;
-    box.addEventListener('animationend', (e) => {
-      // Unpacked: it is gone until the next carry.
-      if ((e as AnimationEvent).animationName === 'krnl-pkg-unpack') box?.classList.remove('is-unpacking');
-    });
     document.body.appendChild(box);
   }
   return box;
@@ -344,9 +340,8 @@ export function endCarry(opts: { unpack?: boolean } = {}): void {
   boxAt = null;
   if (!box) return;
   box.classList.remove('is-shown');
-  if (opts.unpack && shown) {
-    void box.offsetWidth;
-    box.classList.add('is-unpacking');
-  }
+  // Let go on the Calendar: it fades into the slot (a class, no layout read:
+  // reading the layout here held up the drop).
+  if (opts.unpack && shown) box.classList.add('is-unpacking');
 }
 

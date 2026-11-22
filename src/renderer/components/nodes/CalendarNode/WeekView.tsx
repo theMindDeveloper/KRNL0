@@ -7,7 +7,7 @@
 import { pickerOpen } from '../../ui/Popover';
 import { passRightClick, useOneOverlay } from '../../ui/oneOverlay';
 import { KindIcon, KIND_LABEL } from '../../ui/kindIcons';
-import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragItem, type DragMode, type DragOrigin, type Target } from './calendarDrag';
+import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragItem, type DragKind, type DragMode, type DragOrigin, type Target } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
 import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost } from './DropGhost';
 import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
@@ -609,58 +609,21 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   };
   scheduleTaskRef.current = scheduleTask;
 
-  // Decision 60 — while a canvas card is dragged over the Calendar, a soft
-  // block shows where it will land (it glides as you move); once let go, the
-  // plan lands there with a short flash.
-  const [landedTaskId, setLandedTaskId] = useState<string | null>(null);
   // Decision 63 — the one thing being carried from this view (it steps back).
   const [carriedId, setCarriedId] = useState<string | null>(null);
   // The habit boxes that glide while a habit is carried (DOM only).
   const glide = useRef<{ id: string; els: HTMLElement[] } | null>(null);
   const surfaceImpl = useRef<CalendarSurface | null>(null);
-  // Decision 63 — an edge pulled: the block itself follows (DOM only, no
-  // redraw), so its text keeps its form, during the pull and after it.
-  // The block's own sizes (React's) are never written: an attribute and two
-  // custom properties override them (reactflow-theme.css). Taking them off
-  // always shows what the Calendar drew last, landed or not.
-  const stretch = useRef<{ key: string; els: HTMLElement[] } | null>(null);
-  const stretchBlock = (item: DragItem, target: Target | null, origin: DragOrigin | null, mode?: DragMode) => {
-    const cur = stretch.current;
-    if (!target || !mode || mode === 'move') {
-      if (cur) for (const el of cur.els) {
-        el.removeAttribute('data-stretch');
-        el.style.removeProperty('--stretch-top');
-        el.style.removeProperty('--stretch-h');
-        for (const t of Array.from(el.querySelectorAll('[data-live-times]'))) t.removeAttribute('data-live-times');
-      }
-      stretch.current = null;
-      return;
-    }
-    if (!origin) return;
-    const key = `${item.id}@${origin.day}`;
-    let els = cur && cur.key === key ? cur.els : null;
-    if (!els) {
-      const col = rootRef.current?.querySelector(`[data-cal-day="${origin.day}"]`);
-      const sel = item.kind === 'task' ? `[data-testid="task-block-${item.id}"]` : `[data-testid="calendar-routine-${item.id}"]`;
-      els = Array.from(col?.querySelectorAll<HTMLElement>(sel) ?? []);
-      stretch.current = { key, els };
-    }
-    // The Calendar's own sizes (the same as the block gets when it lands: no jump).
-    const css = (v: number | string) => (typeof v === 'number' ? `${v}px` : v);
-    const top = css(rh(target.startMin / 60));
-    const h = css(rhMax(item.kind === 'task' ? MIN_BLOCK_PX : 5, (target.endMin - target.startMin) / 60, -BLOCK_GAP));
-    // Its times follow the pull too, so letting go changes nothing (an
-    // attribute the style sheet shows; the block's own text is untouched).
-    const live = `${fmtMinOfDay(target.startMin)}–${fmtMinOfDay(target.endMin)}`;
-    for (const el of els) {
-      el.style.setProperty('--stretch-top', top);
-      el.style.setProperty('--stretch-h', h);
-      el.setAttribute('data-stretch', '');
-      for (const t of Array.from(el.querySelectorAll<HTMLElement>('[data-cal-times]'))) {
-        const rest = item.kind === 'task' ? '' : (t.querySelector('span')?.textContent ?? '');
-        t.setAttribute('data-live-times', live + rest);
-      }
-    }
+  // Decision 63 — an edge pulled: the Calendar draws the block at its new
+  // times while it is pulled (the same code as after the drop), so its size,
+  // its text and its times are exactly what they will be when it is let go:
+  // nothing changes on release. Drawn again only when the time changes (a
+  // 15-minute step), not on every pointer move.
+  const [pull, setPull] = useState<{ id: string; kind: DragKind; day: string; startMin: number; endMin: number } | null>(null);
+  const pullBlock = (item: DragItem, target: Target | null, origin: DragOrigin | null, mode?: DragMode) => {
+    if (!target || !origin || !mode || mode === 'move') { setPull((p) => (p === null ? p : null)); return; }
+    const next = { id: item.id, kind: item.kind, day: origin.day, startMin: target.startMin, endMin: target.endMin };
+    setPull((p) => (p && p.id === next.id && p.day === next.day && p.startMin === next.startMin && p.endMin === next.endMin ? p : next));
   };
   // Decision 63 (performance) — where the slots are, measured once per drag
   // (the engine calls measure / release): moving the pointer reads no layout.
@@ -704,11 +667,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     release: () => { geom.current = null; },
   }), []);
   useEffect(() => registerCalendarSurface(surface), [surface]);
-  useEffect(() => {
-    if (!landedTaskId) return;
-    const t = window.setTimeout(() => setLandedTaskId(null), 700);
-    return () => window.clearTimeout(t);
-  }, [landedTaskId]);
 
 
   // Popup shown when a task block is clicked (PR #122).
@@ -1173,7 +1131,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     // An edge pulled: the block is not stepped back (it stretches itself).
     setCarried: (id, mode) => { setCarriedId(mode && mode !== 'move' ? null : id); if (id) setTaskPopup(null); },
     preview: (item, target, origin, mode) => {
-      if (item.kind !== 'habit') { stretchBlock(item, target, origin, mode); return; }
+      if (item.kind !== 'habit') { pullBlock(item, target, origin, mode); return; }
       const g = glide.current;
       if (!target || !origin) {
         if (g) { for (const el of g.els) { el.style.transition = 'none'; el.style.transform = ''; el.classList.remove('is-moving'); } requestAnimationFrame(() => { for (const el of g.els) el.style.transition = ''; }); }
@@ -1204,7 +1162,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
           applyTaskState(item.id, (s0) => taskSetPlannedMin(s0, { minutes: durN }));
           scheduleTaskRef.current(item.id, iso, durN);
         } else scheduleTask(item.id, iso, planned);
-        setLandedTaskId(item.id);
         return () => {
           const n = useBoardStore.getState().board?.nodes.find((x) => x.id === item.id);
           return ((n?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor ?? '').slice(0, 16) === iso;
@@ -1301,7 +1258,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   const slicesByDay = useMemo(() => {
     const map = new Map<string, TaskSlice[]>();
     const weekSet = new Set(weekDays);
-    for (const task of scheduledTasks) {
+    // An edge being pulled: the plan is drawn at its new times (Decision 63).
+    const shown = pull && pull.kind === 'task'
+      ? scheduledTasks.map((t) => (t.id === pull.id ? { ...t, startISO: `${pull.day}T${fmtMinOfDay(pull.startMin)}`, scheduledDurationMin: Math.max(1, pull.endMin - pull.startMin), timeOpen: false } : t))
+      : scheduledTasks;
+    for (const task of shown) {
       const startDayYMD = task.startISO.slice(0, 10);
       const [hStr, mStr] = task.startISO.slice(11, 16).split(':');
       const startMinOfDay =
@@ -1335,7 +1296,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       }
     }
     return map;
-  }, [scheduledTasks, weekDays]);
+  }, [scheduledTasks, weekDays, pull]);
 
   // Open scrolled to where the day happens — 90 min before now when today is
   // shown, else the earliest planned block in view — instead of midnight.
@@ -1983,7 +1944,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
 
             (isContinuation ? ' (continued from previous day)' : '')
           }
-          className={`cal-block${landedTaskId === task.id ? ' is-landed' : ''}${carried ? ' is-carried' : ''}`}
+          className={`cal-block${carried ? ' is-carried' : ''}`}
           style={{
             position: 'absolute',
             // A fixed gap between stacked blocks so back-to-back tasks never
@@ -2153,7 +2114,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
             // loses those pieces at its bottom edge, never half the time.
             // Decision 60 — the time small (10 px), wrapping at the dash in a narrow block.
             <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 8, fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: '13px', color: 'var(--ink-3)', overflow: 'hidden', minHeight: 13, maxHeight: Math.max(timeRowLines, widthPx < 110 ? 2 : 1) * 13, flexShrink: 0, pointerEvents: 'none', position: 'relative', zIndex: 1, marginTop: 1 }}>
-              <span data-cal-times="">
+              <span>
                 {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : <>{fmtMinOfDay(blockStartMin)}–<wbr />{fmtMinOfDay(blockEndMin)}</>}
               </span>
               {startNote && <span data-testid={`task-start-delta-${task.id}`} style={{ whiteSpace: 'nowrap' }}>{startNote.replace(/^ · /, '')}</span>}
@@ -2437,7 +2398,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     const out: ReactNode[] = [];
     const colPxB = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
     const railPx = railPxFor(dayYMD);
-    for (const { h, occ, lane, lanes } of routinesOnDay(dayYMD)) {
+    for (const { h, occ: occ0, lane, lanes } of routinesOnDay(dayYMD)) {
+      // An edge being pulled: the event is drawn at its new times (Decision 63).
+      const occ = pull && pull.kind === 'event' && pull.id === h.id && pull.day === dayYMD && !(occ0 as RoutineSpan).spill
+        ? { ...occ0, startMin: pull.startMin, endMin: Math.min(1440, pull.endMin), fullStart: pull.startMin, fullEnd: pull.endMin }
+        : occ0;
       const top = (occ.startMin / 60) * rowHeight;
       const height = Math.max(6, ((occ.endMin - occ.startMin) / 60) * rowHeight);
       const col = `var(--${h.color})`;
@@ -2513,7 +2478,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
               </div>
               {lines.showTime && (
                 // Decision 60 — the time and how often, small, wrapping in a narrow block.
-                <span data-cal-times="" data-testid={`calendar-routine-time-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-3)', whiteSpace: 'normal', overflow: 'hidden', maxHeight: lines.metaLines * EVENT_TEXT.metaLine, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
+                <span data-testid={`calendar-routine-time-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-3)', whiteSpace: 'normal', overflow: 'hidden', maxHeight: lines.metaLines * EVENT_TEXT.metaLine, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
                   {occ.spill ? time : <>{fmtMinOfDay(occ.fullStart)}–<wbr />{fmtMinOfDay(occ.fullEnd)}</>}{!once && <span style={{ whiteSpace: 'nowrap' }}>{` · ${every}`}</span>}
                 </span>
               )}

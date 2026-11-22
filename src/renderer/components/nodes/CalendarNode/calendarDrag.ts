@@ -211,6 +211,12 @@ export function isCalendarDragging(): boolean {
 let boxes: Map<CalendarSurface, DOMRect> | null = null;
 let geomDirty = false;
 const onGeomChange = () => { geomDirty = true; };
+/**
+ * Decision 63 — the canvas moved (it panned or zoomed) while something is
+ * carried: the Calendars on it moved too, so their boxes are measured again
+ * at the next move (a flag; nothing is read here).
+ */
+export function calendarGeometryMoved(): void { if (boxes) geomDirty = true; }
 
 function measureAll(): void {
   boxes = new Map();
@@ -528,6 +534,11 @@ export function externalDragMove(item: DragItem, x: number, y: number): boolean 
   // Measured boxes only (no layout read per move).
   const s = surfaceAt(x, y);
   return !!(s && s.slotAt(x, y));
+}
+
+/** Whether the point is over a Calendar while something is carried (its measured box; no layout read). */
+export function isOverCalendar(x: number, y: number): boolean {
+  return !!active && !!surfaceAt(x, y);
 }
 
 /** The canvas let go of it: lands it on a Calendar under the point (true), or nothing (false). */
