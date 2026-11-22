@@ -135,10 +135,11 @@ function calendarDragOver(id: string, x: number, y: number): void {
     window.dispatchEvent(new CustomEvent('krnl:calendar:drag-over', { detail: { taskId: id, x, y, over } }));
   });
 }
-function calendarDragEnd(id: string): void {
+function calendarDragEnd(id: string, dropped = false): void {
   if (calendarDragRaf) { cancelAnimationFrame(calendarDragRaf); calendarDragRaf = 0; }
   document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`)?.removeAttribute('data-over-calendar');
-  endCarry();
+  // Let go on the Calendar: the package opens there.
+  endCarry({ unpack: dropped });
   window.dispatchEvent(new CustomEvent('krnl:calendar:drag-end', { detail: { taskId: id } }));
 }
 
@@ -1819,7 +1820,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       const day = any?.dataset['calAnytime'] ?? col?.dataset['calDay'];
       if (day) {
         window.dispatchEvent(new CustomEvent('krnl:calendar:drop-task', { detail: { taskId: draggedId, day, clientY: ptr.y, anyTime: !!any } }));
-        calendarDragEnd(draggedId);
+        calendarDragEnd(draggedId, true);
         // The card glides back to its place on the canvas (the plan is on the Calendar now).
         settleNodes([draggedId]);
         setNodes((prev) => prev.map((n) => (n.id === draggedId ? { ...n, position: { ...before } } : n)));

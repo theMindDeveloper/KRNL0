@@ -52,6 +52,8 @@ describe('the wheel over the Calendar on the Free canvas (Decision 61)', () => {
   });
 
   it('zoomed into the hours: the Calendar keeps the wheel (it scrolls) and Ctrl + wheel zooms it', () => {
+    // Zoomed in, the hours are taller than their box: they really scroll.
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(1200);
     onTheCanvas(at(4));
     expect(grid().getAttribute('data-wheel')).toBe('calendar');
     expect(grid().classList.contains('nowheel')).toBe(true);

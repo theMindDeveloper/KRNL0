@@ -11,7 +11,7 @@ import { beginTaskDragInfo, endTaskDragInfo, taskDragInfo } from '../../../store
 import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
 import { CALENDAR_LAYOUT_EVENT, CALENDAR_REVEAL_EVENT, showTask, unscheduleTask } from '../../../store/scheduleActions';
 import { highlightElement } from '../../../store/highlight';
-import { useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
+import { startTransition, useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
@@ -340,7 +340,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver((entries) => {
       const w = Math.round(entries[0]?.contentRect.width ?? 0);
-      setGridW((prev) => (prev === w ? prev : w));
+      // Decision 61 — in the background: the layout is CSS; this only refines text.
+      startTransition(() => setGridW((prev) => (prev === w ? prev : w)));
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -353,12 +354,20 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // Decision 60 — the hours' own height: the day fills it (no empty band
   // under 23:00 in a tall or resized window).
   const [bodyH, setBodyH] = useState(0);
+  // Whether the hours really scroll (zoomed in): then the wheel scrolls them.
+  const [canScroll, setCanScroll] = useState(false);
   useEffect(() => {
     const el = gridBodyRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     const measure = () => {
-      const w = Math.max(0, el.offsetWidth - el.clientWidth); setSbW((p) => (p === w ? p : w));
-      const h = el.clientHeight; setBodyH((p) => (Math.abs(p - h) < 1 ? p : h));
+      const w = Math.max(0, el.offsetWidth - el.clientWidth);
+      const h = el.clientHeight;
+      const scrolls = el.scrollHeight > el.clientHeight + 1;
+      startTransition(() => {
+        setSbW((p) => (p === w ? p : w));
+        setBodyH((p) => (Math.abs(p - h) < 1 ? p : h));
+        setCanScroll(scrolls);
+      });
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -402,10 +411,19 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // Decision 60 — the day fits the window by default (no scroll, no empty
   // band under 23:00, at any size); zooming in makes the hours taller from
   // there. Zoom ZOOM_FIT (the old default, 2) is "fits"; more is taller.
-  const fillRow = bodyH > 0 ? Math.floor(((bodyH - 2 * GRID_PAD) / rowCount) * 4) / 4 : 0;
+  const fillRow = bodyH > 0 ? Math.max(0, (bodyH - 2 * GRID_PAD) / rowCount) : 0;
   const rowFor = (z: number): number => (fillRow > 0 ? fillRow * Math.max(1, z / ZOOM_FIT) : MIN_ROW_HEIGHT * z);
   const zoomFloor = fillRow > 0 ? ZOOM_FIT : CAL_ZOOM_MIN;
   const rowHeight = rowFor(shownZoom);
+  // Decision 61 — the hours are sized by the browser from the hours box's own
+  // height (container units): a window resize redraws them in the same frame,
+  // smoothly, with no React work and no stale measure (a stale one left a gap
+  // under 23:00). React only refines what text fits, in the background.
+  // Without a measured box (tests), plain pixels.
+  const cssRows = fillRow > 0;
+  const zoomK = Math.max(1, shownZoom / ZOOM_FIT);
+  const rh = (hours: number, addPx = 0): number | string => (cssRows ? `calc(var(--rh) * ${hours} + ${addPx}px)` : hours * rowHeight + addPx);
+  const rhMax = (minPx: number, hours: number, addPx = 0): number | string => (cssRows ? `max(${minPx}px, calc(var(--rh) * ${hours} + ${addPx}px))` : Math.max(minPx, hours * rowHeight + addPx));
   // Decision 61 — on the Free canvas, a Calendar whose day fits has nothing to
   // scroll: the plain wheel over it zooms (mouse) or moves (trackpad) the
   // canvas, like anywhere else on it (owner, 2026-11-21). Once the hours are
@@ -413,7 +431,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // the hours. In My layout the Calendar is not on a canvas and keeps the wheel.
   const [onCanvas, setOnCanvas] = useState(false);
   useLayoutEffect(() => { setOnCanvas(!!gridBodyRef.current?.closest('.react-flow__node')); }, []);
-  const wheelToCanvas = onCanvas && fillRow > 0 && rowHeight <= fillRow + 0.01;
+  const wheelToCanvas = onCanvas && fillRow > 0 && !canScroll;
   // #11/#8 — one granularity drives gridlines, gutter labels, AND snapping.
   // Decision 60 — the marks follow the hours' drawn height, not the zoom
   // number: small hours (a fitted day in a small window) get no half-hour
@@ -510,7 +528,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // shows the new length, moving on its own.
       if (!carried) { carried = true; setResizeDraft({ taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 }); }
       const s0 = Math.max(0, sliceStartMin + last.startMinDelta);
-      setCalendarGhost({ day: dayYMD, startMin: s0, endMin: s0 + last.durationMin, name: task.text, times: ghostTimes(s0, s0 + last.durationMin), tone: toneVarForTask(task.id), testId: 'calendar-resize-ghost' });
+      setCalendarGhost({ day: dayYMD, startMin: s0, endMin: s0 + last.durationMin, name: task.text, times: ghostTimes(s0, s0 + last.durationMin), tone: toneVarForTask(task.id), testId: 'calendar-resize-ghost', edge: edge === 'bottom' ? 'bottom' : 'top' });
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
@@ -1115,7 +1133,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // Decision 61 — the week is re-drawn once (the event steps back); the
       // ghost then moves on its own.
       if (!carried) { carried = true; setRtDrag({ id: r.h.id, name: r.h.name, color: r.h.color, fromDay: dayYMD, ...last }); }
-      setCalendarGhost({ day: last.toDay, startMin, endMin, name: r.h.name, times: `${ghostTimes(startMin, endMin)} · every week`, tone: `var(--${r.h.color})`, testId: 'calendar-routine-ghost' });
+      setCalendarGhost({ day: last.toDay, startMin, endMin, name: r.h.name, times: isOneTimeEvent(r.h) ? ghostTimes(startMin, endMin) : `${ghostTimes(startMin, endMin)} · every week`, tone: `var(--${r.h.color})`, testId: 'calendar-routine-ghost', edge: mode === 'bottom' ? 'bottom' : 'top' });
     };
     const clearRoutineGhost = () => { if (calendarGhost()?.testId === 'calendar-routine-ghost') setCalendarGhost(null); };
     const onUp = () => {
@@ -1656,7 +1674,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         // Where it was grabbed stays under the pointer (Decision 61).
         const startAbs = Math.max(0, hour * 60 + snappedMinute - (Number.isFinite(payload.grabMin) ? payload.grabMin! : 0));
         const scheduledFor = `${dayYMD}T${String(Math.floor(startAbs / 60)).padStart(2, '0')}:${String(startAbs % 60).padStart(2, '0')}`;
-        if (payload.taskId) scheduleTask(payload.taskId, scheduledFor, payload.durationMin);
+        if (payload.taskId) { scheduleTask(payload.taskId, scheduledFor, payload.durationMin); setLandedTaskId(payload.taskId); }
         // A Todo row with no task node yet: the dispatcher creates and links
         // one, then schedules it (so both Todo rows and canvas tasks drop here).
         else onCommand('calendar.schedule', { itemId: payload.itemId, scheduledFor, scheduledDurationMin: payload.durationMin });
@@ -2008,6 +2026,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           payload.durationMin,
           payload.taskId !== task.id ? task.id : undefined,
         );
+        setLandedTaskId(payload.taskId);
       };
 
       const handleBlockClick = (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -2126,13 +2145,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             position: 'absolute',
             // A fixed gap between stacked blocks so back-to-back tasks never
             // read as one slab.
-            top: topPx + BLOCK_GAP / 2,
+            top: rh(effStartMin / 60, BLOCK_GAP / 2),
             // The tracked-time rail keeps the left edge; plans fill the rest.
             // Letter bars sit 1 px apart on each side (a 2 px gap) so narrow
             // lanes keep their width; named blocks keep the roomier inset.
             left: `calc(${rail} + (100% - ${rail}) * ${leftFrac} + ${detail === 'letter' ? 1 : 2}px)`,
             right: `calc((100% - ${rail}) * ${rightFrac} + ${detail === 'letter' ? 1 : 3}px)`,
-            height: Math.max(MIN_BLOCK_PX, heightPx - BLOCK_GAP),
+            height: rhMax(MIN_BLOCK_PX, sliceLen / 60, -BLOCK_GAP),
             // Calm by default: a tinted card with a solid colour edge. Done
             // fades; missed is a lighter tint; overrun is a rust strip on the
             // right edge (drawn below) — states that survive any block size.
@@ -2576,7 +2595,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           title={`KRNL0 ${m.kind === 'open' ? 'first opened' : 'last closed'} ${fmtMinOfDay(min)}`}
           style={{
             // A thin dashed line across the whole day, no words (time in the tooltip).
-            position: 'absolute', left: 0, right: 0, top: (min / 60) * rowHeight, height: 0,
+            position: 'absolute', left: 0, right: 0, top: rh(min / 60), height: 0,
             borderTop: `1px dashed ${m.kind === 'open' ? 'var(--cyan, var(--ink-3))' : 'var(--ink-3)'}`,
             opacity: 0.75, pointerEvents: 'none', zIndex: 2,
           }}
@@ -2626,7 +2645,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           aria-label={`${h.name}, repeating event, ${time}${occ.skipped ? ', skipped this time' : ''}`}
           title={`${h.name} · ${time} · repeating event${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
           style={{
-            position: 'absolute', left: `calc(${railPx}px + (100% - ${railPx}px) * ${lane / lanes} + 2px)`, width: `calc((100% - ${railPx}px) / ${lanes} - 4px)`, top: top + 1, height: blockH,
+            position: 'absolute', left: `calc(${railPx}px + (100% - ${railPx}px) * ${lane / lanes} + 2px)`, width: `calc((100% - ${railPx}px) / ${lanes} - 4px)`, top: rh(occ.startMin / 60, 1), height: rhMax(5, (occ.endMin - occ.startMin) / 60, -2),
             zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 6, overflow: 'hidden',
             opacity: rtDrag && rtDrag.id === h.id ? 0.35 : 1,
             ...(occ.skipped
@@ -2703,7 +2722,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           className="cal-rail"
           aria-hidden
           style={{
-            position: 'absolute', top: 3, height: trackEnd - 3, left: trackLeft, width: trackW,
+            position: 'absolute', top: 3, height: dayYMD === todayYMD && RAIL_STYLE === 'A4' ? rh((nowD.getHours() * 60 + nowD.getMinutes()) / 60, -3) : rh(rowCount, -6), left: trackLeft, width: trackW,
             borderRadius: trackW / 2, pointerEvents: 'none', zIndex: 0,
           }}
         />,
@@ -2714,7 +2733,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         if (h * rowHeight >= trackEnd) break;
         out.push(
           <div key={`reality-hour-${h}`} aria-hidden style={{
-            position: 'absolute', top: h * rowHeight - 0.5, height: 1, left: trackLeft, width: trackW,
+            position: 'absolute', top: rh(h, -0.5), height: 1, left: trackLeft, width: trackW,
             background: 'var(--node-bg, var(--paper))', pointerEvents: 'none', zIndex: 2,
           }} />,
         );
@@ -2746,11 +2765,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             position: 'absolute',
             // Decision 59 — spans touch (no 1 px gaps between back-to-back
             // sessions); only a real break leaves the track bare.
-            top: topPx,
+            top: rh(seg.startMin / 60),
             left: trackLeft,
             width: trackW,
             // Never shorter than its round caps.
-            height: Math.max(trackW, heightPx),
+            height: rhMax(trackW, (seg.endMin - seg.startMin) / 60),
             pointerEvents: 'none',
             zIndex: 1,
             borderRadius: trackW / 2,
@@ -2865,7 +2884,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             // filled with a check when done; its name beside it when there is
             // room. No ring with a dot inside.
             position: 'absolute',
-            top: topPx - 10,
+            top: rh(hoursFromStart, -10),
             right: 4,
             left: 'auto',
             height: 20,
@@ -3201,6 +3220,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       <div
         ref={gridBodyRef}
         className={`krnl-week-grid${wheelToCanvas ? '' : ' nowheel'}`}
+        data-css-rows={cssRows ? 'true' : undefined}
         data-testid="calendar-grid-body"
         data-wheel={wheelToCanvas ? 'canvas' : 'calendar'}
         onWheel={(e) => { if (!wheelToCanvas && !e.ctrlKey && !e.metaKey) e.stopPropagation(); }}
@@ -3221,6 +3241,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           overscrollBehavior: 'contain',
           position: 'relative',
           padding: `${GRID_PAD}px 0`,
+          ...(cssRows ? { containerType: 'size', ['--rh' as string]: `calc(100cqh / ${rowCount} * ${zoomK})` } : {}),
         }}
       >
         {/* Time gutter — drag it up or down to zoom the hours (Decision 58). */}
@@ -3236,7 +3257,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             cursor: 'ns-resize',
             touchAction: 'none',
             alignSelf: 'flex-start',
-            height: rowCount * rowHeight,
+            height: rh(rowCount),
           }}
         >
           {Array.from({ length: rowCount }, (_, i) => {
@@ -3252,7 +3273,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               <div
                 key={hour}
                 style={{
-                  height: rowHeight,
+                  height: rh(1),
                   position: 'relative',
                   boxSizing: 'border-box',
                 }}
@@ -3289,7 +3310,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               data-testid="calendar-now-time"
               aria-label={`Now ${fmtMinOfDay(nowMin)}`}
               style={{
-                position: 'absolute', right: 5, top: (nowMin / 60) * rowHeight - 8, height: 16, padding: '0 4px', boxSizing: 'border-box',
+                position: 'absolute', right: 5, top: rh(nowMin / 60, -8), height: 16, padding: '0 4px', boxSizing: 'border-box',
                 display: 'inline-flex', alignItems: 'center', borderRadius: 4, zIndex: 2,
                 fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1,
                 color: '#fff', background: 'color-mix(in srgb, var(--k-now, #ef4444) 84%, #000)', pointerEvents: 'none',
@@ -3317,8 +3338,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             // matches scrollHeight and lets the overlay span the full grid.
             // Plus the part of an hour the panel shows past the last whole
             // hour, so every page (the last too) starts on a whole hour.
-            minHeight: rowCount * rowHeight,
-            height: rowCount * rowHeight,
+            minHeight: rh(rowCount),
+            height: rh(rowCount),
           }}
         >
           {/* Day-separator lines overlay — absolute layer sized to the full
@@ -3346,7 +3367,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             ))}
           </div>
           {/* Decision 61 — the one ghost of this grid (every drag and resize). */}
-          <CalendarGhostLayer rowHeight={rowHeight} planLeft={railPxFor} />
+          <CalendarGhostLayer rowHeight={rowHeight} rowCount={rowCount} planLeft={railPxFor} />
           {weekDays.map((dayYMD, _colIdx) => {
             const isToday = dayYMD === today;
             return (
@@ -3385,7 +3406,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                       onDragLeave={handlers.onDragLeave}
                       onDrop={handlers.onDrop}
                       style={{
-                        height: rowHeight,
+                        height: rh(1),
                         boxSizing: 'border-box',
                         borderBottom: `1px solid ${CAL_HOUR_LINE}`,
                         // Decision 58 — every other hour a shade deeper, so an hour reads as a band.
@@ -3426,6 +3447,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               days={dayCount}
               hourRange={hourRange}
               rowHeight={rowHeight}
+              {...(cssRows ? { rowUnit: 'var(--rh)' } : {})}
               columnWidth={NOMINAL_COLUMN_WIDTH}
               gutterWidth={0}
               // Decision 59 — the dot sits on today's recorded-time line.

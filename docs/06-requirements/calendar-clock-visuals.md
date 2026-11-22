@@ -79,6 +79,9 @@
 | F70 | (Decision 61) **Resizing the canvas Calendar keeps up:** the inside follows the edge in the same frame (scaled while moving, laid out on a pause and on release); the windows to its right never jump on release. |
 | F71 | (Decision 61) **The wheel on the Free canvas:** over a Calendar whose day fits, the wheel zooms or moves the canvas; zoomed into the hours, it scrolls them; Ctrl + wheel and a pinch always zoom the hours. |
 | F72 | (Decision 61) **Readable hour numbers** in My layout and on the canvas: at least 22 px apart, each on its line; the time now hides only the number under it. |
+| F73 | (Decision 61) **The hours follow the window by CSS:** resizing (or a short Station cell) never leaves a band under 23:00 and never freezes the inside; the wheel scrolls the hours exactly when they scroll. |
+| F74 | (Decision 61) **A time line on what is carried:** a line to its top (or pulled bottom) edge with the exact time in the hour column; the carried block keeps its text layout. |
+| F75 | (Decision 61) **The package:** carried from outside, a 3D parcel in the plan's colour packs over the Calendar and unpacks on the drop. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin

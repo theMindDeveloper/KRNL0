@@ -392,26 +392,50 @@ body.cal-resizing .cal-block:active { transform: none; }
    motion: no glide, no shrink, no pop. */
 .cal-drop-ghost { transition: transform 90ms cubic-bezier(0.22, 1, 0.36, 1), height 90ms cubic-bezier(0.22, 1, 0.36, 1), width 90ms cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
 .cal-drop-ghost.is-shown { animation: cal-drop-in 120ms ease-out; }
-.cal-drop-ghost-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-drop-ghost-name { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
 .cal-drop-ghost-name:empty { display: none; }
 .cal-drop-ghost-times { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 @keyframes cal-drop-in { from { opacity: 0; } to { opacity: 1; } }
 .cal-block.is-carried, .cal-event.is-carried { opacity: 0.35; }
-/* The small box at the pointer: the thing carried, in its colour. */
+/* The package at the pointer (DropGhost.tsx): a small parcel in the plan's
+   colour. It packs as it is carried onto the Calendar (pops in, the lid comes
+   down) and unpacks where it is let go (the lid lifts off, it gives way). */
 .krnl-carry-box {
-  position: fixed; left: 0; top: 0; width: 14px; height: 14px; z-index: 2147483000; pointer-events: none; box-sizing: border-box;
-  border-radius: 4px; border: 1.5px solid var(--carry-tone, var(--acid));
-  background: color-mix(in srgb, var(--carry-tone, var(--acid)) 70%, var(--paper));
-  box-shadow: 0 4px 12px -4px rgba(0,0,0,0.55);
-  opacity: 0; scale: 0.6; transition: opacity 110ms ease-out, scale 110ms cubic-bezier(0.22, 1, 0.36, 1); will-change: translate;
+  position: fixed; left: 0; top: 0; width: 30px; height: 30px; z-index: 2147483000; pointer-events: none;
+  opacity: 0; scale: 0.5; transition: opacity 120ms ease-out, scale 120ms ease-out; will-change: translate;
+  filter: drop-shadow(0 5px 6px rgba(0, 0, 0, 0.45));
 }
-.krnl-carry-box.is-shown { opacity: 1; scale: 1; }
+.krnl-carry-box .krnl-pkg { display: block; overflow: visible; }
+.krnl-carry-box .pkg-top { fill: color-mix(in srgb, var(--carry-tone, var(--acid)) 60%, #fff); }
+.krnl-carry-box .pkg-left { fill: var(--carry-tone, var(--acid)); }
+.krnl-carry-box .pkg-right { fill: color-mix(in srgb, var(--carry-tone, var(--acid)) 66%, #000); }
+.krnl-carry-box .pkg-tape { fill: rgba(255, 255, 255, 0.45); }
+.krnl-carry-box .pkg-edge { fill: none; stroke: color-mix(in srgb, var(--carry-tone, var(--acid)) 40%, #000); stroke-width: 0.9; stroke-linejoin: round; stroke-linecap: round; }
+.krnl-carry-box .krnl-pkg-lid, .krnl-carry-box .krnl-pkg-body { transform-box: fill-box; transform-origin: 50% 100%; }
+.krnl-carry-box.is-shown { opacity: 1; scale: 1; animation: krnl-pkg-pack 340ms cubic-bezier(0.2, 0.9, 0.3, 1.25); }
+.krnl-carry-box.is-shown .krnl-pkg-lid { animation: krnl-pkg-lid-close 340ms cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+@keyframes krnl-pkg-pack { from { scale: 0.45; rotate: -10deg; } to { scale: 1; rotate: 0deg; } }
+@keyframes krnl-pkg-lid-close { 0% { transform: translateY(-9px) rotate(-18deg); opacity: 0; } 55% { opacity: 1; } 100% { transform: none; opacity: 1; } }
+.krnl-carry-box.is-unpacking { opacity: 1; animation: krnl-pkg-unpack 420ms ease-out forwards; }
+.krnl-carry-box.is-unpacking .krnl-pkg-lid { animation: krnl-pkg-lid-open 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+@keyframes krnl-pkg-unpack { 0% { scale: 1; opacity: 1; } 45% { scale: 1.12; opacity: 1; } 100% { scale: 1.3; opacity: 0; } }
+@keyframes krnl-pkg-lid-open { 0% { transform: none; opacity: 1; } 100% { transform: translate(-6px, -12px) rotate(-28deg); opacity: 0; } }
+/* The time line of what is carried: across the hours to its edge, the exact time in the hour column. */
+.cal-drop-rule { transition: transform 90ms cubic-bezier(0.22, 1, 0.36, 1), width 90ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cal-drop-rule::after { content: ''; position: absolute; left: 44px; right: 0; top: -0.75px; height: 1.5px; background: var(--ghost-tone, var(--acid)); opacity: 0.9; }
+.cal-drop-rule-time {
+  position: absolute; left: 0; top: -8px; height: 16px; min-width: 40px; box-sizing: border-box; padding: 0 4px; border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--ink-on-bright, #0a0908); background: var(--ghost-tone, var(--acid));
+}
+.cal-drop-rule.is-shown { animation: cal-drop-in 120ms ease-out; }
 /* A canvas card over the Calendar: it goes into the box (around the grab point). */
 .react-flow__node > * { transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease; }
 .react-flow__node[data-over-calendar] > * { transform: scale(0.04); opacity: 0 !important; transform-origin: var(--grab-x, 50%) var(--grab-y, 50%); }
 .cal-block.is-landed { animation: cal-landed 520ms cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes cal-landed { 0% { transform: scale(0.92); box-shadow: 0 0 0 2px var(--acid); } 60% { transform: scale(1.02); } 100% { transform: none; box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .cal-drop-ghost, .cal-drop-ghost.is-shown, .cal-block.is-landed, .krnl-carry-box { animation: none; transition: none; }
+  .cal-drop-ghost, .cal-drop-ghost.is-shown, .cal-drop-rule, .cal-drop-rule.is-shown, .cal-block.is-landed, .krnl-carry-box, .krnl-carry-box * { animation: none !important; transition: none; }
+  .krnl-carry-box.is-unpacking { opacity: 0; }
   .react-flow__node[data-over-calendar] > *, .react-flow__node > * { transition: none; }
 }

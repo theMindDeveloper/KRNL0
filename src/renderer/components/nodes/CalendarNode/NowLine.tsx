@@ -12,6 +12,8 @@ export interface NowLineProps {
   days?: number;
   hourRange: { start: number; end: number };
   rowHeight: number;
+  /** Decision 61 — a CSS length for one hour (the Calendar's --rh); when given, the line follows the hours' CSS size. */
+  rowUnit?: string;
   columnWidth: number;
   gutterWidth: number;
   /** Draw the dot in today's column. */
@@ -38,6 +40,7 @@ export function NowLine({
   days = 7,
   hourRange,
   rowHeight,
+  rowUnit,
   columnWidth,
   gutterWidth,
   showDot = true,
@@ -66,7 +69,7 @@ export function NowLine({
 
   // Y position: fraction of hours from range start.
   const hoursFromStart = currentHour - hourRange.start + currentMinute / 60;
-  const yPos = hoursFromStart * rowHeight;
+  const yPos: number | string = rowUnit ? `calc(${rowUnit} * ${hoursFromStart})` : hoursFromStart * rowHeight;
 
   // X span: anchored to the parent container's full width via left:gutter +
   // right:0 so the bar always reaches the right edge of the day-cols area
