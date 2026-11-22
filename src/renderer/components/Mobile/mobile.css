@@ -1,6 +1,8 @@
-/* The web app on phones and iPads (MobileShell.tsx). App tokens only, so every
-   theme and frame style applies. Spacing scale 4 / 8 / 12 / 16 / 20 / 24 / 32;
-   touch targets at least 44 px; nothing scrolls sideways; no scrollbars shown. */
+/* The web app on phones and iPads (MobileShell.tsx, Decision 51, Decision 56).
+   App tokens only, so every theme and frame style applies. Spacing scale
+   4 / 8 / 12 / 16 / 20 / 24 / 32; touch targets at least 44 px; words in the
+   reading font, numbers in the mono with tabular figures; nothing scrolls
+   sideways; no scrollbars shown. Every control answers the finger on press. */
 
 .m-shell {
   position: fixed;
@@ -8,7 +10,7 @@
   display: flex;
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-mono);
+  font-family: var(--font-read, var(--font-sans));
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
@@ -18,7 +20,8 @@
 .m-shell * { scrollbar-width: none; }
 .m-shell *::-webkit-scrollbar { display: none; }
 .m-shell button { font-family: inherit; }
-.m-shell button:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+.m-shell button:focus-visible { outline: 2px solid var(--acid-ink, var(--acid)); outline-offset: 2px; }
+.m-shell ::selection { background: color-mix(in srgb, var(--acid) 35%, transparent); color: var(--ink); }
 
 .m-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .m-spacer { flex: 1 1 auto; }
@@ -27,6 +30,13 @@
 .m-stack { gap: 12px; }
 
 .m-icon { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.m-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Press feedback: on the press, not the release (transform only). */
+.m-icon-btn, .m-btn, .m-chip, .m-nav__item, .m-day__row, .m-day__focus-open {
+  transition: transform 120ms ease-out, background-color 120ms ease-out, color 120ms ease-out;
+}
+.m-icon-btn:active, .m-btn:active, .m-chip:active, .m-nav__item:active, .m-day__row:active, .m-day__focus-open:active { transform: scale(0.97); }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 .m-head {
@@ -35,103 +45,175 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
-  background: var(--paper-2);
-  border-bottom: 1px solid var(--paper-3);
+  padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+  background: var(--paper);
+  border-bottom: 1px solid color-mix(in srgb, var(--paper-3) 70%, transparent);
 }
 .m-logo { width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; }
 .m-logo--rail { width: 36px; height: 36px; border-radius: 9px; margin-bottom: 14px; }
 .m-head__title { min-width: 0; margin-right: 8px; }
-.m-head__title p { margin: 2px 0 0; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.m-head__title h1 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-head__title p { margin: 2px 0 0; font-size: 13px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-head__title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .m-icon-btn {
   width: 44px; height: 44px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   border: 0; border-radius: 12px; background: transparent; color: var(--ink-2); cursor: pointer;
 }
-.m-icon-btn:active { background: var(--paper-3); }
-.m-cap { font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.m-icon-btn:active { background: var(--paper-2); }
+.m-cap { font-size: 13px; font-weight: 600; color: var(--ink-2); }
 
 .m-chip {
   height: 32px; padding: 0 12px; flex-shrink: 0;
   display: inline-flex; align-items: center; gap: 8px;
-  border-radius: 999px; border: 1px solid var(--paper-3); background: var(--paper-2);
-  color: var(--ink-2); font-size: 11.5px; white-space: nowrap; cursor: pointer;
+  border-radius: 999px; border: 0; background: color-mix(in srgb, var(--acid) 16%, var(--paper-2));
+  color: var(--ink); font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
 }
-.m-chip--live { color: var(--ink); border-color: var(--acid); }
-.m-num { font-variant-numeric: tabular-nums; font-weight: 600; }
-.m-dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; background: var(--ink-3); }
+.m-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; background: var(--ink-3); display: inline-block; }
 .m-dot--acid { background: var(--acid); }
+
+/* Buttons: one quiet filled shape, the primary in the app's primary pair. */
+.m-btn {
+  min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+.m-btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+.m-btn--primary:active { background: var(--btn-primary-bg-hover); }
+.m-btn--quiet { min-height: 36px; padding: 0 12px; border-radius: 10px; background: var(--paper-2); color: var(--ink-2); font-size: 13px; }
+.m-btn--quiet:active { background: var(--paper-3); color: var(--ink); }
 
 /* ── Body and windows ───────────────────────────────────────────────────── */
 .m-body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .m-shell--phone .m-body { padding: 12px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left)); }
 .m-shell--phone .m-body:has(> .m-scroll) { padding: 0; }
+/* The Calendar and the canvas get the whole screen on a phone. */
+.m-shell--phone .m-body:has(> .m-cal) { padding: 8px max(6px, env(safe-area-inset-right)) 8px max(6px, env(safe-area-inset-left)); }
+.m-shell--phone .m-body:has(> .m-canvas) { padding: 0; }
 .m-shell--tablet .m-body { padding: 20px 24px max(20px, env(safe-area-inset-bottom)); }
 
 /* A board window filling its slot (the same frame as a Station cell). */
 .m-window { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; height: 100%; display: flex; flex-direction: column; }
 .m-window > * { flex: 1 1 auto; min-height: 0; }
 
+/* A view arrives with a short fade and rise (a state change, not a show). */
+.m-enter { animation: m-enter 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes m-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .m-enter { animation: none; } .m-shell *:active { transform: none !important; } }
+
 /* Today on a phone: one column that scrolls; each window keeps a height that
    shows it whole (they are the desktop's windows, which fill what they get). */
 .m-scroll {
   position: absolute; inset: 0;
   overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
-  display: flex; flex-direction: column; gap: 16px;
-  padding: 16px max(12px, env(safe-area-inset-right)) 24px max(12px, env(safe-area-inset-left));
+  display: flex; flex-direction: column; gap: 20px;
+  padding: 20px max(12px, env(safe-area-inset-right)) 32px max(12px, env(safe-area-inset-left));
 }
-.m-headline { display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
-.m-headline h1 { margin: 0; font-size: 30px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.05; }
+.m-headline { display: flex; flex-direction: column; gap: 6px; padding: 0 4px; }
+.m-headline h1 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.08; text-wrap: balance; }
+.m-headline__date { color: var(--ink-3); font-weight: 500; }
 .m-headline__row { display: flex; align-items: center; gap: 12px; min-height: 32px; }
-.m-headline__row p { margin: 0; flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--ink-3); }
+.m-headline__row p { margin: 0; flex: 1 1 auto; min-width: 0; font-size: 15px; line-height: 1.4; color: var(--ink-2); }
 .m-slot { flex-shrink: 0; display: flex; flex-direction: column; }
-.m-slot--timer { height: 300px; }
+.m-slot--timer { height: 260px; }
+.m-slot--clock { height: 400px; }
 .m-slot--habits-tab { height: 290px; }
 
-/* Calendar / Clock switch */
-.m-seg { display: inline-flex; align-self: flex-start; padding: 3px; gap: 2px; border-radius: 10px; background: var(--paper-2); border: 1px solid var(--paper-3); flex-shrink: 0; }
-.m-seg button { height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; cursor: pointer; }
-.m-seg button.on { background: var(--paper-3); color: var(--ink); }
+/* A section heading with its one quiet action on the right. */
+.m-section-head { display: flex; align-items: center; gap: 12px; padding: 0 4px; margin-bottom: 8px; }
+.m-section-head h2 { margin: 0; flex: 1 1 auto; font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
 
+/* ── Your day ───────────────────────────────────────────────────────────── */
+.m-day__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.m-day__empty { margin: 0; padding: 16px; border-radius: 14px; background: var(--paper-2); font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.m-day__row, .m-day__focus-open { white-space: normal; }
+.m-day__row {
+  width: 100%; min-height: 52px; padding: 8px 8px 8px 4px; border: 0; border-radius: 12px; cursor: pointer;
+  display: grid; grid-template-columns: 52px 20px minmax(0, 1fr); align-items: start; column-gap: 8px;
+  background: transparent; color: var(--ink); text-align: left;
+}
+.m-day__row:active { background: var(--paper-2); }
+.m-day__time { padding-top: 2px; font-size: 13px; color: var(--ink-2); text-align: right; }
+.m-day__mark { height: 21px; display: inline-flex; align-items: center; justify-content: center; color: var(--acid-ink, var(--acid)); }
+.m-day__text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.m-day__title { font-size: 15px; font-weight: 600; line-height: 1.35; overflow-wrap: break-word; }
+.m-day__meta { font-size: 13px; line-height: 1.35; color: var(--ink-3); }
+.m-day__list li[data-past] .m-day__time,
+.m-day__list li[data-past] .m-day__title { color: var(--ink-3); }
+.m-day__list li[data-done] .m-day__title { color: var(--ink-3); font-weight: 500; }
+
+/* The item going on now (or next), opened out. */
+.m-day__focus {
+  margin: 6px 0; padding: 4px; border-radius: 16px; background: var(--paper-2);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.m-day__focus-open {
+  width: 100%; padding: 12px 12px 10px; border: 0; border-radius: 12px; cursor: pointer; background: transparent; color: var(--ink); text-align: left;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.m-day__focus-open:active { background: var(--paper-3); }
+.m-day__status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.m-day__focus[data-state='now'] .m-day__status { color: var(--acid-ink, var(--acid)); }
+.m-day__focus-title { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; overflow-wrap: break-word; }
+.m-day__focus-meta { font-size: 14px; color: var(--ink-2); }
+.m-day__bar { display: block; height: 4px; margin-top: 4px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+.m-day__bar i { display: block; height: 100%; border-radius: inherit; }
+.m-day__focus > .m-btn { margin: 0 8px 8px; }
+
+.m-day__now { display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 8px 0 4px; }
+.m-day__now span { width: 52px; text-align: right; font-size: 12px; font-weight: 600; color: var(--k-now, #ef4444); }
+.m-day__now i { flex: 1 1 auto; height: 2px; border-radius: 2px; background: var(--k-now, #ef4444); margin-left: 8px; }
+
+/* The canvas, edge to edge on a phone (a map you move with your fingers). */
 .m-canvas { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--paper-3); }
+.m-shell--phone .m-canvas { border: 0; border-radius: 0; }
 /* A phone has no room for the map of the board; pinch and Fit do its job. */
 .m-shell--phone .m-canvas .react-flow__minimap { display: none; }
+/* The tools stay within reach and take less of the canvas. */
+.m-shell--phone .m-canvas [data-testid='dock'] { transform: scale(0.84); transform-origin: left center; }
+.m-shell--phone .m-canvas .react-flow__controls { margin-bottom: 16px; }
+.m-shell--phone .m-canvas .react-flow__controls-button { width: 40px; height: 40px; }
+/* The canvas takes every gesture: pan, pinch and drag go to it, not the page. */
+.m-canvas .react-flow { touch-action: none; }
+
+/* iPad: the Calendar beside the Clock. */
+.m-cal-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 16px; }
 
 /* iPad Today: Timer and Plans on the left, Calendar and Habits on the right. */
 .m-today-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 16px; }
 .m-col { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-@media (max-width: 899px) { .m-today-grid { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); } }
+@media (max-width: 899px) { .m-today-grid { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); } .m-cal-split { grid-template-columns: minmax(0, 1fr); } }
 
 /* ── Phone tab bar: a material layer at the bottom ──────────────────────── */
 .m-shell--phone { flex-direction: column; }
 .m-tabbar {
   flex-shrink: 0;
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px;
   padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
-  background: color-mix(in srgb, var(--paper-2) 82%, transparent);
+  background: color-mix(in srgb, var(--paper-2) 88%, transparent);
   backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border-top: 1px solid var(--paper-3);
+  border-top: 1px solid color-mix(in srgb, var(--paper-3) 70%, transparent);
 }
 .m-nav__item {
-  min-height: 52px; min-width: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  border: 0; background: transparent; color: var(--ink-3); cursor: pointer;
-  font-size: 10.5px; letter-spacing: 0.04em;
+  min-height: 56px; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border: 0; border-radius: 14px; background: transparent; color: var(--ink-3); cursor: pointer;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0;
 }
 .m-nav__item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.m-nav__item.on { color: var(--acid-ink); }
-:root[data-theme='dark'] .m-nav__item.on { color: var(--acid); }
+/* The chosen view: its icon sits in a filled pill and its name turns to ink. */
+.m-nav__item .m-icon { width: 52px; height: 30px; padding: 4px 15px; box-sizing: border-box; border-radius: 999px; transition: background-color 160ms ease-out; }
+.m-nav__item.on { color: var(--ink); font-weight: 600; }
+.m-nav__item.on .m-icon { background: color-mix(in srgb, var(--acid) 22%, var(--paper-3)); color: var(--acid-ink, var(--ink)); }
+:root[data-theme='dark'] .m-nav__item.on .m-icon { color: var(--acid); background: color-mix(in srgb, var(--acid) 16%, var(--paper-2)); }
 
 /* ── iPad rail ──────────────────────────────────────────────────────────── */
 .m-rail {
-  width: 76px; flex-shrink: 0;
+  width: 84px; flex-shrink: 0;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: max(24px, env(safe-area-inset-top)) 0 max(20px, env(safe-area-inset-bottom)) env(safe-area-inset-left);
   background: var(--paper-2); border-right: 1px solid var(--paper-3);
 }
-.m-rail .m-nav__item { width: 56px; min-height: 56px; border-radius: 14px; flex: 0 0 auto; }
-.m-rail .m-nav__item.on { background: var(--acid-faint); }
+.m-rail .m-nav__item { width: 72px; min-height: 60px; flex: 0 0 auto; }
 
 /* ── Focus: the timer alone ─────────────────────────────────────────────── */
 .m-focus {
@@ -139,10 +221,18 @@
   display: flex; flex-direction: column; gap: 12px;
   padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background: var(--paper);
+  animation: m-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .m-focus__head { display: flex; align-items: center; gap: 8px; }
 .m-focus__head .m-cap { flex: 1 1 auto; text-align: center; }
 
+/* The morning line and other notices sit above the tab bar, never on it. */
+body:has(.m-shell--phone) .dm-morning { bottom: calc(84px + env(safe-area-inset-bottom)); }
+
 @media (prefers-reduced-transparency: reduce) {
   .m-tabbar { background: var(--paper-2); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .m-head, .m-tabbar { border-color: var(--ink-3); }
+  .m-day__meta, .m-day__time { color: var(--ink-2); }
 }

@@ -3,6 +3,9 @@
 // label, the Analytics window's page and range, a media title, an image's alt
 // text. Each one writes the board the way the window does it.
 
+import { RESIZABLE_MOTHERS, motherSizeOf, resizeMotherIn } from '../../shared/motherLayout';
+import { layoutLabel, presetOf, presetRows, presetWindows, swapInRows, withPreset, withPresetWindow } from '../../shared/stationLayouts';
+import type { StationGeometry } from '../../shared/types/board';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import type { SysResult } from '../SysFacade';
 import type { Board } from '../../shared/types';
@@ -52,6 +55,9 @@ function motherOf(board: RawBoard, name: string | undefined): AnyNode | string {
 /** Shown in Station unless hidden; the terminal starts hidden; Easy has no terminal. */
 function isShown(board: RawBoard, n: AnyNode): boolean {
   if (board['uiMode'] === 'easy' && n.kind === 'term') return false;
+  // Decision 59 — a ready-made layout shows its own set of windows.
+  const ready = readyMadeOf(board);
+  if (ready) return presetWindows(ready.preset, ready.geo?.[ready.preset]).has(n.kind);
   const hidden = n.config?.['stationHidden'];
   if (hidden !== undefined) return hidden !== true;
   return n.kind !== 'term';
@@ -69,6 +75,14 @@ export function windowList(ctx: WindowCtx, json = false): SysResult {
   return { ok: true, message: rows.map((r) => `${r.window.padEnd(10)} ${r.shown ? 'shown' : 'hidden'}`).join('\n'), data: rows };
 }
 
+/** The ready-made layout in use (Station with Calendar & Clock or Wide Calendar), if any. */
+function readyMadeOf(board: RawBoard): { preset: 'grid' | 'planner'; geo: StationGeometry | undefined } | null {
+  if (board['layoutMode'] !== 'station') return null;
+  const geo = (board['layoutGeometry'] as { station?: StationGeometry } | undefined)?.station;
+  const preset = presetOf(geo);
+  return preset === 'classic' ? null : { preset, geo };
+}
+
 /** `krnl window show|hide <name>` — the Station toolbar's eye buttons. */
 export function windowSetShown(ctx: WindowCtx, name: string | undefined, show: boolean): SysResult {
   const board = load(ctx);
@@ -78,10 +92,34 @@ export function windowSetShown(ctx: WindowCtx, name: string | undefined, show: b
   if (show && m.kind === 'term' && board['uiMode'] === 'easy') {
     return { ok: false, message: 'Easy mode has no terminal; switch to Advanced first (krnl settings mode advanced)' };
   }
+  // Decision 59 — in a ready-made layout the window joins or leaves that layout only.
+  const ready = readyMadeOf(board);
+  if (ready) {
+    board['layoutGeometry'] = { ...(board['layoutGeometry'] as object | undefined), station: withPresetWindow(ready.geo, ready.preset, m.kind, show) };
+    save(ctx, board);
+    return { ok: true, message: `${label(m.kind)} ${show ? 'shown' : 'hidden'} in ${layoutLabel(ready.preset)}`, data: { id: m.id, shown: show } };
+  }
   m.config = { ...(m.config ?? {}), stationHidden: !show };
   save(ctx, board);
   const note = board['layoutMode'] === 'station' ? '' : ' (applies in Station layout; the canvas always shows every window)';
   return { ok: true, message: `${label(m.kind)} ${show ? 'shown' : 'hidden'}${note}`, data: { id: m.id, shown: show } };
+}
+
+/** `krnl window size <name> [width height]` — a window's size on the Free canvas (Decision 60: the Calendar). */
+export function windowSize(ctx: WindowCtx, name: string | undefined, width: number | undefined, height: number | undefined): SysResult {
+  const board = load(ctx);
+  if (!board) return { ok: false, message: 'No board found' };
+  const m = motherOf(board, name);
+  if (typeof m === 'string') return { ok: false, message: m };
+  const cur = motherSizeOf(m as never);
+  if (width === undefined && height === undefined) return { ok: true, message: `${label(m.kind)}: ${cur.width} × ${cur.height}`, data: cur };
+  if (!RESIZABLE_MOTHERS.has(m.kind)) return { ok: false, message: `${label(m.kind)} keeps its size; only the calendar can be resized` };
+  const side = Math.max(width ?? 0, height ?? 0);
+  if (!Number.isFinite(side) || side <= 0) return { ok: false, message: 'window size: give a size in px (e.g. krnl window size calendar 900)' };
+  board.nodes = resizeMotherIn(board.nodes as never, m.id, side) as never;
+  save(ctx, board);
+  const now = motherSizeOf(board.nodes.find((n) => n.id === m.id) as never);
+  return { ok: true, message: `${label(m.kind)}: ${now.width} × ${now.height} on the Free canvas (it keeps its shape; 540 is the smallest; this device only)`, data: now };
 }
 
 /** `krnl window swap <a> <b>` — swap two windows' places (dragging one onto another). */
@@ -93,6 +131,15 @@ export function windowSwap(ctx: WindowCtx, a: string | undefined, b: string | un
   const mb = motherOf(board, b);
   if (typeof mb === 'string') return { ok: false, message: mb };
   if (ma.id === mb.id) return { ok: false, message: 'Pick two different windows' };
+  // Decision 58 — in Grid and Planner the two windows trade places in that layout's order.
+  const geo = (board['layoutGeometry'] as { station?: StationGeometry } | undefined)?.station;
+  const preset = presetOf(geo);
+  if (board['layoutMode'] === 'station' && preset !== 'classic') {
+    const order = swapInRows(presetRows(preset, geo?.[preset]?.order), ma.kind, mb.kind);
+    board['layoutGeometry'] = { ...(board['layoutGeometry'] as object | undefined), station: { ...withPreset(geo, preset), [preset]: { ...geo?.[preset], order } } };
+    save(ctx, board);
+    return { ok: true, message: `${label(ma.kind)} and ${label(mb.kind)} swapped places (${layoutLabel(preset)})` };
+  }
   const posA = ma.position ?? { x: 0, y: 0 };
   const posB = mb.position ?? { x: 0, y: 0 };
   const slotA = ma.config?.['stationSlot'];

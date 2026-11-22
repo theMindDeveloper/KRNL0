@@ -1,3 +1,29 @@
 /* The web app's page: the app fills the browser window, nothing scrolls the page itself. */
 html, body, #root { height: 100%; }
 body { margin: 0; overflow: hidden; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+
+/* Touch screens (Decision 56): a long-press is the right-click menu and
+   nothing else. UI text (dial numbers, headers, buttons, chips, rows) is not
+   selectable, so a long-press never starts a selection or the phone's own
+   callout; fields, text being edited and anything marked data-selectable keep
+   the system's long-press (select, paste). touch.ts does the rest. */
+@media (pointer: coarse) {
+  /* body, not #root: menus and cards open in portals on the body. */
+  html, body, body * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  body input, body textarea, body select,
+  body [contenteditable=""], body [contenteditable="true"], body [contenteditable=""] *, body [contenteditable="true"] *,
+  body [data-selectable], body [data-selectable] * {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+  /* No grey flash on every tap. */
+  body { -webkit-tap-highlight-color: transparent; }
+  /* Menus a finger opens get rows a finger can hit (44 px). */
+  [data-testid='context-menu'] { font-size: 14px !important; }
+  [data-testid='context-menu'] > button, [data-testid='context-menu'] [role='menuitem'], [data-testid='context-menu'] > div > button { min-height: 44px; }
+}

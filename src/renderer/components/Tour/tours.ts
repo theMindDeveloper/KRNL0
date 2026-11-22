@@ -71,6 +71,9 @@ export interface TourStep {
   nudge?: (now: Board, atStart: Board) => string | null;
   /** A second button that ends this tour and starts another ("Show me Advanced"). */
   then?: { label: string; tour: string };
+  /** Show the app in this layout for the step (My layout is 'station'); the
+   *  tour's `restoreLayout` puts the user's own layout back at the end. */
+  layout?: 'station' | 'canvas';
 }
 
 export interface Tour {
@@ -84,6 +87,8 @@ export interface Tour {
   onlyIn?: 'easy' | 'advanced';
   /** About the desktop app only (the Terminal, the AI orb): not listed on the web (Decision 51). */
   desktopOnly?: boolean;
+  /** Puts back the layout the user started in when the tour ends (the layout tour). */
+  restoreLayout?: boolean;
   /** What it shows that a new board doesn't have yet: added as examples
    *  when missing, removed when the tour ends (tourExamples.ts). */
   examples?: ExampleKind[];
@@ -128,6 +133,18 @@ const endedCount = (b: Board) => habits(b).filter((h) => h.kind === 'routine' &&
 const routineAdded = (now: Board, start: Board) => routineCount(now) > routineCount(start);
 const routineSkipped = (now: Board, start: Board) => exceptionCount(now) > exceptionCount(start);
 const routineEnded = (now: Board, start: Board) => endedCount(now) > endedCount(start);
+// Decision 62 — an event that happens once (its first and last day the same) or every week.
+type HabitDates = HabitLite & { startsOn?: string };
+const onceCount = (b: Board) => (habits(b) as HabitDates[]).filter((h) => h.kind === 'routine' && !!h.startsOn && h.startsOn === h.endsOn).length;
+const oneTimeAdded = (now: Board, start: Board) => onceCount(now) > onceCount(start);
+const repeatingAdded = (now: Board, start: Board) => routineCount(now) - onceCount(now) > routineCount(start) - onceCount(start);
+// The layout tour: windows swapped (or resized) in My layout; the Free canvas picked.
+const arrangementKey = (b: Board) => JSON.stringify([
+  (b as { layoutGeometry?: { station?: unknown } }).layoutGeometry?.station ?? null,
+  b.nodes.filter((n) => n.isMother).map((n) => [n.id, n.position?.x ?? 0, n.position?.y ?? 0, (n.config as { stationSlot?: unknown } | undefined)?.stationSlot ?? null]),
+]);
+const arrangementChanged = (now: Board, start: Board) => arrangementKey(now) !== arrangementKey(start);
+const onFreeCanvas = (now: Board) => now.layoutMode === 'canvas';
 const taskDone = (now: Board, start: Board) => doneCount(now) > doneCount(start);
 // "When plans change" tour (task-node F21/F22): a missed plan is settled
 // (Done on its day, or Won't do), a done card is archived.
@@ -197,6 +214,9 @@ const SYNC_SHEET = '[data-testid="sync-status"]';
 const EXAMPLE_MISSED_TEXT = 'Example: Read chapter 2';
 const EXAMPLE_PLAN_TEXT = 'Example: Read chapter 3';
 const MODE = '[role="radiogroup"][aria-label="Easy or Advanced"]';
+const LAYOUT_MENU = '[data-testid="layout-menu"]';
+// The Calendar's field: its button, or the field itself while you type in it.
+const EVENT_FIELD = '[data-testid="calendar-new"], [data-testid="calendar-add-input"]';
 
 export const TOURS: readonly Tour[] = [
   // engagement.md F12 — one story through the whole loop. The orb's first
@@ -286,19 +306,22 @@ export const TOURS: readonly Tour[] = [
   {
     id: 'calendar',
     examples: ['plan', 'recorded'],
-    title: 'Calendar — plan vs reality',
-    summary: 'Drag or click to plan, any time, plan vs reality',
+    title: 'Calendar — your week',
+    summary: 'Plan from your Todo, click for its card, zoom, what you recorded',
     steps: [
-      { say: "The Calendar holds your plan, the blocks, and what really happened: the thin track at the left of each day.", node: 'mother-calendar', target: CAL, badge: 'CALENDAR', text: 'The Calendar holds your **plan** (blocks) and **what really happened** (the thin track at the left of each day).' },
-      { say: "Drag a plan from the To-do onto a time here, to plan it.", target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', also: ['mother-todo'], from: TODO, fromBadge: 'FROM HERE', badge: 'DROP HERE', text: '**Drag a plan** from the **Todo** onto a time here to plan it.', waitFor: { board: taskScheduled }, hint: 'Waiting for you to drop a task on the grid…' },
+      { say: "The Calendar holds your plans, your events, and what really happened: the thin line at the left of each day.", node: 'mother-calendar', target: CAL, badge: 'CALENDAR', text: 'The Calendar holds your **plans**, your **events** and **what really happened** (the thin line at the left of each day).' },
+      { say: "Drag a plan from the To-do onto a time. A line shows the exact time while you carry it.", target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', also: ['mother-todo'], from: TODO, fromBadge: 'FROM HERE', badge: 'DROP HERE', text: '**Drag a plan** from the **Todo** onto a time. A line shows the **exact time** while you carry it.', waitFor: { board: taskScheduled }, hint: 'Waiting for you to drop a task on the grid…' },
       { say: "On a day, but no set time? Drop it in the \"any time\" strip under the day names, and drag it into the hours later to give it a time. A dashed flag there is a deadline.", onlyIn: 'advanced', target: '[data-testid="calendar-day-only-row"]', node: 'mother-calendar', badge: 'ANY TIME', text: 'On a day but **no set time**? Drop it in the **ANY TIME** strip under the day names. Drag it into the hours later to give it a time. A dashed **flag** there is a deadline.' },
       { say: "On a day, but no set time? Drop it in the \"any time\" strip under the day names, and drag it into the hours later to give it a time.", onlyIn: 'easy', target: '[data-testid="calendar-day-only-row"]', node: 'mother-calendar', badge: 'ANY TIME', text: 'On a day but **no set time**? Drop it in the **ANY TIME** strip under the day names. Drag it into the hours later to give it a time.' },
-      { say: "Double-click empty hours, or click \"add a plan\" at the bottom, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.", target: '[data-testid="calendar-new"]', node: 'mother-calendar', badge: 'ADD HERE', text: '**Double-click empty hours** — or **add a plan** at the bottom — to add a plan right on the Calendar. Switch it to **Repeats** for a class or a shift that comes back every week.' },
-      { onlyIn: 'advanced', say: "Click a plan to open its card. Move it to another day or to any time, change how long it takes, set a reminder, mark it done, or delete it.", target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', badge: 'ITS CARD', text: '**Click a plan** to open its card: move it to another day or **any time**, change how long, set a reminder, mark it done or delete it.' },
-      { onlyIn: 'easy', say: "Click a plan to open its card. Move it to another day or to any time, change how long it takes, mark it done, or delete it.", target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', badge: 'ITS CARD', text: '**Click a plan** to open its card: move it to another day or **any time**, change how long, mark it done or delete it.' },
+      { onlyIn: 'advanced', say: "Click a plan to see its card, with Start and Done. Right-click it to change it: another day or any time, its length, a reminder, or delete it.", target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', badge: 'ITS CARD', text: '**Click a plan** to see its card: when, how long, **Start** and **Done**. **Right-click** it to change it: another day or **any time**, its length, a reminder, or delete it.' },
+      { onlyIn: 'easy', say: "Click a plan to see its card, with Done. Right-click it to change it: another day or any time, its length, or delete it.", target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', badge: 'ITS CARD', text: '**Click a plan** to see its card: when, how long, and **Done**. **Right-click** it to change it: another day or **any time**, its length, or delete it.' },
+      { say: "Pull a block's bottom edge to make it longer or shorter. Its times change as you pull.", target: '[data-testid="calendar-grid-body"]', node: 'mother-calendar', badge: 'LONGER', text: 'Pull a block\'s **bottom edge** to make it longer or shorter. Its times change as you pull.' },
+      { say: "Zoom the hours with a pinch, with Control and the mouse wheel, or by dragging the hour numbers.", target: '[data-testid="calendar-gutter"]', node: 'mother-calendar', badge: 'ZOOM', text: 'Zoom the hours with a **pinch**, **Ctrl + wheel**, or by dragging the **hour numbers**.' },
       { say: "Once you work on it, the planned block tells you how it went: \"started twenty minutes late\", or \"thirty minutes over\".", onlyIn: 'advanced', target: '[data-testid="calendar-grid-body"]', badge: 'HOW IT WENT', text: 'Once you work on it, the planned block says how it went: **"started 20m late"**, **"+30m over"**.' },
-      { say: "The thin track at the left of each day fills with recorded time. Click a filled stretch to see it, and double-click its start or end time to fix it.", target: '[data-testid="calendar-reality-block"]', node: 'mother-calendar', badge: 'RECORDED', text: 'The thin track at the left of each day fills with **recorded time**. Click a filled stretch to see it; **double-click** its start or end time to fix it.' },
+      { say: "The thin line at the left of each day fills with recorded time. Click it to see that session, and double-click its start or end time to fix it.", target: '[data-testid="calendar-reality-block"]', node: 'mother-calendar', badge: 'RECORDED', text: 'The thin line at the left of each day fills with **recorded time**. Click it to see that session; **double-click** its start or end time to fix it.' },
       { say: "Forgot to record something? Right-click an empty time, and choose \"Log time here\".", target: '[data-testid="calendar-grid-body"]', badge: 'RIGHT-CLICK', text: 'Forgot to record something? **Right-click** an empty time and choose **Log time here…**' },
+      { onlyIn: 'advanced', say: "The menu button in the Calendar's header has the rest, in every view: your events, what to show, and zoom.", target: '[data-testid="week-legend"]', node: 'mother-calendar', badge: 'MENU', text: 'The **menu** button in the Calendar\'s header has the rest, in every view: your **events**, what to show, and zoom.' },
+      { onlyIn: 'easy', say: "The menu button in the Calendar's header lists all your events, in every view.", target: '[data-testid="week-legend"]', node: 'mother-calendar', badge: 'MENU', text: 'The **menu** button in the Calendar\'s header lists all your **events**, in every view.' },
     ],
   },
   {
@@ -328,16 +351,35 @@ export const TOURS: readonly Tour[] = [
   },
   {
     id: 'routines',
-    title: 'Repeating events',
-    summary: 'A class or a shift on the Calendar, never ticked',
+    title: 'Events — once or every week',
+    summary: 'An appointment once, a class every week; never ticked',
     steps: [
-      { say: "A class, a work shift, a weekly call: that's a repeating event. It sits on your Calendar every week, and it's never ticked or missed. Habits are the things you tick.", node: 'mother-calendar', target: CAL, badge: 'JUST HAPPENS', text: 'A class, a work shift, a weekly call: a **repeating event**. It sits on your Calendar every week and is never ticked or "missed". Habits are the things you tick.' },
-      { say: "Click \"add a plan\" at the bottom of the Calendar, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.", node: 'mother-calendar', target: '[data-testid="calendar-new"]', badge: 'ADD ONE', text: 'Click **add a plan** at the bottom of the Calendar (or double-click empty hours) and pick **Repeats**. Name it **Class**, pick its days and time, press **Enter**.', waitFor: { board: routineAdded }, hint: 'Waiting for a new repeating event…' },
-      { say: "It has a card on the board too! It's never ticked: its page shows the next date, with \"Skip this one\", and \"Show\" on the Calendar.", target: '[data-card="event"]', badge: 'ON THE BOARD', text: 'It has a **card on the board** too. It is never ticked: its page shows the **next date**, with **Skip this one** and **Show** on the Calendar.' },
-      { say: "On the Calendar it's a hatched band, every week, with your plans on top. The menu button in the Calendar's header hides them, and lists them all.", onlyIn: 'advanced', node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'ON YOUR WEEK', text: 'It is a **hatched band** every week; your plans sit on top. The **menu** button in the Calendar\'s header hides them and lists them all.' },
-      { say: "On the Calendar it's a hatched band, every week, with your plans on top. The menu button in the Calendar's header lists all your repeating events.", onlyIn: 'easy', node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'ON YOUR WEEK', text: 'It is a **hatched band** every week; your plans sit on top. The **menu** button in the Calendar\'s header lists all your repeating events.' },
-      { say: "No class next time? Click the band, and choose \"Skip this one\". Only that day changes.", node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'SKIP ONE', text: 'No class next time? **Click the band** and choose **Skip this one**. Only that day changes.', waitFor: { board: routineSkipped }, hint: 'Waiting for a skipped event…' },
-      { say: "Semester over? Click the band and choose \"End after this day\". The days before it stay, and \"Restart\" is in the events list.", node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'END, DON’T DELETE', text: 'Semester over? Click the band and choose **End after this day**: the days before stay. **Restart** is in the events list.', waitFor: { board: routineEnded }, hint: 'Waiting for an ended event… (or Skip)' },
+      { say: "An appointment, an exam, a class, a shift: those are events. They happen, and they're never ticked or missed. Habits are the things you tick.", node: 'mother-calendar', target: CAL, badge: 'JUST HAPPENS', text: 'An appointment, an exam, a class, a shift: those are **events**. They happen; they are never ticked or "missed". **Habits** are the things you tick.' },
+      { say: "Click add an event at the bottom of the Calendar, and type Dentist, Friday, and a time. Press Enter, and it's on your Calendar.", node: 'mother-calendar', target: EVENT_FIELD, badge: 'TYPE IT', text: 'Click **add an event** at the bottom of the Calendar and type **Dentist fri 15:00**. Press **Enter**: it is on Friday at 15:00.', waitFor: { board: oneTimeAdded }, hint: 'Waiting for a new event…' },
+      { say: "Now type Class, with no time. Its card opens. Pick Repeats, its days and its time, and press Enter.", node: 'mother-calendar', target: EVENT_FIELD, badge: 'EVERY WEEK', text: 'Now type **Class** with no time. Its card opens: pick **Repeats**, its days and time, and press **Enter**.', waitFor: { board: repeatingAdded }, hint: 'Waiting for a repeating event…' },
+      { say: "Each event has a card on the board too. Its page shows the next date, with Skip this one, and Show, which takes you straight to it.", target: '[data-card="event"]', badge: 'ON THE BOARD', text: 'Each event has a **card on the board** too: its page shows the **next date**, with **Skip this one** and **Show**, which takes you straight to it on the Calendar.' },
+      { say: "On the Calendar, an event is a calm card with its time and room, and your plans sit beside it. The menu button in the header lists them all, and can hide them.", onlyIn: 'advanced', node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'ON YOUR WEEK', text: 'On the Calendar an event is a calm card with its time and room; your plans sit beside it. The **menu** button in the Calendar\'s header lists them all and can hide them.' },
+      { say: "On the Calendar, an event is a calm card with its time and room, and your plans sit beside it. The menu button in the header lists them all.", onlyIn: 'easy', node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'ON YOUR WEEK', text: 'On the Calendar an event is a calm card with its time and room; your plans sit beside it. The **menu** button in the Calendar\'s header lists them all.' },
+      { say: "No class next time? Right-click it, and choose Skip this one. Only that day changes.", node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'SKIP ONE', text: 'No class next time? **Right-click** it and choose **Skip this one**. Only that day changes.', waitFor: { board: routineSkipped }, hint: 'Waiting for a skipped event…' },
+      { say: "Semester over? Right-click it, and choose End after this day. The days before it stay, and Restart is in the events list.", node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'END, DON’T DELETE', text: 'Semester over? **Right-click** it and choose **End after this day**: the days before stay. **Restart** is in the events list.', waitFor: { board: routineEnded }, hint: 'Waiting for an ended event… (or Skip)' },
+    ],
+  },
+  // Decisions 54-60 — the layout menu: My layout and the Free canvas. The tour
+  // shows My layout where it needs it, and puts the user's own layout back.
+  {
+    id: 'layout',
+    title: 'Your layout',
+    summary: 'My layout or the Free canvas, arranged your way',
+    restoreLayout: true,
+    steps: [
+      { say: "This menu picks how your windows are arranged: My layout, or the Free canvas.", target: LAYOUT_MENU, badge: 'LAYOUT', text: 'This menu picks how your windows are arranged: **My layout** or the **Free canvas**.' },
+      { say: "In My layout, drag a window by its grip onto another window to swap them.", layout: 'station', target: '.station-drag-handle', badge: 'SWAP', text: 'In My layout, drag a window by its **grip** onto another window to **swap** them.', waitFor: { board: arrangementChanged }, hint: 'Waiting for two windows to swap… (or Skip)' },
+      { say: "Drag the line between two windows to give one more room. It stays as you leave it.", layout: 'station', target: '.station-splitter', badge: 'RESIZE', text: 'Drag the **line between two windows** to give one more room. It stays as you leave it.' },
+      { say: "The window buttons in the top bar show or hide a window.", layout: 'station', target: '[data-testid="station-toolbar"]', badge: 'SHOW & HIDE', text: 'The **window buttons** in the top bar show or hide a window.' },
+      { say: "Want to start over? Reset, in this menu, brings back the Timer, the Clock and the To-do, over a full-width Calendar.", press: LAYOUT_MENU, target: '[data-testid="layout-reset-mine"]', badge: 'RESET', text: 'Want to start over? **Reset** in this menu brings back Timer, Clock and Todos over a full-width Calendar.' },
+      { say: "Pick Free canvas. Every window becomes a card on the canvas, and you can put anything anywhere.", press: LAYOUT_MENU, target: '[data-testid="layout-option-free"]', badge: 'FREE CANVAS', text: 'Pick **Free canvas**: every window becomes a card on the canvas, and you can put anything anywhere.', waitFor: { board: onFreeCanvas }, hint: 'Waiting for the Free canvas…' },
+      { say: "Drag the Calendar's edge to make it bigger. The windows beside it make room.", node: 'mother-calendar', target: '[data-testid="mother-resize-x-mother-calendar"]', badge: 'BIGGER', text: 'Drag the Calendar\'s **edge** to make it bigger. The windows beside it make room.' },
+      { say: "Each computer keeps its own layout, and your plans are the same everywhere. Switch back here any time, or press Control, Shift and L.", target: LAYOUT_MENU, badge: 'YOURS HERE', text: 'Each computer keeps its **own layout**; your plans are the same everywhere. Switch back here any time, or press **Ctrl + Shift + L**.' },
     ],
   },
   {
@@ -364,7 +406,7 @@ export const TOURS: readonly Tour[] = [
     id: 'plans-change',
     examples: ['missed', 'plan'],
     title: 'When plans change',
-    summary: 'Missed plans, Won’t do, done cards, chains',
+    summary: 'Missed plans, Won’t do, done cards',
     summaryEasy: 'Missed plans, Won’t do, done cards',
     steps: [
       { say: "Plans change. Some you did, but forgot to tick, and some you won't do at all. Here's how to tell the app what really happened, so your days stay true.", text: "Plans change. Some you did but forgot to tick, some you won't do at all. Here's how to tell the app **what really happened**, so your days stay true." },
@@ -373,8 +415,6 @@ export const TOURS: readonly Tour[] = [
       { say: "Now a plan for today. Tick it, right on its card.", target: CARD, targetText: EXAMPLE_PLAN_TEXT, badge: 'TICK', text: 'Now a plan for today: **tick it** on its card.', waitFor: { board: taskDone }, hint: 'Waiting for a tick… (or Skip)' },
       { say: "A done card stays on the board until tomorrow morning, so you can see your day. Want it gone now? Press \"Archive\". It leaves the board and the done list, and Analytics keeps it.", target: '[data-testid="done-card-archive"]', badge: 'PRESS', text: 'A done card stays on the board **until tomorrow morning**, so you see your day. Want it gone now? Press **Archive**: it leaves the board and **Done today**, and Analytics keeps it.', waitFor: { board: archived }, hint: 'Waiting for Archive… (or Skip)' },
       { onlyIn: 'advanced', say: "When done cards leave is up to you. Settings, then Finished cards: overnight, after an hour, or keep them.", press: GEAR, target: '[data-testid="settings-finished"]', badge: 'WHEN THEY GO', text: 'When done cards leave is up to you: **Settings → Finished cards** — overnight, after an hour, or keep them.' },
-      { onlyIn: 'advanced', say: "Plans in a chain leave the board together, once all of them are done. Until then, a done card says \"waits on chain\". Hover it to see which plan is holding it, or archive it.", target: CARD, badge: 'CHAINS', text: 'Plans in a **chain** leave the board together, once all of them are done. Until then a done card says **waits on chain**: hover it to see which plan holds it — or **Archive** it.' },
-      { onlyIn: 'advanced', say: "On the Calendar, a plan in a chain says \"after\", and the one before it. It starts when that one ends.", node: 'mother-calendar', target: CAL, badge: 'IN ORDER', text: 'On the Calendar, a plan in a chain says **after** the one before it: it starts when that one ends.' },
       { say: "Away for a day or more? \"Welcome back\" opens with the plans you missed. Tick what you did, and it counts on its own day. Then move the rest, or choose \"Won't do\". Close moves nothing.", text: "Away for a day or more? **Welcome back** opens with the plans you missed. **Tick** what you did (it counts on its own day), then **Move** or **Won't do** the rest. **Close** moves nothing." },
       { onlyIn: 'advanced', say: "One more thing. You can keep separate boards, one for each part of your life. Every board has its own plans, calendar, habits and timer. Open this to see them.", target: '[data-testid="topbar-canvas-switcher"]', badge: 'BOARDS', text: "One more: you can keep **separate boards**, one for each part of your life. Every board has its own **plans, Calendar, habits and timer**. Open this to see them." },
       { say: "That's how your days stay true. Done on its day, won't do, and archive. Every tour is in my menu.", target: ORB, badge: 'ASK ME', text: "That's how your days stay true: **done on its day**, **won't do**, **archive**. Every tour is in my menu." },
@@ -413,7 +453,7 @@ export const TOURS: readonly Tour[] = [
       { say: "I've switched to Advanced, and this switch appeared! \"Sessions\" gives you classic twenty-five minute rounds with breaks. \"Stopwatch\" runs until you stop.", mode: 'advanced', node: 'mother-pomo', target: '[aria-label="Timer mode"]', badge: 'NEW IN ADVANCED', text: "I've switched to **Advanced** — this switch appeared. **Sessions** gives classic 25-minute rounds with breaks; **Stopwatch** runs until you stop." },
       { say: "Recorded sessions can be named. Give each one a task or a category, so you know what the time was for.", mode: 'advanced', node: 'mother-pomo', target: '[data-testid="pomo-log-toggle"]', badge: 'MORE IN ADVANCED', text: 'Recorded sessions can be **named**: give each one a task or a category, so you know what the time was for.' },
       { say: "Tasks get tags, like Code or Study. And right-click a plan, then \"More\", for \"Focus on it\".", mode: 'advanced', node: 'mother-todo', target: '[data-testid^="todo-tag-"]', badge: 'NEW IN ADVANCED', text: 'Tasks get **tags** (Code, Study…). **Right-click** a plan, then **More**, for **Focus on it**.' },
-      { say: "Plans get deadlines, like \"by Friday\", and reminders. And cards can be chained. A card's \"Add next\" plans what comes after, and wires show the order.", mode: 'advanced', target: '[data-testid="task-node-root"]', badge: 'NEW IN ADVANCED', text: 'Plans get **deadlines** ("by Friday") and **reminders**, and cards can be **chained**: a card\'s **Add next** plans what comes after, and wires show the order.' },
+      { say: "Plans get deadlines, like \"by Friday\", and reminders. A card's \"Add next\" plans what comes right after it, and a line shows the order.", mode: 'advanced', target: '[data-testid="task-node-root"]', badge: 'NEW IN ADVANCED', text: 'Plans get **deadlines** ("by Friday") and **reminders**. A card\'s **Add next** plans what comes right after it, and a line shows the order.' },
       { say: "The Calendar gets layers: show or hide recorded time, habits and events, and a zoom for the hours.", mode: 'advanced', node: 'mother-calendar', target: '[data-testid="week-legend"]', badge: 'NEW IN ADVANCED', text: 'The Calendar gets **layers** — show or hide recorded time, habits and events — and a zoom for the hours.' },
       { say: "And there is more: separate boards, frames to group cards, the Terminal with Claude Code, and weekly targets and goals for your habits!", mode: 'advanced', target: '[data-testid="topbar-canvas-switcher"]', badge: 'NEW IN ADVANCED', text: 'And there is more: **separate boards**, **frames** to group cards, the **Terminal** with Claude Code, and weekly targets and goals for habits.' },
       { say: "\"Planned versus spent\": each task's estimate, next to the time you really spent on it.", mode: 'advanced', node: 'mother-analytics', target: '[data-testid="analytics-page-estimates"]', badge: 'NEW PAGE', text: '**Planned vs spent**: each task\u2019s estimate next to the time you really spent on it.' },
@@ -428,15 +468,15 @@ export const TOURS: readonly Tour[] = [
     title: 'The board',
     summary: 'Cards, notes, Show, and lining things up',
     steps: [
-      { say: "This is your board. Every plan, habit and repeating event has a card here, and you can put your own notes and pictures around them.", target: '.react-flow', badge: 'YOUR BOARD', text: 'This is your **board**. Every plan, habit and repeating event has a **card** here, and you can put your own notes and pictures around them.' },
+      { say: "This is your board. Every plan, habit and event has a card here, and you can put your own notes and pictures around them.", target: '.react-flow', badge: 'YOUR BOARD', text: 'This is your **board**. Every plan, habit and event has a **card** here, and you can put your own notes and pictures around them.' },
       { say: "The toolbar adds things: a text note, a sticky note, a shape, an image, and the pen.", onlyIn: 'easy', target: '[data-testid="dock"]', badge: 'TOOLBAR', text: 'The **toolbar** adds things: a **text** note, a **sticky note**, a shape, an **image** and the **pen**.' },
       { say: "The toolbar adds things: a text note, a sticky note, a shape, an image, the pen, and a frame to group cards.", onlyIn: 'advanced', target: '[data-testid="dock"]', badge: 'TOOLBAR', text: 'The **toolbar** adds things: a **text** note, a **sticky note**, a shape, an **image**, the **pen** and a **frame** to group cards.' },
       { say: "Add a sticky note: press this, or the S key, then type on it.", target: '[data-testid="dock-btn-sticky"]', badge: 'PRESS', text: 'Add a **sticky note**: press this (or the key **S**), then type on it.', waitFor: { board: noteAdded }, hint: 'Waiting for a sticky note…' },
       { say: "Right-click a plan's card, choose \"More\", then \"Show\". It lights up here and on the Calendar, so you always find it. Plans with a day have it.", target: '[data-testid="task-node-root"]', badge: 'SHOW', text: '**Right-click** a plan’s card, choose **More**, then **Show** (plans with a day have it): it lights up here and on the Calendar, so you always find it.' },
-      { say: "Habits and repeating events have cards too. On a habit, today's square ticks it. An event shows its next date, with \"Skip this one\" and \"Show\".", target: '[data-card="habit"], [data-card="event"]', badge: 'HABITS & EVENTS', text: 'Habits and repeating events have cards too. On a habit, **today’s square** ticks it; an event shows its **next date**, with **Skip this one** and **Show**.' },
+      { say: "Habits and events have cards too. On a habit, today's square ticks it. An event shows its next date, or once it's over, the last one, with \"Skip this one\" and \"Show\".", target: '[data-card="habit"], [data-card="event"]', badge: 'HABITS & EVENTS', text: 'Habits and events have cards too. On a habit, **today’s square** ticks it; an event shows its **next date** (once it is over, the last one), with **Skip this one** and **Show**.' },
       { say: "Want things to line up? Settings, Canvas, \"Align to grid\". What you move settles into a neat spot, never on top of something. Cards only, or everything.", press: GEAR, target: '[data-testid="settings-align-grid"]', badge: 'LINE UP', text: 'Want things to line up? **Settings → Canvas → Align to grid**: what you move settles into a neat spot, never on top of something. **Cards only**, or **Everything**.' },
       { say: "Need a separate space? Make another board here, one per project. Each board has its own plans, habits and calendar.", onlyIn: 'advanced', target: '[data-testid="topbar-canvas-switcher"]', badge: 'BOARDS', text: 'Need a separate space? Make **another board** here, one per project. Each board has its own plans, habits and calendar.' },
-      { say: "Drag from the dot on a card's side to another card, to put plans in order. The wire shows what comes next.", onlyIn: 'advanced', target: '[data-testid="task-node-root"]', badge: 'IN ORDER', text: '**Drag from the dot** on a card’s side to another card to put plans **in order**: the wire shows what comes next.' },
+      { say: "Drag from the dot on a card's side to another card, to show an order. The line shows what comes next. It never moves their times.", onlyIn: 'advanced', target: '[data-testid="task-node-root"]', badge: 'IN ORDER', text: '**Drag from the dot** on a card’s side to another card to show an **order**: the line shows what comes next. It never moves their times.' },
       { say: "That's the board! Ask me to show something, add a note, or tidy up. I can change it for you.", target: ORB, badge: 'ASK ME', text: 'That’s the board. **Ask me** to show something, add a note or tidy up: I can change it for you.' },
     ],
   },

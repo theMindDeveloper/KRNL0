@@ -13,6 +13,7 @@ import type { TagDef } from '../../../../shared/tags/classify';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { spanTone } from '../../../store/spanTags';
 import { wallHoursFromDayStart } from './wallHours';
+import type { GhostSpec } from '../CalendarNode/DropGhost';
 
 export type ClockHalf = 0 | 1;
 
@@ -352,4 +353,51 @@ function localYMDOf(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '0000-00-00';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Decision 63 — the Clock's id for what is carried (its entry in withCarried),
+ * or null when nothing the Clock shows is carried (a habit's time line).
+ */
+export function carriedClockId(g: GhostSpec | null): string | null {
+  if (!g || g.ruleOnly) return null;
+  return g.refId ? (g.refKind === 'event' ? `habit-${g.refId}` : g.refId) : 'calendar-carried';
+}
+
+/**
+ * Decision 61 — what is being carried on the Calendar, shown on the Clock too:
+ * the carried task or event leaves its place and is drawn at the ghost's time
+ * when the ghost is on this day and half (a new one from the Calendar's field
+ * appears there). Habits are not on the Clock (Decision 60).
+ */
+export function withCarried(tasks: TaskEntry[], g: GhostSpec | null, ymd: string, half: ClockHalf): TaskEntry[] {
+  if (!g || g.ruleOnly) return tasks;
+  const id = g.refId ? (g.refKind === 'event' ? `habit-${g.refId}` : g.refId) : null;
+  const old = id ? tasks.find((t) => t.id === id) : undefined;
+  const base = old ? tasks.filter((t) => t !== old) : tasks;
+  if (g.day !== ymd) return base;
+  const winLo = half === 1 ? 12 : 0;
+  const winHi = winLo + 12;
+  const s = g.startMin / 60;
+  const e = Math.min(24, g.endMin / 60);
+  if (e <= winLo || s >= winHi) return base;
+  const moved: TaskEntry = {
+    ...(old ?? {
+      id: id ?? 'calendar-carried',
+      name: g.name,
+      colorVar: g.tone,
+      parallelGroupId: null,
+      parallelBranchIndex: null,
+      source: 'task' as const,
+      ...(g.refKind === 'event' ? { routine: true } : {}),
+    }),
+    start: Math.max(s, winLo),
+    end: Math.min(e, winHi),
+    realStart: s,
+    realEnd: e,
+    plannedMin: g.endMin - g.startMin,
+    // Its Pomodoro split is for its old length: a plain arc while carried.
+    breakdown: null,
+  } as TaskEntry;
+  return [...base, moved];
 }

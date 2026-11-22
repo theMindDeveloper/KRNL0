@@ -11,10 +11,10 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Board } from '../../../shared/types';
-import type { MotherNodeConfig } from '../../../shared/types/board';
+import type { LayoutMode, MotherNodeConfig } from '../../../shared/types/board';
 import { useBoardStore } from '../../store/boardStore';
 import { saveBoard } from '../../store/eventLog';
-import { CALENDAR_LAYOUT_EVENT, CALENDAR_REVEAL_EVENT, focusNode } from '../../store/scheduleActions';
+import { CALENDAR_LAYOUT_EVENT, CALENDAR_REVEAL_EVENT, focusNode, revealElement } from '../../store/scheduleActions';
 import { beginPractice, keepPractice, practiceActive, practiceSummary, removePractice, type PracticeSummary } from '../../store/tourPractice';
 import { addExamples, removeExamples } from '../../store/tourExamples';
 import { isStationHidden } from '../Station/stationVisibility';
@@ -339,6 +339,8 @@ export function TourHost(): JSX.Element | null {
   const modeChosen = useRef(false);
   // The guide opened Settings for a step; close it again when moving on.
   const openedSettings = useRef(false);
+  /** The layout the user was in when a tour with `restoreLayout` started. */
+  const ownLayout = useRef<LayoutMode | null>(null);
   // Last card position: the card stays where it is while the next target
   // settles, then glides there.
   const cardPos = useRef<{ left: number; top: number } | null>(null);
@@ -354,6 +356,12 @@ export function TourHost(): JSX.Element | null {
   const end = (): void => {
     closeSettings();
     if (ownMode.current && !modeChosen.current) useBoardStore.getState().setUiMode(ownMode.current);
+    // The layout tour puts back the layout the user started in.
+    if (ownLayout.current) {
+      const st = useBoardStore.getState();
+      if (st.board && st.board.layoutMode !== ownLayout.current) st.setLayoutMode(ownLayout.current);
+      ownLayout.current = null;
+    }
     ownMode.current = null;
     modeChosen.current = false;
     cardPos.current = null;
@@ -398,6 +406,7 @@ export function TourHost(): JSX.Element | null {
       const pomoCfg = b?.nodes.find((n) => n.kind === 'pomo' && n.isMother)?.config as { mode?: string } | undefined;
       const timer = mode === 'easy' || pomoCfg?.mode === 'observe' ? 'stopwatch' : 'pomo';
       setTimer(timer);
+      ownLayout.current = t.restoreLayout && b ? (b.layoutMode ?? 'canvas') : null;
       setTour({ ...t, steps: stepsFor(t, mode, timer) });
       tourStartIds.current = new Set(idsOnBoard(useBoardStore.getState().board));
       setI(0);
@@ -421,6 +430,7 @@ export function TourHost(): JSX.Element | null {
       if (ownMode.current === null) ownMode.current = cur;
       if (cur !== step.mode) st.setUiMode(step.mode);
     }
+    if (step.layout && st.board && st.board.layoutMode !== step.layout) st.setLayoutMode(step.layout);
     if (step.press === GEAR_SELECTOR) {
       // Rule: Settings opens on the page that holds what the step talks about
       // (the target is not in the page until its section is shown).
@@ -428,7 +438,10 @@ export function TourHost(): JSX.Element | null {
       openedSettings.current = true;
     } else if (step.press) {
       const el = document.querySelector(step.press);
-      if (el instanceof HTMLElement && !document.querySelector(SETTINGS_MODAL)) {
+      // Already showing what the step points at (a menu the step before
+      // opened): pressing again would close it.
+      const showing = !!step.target && !!document.querySelector(step.target);
+      if (el instanceof HTMLElement && !showing && !document.querySelector(SETTINGS_MODAL)) {
         el.click();
         openedSettings.current = true;
       }
@@ -480,7 +493,11 @@ export function TourHost(): JSX.Element | null {
         const card = (found.el as HTMLElement).closest?.('.react-flow__node');
         const cardId = card?.getAttribute('data-id');
         // (In Station too: its cards sit on a real canvas beside the panels.)
-        if (cardId) focusNode(cardId);
+        // On the Free canvas the camera goes to the thing itself: centring its
+        // window missed it when the window is large (a big Calendar's menu
+        // button or its field stayed off screen).
+        if (cardId && useBoardStore.getState().board?.layoutMode !== 'station') revealElement(found.el);
+        else if (cardId) focusNode(cardId);
         else try { (found.el as HTMLElement).scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch { /* never break a tour */ }
       }
       // A floating panel covering it steps aside for this step (put back when the step ends).

@@ -16,8 +16,24 @@
 | F8 | Easy and Advanced show the same cards (no tags on them). |
 | F9 | An event card's **Skip this one** skips the date on its page (that day only; "Undo skip" brings it back); **Show** opens that week on the Calendar and rings the event's block. `krnl routine skip <name>` and `krnl show <event name>` do the same from the terminal. |
 | F10 | Old wires to a habit card (made before F1) are not drawn; they stay in the board and still fire (`krnl edge list`). |
+| F11 | (owner, 2026-11-22) **Show lands on the event:** the Calendar opens on its week, its hours scroll to the event and the camera moves onto the event's block itself (not the Calendar's middle), then rings it. **An event that has ended** shows the last time it happened on its page (ENDED, the day and month) and Show goes there; it never rings today or an empty day. With no date at all, Show rings the Calendar. `krnl show <event>` does the same. |
 
 ## Gherkin Scenarios (ATDD)
+
+```gherkin
+Feature: Show on an event card lands on the event (F11)
+  Scenario: The camera ends on the event
+    Given an event card on the canvas and a large Calendar
+    When I press Show
+    Then the Calendar opens on the event's week with its hours scrolled to it
+    And the event's block is on screen with the ring around it
+
+  Scenario: An ended event goes to its last time
+    Given a weekly event that ended last week
+    Then its card's page reads ENDED with the last date it happened
+    When I press Show
+    Then the Calendar rings that last date's block, not today
+```
 
 ```gherkin
 Feature: Board cards for habits and events

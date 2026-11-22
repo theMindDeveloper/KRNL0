@@ -1,16 +1,8 @@
 /**
- * Calendar parallel drop — a task dropped onto another task runs alongside it,
- * even when it was chained after that task (otherwise #168 pushes it back).
- *
- * Rules (amends ADR 0005, see decisions.md "#168 chain push"):
- *   - A task's block length (incl. a calendar resize override) is also how far
- *     the cursor advances, so successors start where the block visually ends.
- *   - An anchored successor is an earliest-start constraint: it keeps its own
- *     time when that is later than the predecessor's end, and is pushed to the
- *     predecessor's end when it would otherwise overlap.
+ * Decision 63 — connections are only drawn. Running a task alongside another
+ * is the same start (its own time); a connection never pushes or rewires.
  */
 import { describe, it, expect } from 'vitest';
-import { parallelizeChainEdges } from '../../../src/renderer/store/chainWalker';
 import { selectSchedule } from '../../../src/renderer/store/scheduleSelector';
 import type { Board } from '../../../src/shared/types';
 import type { Node } from '../../../src/shared/types/node';
@@ -49,37 +41,23 @@ function board(nodes: Node[], edges: Edge[]): Board {
   };
 }
 
-describe('parallel drop rewires the chain', () => {
-  const mk = (a: string, b: string) => edge(a, b);
+describe('a task put on another task\'s time runs alongside it (Decision 63)', () => {
   const at = (id: string, when: string, min: number) => task(id, min, { scheduledFor: when });
 
-  it('t2 chained after t1, dropped on t1 → same start, t3 still follows', () => {
+  it('t2 connected after t1, put at t1\'s start: both start then; t3 keeps its own time', () => {
     seq = 0;
-    const nodes = [at('t1', '2026-11-02T21:00', 45), at('t2', '2026-11-02T21:00', 30), task('t3', 15)];
-    const before = selectSchedule(board(nodes, [edge('t1', 't2'), edge('t2', 't3')]));
-    // A plan with its own time keeps it (Decision 30, amended 2026-11-19): t2 is not pushed.
-    expect(before.placements.get('t2')?.startISO).toBe('2026-11-02T21:00');
-
-    const edges = parallelizeChainEdges([edge('t1', 't2'), edge('t2', 't3')], 't2', 't1', true, mk);
+    const edges = [edge('t1', 't2'), edge('t2', 't3')];
+    const nodes = [at('t1', '2026-11-02T21:00', 45), at('t2', '2026-11-02T21:00', 30), at('t3', '2026-11-02T21:45', 15)];
     const { placements } = selectSchedule(board(nodes, edges));
     expect(placements.get('t1')?.startISO).toBe('2026-11-02T21:00');
     expect(placements.get('t2')?.startISO).toBe('2026-11-02T21:00');
     expect(placements.get('t3')?.startISO).toBe('2026-11-02T21:45');
   });
 
-  it('target with a predecessor → moved task forks from the same predecessor', () => {
+  it('a connection never pushes a task: one put before the end of the task before it stays there', () => {
     seq = 0;
-    const nodes = [at('t0', '2026-11-02T08:00', 60), task('t1', 30), at('t2', '2026-11-02T09:00', 20)];
-    const edges = parallelizeChainEdges([edge('t0', 't1'), edge('t1', 't2')], 't2', 't1', true, mk);
-    expect(edges.some((e) => e.from.nodeId === 't0' && e.to.nodeId === 't2')).toBe(true);
-    expect(edges.some((e) => e.from.nodeId === 't1' && e.to.nodeId === 't2')).toBe(false);
-    const { placements } = selectSchedule(board(nodes, edges));
-    expect(placements.get('t1')?.startISO).toBe('2026-11-02T09:00');
-    expect(placements.get('t2')?.startISO).toBe('2026-11-02T09:00');
-  });
-
-  it('different todos → only unlinks, never adds cross-todo edges', () => {
-    const edges = parallelizeChainEdges([edge('x', 'm'), edge('a', 't')], 'm', 't', false, mk);
-    expect(edges.map((e) => e.id)).toEqual(['e-a-t']);
+    const nodes = [at('t0', '2026-11-02T08:00', 90), at('t1', '2026-11-02T08:30', 30)];
+    const { placements } = selectSchedule(board(nodes, [edge('t0', 't1')]));
+    expect(placements.get('t1')?.startISO).toBe('2026-11-02T08:30');
   });
 });

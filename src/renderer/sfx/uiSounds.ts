@@ -145,6 +145,18 @@ class UiSoundEngine {
     }
   }
 
+  /** Make the audio engine and decode the current pack now (on idle). */
+  prepare(): void {
+    try {
+      const s = useSoundSettings.getState();
+      if (!s.enabled) return;
+      const ctx = this.context();
+      if (ctx) this.warm(ctx, s.pack);
+    } catch {
+      /* NF1: a sound never breaks the app */
+    }
+  }
+
   private warmed = new Set<SoundPackId>();
   /** After a pack's first sound, decode the rest of it so later sounds start at once. */
   private warm(ctx: Ctx, pack: SoundPackId): void {
@@ -168,3 +180,12 @@ class UiSoundEngine {
 }
 
 export const uiSounds = new UiSoundEngine();
+
+// Decision 63 (performance) — making the audio engine took ~0.1 s, inside the
+// first action that made a sound (the first drop froze for it). It is made
+// while the app is idle instead, with the current pack decoded.
+if (typeof window !== 'undefined' && typeof window.AudioContext === 'function') {
+  const idle = (window as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  const prepare = () => uiSounds.prepare();
+  if (idle) idle(prepare, { timeout: 4000 }); else window.setTimeout(prepare, 1500);
+}

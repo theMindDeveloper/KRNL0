@@ -7,6 +7,10 @@
  */
 
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, createContext, useContext, memo, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { calendarGeometryMoved, externalDragEnd, isOverCalendar } from '../nodes/CalendarNode/calendarDrag';
+import { calendarCarryEnd, calendarCarryLanded, calendarCarryMove, calendarCarryShowHome, calendarCarryStart, canvasDragItem } from './calendarCarry';
+import { afterPaint } from '../../utils/afterPaint';
+import { toneVarForTask } from '../../utils/taskColor';
 import { createPortal } from 'react-dom';
 import { scheduleBatch } from '../../utils/rafBatcher';
 import { rfToScreen, updateViewport, updateCanvasRect } from '../../utils/viewportBus';
@@ -21,6 +25,8 @@ import {
   BaseEdge,
   getBezierPath,
   useReactFlow,
+  useStoreApi,
+  useUpdateNodeInternals,
   applyNodeChanges,
   type NodeChange,
   type EdgeChange,
@@ -43,6 +49,7 @@ import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { DrawLayer } from './DrawLayer';
 import { motherRowY } from './motherRow';
+import { motherRowXs } from '../../../shared/motherLayout';
 import { DrawStrokeNode, STROKE_NODE_PREFIX, STROKE_Z, strokeBox } from './DrawStrokeNode';
 import type { DrawStroke } from '../../../shared/types/board';
 import { targetNodeIdAt } from './connectTarget';
@@ -85,7 +92,7 @@ import { undoable } from '../../store/undoNotice';
 const MOTHER_ROW_START_X = -1400;
 const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
-import { FIT_NODES_EVENT, FOCUS_NODE_EVENT } from '../../store/scheduleActions';
+import { FIT_NODES_EVENT, FOCUS_NODE_EVENT, REVEAL_ELEMENT_EVENT } from '../../store/scheduleActions';
 import { activeCanvasOf, edgesOnCanvas, isOnCanvas, isSharedNode, isStrokeOnCanvas, visibleNodeIds } from '../../../shared/canvas';
 import { alignAll, gridScopeOf, landing, onGrid, snap as snapGrid, type Box } from './alignGrid';
 
@@ -511,6 +518,11 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport, setCenter } = useReactFlow();
+  // A card back from the Calendar has its connection dots measured again once
+  // it is whole (they were measured while it shrank into the box).
+  const updateNodeInternals = useUpdateNodeInternals();
+  // React Flow's own store (the edge auto-pan switch, Decision 63).
+  const rfStore = useStoreApi();
 
   // Dock-frame variant (classic | synthesizer | telemetry | phosphor).
   // Hook applies `data-dock` to <html> and persists in localStorage.
@@ -565,8 +577,24 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       ensureVisible(detail);
     };
     window.addEventListener('krnl:ensure-visible', onEnsureVisible);
-    return () => window.removeEventListener('krnl:ensure-visible', onEnsureVisible);
-  }, [ensureVisible]);
+    // "Show" on an event (and anything drawn inside a canvas window): the
+    // camera goes to the thing itself, not to the window's middle (a large
+    // Calendar's middle left the event off screen).
+    const onReveal = (e: Event) => {
+      const el = (e as CustomEvent<{ el?: Element }>).detail?.el;
+      if (!el || !el.isConnected || !el.closest('.react-flow__node')) return;
+      if (isStationShown(useBoardStore.getState().board?.layoutMode)) return;
+      const r = el.getBoundingClientRect();
+      const a = screenToFlowPosition({ x: r.left, y: r.top });
+      const b = screenToFlowPosition({ x: r.right, y: r.bottom });
+      ensureVisible({ x: a.x, y: a.y, width: Math.max(1, b.x - a.x), height: Math.max(1, b.y - a.y) }, { padding: 90 });
+    };
+    window.addEventListener(REVEAL_ELEMENT_EVENT, onReveal);
+    return () => {
+      window.removeEventListener('krnl:ensure-visible', onEnsureVisible);
+      window.removeEventListener(REVEAL_ELEMENT_EVENT, onReveal);
+    };
+  }, [ensureVisible, screenToFlowPosition]);
 
   // While a mouse button is held (dragging nodes, a marquee, panning), embedded
   // pages (YouTube, websites) must not catch the mouse: an iframe swallows the
@@ -1458,9 +1486,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       .slice()
       .sort((a: KrnlNode, b: KrnlNode) => a.position.x - b.position.x);
     const rowStartX = Math.min(...motherNodes.map((n) => n.position.x), MOTHER_ROW_START_X);
-    const displayX = new Map<string, number>(
-      motherNodes.map((n, i) => [n.id, rowStartX + i * MOTHER_ROW_STEP]),
-    );
+    // Decision 60 — each window at its own width (the Calendar can be bigger):
+    // the next one starts a gap after it, so nothing overlaps.
+    void MOTHER_ROW_STEP;
+    const displayX = motherRowXs(motherNodes, rowStartX);
     const rowY = motherRowY(board.nodes);
     const slotTotal = motherNodes.length;
     const slotIndexMap = new Map<string, number>(
@@ -1558,6 +1587,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   //     sync becomes a no-op because the new position already matches.
   const [nodes, setNodes] = useState<KrnlRFNode[]>(derivedNodes);
   const isDraggingRef = useRef(false);
+  // Decision 60 — where the pointer is during a node drag (a task card let go over the Calendar).
+  const lastDragPointer = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!isDraggingRef.current) {
@@ -1597,6 +1628,14 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       return getMemoizedRfEdge(edge, srcKind, tgtKind);
     });
   }, [board, isStation, derivedNodes]);
+  // Decision 63 — a card in the box over a Calendar is unseen, and so are its
+  // connection lines (they would end where it went in, in empty space); they
+  // come back with the card.
+  const [carryHiddenCard, setCarryHiddenCard] = useState<string | null>(null);
+  const shownEdges = useMemo(
+    () => (carryHiddenCard ? rfEdges.map((e) => (e.source === carryHiddenCard || e.target === carryHiddenCard ? { ...e, hidden: true } : e)) : rfEdges),
+    [rfEdges, carryHiddenCard],
+  );
 
   // ── Bold-set — which source node IDs should bold their outgoing edges ─────
   // Keyed on [board.nodes, hoveredNodeId]. When a mother is hovered we walk its
@@ -1636,7 +1675,15 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   }, []);
 
   const onNodesChange = useCallback(
-    (changes: NodeChange<KrnlRFNode>[]) => {
+    (allChanges: NodeChange<KrnlRFNode>[]) => {
+      // Decision 63 (performance) — a card carried over a Calendar is in the
+      // box, unseen: the canvas does not redraw it on every move (it is drawn
+      // where the pointer is the moment it leaves the Calendar, see onNodeDrag).
+      const hidden = carriedOver.current;
+      const changes = hidden
+        ? allChanges.filter((c) => !(c.type === 'position' && c.dragging === true && c.id === hidden))
+        : allChanges;
+      if (changes.length === 0) return;
       const collidedIds: string[] = [];
 
       setNodes((nds) => {
@@ -1740,7 +1787,14 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
                 strokeMoves.push({ id: sid, dx: change.position.x - b.x, dy: change.position.y - b.y });
               }
             } else if (change.position) {
-              commitDragEnd(change.id);
+              const id = change.id;
+              // Decision 63 — a card let go over a Calendar lands there now,
+              // in the same moment as a move on the Calendar itself.
+              if (carriedCard.current === id && landCarriedCard(id)) continue;
+              // Decision 63 (performance) — the card is already drawn where it
+              // was let go (React Flow's own state); the board, which redraws
+              // every window, changes after that frame is on screen.
+              afterPaint(() => commitDragEnd(id));
             }
           }
         }
@@ -1757,6 +1811,56 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // and persists them through the store. For a frame: also persists all child
   // positions. For a non-frame: recomputes which frame (if any) contains the
   // dragged node's center and rewrites the affected frames' childIds.
+  // The card being carried toward a Calendar in this gesture (Decision 63).
+  const carriedCard = useRef<string | null>(null);
+  // ...and while it is over a Calendar (in the box, unseen): its id.
+  const carriedOver = useRef<string | null>(null);
+  /**
+   * Decision 63 — while a card is carried toward a Calendar the canvas holds
+   * still over a Calendar and outside the canvas (a docked window): React
+   * Flow's edge auto-pan slid the hours away under the card and moved the card
+   * on every frame. Decided on pointermove, which comes before React Flow's
+   * own move handler, so not even one step slips through.
+   */
+  const panGuard = useRef<((e: PointerEvent) => void) | null>(null);
+  const holdCanvasForCarry = (on: boolean): void => {
+    if (panGuard.current) { window.removeEventListener('pointermove', panGuard.current, true); panGuard.current = null; }
+    if (rfStore.getState().autoPanOnNodeDrag !== true) rfStore.setState({ autoPanOnNodeDrag: true });
+    if (!on) return;
+    const pane = canvasContainerRef.current?.getBoundingClientRect() ?? null;
+    const guard = (e: PointerEvent): void => {
+      const outside = !!pane && (e.clientX < pane.left || e.clientX > pane.right || e.clientY < pane.top || e.clientY > pane.bottom);
+      const allow = !(outside || isOverCalendar(e.clientX, e.clientY));
+      if (rfStore.getState().autoPanOnNodeDrag !== allow) rfStore.setState({ autoPanOnNodeDrag: allow });
+    };
+    panGuard.current = guard;
+    window.addEventListener('pointermove', guard, true);
+  };
+  useEffect(() => () => { if (panGuard.current) window.removeEventListener('pointermove', panGuard.current, true); }, []);
+  /**
+   * Decisions 60, 63 — the card carried toward a Calendar is let go: the one
+   * drag engine lands it there (true) and the card is back in its own place on
+   * the canvas, unseen, then fades in. Not on a Calendar (false): it is let go
+   * on the canvas like any card (commitDragEnd places it).
+   */
+  const landCarriedCard = (draggedId: string): boolean => {
+    carriedCard.current = null;
+    carriedOver.current = null;
+    holdCanvasForCarry(false);
+    const ptr = lastDragPointer.current;
+    const before = useBoardStore.getState().board?.nodes.find((n) => n.id === draggedId)?.position;
+    const landed = !!ptr && externalDragEnd(ptr.x, ptr.y);
+    if (!landed || !before) {
+      setCarryHiddenCard(null);
+      calendarCarryEnd(draggedId);
+      window.setTimeout(() => updateNodeInternals(draggedId), 260);
+      return false;
+    }
+    calendarCarryLanded(draggedId);
+    setNodes((prev) => prev.map((n) => (n.id === draggedId ? { ...n, position: { ...before }, dragging: false } : n)));
+    afterPaint(() => { calendarCarryShowHome(draggedId); setCarryHiddenCard(null); updateNodeInternals(draggedId); });
+    return true;
+  };
   const commitDragEnd = useCallback((draggedId: string) => {
     const all = getNodes() as KrnlRFNode[];
     const dragged = all.find((n) => n.id === draggedId);
@@ -1764,6 +1868,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const draggedKind = dragged.data?.node?.kind;
     // Where the store had it before this drag (for hidden frame children).
     const before = useBoardStore.getState().board?.nodes.find((n) => n.id === draggedId)?.position;
+
 
     // Align to grid: the drop settles on the nearest free grid spot (a frame
     // only snaps; its children move with it). Others moving in the same
@@ -1897,9 +2002,20 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // Pure module-level write — no React state, no Zustand, no re-renders.
   // Badges and swap-buttons call rfToScreen() inside their rAF read() slots
   // and see the updated numbers without triggering any component updates.
+  // Decision 61 — while the canvas pans or zooms, it moves as one picture
+  // (will-change on the viewport: scaled by the GPU, not redrawn every frame;
+  // a big Calendar made each zoom step redraw thousands of parts). It is
+  // drawn sharp again a moment after the gesture ends.
+  const movingTimer = useRef(0);
   const onMove = useCallback(
     (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
       updateViewport(viewport.x, viewport.y, viewport.zoom);
+      // A card carried toward a Calendar: the Calendars on the canvas moved.
+      calendarGeometryMoved();
+      const el = canvasContainerRef.current;
+      if (el && !el.classList.contains('is-canvas-moving')) el.classList.add('is-canvas-moving');
+      window.clearTimeout(movingTimer.current);
+      movingTimer.current = window.setTimeout(() => canvasContainerRef.current?.classList.remove('is-canvas-moving'), 160);
     },
     []
   );
@@ -1920,11 +2036,36 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     <BoldSetProvider>
     <ReactFlow
       nodes={nodes}
-      edges={rfEdges}
+      edges={shownEdges}
       nodeTypes={ALL_NODE_TYPES}
       edgeTypes={EDGE_TYPES}
       defaultViewport={initialViewport}
       onNodesChange={onNodesChange}
+      onNodeDrag={(e, n) => {
+        lastDragPointer.current = { x: e.clientX, y: e.clientY };
+        const item = carriedCard.current === n.id ? canvasDragItem((n as KrnlRFNode).data?.node) : null;
+        if (!item) return;
+        if (calendarCarryMove(n.id, item, e.clientX, e.clientY)) {
+          if (carriedOver.current !== n.id) { carriedOver.current = n.id; setCarryHiddenCard(n.id); }
+          return;
+        }
+        if (carriedOver.current === n.id) {
+          // Off the Calendar again: the card is drawn where the pointer is now.
+          carriedOver.current = null;
+          setCarryHiddenCard(null);
+          const pos = { ...n.position };
+          setNodes((prev) => prev.map((x) => (x.id === n.id ? { ...x, position: pos } : x)));
+        }
+      }}
+      onNodeDragStart={(e, n) => {
+        lastDragPointer.current = { x: e.clientX, y: e.clientY };
+        carriedOver.current = null;
+        // A carry left by a drag that never ended (let go outside the window)
+        // gives the canvas its auto-pan back first.
+        holdCanvasForCarry(false);
+        setCarryHiddenCard(null);
+        if (canvasDragItem((n as KrnlRFNode).data?.node)) { carriedCard.current = n.id; calendarCarryStart(n.id, e.clientX, e.clientY); holdCanvasForCarry(true); }
+      }}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       // Easier wiring: snap to a handle from further away, and dropping

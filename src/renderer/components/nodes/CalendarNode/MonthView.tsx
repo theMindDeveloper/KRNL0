@@ -5,6 +5,7 @@
 // (node positions, pomo state, etc.) do not re-render this component.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { beginCalendarDrag, registerCalendarSurface, type CalendarSurface } from './calendarDrag';
 import { useBoardStore } from '../../../store/boardStore';
 import { dayOnlyPlans } from './dayOnly';
 import { DueFlag } from './DueFlag';
@@ -14,6 +15,7 @@ import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
 import { selectSchedule, selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
+import { calendarLayersOf } from './types';
 import { getMonthDays, getMondayOf, toYMD, isRoutine } from '../HabitNode/types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { selectPomoReality } from '../../../store/pomoReality';
@@ -156,7 +158,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
     }
     return out;
   }, [pomoNode, todayYMD]);
-  const showHabits = config?.showHabits !== false;
+  // The Calendar's Habits layer (its menu) hides the dots here too.
+  const showHabits = config?.showHabits !== false && calendarLayersOf(state).habits;
   const cells = useMemo(() => buildMonthGrid(anchor), [state.anchorDate]);
   const monthLabel = formatMonthLabel(anchor);
   // Determine which month's days belong to this calendar page.
@@ -267,13 +270,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
   // ADR 0001 §9 — a month day cell takes task drops (Todo rows, canvas tasks,
   // other month chips). There is no hour here: a task that already has a time
   // keeps its time of day on the new date; a new one starts at 09:00.
-  const isTaskDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('application/krnl-task');
-  const handleDrop = (ymd: string, e: React.DragEvent<HTMLDivElement>) => {
-    e.currentTarget.removeAttribute('data-drop-target');
-    if (!isTaskDrag(e)) return;
-    e.preventDefault();
-    let payload: { taskId?: string; itemId?: string; durationMin?: number };
-    try { payload = JSON.parse(e.dataTransfer.getData('application/krnl-task')) as typeof payload; } catch { return; }
+  const dropOnDay = (payload: { taskId?: string; itemId?: string; durationMin?: number }, ymd: string) => {
     const board = useBoardStore.getState().board;
     const task = payload.taskId ? board?.nodes.find((n) => n.id === payload.taskId) : undefined;
     // Its time as drawn: a chained plan has none of its own (it follows the
@@ -297,6 +294,44 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
     }
   };
 
+  // Decision 63 — the one drag engine: a day of this month takes a plan.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [hotDay, setHotDay] = useState<string | null>(null);
+  const monthImpl = useRef<CalendarSurface | null>(null);
+  // The days' boxes, measured once per drag (no layout read per move).
+  const cellBoxes = useRef<Array<{ l: number; t: number; r: number; b: number; day: string }> | null>(null);
+  const readCells = () => Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-month-day]') ?? []).map((cell) => {
+    const r = cell.getBoundingClientRect();
+    return { l: r.left, t: r.top, r: r.right, b: r.bottom, day: cell.dataset['monthDay']! };
+  });
+  monthImpl.current = {
+    el: rootRef.current,
+    slotAt: (x, y) => {
+      for (const c of cellBoxes.current ?? readCells()) {
+        if (x >= c.l && x <= c.r && y >= c.t && y <= c.b) return { monthDay: c.day };
+      }
+      return null;
+    },
+    gran: () => 15,
+    hover: (slot) => setHotDay(slot && 'monthDay' in slot ? slot.monthDay : null),
+    commit: (item, result) => {
+      if (item.kind !== 'task' || !('monthDay' in result)) return null;
+      const durationMin = item.plannedMin ?? item.lenMin;
+      dropOnDay(item.itemOnly ? { itemId: item.id, durationMin } : { taskId: item.id, durationMin }, result.monthDay);
+      return null;
+    },
+  };
+  const monthSurface = useMemo<CalendarSurface>(() => ({
+    get el() { return rootRef.current; },
+    slotAt: (x, y) => monthImpl.current?.slotAt(x, y) ?? null,
+    gran: () => 15,
+    hover: (slot) => monthImpl.current?.hover?.(slot),
+    commit: (item, result, origin, mode) => monthImpl.current?.commit(item, result, origin, mode) ?? null,
+    measure: () => { cellBoxes.current = readCells(); },
+    release: () => { cellBoxes.current = null; },
+  }), []);
+  useEffect(() => registerCalendarSurface(monthSurface), [monthSurface]);
+
   const handleCellDoubleClick = (ymd: string) => {
     onCommand('calendar.setAnchor', { date: ymd });
     onCommand('calendar.setView', { view: 'day' });
@@ -312,6 +347,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
 
   return (
     <div
+      ref={rootRef}
+      data-cal-surface="month"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -369,10 +406,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                 overflowX: 'auto',
                 overflowY: 'hidden',
                 scrollbarWidth: 'none',
-                // The strip scrolls sideways; its right edge fades to say so.
-                maskImage: 'linear-gradient(to right, #000 calc(100% - 18px), transparent)',
-                WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 18px), transparent)',
-                paddingRight: 14,
+                // Decision 60 — no fade (it read as a blur); the strip just scrolls.
+                paddingRight: 4,
                 flex: 1,
                 minWidth: 0,
               }}
@@ -481,14 +516,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
               className={isToday ? 'krnl-month-cell krnl-month-cell--today' : 'krnl-month-cell'}
               onClick={inCurrentMonth ? () => handleCellClick(ymd) : undefined}
               onDoubleClick={inCurrentMonth ? () => handleCellDoubleClick(ymd) : undefined}
-              onDragOver={inCurrentMonth ? (e) => {
-                if (!isTaskDrag(e)) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                e.currentTarget.setAttribute('data-drop-target', 'true');
-              } : undefined}
-              onDragLeave={inCurrentMonth ? (e) => e.currentTarget.removeAttribute('data-drop-target') : undefined}
-              onDrop={inCurrentMonth ? (e) => handleDrop(ymd, e) : undefined}
+              data-month-day={inCurrentMonth ? ymd : undefined}
+              data-drop-target={inCurrentMonth && hotDay === ymd ? 'true' : undefined}
               style={{
                 position: 'relative',
                 // A faint fill marks each day of this month as its own cell, so
@@ -588,7 +617,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                     overflowY: 'auto',
                     overflowX: 'hidden',
                     scrollbarWidth: 'thin',
-                    ...(scrolls ? { maskImage: 'linear-gradient(to bottom, #000 calc(100% - 12px), transparent)', WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 12px), transparent)', paddingBottom: 8 } : {}),
+                    // Decision 60 — no fade at the bottom (it read as a blur): the list scrolls, crisp.
+                    ...(scrolls ? { paddingBottom: 4 } : {}),
                     position: 'relative',
                     zIndex: 1,
                   }}
@@ -598,11 +628,11 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                       key={task.id}
                       data-testid="month-task-chip"
                       title={`${task.text} · click for details, drag to another day`}
-                      draggable
-                      onDragStart={(e) => {
+                      onPointerDown={(e) => {
                         e.stopPropagation();
-                        e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: task.id }));
-                        e.dataTransfer.effectAllowed = 'move';
+                        const ts = useBoardStore.getState().board?.nodes.find((n) => n.id === task.id)?.state as { plannedMin?: number } | undefined;
+                        const len = ts?.plannedMin && ts.plannedMin > 0 ? ts.plannedMin : 60;
+                        beginCalendarDrag(e, { item: { kind: 'task', id: task.id, name: task.text, tone: toneVarForTask(task.id), lenMin: len, plannedMin: len }, home: monthSurface });
                       }}
                       onClick={(e) => { e.stopPropagation(); setTaskPopup({ taskId: task.id, x: e.clientX, y: e.clientY }); }}
                       style={{
@@ -629,13 +659,16 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                       key={`day-${d.id}`}
                       data-testid={d.kind === 'deadline' ? 'month-deadline-chip' : 'month-day-only-chip'}
                       title={d.kind === 'deadline' ? `Deadline: ${d.text}` : `${d.text} — this day, any time. Drag it to another day, or into the hours of the week view.`}
-                      draggable={d.kind === 'plan'}
-                      onDragStart={(e) => {
+                      onPointerDown={d.kind === 'plan' ? (e) => {
                         e.stopPropagation();
-                        if (d.kind === 'deadline') { e.preventDefault(); return; }
-                        e.dataTransfer.setData('application/krnl-task', JSON.stringify(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin }));
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
+                        const len = d.plannedMin ?? 30;
+                        beginCalendarDrag(e, {
+                          item: d.taskId
+                            ? { kind: 'task', id: d.taskId, name: d.text, tone: toneVarForTask(d.taskId), lenMin: len, plannedMin: len }
+                            : { kind: 'task', id: d.id, itemOnly: true, name: d.text, tone: 'var(--acid)', lenMin: len, plannedMin: len },
+                          home: monthSurface,
+                        });
+                      } : undefined}
                       style={{
                         fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0, borderRadius: 2, padding: '0 3px', lineHeight: '1.3',
                         overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: d.kind === 'plan' ? 'grab' : 'default',

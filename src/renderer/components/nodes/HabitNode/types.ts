@@ -89,6 +89,9 @@ export interface Habit {
   kind?: 'routine';
   /** Routine only: last day it happens (YYYY-MM-DD). Absent = no end. */
   endsOn?: string;
+  /** Routine only (Decision 62): first day it happens (YYYY-MM-DD). With
+   *  `endsOn` on the same day it is a one-time event: it happens once. */
+  startsOn?: string;
   /** Routine only: stretches it was ended and later restarted (inclusive
    *  YYYY-MM-DD). Nothing happened then, so nothing is drawn there. */
   pauses?: Array<{ from: string; to: string }>;
@@ -135,6 +138,11 @@ export interface RoutineException {
 /** Decision 39 — the one guard every tick / count / flag consumer checks. */
 export function isRoutine(h: { kind?: string } | null | undefined): boolean {
   return h?.kind === 'routine';
+}
+
+/** Decision 62 — an event that happens once (its first and last day are the same day). */
+export function isOneTimeEvent(h: { kind?: string; startsOn?: string; endsOn?: string } | null | undefined): boolean {
+  return !!h && h.kind === 'routine' && !!h.startsOn && h.startsOn === h.endsOn;
 }
 
 /** A habit (or routine) that repeats at a set time of day. */
@@ -185,9 +193,10 @@ export function routineSpansOn(h: Habit, date: string): RoutineSpan[] {
 export function routineOccurrence(h: Habit, date: string): RoutineOccurrence | null {
   if (!isRoutine(h) || h.archived || !hasTimeOfDay(h)) return null;
   if (!isDayScheduled(h.schedule, date)) return null;
-  // From the start of the week it was added: a routine added on a Sunday still
-  // shows across that week, not only from next Monday.
-  if (date < toYMD(getMondayOf(new Date(h.createdAt)))) return null;
+  // From its first day (Decision 62), else from the start of the week it was
+  // added: a routine added on a Sunday still shows across that week.
+  if (h.startsOn) { if (date < h.startsOn) return null; }
+  else if (date < toYMD(getMondayOf(new Date(h.createdAt)))) return null;
   if (h.endsOn && date > h.endsOn) return null;
   if (h.pauses?.some((p) => date >= p.from && date <= p.to)) return null;
   const ex = h.exceptions?.find((e) => e.date === date);
@@ -196,6 +205,24 @@ export function routineOccurrence(h: Habit, date: string): RoutineOccurrence | n
   const startMin = hh * 60 + mm;
   const len = Math.max(5, h.schedule.durationMin ?? 60);
   return { date, startMin, endMin: Math.min(24 * 60, startMin + len), skipped: ex?.skip === true, moved: !!ex?.at };
+}
+
+/**
+ * The last date a routine happened on or before `day` (not skipped), or null
+ * (looks back a year). An event that has ended is shown there: its card's
+ * page and its "Show" (owner, 2026-11-22: Show on an ended event lit up today).
+ */
+export function lastRoutineDate(h: Habit, day: string): string | null {
+  let d = h.endsOn && h.endsOn < day ? h.endsOn : day;
+  for (let i = 0; i < 400; i++) {
+    const occ = routineOccurrence(h, d);
+    if (occ && !occ.skipped) return d;
+    if (h.startsOn && d <= h.startsOn) return null;
+    const x = new Date(`${d}T00:00:00`);
+    x.setDate(x.getDate() - 1);
+    d = toYMD(x);
+  }
+  return null;
 }
 
 // Built-in icon ids (drawn as theme-aware SVGs by HabitNode/HabitIcon.tsx —

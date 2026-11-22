@@ -9,9 +9,10 @@
 import type { DayPlanActual, TaskEstimate } from '../estimates';
 import { COLOR_AXIS, COLOR_GRID, COLOR_LABEL } from './common';
 
-export const COLOR_PLANNED = '#1ba3bb';
-export const COLOR_TRACKED = '#c8553d';
-export const COLOR_BREAK = '#83a332';
+// Decision 58 — what you planned is the quiet grey, what you spent is the accent.
+export const COLOR_PLANNED = 'color-mix(in srgb, var(--k-an-ink-3, #9aa1a8) 55%, transparent)';
+export const COLOR_TRACKED = 'var(--k-an-accent-ink, var(--acid-ink, var(--acid)))';
+export const COLOR_BREAK = 'color-mix(in srgb, var(--k-an-ink-4, #7d848b) 45%, transparent)';
 const COLOR_UNTAGGED = '#6b7178';
 
 export function fmtMinutes(min: number): string {
@@ -72,7 +73,7 @@ export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tas
   const x = (v: number) => (v / max) * plotW;
   const height = rows.length * rowH + 4 + MORE_H;
   if (rows.length === 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_AXIS, padding: 8 }}>No tracked or finished tasks in this range yet. Tag a pomo session with a task to start comparing.</div>;
+    return <div style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 13, color: COLOR_LABEL, padding: 8, lineHeight: 1.45 }}>No tracked or finished tasks in this range yet. Tag a pomo session with a task to start comparing.</div>;
   }
   return (
     <svg data-testid="analytics-estimate-bars" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
@@ -89,7 +90,7 @@ export function EstimateBars({ tasks, width, height: boxH, maxRows = 10 }: { tas
             {/* full-row hit target */}
             <rect x={0} y={y - 4} width={width} height={rowH} fill="transparent" />
             {t.done && <path d={narrow ? `M1 ${textY - 4}l2.5 2.5L8 ${textY - 8}` : `M2 ${textY - 4}l2.5 2.5L9 ${textY - 8}`} stroke={COLOR_LABEL} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-            <text x={narrow ? (t.done ? 11 : 0) : labelW - 6} y={textY} textAnchor={narrow ? 'start' : 'end'} fontSize={11} fill={COLOR_LABEL} fontFamily="var(--font-sans)" opacity={t.deleted ? 0.6 : 1}>
+            <text x={narrow ? (t.done ? 11 : 0) : labelW - 6} y={textY} textAnchor={narrow ? 'start' : 'end'} fontSize={11} fill={COLOR_LABEL} fontFamily="var(--font-read, var(--font-sans))" opacity={t.deleted ? 0.6 : 1}>
               {label}
             </text>
             {t.plannedMin > 0 && (
@@ -117,7 +118,7 @@ export function DailyPlanActual({ days, width, height }: { days: readonly DayPla
   // Nothing planned or worked: say so, like the other cards (bare 30m / 15m
   // axes read as a broken chart to a new user).
   if (!days.some((d) => d.plannedMin > 0 || d.workedMin > 0)) {
-    return <div data-testid="analytics-daily-plan-actual-empty" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: COLOR_AXIS, padding: 8 }}>Nothing planned on the Calendar or worked in this range yet. Plan a task on the Calendar and run a pomo on it to compare.</div>;
+    return <div data-testid="analytics-daily-plan-actual-empty" style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 13, color: COLOR_LABEL, padding: 8, lineHeight: 1.45 }}>Nothing planned on the Calendar or worked in this range yet. Plan a task on the Calendar and run a pomo on it to compare.</div>;
   }
   const pad = { left: 30, right: 6, top: 8, bottom: 18 };
   const innerW = Math.max(20, width - pad.left - pad.right);
@@ -168,7 +169,7 @@ export function FocusMix({ mix, width }: { mix: { taggedWorkMin: number; untagge
     { key: 'break', label: 'Break', min: mix.breakMin, color: COLOR_BREAK, hatch: true },
   ];
   if (total <= 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: COLOR_AXIS, padding: 8 }}>No pomo time recorded in this range.</div>;
+    return <div style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 13, color: COLOR_LABEL, padding: 8, lineHeight: 1.45 }}>No pomo time recorded in this range.</div>;
   }
   let cursor = 0;
   const barH = 16;

@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useContext } from 'react';
+import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { calendarGhost, subscribeCalendarGhost } from '../CalendarNode/DropGhost';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
@@ -13,7 +14,7 @@ import { saveBoard } from '../../../store/eventLog';
 import type { ClockState, ClockConfig } from './types';
 import { todayLocalYMD } from './types';
 import { dayProgress, progressRatio } from '../../../store/dayProgress';
-import { MotherFrame, MotherFrameStationContext, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
+import { MotherFrame, MOTHER_WIDTH, MOTHER_TOTAL } from '../MotherFrame';
 import { useBoardStore } from '../../../store/boardStore';
 import { dueOnDay } from '../../../../shared/dueOn';
 import { MenuIcon } from '../../ui/menuIcons';
@@ -25,7 +26,6 @@ import { Z } from '../../ui/layers';
 import { useFrameTheme } from '../../../themes/useFrameTheme';
 import { ClockBezel } from './ClockBezel';
 import { ClockWeek, buildWeek } from './ClockWeek';
-import { PagedView } from '../../ui/PagedView';
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu';
 import { segmentMenuItems, taskMenuItems } from '../../ContextMenu/scheduleMenus';
 import { spanTaskName, spanTaskTargets } from '../PomoNode/taskTargets';
@@ -35,8 +35,9 @@ import { SPACE, popupColumn } from '../../ui/spacing';
 import { msAtWallHours } from './wallHours';
 import { localYMD } from '../../../../shared/ymd';
 import { CX, CY, R_FACE, pt, arcPath, sectorPath } from './dialGeometry';
+import { ClockCarriedArc } from './ClockCarriedArc';
 import {
-  planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, type TaskEntry,
+  planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, carriedClockId, type TaskEntry,
 } from './dayModel';
 import { halfOf, startupFollow, rolloverFollow, claimStartup, type ClockNowMark } from './follow';
 import { LineGlyph } from '../../ui/LineGlyph';
@@ -96,6 +97,9 @@ function Hand({ kind, back, len, width }: { kind: 'line' | 'sword' | 'block'; ba
     />
   );
 }
+
+/** Which item is carried on the Calendar, as the Clock names it (a string: the Clock redraws only when it changes). */
+const carriedIdNow = (): string | null => carriedClockId(calendarGhost());
 
 export function ClockNode({
   node,
@@ -251,7 +255,9 @@ export function ClockNode({
 
   // Task facts + scheduled habits for the day model (dayModel.ts).
   const taskInfo = useMemo(() => collectTaskInfo(board), [board?.nodes]);
-  const scheduledHabits = useMemo(() => collectScheduledHabits(board), [board?.nodes]);
+  // Decision 60 — habits are not drawn on the Clock (owner, 2026-11-21); a
+  // repeating event (a class, a shift) still is.
+  const scheduledHabits = useMemo(() => collectScheduledHabits(board).filter((h) => !!h.routine), [board?.nodes]);
 
   // Today (real wall-clock day) — used to decide whether `now`-derived UI
   // (now-pointer, active task, now-playing strip) is meaningful for the
@@ -294,10 +300,19 @@ export function ClockNode({
 
   // Flatten placements + scheduled habits → TaskEntry[].
   // Filter by selected day and 12-hour viewWindow.
-  const tasks: TaskEntry[] = useMemo(
+  const planned: TaskEntry[] = useMemo(
     () => (placementsMap ? planForDay(placementsMap.values(), taskInfo, scheduledHabits, selectedDate, viewWindow) : []),
     [placementsMap, taskInfo, viewWindow, scheduledHabits, selectedDate],
   );
+  // Decision 61 — what is being moved on the Calendar moves here too, live.
+  // Decision 63 (owner, 2026-11-22: "too slow and too stuttery") — the Clock
+  // window is drawn again only when a drag starts and ends (which item is
+  // carried: its original steps back); the carried item itself is one small
+  // arc of its own that follows every step and glides (ClockCarriedArc). It
+  // used to redraw the whole window on every step, at low priority, so it
+  // fell behind and jumped.
+  const carriedId = useSyncExternalStore(subscribeCalendarGhost, carriedIdNow, carriedIdNow);
+  const tasks: TaskEntry[] = planned;
 
   // Issue #166 — tracked REALITY segments for the selected day, clipped to the
   // 12-hour window. These are the filled "what actually happened" arcs (work +
@@ -351,10 +366,6 @@ export function ClockNode({
   const trackInnerEdge = REALITY_R - REALITY_SW / 2;
   const trackOuterEdge = trackBaseR + (trackTotalLanes - 1) * (TRACK_STROKE + TRACK_LANE_GAP) + TRACK_STROKE / 2;
 
-  // Station mode: the bottom-right Clock panel is much taller than the canvas-
-  // mode fixed mother (540px) — scale the dial up so it fills the space
-  // instead of leaving a strip of empty card around a tiny 244px square.
-  const inStation = useContext(MotherFrameStationContext);
   // engagement.md F18 — the outer ring closes as the day's planned blocks are ticked.
   const dayDone = useMemo(() => dayProgress(board0, selectedDate), [board0, selectedDate]);
   const ringR = trackOuterEdge + 6;
@@ -390,22 +401,12 @@ export function ClockNode({
             <button
               type="button"
               data-testid="clock-view-day"
-              aria-pressed={!weekView && !dialOnly}
+              aria-pressed={!weekView}
               title="The day, with its schedule"
-              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); if (dialOnly) onCommand('clock.setDialOnly', { on: false }); }}
+              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); }}
               onMouseDown={(e) => e.stopPropagation()}
             >
               DAY
-            </button>
-            <button
-              type="button"
-              data-testid="clock-dial-only"
-              aria-pressed={dialOnly && !weekView}
-              title="Big clock — dial only"
-              onClick={(e) => { e.stopPropagation(); if (weekView) onCommand('clock.setWeekView', { on: false }); onCommand('clock.setDialOnly', { on: true }); }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              BIG CLOCK
             </button>
             <button
               type="button"
@@ -418,6 +419,24 @@ export function ClockNode({
               WEEK
             </button>
           </span>
+          {/* Decision 58 — the big clock is a quiet icon, not a third view: the
+              dial takes the whole window, and the icon brings the list back. */}
+          {!weekView && (
+            <button
+              type="button"
+              className="kw-btn nodrag clock-expand"
+              data-testid="clock-dial-only"
+              aria-pressed={dialOnly}
+              aria-label={dialOnly ? 'Show the day\'s list again' : 'Big clock: the dial fills the window'}
+              title={dialOnly ? 'Show the list' : 'Big clock'}
+              onClick={(e) => { e.stopPropagation(); onCommand('clock.setDialOnly', { on: !dialOnly }); }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {dialOnly ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+              </svg>
+            </button>
+          )}
         </div>
         {/* #207 — Week view replaces the day view; the day view stays mounted
             (display: contents keeps its flex layout) so switching back is instant. */}
@@ -508,9 +527,12 @@ export function ClockNode({
             position: 'relative',
             // Flexes with the window so the whole clock always fits: the
             // dial's height comes from the free space, its width follows.
-            flex: dialOnly ? '1 1 auto' : '3 1 0',
+            // Decision 58 — the dial takes all the room the list does not need.
+            flex: '1 1 auto',
             minHeight: 140,
-            maxHeight: dialOnly ? '100%' : inStation ? 620 : 300,
+            // Decision 59 — the same in Free as in the Station: the dial grows
+            // with the window (a 300 px cap left a tall canvas Clock half empty).
+            maxHeight: '100%',
             aspectRatio: '1 / 1',
             maxWidth: '100%',
             margin: '0 auto',
@@ -554,12 +576,14 @@ export function ClockNode({
               <g data-testid="clock-done-ring" data-done={dayDone.done} data-planned={dayDone.planned} pointerEvents="none">
                 <title>{`${dayDone.done} of ${dayDone.planned} planned done`}</title>
                 <circle cx={CX} cy={CY} r={ringR} fill="none" stroke="var(--paper-3)" strokeWidth={2.5} />
-                <circle
+                {/* Decision 60 — the fill only once something is done: a zero-length
+                    round cap drew a lone dot at 12. */}
+                {dayDone.done > 0 && <circle
                   cx={CX} cy={CY} r={ringR} fill="none" stroke="var(--acid)" strokeWidth={2.5} strokeLinecap="round"
                   strokeDasharray={`${(progressRatio(dayDone) * ringC).toFixed(2)} ${ringC.toFixed(2)}`}
                   transform={`rotate(-90 ${CX} ${CY})`}
                   style={{ transition: 'stroke-dasharray 400ms cubic-bezier(0.32, 0.72, 0, 1)' }}
-                />
+                />}
               </g>
             )}
 
@@ -608,7 +632,7 @@ export function ClockNode({
               }
 
               // ── Task arcs riding their lane's track ──
-              const arcs = tasks.flatMap((t, i) => {
+              const arcOf = (t: TaskEntry, i: number): React.ReactElement[] => {
                 // `ended` (faded arc) only makes sense for today — a 9am task
                 // on tomorrow is not "ended" at 3pm today.
                 const ended = isToday && nowFloat >= t.realEnd;
@@ -744,10 +768,16 @@ export function ClockNode({
                   segCursor = segEnd;
                 }
                 return out;
-              });
+              };
+              // What is carried on the Calendar steps back here, as it does
+              // there; its new place is the carried arc drawn below.
+              const arcs = tasks.flatMap((t, i) => (t.id === carriedId
+                ? [<g key={`${t.id}-carried-from`} data-testid="clock-carried-from" opacity={0.35}>{arcOf(t, i)}</g>]
+                : arcOf(t, i)));
 
               return [...tracks, ...arcs];
             })()}
+            <ClockCarriedArc planned={planned} ymd={selectedDate} half={viewWindow} baseR={trackBaseR} laneStep={TRACK_STROKE + TRACK_LANE_GAP} stroke={TRACK_STROKE} />
 
             {/* #180 — tracked reality moved to a dial-face wash (drawn above,
                 under the ticks). The old lane-ring stroke is gone so reality
@@ -965,12 +995,18 @@ export function ClockNode({
             that sat here are gone: the WEEK view shows the week, and the list
             below marks the plan that is running. */}
         {/* Task list — pages of whole rows, never a scrollbar. */}
-        <PagedView
-          testId="clock-task-pages"
-          resetKey={selectedDate}
-          style={{ width: '100%', flex: tasks.length > 0 ? '1 1 0' : '0 0 auto', minHeight: tasks.length > 0 ? 64 : 0, display: dialOnly ? 'none' : undefined }}
-          contentStyle={{ display: 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)' }}
-          revealIndex={activeIdx}
+        {/* Decision 58 — at the bottom, as tall as its rows (up to about four);
+            more scroll in place, so no gap opens between the dial and the list. */}
+        <div
+          data-testid="clock-task-pages"
+          ref={(el) => {
+            // The plan going on now stays in view in a long list.
+            if (!el || activeIdx < 0) return;
+            const row = el.querySelectorAll<HTMLElement>('[data-testid="clock-task-row"]')[activeIdx];
+            if (row && (row.offsetTop < el.scrollTop || row.offsetTop + row.offsetHeight > el.scrollTop + el.clientHeight)) el.scrollTop = row.offsetTop - 4;
+          }}
+          className="clock-list nowheel"
+          style={{ width: '100%', flex: '0 0 auto', maxHeight: 'min(132px, 34%)', overflowY: 'auto', overscrollBehavior: 'contain', display: dialOnly || tasks.length === 0 ? 'none' : 'flex', flexDirection: 'column', gap: 1, fontFamily: 'var(--font-mono)', marginTop: 'auto' }}
         >
           {tasks.map((t, i) => {
             const ended = isToday && nowFloat >= t.realEnd;
@@ -995,8 +1031,9 @@ export function ClockNode({
                   alignItems: 'center',
                   gap: 8,
                   padding: '4px 0',
-                  // Over: quieter ink, never faded below readable.
-                  opacity: 1,
+                  // Over: quieter ink, never faded below readable. Carried on
+                  // the Calendar: it steps back, as there.
+                  opacity: t.id === carriedId ? 0.45 : 1,
                   position: 'relative',
                 }}
               >
@@ -1053,7 +1090,7 @@ export function ClockNode({
               </div>
             );
           })}
-        </PagedView>
+        </div>
         {!dialOnly && dueItems.length > 0 && (
           <div
             data-testid="clock-due"

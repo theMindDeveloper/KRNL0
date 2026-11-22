@@ -10,7 +10,7 @@
 //   - Esc          leaves the pen
 // The cursor is a pen tip in the current colour (a ring for the eraser).
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, memo } from 'react';
 import { ViewportPortal, useReactFlow } from '@xyflow/react';
 import { getStroke } from 'perfect-freehand';
 import { useBoardStore } from '../../store/boardStore';
@@ -103,7 +103,7 @@ export function penCursor(tool: PenTool, color: string): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg).replace('COLOR', c)}") 2 24, crosshair`;
 }
 
-export function DrawLayer() {
+function DrawLayerImpl() {
   const drawings = useBoardStore((s) => s.board?.drawings);
   const addStroke = useBoardStore((s) => s.addStroke);
   const removeStrokes = useBoardStore((s) => s.removeStrokes);
@@ -232,3 +232,7 @@ export function DrawLayer() {
     </>
   );
 }
+
+// Decision 63 (performance) — the canvas re-renders on every pointer move of a
+// drag; this part does not need to (its props do not change).
+export const DrawLayer = memo(DrawLayerImpl);

@@ -58,6 +58,9 @@ interface Props {
   // variant the badge is a normal absolute-positioned span inside the panel
   // (no ViewportPortal, no rfToScreen arithmetic).  Mother content is identical.
   variant?: 'canvas' | 'station';
+  /** Decision 60 — the window can be resized on the canvas (its right edge,
+   *  bottom edge and corner); `onResized` gets the size when you let go. */
+  resizable?: { onResize: (width: number, height: number, first: boolean) => void; min: { width: number; height: number }; max: { width: number; height: number } };
 }
 
 // Wave C (LifeOS UI refresh) — bumped to 500×500 so mothers read as the
@@ -79,6 +82,7 @@ export function MotherFrame({
   borderColor = 'var(--paper-3)',
   minHeight = MOTHER_HEIGHT,
   variant: variantProp = 'canvas',
+  resizable,
 }: Props) {
   // Context override: when this MotherFrame is rendered inside a StationCell,
   // the provider sets the context to true and we force 'station' variant —
@@ -152,6 +156,102 @@ export function MotherFrame({
   }, [position.x, position.y, variant]);
 
   const isStation = variant === 'station';
+  // Decision 60 — live size while an edge is dragged; it stays until the
+  // board has the new size (no snap back to the old one for a frame).
+  const [live, setLive] = useState<{ width: number; height: number } | null>(null);
+  useLayoutEffect(() => { setLive(null); }, [width, minHeight]);
+  const startResize = (axis: 'x' | 'y' | 'xy') => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizable || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const zoom = getZoom() || 1;
+    const w0 = width;
+    const h0 = minHeight;
+    let last = { width: w0, height: h0 };
+    let started = false;
+    // Decision 60 — smooth: while you drag, only the screen changes (this
+    // frame's size, and the windows to its right slid along with a CSS
+    // translate on their wrappers); the board is written once, on release.
+    // (Writing it on every move re-rendered the whole canvas: it stuttered.)
+    const frame = frameRef.current;
+    const ownWrap = frame?.closest('.react-flow__node') as HTMLElement | null;
+    const ownLeft = ownWrap?.getBoundingClientRect().left ?? 0;
+    const neighbours = Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node.krnl-mother'))
+      .filter((el) => el !== ownWrap && el.getBoundingClientRect().left > ownLeft + 1)
+      .map((el) => ({ el, transform: el.style.transform }));
+    // Decision 61 — the inside keeps up by itself: the Calendar's hours are
+    // sized by CSS from its own height, so they follow the edge in the same
+    // frame (an earlier "scale while dragging" could leave the inside frozen
+    // at its old size).
+    let raf = 0;
+    const paint = () => {
+      raf = 0;
+      if (frame) { frame.style.width = `${last.width}px`; frame.style.height = `${last.height}px`; }
+      for (const n of neighbours) n.el.style.translate = `${last.width - w0}px 0px`;
+    };
+    // It grows like a picture (same shape), never below the standard size,
+    // and snaps to the smallest and largest sizes when you come close.
+    const move = (ev: PointerEvent) => {
+      const dx = (ev.clientX - x0) / zoom;
+      const dy = (ev.clientY - y0) / zoom;
+      const d = axis === 'x' ? dx : axis === 'y' ? dy : Math.max(dx, dy);
+      // Every pixel (steps of 10 px read as jumps); snaps only at the ends.
+      let side = Math.round(w0 + d);
+      if (side < resizable.min.width + 28) side = resizable.min.width;
+      if (side > resizable.max.width - 28) side = resizable.max.width;
+      const next = { width: side, height: Math.round(side * (h0 / Math.max(1, w0))) };
+      if (next.width === last.width && next.height === last.height) return;
+      last = next;
+      started = true;
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (raf) { cancelAnimationFrame(raf); paint(); }
+      if (!started) return;
+      // One write (one undo step); the neighbours' slide is handed to the
+      // canvas once it has moved them. Their 280 ms glide is off for that
+      // hand-off: with it, the new place glided in while the slide was taken
+      // away, so a window jumped back and came forward again (owner).
+      // The slide comes off in the very moment the canvas moves a window
+      // (a style change is seen before the screen is drawn; checking once a
+      // frame missed it by one frame: the window jumped and came back).
+      for (const n of neighbours) n.el.style.transition = 'none';
+      let done = false;
+      const finish = (mo: MutationObserver | null) => {
+        if (done) return;
+        done = true;
+        mo?.disconnect();
+        for (const n of neighbours) n.el.style.translate = '';
+        // The glide back on for later moves (swaps), once this is drawn.
+        requestAnimationFrame(() => requestAnimationFrame(() => { for (const n of neighbours) n.el.style.transition = ''; }));
+      };
+      const mo = typeof MutationObserver === 'function'
+        ? new MutationObserver(() => {
+          let pending = false;
+          for (const n of neighbours) {
+            if (!n.el.style.translate) continue;
+            if (n.el.style.transform !== n.transform) n.el.style.translate = '';
+            else pending = true;
+          }
+          if (!pending) finish(mo);
+        })
+        : null;
+      for (const n of neighbours) mo?.observe(n.el, { attributes: true, attributeFilter: ['style'] });
+      resizable.onResize(last.width, last.height, true);
+      // Never stuck: whatever the canvas shows after a moment stands.
+      window.setTimeout(() => finish(mo), 600);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+  const shownW = live?.width ?? width;
+  const shownH = live?.height ?? minHeight;
   return (
     <div
       ref={frameRef}
@@ -163,8 +263,8 @@ export function MotherFrame({
         position: 'relative',
         // Canvas: fixed 540×540 (RF flow coords). Station: fill the resizable
         // panel so the user can shrink/grow it without content overflowing.
-        width: isStation ? '100%' : width,
-        height: isStation ? '100%' : minHeight,
+        width: isStation ? '100%' : shownW,
+        height: isStation ? '100%' : shownH,
         display: 'flex',
         flexDirection: 'column',
         background: background === 'var(--node-bg)'
@@ -208,6 +308,23 @@ export function MotherFrame({
           as a sibling, with the same MIME contract. */}
       {!isStation && (
         <MotherDragHandle nodeId={nodeId} />
+      )}
+
+      {/* Decision 60 — resize edges (canvas only): right, bottom, corner. */}
+      {!isStation && resizable && (
+        <>
+          <div className="nodrag nopan mother-resize mother-resize--x" data-testid={`mother-resize-x-${nodeId}`} title="Drag to resize" onPointerDown={startResize('x')}
+            style={{ position: 'absolute', top: 40, bottom: 14, right: -5, width: 10, cursor: 'ew-resize', zIndex: 6 }} />
+          <div className="nodrag nopan mother-resize mother-resize--y" data-testid={`mother-resize-y-${nodeId}`} title="Drag to resize" onPointerDown={startResize('y')}
+            style={{ position: 'absolute', left: 14, right: 14, bottom: -5, height: 10, cursor: 'ns-resize', zIndex: 6 }} />
+          <div className="nodrag nopan mother-resize mother-resize--xy" data-testid={`mother-resize-${nodeId}`} title="Drag to resize" onPointerDown={startResize('xy')}
+            style={{ position: 'absolute', right: 0, bottom: 0, width: 20, height: 20, cursor: 'nwse-resize', zIndex: 7 }}>
+            {/* The canvas's own resize grip (as on notes and images). */}
+            <svg className="mother-resize__grip" width="14" height="14" viewBox="0 0 14 14" aria-hidden style={{ position: 'absolute', right: 3, bottom: 3, color: 'var(--ink-4)', pointerEvents: 'none' }}>
+              <path d="M13 5L5 13M13 9L9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </div>
+        </>
       )}
 
       {children}

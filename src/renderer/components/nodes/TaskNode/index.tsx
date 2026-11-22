@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { beginCalendarDrag } from '../CalendarNode/calendarDrag';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import type { NodeProps } from '../types';
@@ -17,6 +18,7 @@ import type { PomoState } from '../PomoNode/types';
 import { trackedSecondsForTask, selectPomoNode, pomoOnlyBoard } from '../../../store/trackedTime';
 import { DoneCard } from './DoneCard';
 import { CardIcon, CardMetaRow, CardMeter, cardFrameStyle, fmtDayAnyTime, fmtDur, fmtWhen } from './CardParts';
+import { KindIcon } from '../../ui/kindIcons';
 import { saveBoard } from '../../../store/eventLog';
 import { undoable } from '../../../store/undoNotice';
 import { archiveDoneTask, bringBackTask, doneLabel, markDoneAsPlanned, plannedEndMs, wontDoTask } from '../../../store/planActions';
@@ -502,26 +504,26 @@ export function TaskNode({ node, onCommand }: NodeProps<TaskState, TaskConfig>) 
             </span>
           )}
 
-          {/* Drag to the Calendar: the grip starts an HTML5 drag with the
-              same payload the Todo rows use; the rest of the node still moves
-              on the canvas (React Flow ignores .nodrag). */}
+          {/* Drag to the Calendar: the grip starts the one drag engine
+              (Decision 63), as the Todo rows do; the rest of the card still
+              moves on the canvas (React Flow ignores .nodrag). */}
           <span
             data-testid="task-calendar-grip"
             className="nodrag task-card-action"
-            draggable
             title={isPastScheduled ? 'Missed — drag onto the Calendar to move it' : when ? `On the Calendar (${when}) — drag to move it` : 'Not on the Calendar — drag it there to plan it'}
-            onDragStart={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation();
-              e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId, durationMin: state.plannedMin }));
-              e.dataTransfer.effectAllowed = 'move';
+              const len = state.plannedMin > 0 ? state.plannedMin : 25;
+              beginCalendarDrag(e, { item: { kind: 'task', id: taskId, name: state.text, tone: toneVarForTask(taskId), lenMin: len, plannedMin: len } });
             }}
             style={{
               width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'grab',
-              color: planCol,
-              background: isPastScheduled || when ? `color-mix(in srgb, ${planCol} 14%, transparent)` : 'var(--paper-2)',
+              color: isPastScheduled ? 'var(--rust)' : planCol,
+              background: isPastScheduled ? 'color-mix(in srgb, var(--rust) 14%, transparent)' : when ? `color-mix(in srgb, ${planCol} 14%, transparent)` : 'var(--paper-2)',
             }}
           >
-            <CardIcon name={isPastScheduled ? 'replan' : 'grip'} size={13} />
+            {/* Its kind in the corner (a task), or replan when it was missed. */}
+            <KindIcon kind={isPastScheduled ? 'replan' : 'task'} size={13} />
           </span>
       </div>
 

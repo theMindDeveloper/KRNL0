@@ -1,5 +1,8 @@
 import { create } from 'zustand';
+import { resizeMotherIn } from '../../shared/motherLayout';
+import { presetOf, presetRows, swapInRows, withPreset } from '../../shared/stationLayouts';
 import { saveBoard, setLiveViewportSource } from './eventLog';
+import { selectSchedule } from './scheduleSelector';
 import type { Board, BoardViewport, Node, Edge, LayoutMode, StationGeometry, MotherNodeConfig, CompletionRecord } from '../../shared/types';
 import type { DrawStroke } from '../../shared/types/board';
 import type { TaskState } from '../components/nodes/TaskNode/types';
@@ -93,6 +96,8 @@ interface BoardStore {
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
   swapMotherSlots: (idA: string, idB: string) => void;
+  /** Decision 60 — resize a window on the Free canvas (the Calendar); the row makes room. */
+  resizeMother: (id: string, width: number, height: number, opts?: { skipHistory?: boolean }) => void;
   reorderMotherSlots: (motherId: string, toSlotIndex: number) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   setViewport: (v: BoardViewport) => void;
@@ -302,12 +307,25 @@ export const useBoardStore = create<BoardStore>((set) => ({
       // in station mode visibly rearranges the panels (ADR 0008 § 4.2).
       const cfgA = (nodeA.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
       const cfgB = (nodeB.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
+      // Decision 58 — in Grid and Planner the preset keeps its own order: the
+      // two windows trade places there, and Classic's places stay as they are.
+      const geo = s.board.layoutGeometry?.station;
+      const preset = presetOf(geo);
+      if (s.board.layoutMode === 'station' && preset !== 'classic') {
+        const order = swapInRows(presetRows(preset, geo?.[preset]?.order), nodeA.kind, nodeB.kind);
+        return {
+          ...pushHistory(s),
+          board: { ...s.board, layoutGeometry: { ...s.board.layoutGeometry, station: { ...withPreset(geo, preset), [preset]: { ...geo?.[preset], order } } } },
+        };
+      }
       const slotA = cfgA.stationSlot;
       const slotB = cfgB.stationSlot;
       return {
         ...pushHistory(s),
         board: {
           ...s.board,
+          // (Decision 60 — the canvas draws the row at each window's own width,
+          // so a wide Calendar never covers a neighbour after a swap.)
           nodes: s.board.nodes.map((n) => {
             if (n.id === idA) return { ...n, position: posB, config: { ...cfgA, stationSlot: slotB } };
             if (n.id === idB) return { ...n, position: posA, config: { ...cfgB, stationSlot: slotA } };
@@ -315,6 +333,14 @@ export const useBoardStore = create<BoardStore>((set) => ({
           }),
         },
       };
+    }),
+
+  resizeMother: (id, width, height, opts) =>
+    set((s) => {
+      if (!s.board) return s;
+      const nodes = resizeMotherIn(s.board.nodes, id, width, height);
+      if (nodes.every((n, i) => n === s.board!.nodes[i])) return s;
+      return { ...(opts?.skipHistory ? {} : pushHistory(s)), board: { ...s.board, nodes } };
     }),
 
   // Drag-to-reorder: move motherId to the given 0-based toSlotIndex, shifting
@@ -643,6 +669,11 @@ export const useBoardStore = create<BoardStore>((set) => ({
       const newItemId = crypto.randomUUID();
       const newNodeId = `task-${crypto.randomUUID()}`;
 
+      // Decision 63: connections are only drawn, so the parallel task gets its
+      // own time: the same start as the task it was added beside.
+      const srcStart = selectSchedule(s.board).placements.get(taskNodeId)?.startISO ?? '';
+      const twinAt = /T\d{2}:\d{2}/.test(srcStart) ? srcStart.slice(0, 16) : null;
+
       // Build new task state — parallel fork, same layer / parentTodoId / parentTaskId
       const newTaskState: TaskState = {
         text,
@@ -665,6 +696,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
         // or the calendar selector (which renders kind==='event' only) drops it,
         // so "2.1" never appears on the calendar/clock even after scheduling.
         kind: 'event',
+        ...(twinAt ? { scheduledFor: twinAt } : {}),
       };
 
       const newNode: Node = {
@@ -712,6 +744,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
         createdAt: new Date().toISOString(),
         completedAt: null,
         taskNodeId: newNodeId,
+        ...(twinAt ? { scheduledFor: twinAt } : {}),
       };
 
       const updatedNodes = s.board.nodes.map((n) => {

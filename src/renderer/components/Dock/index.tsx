@@ -12,7 +12,7 @@
  */
 
 import { isEasyBoard, useEasyMode } from '../../store/uiMode';
-import { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { useEffect, useRef, useState, useLayoutEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeKind } from '../../../shared/types/node';
 import { DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
@@ -51,7 +51,7 @@ export function anchorFor(x: number, y: number, w: number, h: number): DockAncho
 /** Faint keyboard-shortcut letter in a dock button's corner. */
 function KeyHint({ k }: { k: string }) {
   return (
-    <span aria-hidden style={{
+    <span aria-hidden className="dock-key-hint" style={{
       position: 'absolute', right: 3, bottom: 1, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1,
       opacity: 0.38, pointerEvents: 'none', color: 'currentColor',
     }}>{k}</span>
@@ -82,7 +82,7 @@ export interface DockProps {
   onDockStyleChange?: (s: DockStyle) => void;
 }
 
-export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: DockProps) {
+function DockImpl({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: DockProps) {
   const easy = useEasyMode();
   const [activeTool, setActiveTool] = useState<ToolMode>('select');
   const penActive = useDrawStore((s) => s.active);
@@ -544,3 +544,7 @@ export function Dock({ onAddNode, onToolChange, dockStyle, onDockStyleChange }: 
     </div>
   );
 }
+
+// Decision 63 (performance) — the canvas re-renders on every pointer move of a
+// drag; this part does not need to (its props do not change).
+export const Dock = memo(DockImpl);

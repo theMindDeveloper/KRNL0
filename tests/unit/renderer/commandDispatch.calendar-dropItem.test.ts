@@ -6,7 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, act } from '@testing-library/react';
+import { registerCalendarSurface, type CalendarSurface } from '../../../src/renderer/components/nodes/CalendarNode/calendarDrag';
+import { pageSurfaceEl, release } from '../../../src/renderer/components/nodes/CalendarNode/__tests__/calendarLayout';
 import React from 'react';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
 import { makeCommandHandler } from '../../../src/renderer/components/Canvas/commandDispatch';
@@ -66,7 +68,7 @@ describe('Calendar drop — Todo row without a task', () => {
 });
 
 describe('Calendar drop — canvas task grip', () => {
-  it('starts a krnl-task drag with the task id and planned minutes', () => {
+  it('starts the one drag engine (Decision 63) with the task id and planned minutes', async () => {
     const state: TaskState = {
       text: 'deep work', done: false, durationMin: 25, eta: '~50 min', sequenceNumber: 1, layer: 0,
       createdAt: '2026-05-15T10:00:00.000Z', parentTodoId: 'todo-mother', parentTaskId: null, todoItemId: null,
@@ -74,10 +76,26 @@ describe('Calendar drop — canvas task grip', () => {
     };
     const node: Node = { id: 'task-x', kind: 'todo.task', position: { x: 0, y: 0 }, isMother: false, state, config: {} };
     const { getByTestId } = render(React.createElement(TaskNode, { node, onCommand: () => undefined } as never));
-    const data: Record<string, string> = {};
-    fireEvent.dragStart(getByTestId('task-calendar-grip'), {
-      dataTransfer: { setData: (t: string, v: string) => { data[t] = v; }, effectAllowed: '' },
-    });
-    expect(JSON.parse(data['application/krnl-task']!)).toEqual({ taskId: 'task-x', durationMin: 50 });
+    const grip = getByTestId('task-calendar-grip');
+    expect(grip.getAttribute('draggable')).toBeNull();
+    // A Calendar covering the page, at 09:00 on 20 May.
+    const commit = vi.fn<Parameters<CalendarSurface['commit']>, ReturnType<CalendarSurface['commit']>>(() => null);
+    const off = registerCalendarSurface({ el: pageSurfaceEl(), slotAt: () => ({ day: '2026-05-20', min: 540 }), gran: () => 15, commit });
+    const d = document as unknown as { elementsFromPoint?: ((x: number, y: number) => Element[]) | undefined };
+    const before = d.elementsFromPoint;
+    d.elementsFromPoint = () => [document.body];
+    try {
+      fireEvent.pointerDown(grip, { button: 0, clientX: 10, clientY: 10 });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 200, clientY: 200 }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      expect(document.body.classList.contains('krnl-cal-dragging')).toBe(true);
+      await act(async () => { await release(200, 200); });
+      expect(commit).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'task', id: 'task-x', plannedMin: 50, lenMin: 50 }),
+        { day: '2026-05-20', startMin: 540, endMin: 590 },
+        null,
+        'move',
+      );
+    } finally { off(); d.elementsFromPoint = before; }
   });
 });

@@ -75,6 +75,20 @@ describe('the card (F1–F3)', () => {
     expect(screen.getByTestId('habit-card-left').textContent).toBe('Wed · in 2 days');
   });
 
+  it('F3: an event that has ended shows the last time it happened, and Show goes there (never today)', async () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 30, 10, 0).getTime(), toFake: ['Date'] }); // Mon 30 Nov
+    // Weekly on Mondays and Wednesdays, ended on Friday the 27th: the last time was Wed 25.
+    seed([{ id: 'e4', name: 'Course', color: 'acid', kind: 'routine', createdAt: '2026-11-01T00:00:00.000Z', log: [], startsOn: '2026-11-02', endsOn: '2026-11-27', schedule: { kind: 'weekly', days: [1, 3], timeOfDay: '09:00', durationMin: 60 } }]);
+    const show = vi.spyOn(await import('../../../src/renderer/store/showCli'), 'showEventOnCalendar').mockReturnValue({ ok: true, message: '' });
+    draw('e4');
+    expect(screen.getByTestId('event-card-date').textContent).toBe('ENDED25Nov');
+    expect(screen.getByTestId('event-card-date').getAttribute('aria-label')).toBe('Last: 2026-11-25');
+    expect(screen.getByTestId('event-card-time').textContent).toBe('09:00 – 10:00');
+    screen.getByTestId('event-card-show').click();
+    expect(show).toHaveBeenCalledWith('e4', '2026-11-25');
+    show.mockRestore();
+  });
+
   it('F6: Skip this one skips that date; Undo skip brings it back', () => {
     vi.useFakeTimers({ now: new Date(2026, 10, 9, 19, 0).getTime(), toFake: ['Date'] });
     seed([{ id: 'e3', name: 'Class', color: 'acid', kind: 'routine', createdAt: '2026-11-01T00:00:00.000Z', log: [], schedule: { kind: 'weekly', days: [3], timeOfDay: '17:00', durationMin: 80 } }]);

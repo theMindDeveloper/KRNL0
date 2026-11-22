@@ -41,16 +41,17 @@ describe('computeCatchup (F13)', () => {
     expect(c.tasks.map((t) => t.id)).toEqual(['a', 'c']);
     expect(c.tasks[0]).toMatchObject({ wasDay: '2026-11-03', time: '09:00' });
   });
-  it('puts chained tasks under the first one, without their own buttons', () => {
-    expect(c.tasks[0]!.followers).toEqual([{ id: 'b', text: 'Draft section 3.1' }]);
+  it('a connected task is not listed under another (Decision 63: connections are only drawn)', () => {
+    expect(c.tasks[0]!.followers).toEqual([]);
+    // b has no time of its own: it did not slip.
     expect(c.tasks.some((t) => t.id === 'b')).toBe(false);
   });
   it('a moved task keeps its time of day (F14)', () => {
     expect(movedSchedule(c.tasks[1]!, TODAY)).toBe('2026-11-06T14:30');
   });
-  it('a follower with its own past plan still moves with its head', () => {
+  it('a connected task with its own past plan is listed on its own', () => {
     const b2 = { nodes: [task('a', 'A', '2026-11-03T09:00'), task('b', 'B', '2026-11-03T10:00')], edges: [next('a', 'b')] };
-    expect(computeCatchup(b2, TODAY).tasks.map((t) => t.id)).toEqual(['a']);
+    expect(computeCatchup(b2, TODAY).tasks.map((t) => t.id)).toEqual(['a', 'b']);
   });
   it('a slipped task whose chain head is already done still shows (it is the head now)', () => {
     const b3 = { nodes: [task('a', 'A', '2026-11-02T09:00', true), task('b', 'B', '2026-11-03T10:00')], edges: [next('a', 'b')] };
@@ -60,22 +61,20 @@ describe('computeCatchup (F13)', () => {
     const b4 = { nodes: [task('a', 'A'), task('b', 'B', '2026-11-03T10:00')], edges: [next('a', 'b')] };
     expect(computeCatchup(b4, TODAY).tasks.map((t) => t.id)).toEqual(['b']);
   });
-  it('a slipped task further down a slipped chain is listed once, under its head', () => {
+  it('slipped tasks along connected cards are each listed once, on their own', () => {
     const b5 = {
       nodes: [task('a', 'A', '2026-11-02T09:00'), task('x', 'X'), task('b', 'B', '2026-11-03T10:00')],
       edges: [next('a', 'x'), next('x', 'b')],
     };
     const c5 = computeCatchup(b5, TODAY);
-    expect(c5.tasks.map((t) => t.id)).toEqual(['a']);
-    expect(c5.tasks[0]!.followers.map((f) => f.id)).toEqual(['x', 'b']);
-    // b slipped itself: it carries its time so it moves with the head.
-    expect(c5.tasks[0]!.followers).toEqual([{ id: 'x', text: 'X' }, { id: 'b', text: 'B', time: '10:00' }]);
+    expect(c5.tasks.map((t) => t.id)).toEqual(['a', 'b']);
+    expect(c5.tasks.every((t) => t.followers.length === 0)).toBe(true);
   });
   it('says plainly when nothing slipped', () => {
     const empty = computeCatchup({ nodes: [], edges: [] }, TODAY);
     expect(isEmptyCatchup(empty)).toBe(true);
     expect(describeCatchup(empty)).toContain('Nothing slipped');
-    expect(describeCatchup(c)).toContain('↳ Draft section 3.1');
+    expect(describeCatchup(c)).not.toContain('↳');
   });
 });
 

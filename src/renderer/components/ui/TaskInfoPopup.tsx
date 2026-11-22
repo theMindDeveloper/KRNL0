@@ -3,6 +3,7 @@
 // planned time, time actually tracked on it, and quick actions. Mirrors the
 // tracked-span popup so tasks, habits and observed time behave the same on click.
 
+import { passRightClick, useOneOverlay } from './oneOverlay';
 import { LineGlyph } from './LineGlyph';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -16,11 +17,10 @@ import { toneVarForTask } from '../../utils/taskColor';
 import type { TaskState } from '../nodes/TaskNode/types';
 import type { TodoState } from '../nodes/TodoNode/types';
 import { habitStreak } from '../nodes/HabitNode/commands';
-import { todayLocal, type HabitState } from '../nodes/HabitNode/types';
+import { isOneTimeEvent, todayLocal, type HabitState } from '../nodes/HabitNode/types';
 import { CategoryIcon } from '../nodes/PomoNode/CategoryIcon';
 import { useEasyMode } from '../../store/uiMode';
 import { Z } from './layers';
-import { TaskTimeline } from './TaskTimeline';
 
 export interface TaskInfoPopupProps {
   /** A task node id, or `habit-<habitId>` for a habit on the dial. */
@@ -31,6 +31,8 @@ export interface TaskInfoPopupProps {
   startMs?: number;
   endMs?: number;
   onClose: () => void;
+  /** Decision 59 — the Calendar's "Details": the card that changes it. */
+  onDetails?: () => void;
 }
 
 const ymdOf = (ms: number): string => {
@@ -54,6 +56,8 @@ export function TaskInfoPopup(props: TaskInfoPopupProps) {
 }
 
 function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () => void; children: React.ReactNode }) {
+  // One overlay at a time: this card closes the menu or card that was open.
+  useOneOverlay(true, onClose);
   // Esc closes, like the Calendar's task popup.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -62,7 +66,7 @@ function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () 
   }, [onClose]);
   return createPortal(
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
+      <div onClick={onClose} onContextMenu={(e) => passRightClick(e, onClose)} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
       <div
         data-testid="task-info-popup"
         className="kw-card"
@@ -93,7 +97,7 @@ function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () 
   );
 }
 
-function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps) {
+function TaskInfo({ taskId, x, y, startMs, endMs, onClose, onDetails }: TaskInfoPopupProps) {
   // Easy mode: name, time and done only — no category, tracked time or focus.
   const easy = useEasyMode();
   const info = useBoardStore(
@@ -144,7 +148,7 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         {info.done && <span style={{ fontSize: 12.5, color: 'var(--acid-ink, var(--acid))' }} ><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><LineGlyph name="check" size={10} weight={2.6} />Done</span></span>}
       </div>
       <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 12, paddingLeft: 19 }}>{when}</div>
-      {!easy && <div style={{ display: 'flex', gap: '4px 14px', fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 12, flexWrap: 'wrap', padding: '10px 12px', borderRadius: 10, background: 'var(--paper-2)' }}>
+      {!easy && <div style={{ display: 'flex', gap: '4px 16px', fontSize: 13, color: 'var(--ink-2)', marginBottom: 12, flexWrap: 'wrap', padding: '10px 12px', borderRadius: 10, background: 'var(--paper-2)' }}>
         {info.catId && info.catColor && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <CategoryIcon id={info.catId} color={info.catColor} size={11} />{info.catLabel}
@@ -153,20 +157,27 @@ function TaskInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps)
         <span>Planned <b style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--ink)' }}>{info.plannedMin ? fmtMin(info.plannedMin) : '—'}</b></span>
         <span>Recorded <b style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: info.trackedMin > 0 ? 'var(--ink)' : 'var(--ink-4)' }}>{fmtMin(info.trackedMin)}</b></span>
       </div>}
-      {/* #207 — the task's story from the time log (per-day work, plan moves, completions). */}
-      {!easy && <TaskTimeline taskId={taskId} />}
+      {/* Decision 60 — only what you need here: no history line ("planned … (moved 6×)"). */}
       <div style={{ display: 'flex', gap: 6 }}>
         {!info.done && !easy && <button type="button" data-testid="task-info-focus" title="Start the Timer on this plan" style={{ ...btn, background: 'var(--btn-primary-bg, var(--acid))', color: 'var(--btn-primary-fg, #111)', fontWeight: 600 }} onClick={act(() => { void startFocusOnTask(taskId); })}>Start</button>}
         <button type="button" data-testid="task-info-done" style={btn} onClick={act(() => { void toggleTaskDone(taskId); })}>{info.done ? 'Reopen' : 'Done'}</button>
-        <button type="button" data-testid="task-info-show" style={btn} onClick={act(() => focusNode(taskId))}>Show</button>
+        {onDetails
+          ? <button type="button" data-testid="task-info-details" title="Change the day, time, length, reminder or deadline" style={btn} onClick={act(onDetails)}>Details</button>
+          : <button type="button" data-testid="task-info-show" style={btn} onClick={act(() => focusNode(taskId))}>Show</button>}
         {/* A chain successor has no scheduledFor of its own but is planned too. */}
-        {planAnchor && <button type="button" data-testid="task-info-unschedule" title={planAnchor === taskId ? 'Remove from the calendar (keeps the task)' : 'Remove the whole chain from the calendar (keeps the tasks)'} style={{ ...btn, color: 'var(--rust)' }} onClick={act(() => { void unscheduleTask(taskId); })}>{planAnchor === taskId ? 'Unplan' : 'Unplan chain'}</button>}
+        {!onDetails && planAnchor && <button type="button" data-testid="task-info-unschedule" title={planAnchor === taskId ? 'Remove from the calendar (keeps the task)' : 'Remove the whole chain from the calendar (keeps the tasks)'} style={{ ...btn, color: 'var(--rust)' }} onClick={act(() => { void unscheduleTask(taskId); })}>{planAnchor === taskId ? 'Unplan' : 'Unplan chain'}</button>}
       </div>
+      {onDetails && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+          <button type="button" data-testid="task-info-show" style={btn} onClick={act(() => focusNode(taskId))}>Show in Todos</button>
+          {planAnchor && <button type="button" data-testid="task-info-unschedule" title={planAnchor === taskId ? 'Remove from the calendar (keeps the task)' : 'Remove the whole chain from the calendar (keeps the tasks)'} style={{ ...btn, color: 'var(--rust)' }} onClick={act(() => { void unscheduleTask(taskId); })}>{planAnchor === taskId ? 'Unplan' : 'Unplan chain'}</button>}
+        </div>
+      )}
     </Shell>
   );
 }
 
-function HabitInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps) {
+function HabitInfo({ taskId, x, y, startMs, endMs, onClose, onDetails }: TaskInfoPopupProps) {
   const habitId = taskId.slice('habit-'.length);
   const info = useBoardStore(
     useShallow((s) => {
@@ -177,7 +188,7 @@ function HabitInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps
       const date = startMs !== undefined ? ymdOf(startMs) : today;
       return {
         name: h.name, color: h.color, doneToday: h.log.includes(today), streak: habitStreak(h, today).current, streakUnit: habitStreak(h, today).unit,
-        routine: h.kind === 'routine', date, skipped: !!h.exceptions?.some((e) => e.date === date && e.skip),
+        routine: h.kind === 'routine', once: isOneTimeEvent(h), date, skipped: !!h.exceptions?.some((e) => e.date === date && e.skip),
       };
     }),
   );
@@ -186,32 +197,35 @@ function HabitInfo({ taskId, x, y, startMs, endMs, onClose }: TaskInfoPopupProps
   if (info.routine) {
     return (
       <Shell x={x} y={y} onClose={onClose}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, boxShadow: `inset 0 0 0 2px var(--${info.color})` }} />
-          <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.08em' }}>ROUTINE</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <span aria-hidden style={{ width: 9, height: 9, borderRadius: 999, flexShrink: 0, background: `var(--${info.color})` }} />
+          <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
+          <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{info.once ? 'Event' : 'Repeats'}</span>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>
-          {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''} · `}
-          {info.skipped ? 'skipped this time' : 'every week'}
+        <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 12, paddingLeft: 19 }}>
+          {/* Decision 62 — a one-time event: its day and time. */}
+          {info.once && `${new Date(`${info.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · `}
+          {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''}`}
+          {!info.once && ` · ${info.skipped ? 'skipped this time' : 'every week'}`}
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button type="button" data-testid="routine-info-skip" style={btn}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {!info.once && <button type="button" data-testid="routine-info-skip" style={btn}
             onClick={() => { void habitMotherCommand(info.skipped ? 'routine.unskip' : 'routine.skip', { id: habitId, date: info.date }); onClose(); }}>
             {info.skipped ? 'Undo skip' : 'Skip this one'}
-          </button>
+          </button>}
+          {onDetails && <button type="button" data-testid="routine-info-details" title="Change its name, days, time or length" style={btn} onClick={() => { onDetails(); onClose(); }}>Details</button>}
         </div>
       </Shell>
     );
   }
   return (
     <Shell x={x} y={y} onClose={onClose}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, flexShrink: 0, background: `var(--${info.color})` }} />
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
-        <span style={{ fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.08em' }}>HABIT</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <span aria-hidden style={{ width: 9, height: 9, borderRadius: 999, flexShrink: 0, background: `var(--${info.color})` }} />
+        <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{info.name}</span>
+        <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Habit</span>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 10 }}>
+      <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 12, paddingLeft: 19 }}>
         {startMs !== undefined && `${hm(startMs)}${endMs !== undefined ? `–${hm(endMs)}` : ''} · `}
         streak {info.streak} {info.streakUnit ?? 'day'}{info.streak === 1 ? '' : 's'}
         {' · '}

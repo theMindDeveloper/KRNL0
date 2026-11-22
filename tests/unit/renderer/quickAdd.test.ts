@@ -143,3 +143,20 @@ describe('krnl todo add reads the words too', () => {
     expect(w?.dueOn).toBeUndefined();
   });
 });
+
+describe('bug hunt 2026-11-22: lengths, overnight ranges, impossible times', () => {
+  const now = new Date(2026, 10, 22, 7, 55); // Sun 22 Nov 07:55
+  it('a length a plan cannot have stays in its name (it was dropped: a 1-hour block)', () => {
+    expect(parseQuickAdd('Lunch 12:00 for 9h', now)).toMatchObject({ text: 'Lunch for 9h', time: '12:00' });
+    expect(parseQuickAdd('Lunch 12:00 for 9h', now).durationMin).toBeUndefined();
+  });
+  it('the Calendar events may be up to 12 hours', () => {
+    expect(parseQuickAdd('Sleep 23:00 for 9h', now, { maxMin: 720 })).toMatchObject({ text: 'Sleep', time: '23:00', durationMin: 540 });
+  });
+  it('a range past midnight', () => {
+    expect(parseQuickAdd('Party sat 22:00-02:00', now)).toMatchObject({ text: 'Party', time: '22:00', durationMin: 240, day: '2026-11-28' });
+  });
+  it('a time that does not exist is not half read', () => {
+    expect(parseQuickAdd('Talk at 9:60', now)).toEqual({ text: 'Talk at 9:60' });
+  });
+});

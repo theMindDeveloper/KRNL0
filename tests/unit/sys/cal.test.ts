@@ -171,13 +171,11 @@ describe('sys cal show', () => {
     expect(res.message).toMatch(/\[A\]/);
   });
 
-  it('lists the derived task placement after the anchor', async () => {
+  it('a task its chain placed keeps that time as its own (Decision 63: nothing moves)', async () => {
     seedBoardWithScheduledTasks();
     const res = await calShow(ctx, undefined, undefined, false);
     expect(res.ok).toBe(true);
-    expect(res.message).toMatch(/09:25/);
-    expect(res.message).toMatch(/derived task/);
-    expect(res.message).toMatch(/->/);
+    expect(res.message).toMatch(/09:25-09:55 +\[A\] +task-der +derived task/);
   });
 
   it('returns JSON when --json is set', async () => {

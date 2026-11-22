@@ -20,6 +20,7 @@ import type { MotherNodeConfig, StationGeometry } from '../../../shared/types';
 import { SLOT_DEFAULTS } from './SlotResolver';
 import { isStationHidden } from './stationVisibility';
 import { useEasyMode } from '../../store/uiMode';
+import { presetKinds, presetOf, presetWindows, withPresetWindow } from '../../../shared/stationLayouts';
 
 interface MotherEntry {
   kind: NodeKind;
@@ -180,9 +181,18 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
   const mothers = board.nodes.filter((n) => n.isMother);
   const motherByKind = new Map<string, Node>(mothers.map((m) => [m.kind, m]));
 
+  const preset = presetOf(stationGeo);
+  const inStation = board.layoutMode === 'station';
+  // Decision 59 — in a ready-made layout the toggles change its own windows.
+  const readyMade = inStation && preset !== 'classic' ? preset : null;
+  const readyWindows = readyMade ? presetWindows(readyMade, stationGeo?.[readyMade]) : null;
   const toggleMother = (kind: NodeKind) => {
     const m = motherByKind.get(kind);
     if (!m) return;
+    if (readyMade && readyWindows) {
+      setLayoutGeometry({ station: withPresetWindow(stationGeo, readyMade, kind, !readyWindows.has(kind)) });
+      return;
+    }
     const cfg = (m.config ?? {}) as MotherNodeConfig & Record<string, unknown>;
     // Read the effective visibility (factors in the terminal default-hidden
     // rule) so the toggle flips from what the user actually sees, not from
@@ -191,10 +201,16 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
     updateNode(m.id, { config: { ...cfg, stationHidden: !currentlyHidden } });
   };
 
-  const canvasShown = !canvasHidden;
+  const canvasShown = readyWindows ? readyWindows.has('canvas') : !canvasHidden;
+  const kinds = inStation ? presetKinds(preset) : null;
 
   const toggleCanvas = () => {
+    if (readyMade && readyWindows) {
+      setLayoutGeometry({ station: withPresetWindow(stationGeo, readyMade, 'canvas', !readyWindows.has('canvas')) });
+      return;
+    }
     const next: StationGeometry = {
+      ...stationGeo,
       rowFraction: stationGeo?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
       columnFractions: stationGeo?.columnFractions ?? [],
       rightColumnSplit: stationGeo?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
@@ -236,9 +252,9 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           panels
         </span>
       )}
-      {MOTHER_ORDER.filter((m) => !((easy || IS_WEB) && m.kind === 'term')).map((m) => {
+      {MOTHER_ORDER.filter((m) => !((easy || IS_WEB) && m.kind === 'term') && (kinds === null || kinds.has(m.kind))).map((m) => {
         const node = motherByKind.get(m.kind);
-        const active = !!node && !isStationHidden(node);
+        const active = !!node && (readyWindows ? readyWindows.has(m.kind) : !isStationHidden(node));
         return (
           <ToolbarBtn
             key={m.kind}
@@ -250,8 +266,8 @@ export function StationToolbar({ variant = 'row' }: { variant?: 'row' | 'inline'
           </ToolbarBtn>
         );
       })}
-      {/* The canvas only has a panel to hide in Station mode. */}
-      {board.layoutMode === 'station' && <ToolbarBtn
+      {/* The canvas has a panel to show or hide in every Station layout (Decision 58). */}
+      {inStation && <ToolbarBtn
         active={canvasShown}
         label="Canvas"
         onClick={toggleCanvas}

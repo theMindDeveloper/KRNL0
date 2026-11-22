@@ -5,6 +5,7 @@
  * overflow:hidden ancestor. Dismisses on click-outside (capture phase) or ESC.
  */
 
+import { useOneOverlay } from '../ui/oneOverlay';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Z } from '../ui/layers';
@@ -25,6 +26,8 @@ export interface ContextMenuItem {
   /** menus.md — the rare things: choosing this row shows these instead, with a
    *  way back. One level only. */
   children?: ContextMenuItem[];
+  /** Stay open after choosing (a step you may press a few times, like zoom). */
+  keepOpen?: boolean;
 }
 
 export interface ContextMenuProps {
@@ -63,18 +66,26 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
         onDismiss();
       }
     };
+    // A press that stops its mouse events (preventDefault on pointerdown)
+    // still closes the menu.
+    document.addEventListener('pointerdown', handleMouseDown, true);
     document.addEventListener('mousedown', handleMouseDown, true);
     document.addEventListener('keydown', handleKeyDown, true);
     return () => {
+      document.removeEventListener('pointerdown', handleMouseDown, true);
       document.removeEventListener('mousedown', handleMouseDown, true);
       document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [onDismiss]);
+  // One overlay at a time: this menu closes the card or menu that was open.
+  useOneOverlay(true, onDismiss);
 
   const hasIcons = shown.some((it) => !!it.icon);
   const menu = (
     <div
       ref={menuRef}
+      role="menu"
+      data-testid="context-menu"
       style={{
         position: 'fixed',
         left: pos.left,
@@ -131,7 +142,7 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
               if (item.disabled) return;
               if (item.children) { setSub({ label: item.label, items: item.children }); return; }
               item.onSelect();
-              onDismiss();
+              if (!item.keepOpen) onDismiss();
             }}
             style={{
               display: 'flex',

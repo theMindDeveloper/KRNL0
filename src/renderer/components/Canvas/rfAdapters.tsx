@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import { RESIZABLE_MOTHERS, motherSizeOf } from '../../../shared/motherLayout';
 import { Handle, Position } from '@xyflow/react';
 import type {
   Node as RFNode,
@@ -91,8 +92,10 @@ export function toRfNode(
   // initial 540×540 box regardless of any state.width/height left over from
   // older boards. Internal scroll handles overflow.
   const lockSize = node.kind === 'analytics';
-  const w = lockSize ? initialDims?.width : stateAny.width ?? initialDims?.width;
-  const h = lockSize ? initialDims?.height : stateAny.height ?? initialDims?.height;
+  // Decision 60 — a window with its own size (the Calendar, resized on the canvas).
+  const canvasSize = node.isMother && (RESIZABLE_MOTHERS.has(node.kind) || (node.config as { canvasSize?: unknown } | undefined)?.canvasSize) ? motherSizeOf(node) : undefined;
+  const w = canvasSize ? canvasSize.width : lockSize ? initialDims?.width : stateAny.width ?? initialDims?.width;
+  const h = canvasSize ? canvasSize.height : lockSize ? initialDims?.height : stateAny.height ?? initialDims?.height;
   const sizeFields =
     w !== undefined && h !== undefined
       ? { width: w, height: h, measured: { width: w, height: h } }
@@ -163,12 +166,14 @@ export function toRfEdge(
 
 // ── createNodeAdapter ─────────────────────────────────────────────────────────
 
+// Decision 63 — connections are only drawn, so their dots are quiet: the
+// 12 px box (and its wider grab area, tokens.css) stays, the visible dot is a
+// small circle drawn inside it (reactflow-theme.css) that shows on hover.
 const handleStyle: React.CSSProperties = {
   width: 12,
   height: 12,
-  background: 'var(--paper)',
-  border: '1.5px solid var(--ink-3)',
-  opacity: 0.7,
+  background: 'transparent',
+  border: 'none',
   // RF positions Handles at the absolute left/right edge of the node. Without
   // an explicit z-index, nodes whose body has `position: relative` content
   // (e.g. ImageNode's image-frame) create a new stacking context and bury
@@ -224,5 +229,9 @@ export function createNodeAdapter<S = unknown, C = unknown>(
   }
 
   NodeAdapter.displayName = `NodeAdapter(${Inner.displayName ?? Inner.name ?? 'Unknown'})`;
-  return React.memo(NodeAdapter) as ComponentType<RFNodeProps<KrnlRFNode>>;
+  // Decision 63 (performance) — React Flow hands a dragged node new position
+  // props on every pointer move; the card draws only from its data and its
+  // selection, so a move does not redraw it (it was re-rendered, dates and
+  // all, at every step of a drag).
+  return React.memo(NodeAdapter, (a, b) => a.data === b.data && a.selected === b.selected) as ComponentType<RFNodeProps<KrnlRFNode>>;
 }

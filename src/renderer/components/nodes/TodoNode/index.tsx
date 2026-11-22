@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { beginCalendarDrag } from '../CalendarNode/calendarDrag';
 import { useDismissOutside } from '../../ui/useDismissOutside';
 import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
-import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import type { NodeProps } from '../types';
 import type { TodoConfig, TodoItem, TodoState } from './types';
 import { todoBuckets, todoReclassify, todoTagLibrary, visibleItems } from './commands';
@@ -187,64 +188,12 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
     }),
   );
 
-  // Bug 5: Sort items by chain order. Items are grouped into undone/done buckets
-  // first, then within each bucket sorted by their position in the task.next chain.
-  // Orphan items (no taskNodeId) go at the end of each bucket in insertion order.
-  const chainIndex = useBoardStore(useShallow((s) => s.selectTaskChain()));
-
-  const sortByChain = (bucket: TodoItem[]): TodoItem[] => {
-    // Build a task-nodeId → chain-position map by walking the chain index.
-    // A root is a task with no predecessor in the chain index.
-    const taskIds = bucket.map((i) => i.taskNodeId).filter((id): id is string => id !== null);
-    const taskIdSet = new Set(taskIds);
-
-    // Find roots: task nodes in our bucket that have no prev in the chain index,
-    // or whose prev is not also in our bucket.
-    const roots = taskIds.filter((id) => {
-      const entry = chainIndex.get(id);
-      return !entry || !entry.prev || !taskIdSet.has(entry.prev);
-    });
-
-    const visited = new Set<string>();
-    const ordered: TodoItem[] = [];
-
-    const emit = (taskNodeId: string) => {
-      if (visited.has(taskNodeId)) return;
-      visited.add(taskNodeId);
-      const item = bucket.find((i) => i.taskNodeId === taskNodeId);
-      if (item) ordered.push(item);
-      // Follow the next pointer within the same bucket
-      const entry = chainIndex.get(taskNodeId);
-      if (entry?.next && taskIdSet.has(entry.next)) {
-        emit(entry.next);
-      }
-    };
-
-    // Sort roots by their original bucket index for deterministic ordering
-    const rootsSorted = roots.slice().sort((a, b) => {
-      const ai = bucket.findIndex((i) => i.taskNodeId === a);
-      const bi = bucket.findIndex((i) => i.taskNodeId === b);
-      return ai - bi;
-    });
-
-    for (const root of rootsSorted) {
-      emit(root);
-    }
-
-    // Any remaining items not yet visited (orphans without taskNodeId, or disconnected)
-    for (const item of bucket) {
-      if (!item.taskNodeId || !visited.has(item.taskNodeId)) {
-        ordered.push(item);
-      }
-    }
-
-    return ordered;
-  };
-
+  // Decision 63: rows keep their own order (connections between cards are
+  // only drawn; they do not sort the list).
   const undoneBucket = rawItems.filter((i) => !i.done);
   const doneBucket = rawItems.filter((i) => i.done);
-  const items = sortByChain(undoneBucket);
-  const doneItems = sortByChain(doneBucket);
+  const items = undoneBucket;
+  const doneItems = doneBucket;
 
   // PR8 — count items whose scheduled-end has passed and are still undone.
   // Same isPast rule as the per-row graying below, lifted into a reduce so
@@ -565,18 +514,19 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
       key={item.id}
       data-item-id={item.id}
       className={`todo-item${item.done ? ' done' : ''}`}
-      draggable={true}
-      onDragStart={(e: DragEvent<HTMLDivElement>) => {
-        if (item.done) { e.preventDefault(); return; }
+      onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
+        // Decision 63 — the one drag engine carries it to the Calendar (no
+        // browser drag: no system box beside the pointer, no 50 ms steps).
+        if (item.done || e.button !== 0) return;
+        if ((e.target as HTMLElement).closest('button, input, textarea, select, a, [contenteditable="true"]')) return;
         const durationMin = item.taskNodeId !== null
           ? (taskPlannedMin.get(item.taskNodeId) ?? 25)
           : 25;
-        const payload = item.taskNodeId !== null
-          ? { taskId: item.taskNodeId, durationMin }
-          : { itemId: item.id, durationMin };
-        e.dataTransfer.setData('application/krnl-task', JSON.stringify(payload));
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setDragImage(e.currentTarget, 0, 12);
+        beginCalendarDrag(e, {
+          item: item.taskNodeId !== null
+            ? { kind: 'task', id: item.taskNodeId, name: item.text, tone: toneVarForTask(item.taskNodeId), lenMin: durationMin, plannedMin: durationMin }
+            : { kind: 'task', id: item.id, itemOnly: true, name: item.text, tone: 'var(--acid)', lenMin: durationMin, plannedMin: durationMin },
+        });
       }}
       onContextMenu={(e) =>
         handleRowContextMenu(e, item.id, item.taskNodeId !== null)

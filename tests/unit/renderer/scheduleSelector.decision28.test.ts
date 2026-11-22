@@ -10,14 +10,21 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  selectSchedule,
-} from '../../../src/renderer/store/scheduleSelector';
 import type { Board } from '../../../src/shared/types';
 import type { Node } from '../../../src/shared/types/node';
 import type { Edge } from '../../../src/shared/types/edge';
 import type { TaskState } from '../../../src/renderer/components/nodes/TaskNode/types';
 import type { PomoConfig } from '../../../src/renderer/components/nodes/PomoNode/types';
+import { buildWithChains, type ScheduleResult, type ScheduledTaskPlacement } from '../../../src/renderer/store/scheduleSelector';
+import { defaultPomoConfig, type PomoConfig as LegacyPomoConfig } from '../../../src/renderer/components/nodes/PomoNode/types';
+
+// Decision 63: connections no longer place tasks. These tests pin the old
+// chain rule, which stays only to give chain-placed tasks their time as their
+// own, once, when a board opens (chainTimes.ts; see chainTimes.test.ts).
+const legacyCfg = (b: Board | null): LegacyPomoConfig =>
+  (b?.nodes.find((n) => n.kind === 'pomo')?.config as LegacyPomoConfig | undefined) ?? defaultPomoConfig();
+const selectSchedule = (b: Board | null): ScheduleResult => (b ? buildWithChains(b, legacyCfg(b)) : { placements: new Map(), computedAt: 0 });
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -52,7 +52,7 @@ describe('Easy and Advanced tour — a live demo', () => {
 
 describe('tour catalogue', () => {
   it('has a tour for each part of the app', () => {
-    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'on-track', 'plans-change', 'analytics', 'modes', 'board', 'boards', 'sync', 'terminal']);
+    expect(TOURS.map((t) => t.id)).toEqual(['first-day', 'welcome', 'pomo', 'todo', 'calendar', 'clock', 'habits', 'routines', 'layout', 'on-track', 'plans-change', 'analytics', 'modes', 'board', 'boards', 'sync', 'terminal']);
     for (const t of TOURS) {
       expect(t.steps.length).toBeGreaterThan(1);
       for (const s of t.steps) expect(s.text.length).toBeGreaterThan(10);
@@ -132,12 +132,16 @@ describe('Staying on track tour', () => {
 describe('Habits & Routines tour (routines.md F13)', () => {
   const boardWith = (habits: unknown[]) => ({ nodes: [{ id: 'mother-habit', kind: 'habit', isMother: true, state: { habits } }], edges: [] }) as never;
   const routine = { id: 'r', kind: 'routine', log: [], schedule: { kind: 'weekly', days: [1], timeOfDay: '10:00', durationMin: 120 } };
-  it('waits for a routine to be added, a week skipped and a routine ended', () => {
+  it('waits for an event once, a repeating one, a week skipped and an event ended (Decision 62)', () => {
     const t = tourById('routines')!;
     const waits = t.steps.filter((s) => s.waitFor && 'board' in s.waitFor).map((s) => (s.waitFor as { board: (a: never, b: never) => boolean }).board);
-    expect(waits).toHaveLength(3);
-    const [added, skipped, ended] = waits as [(a: never, b: never) => boolean, (a: never, b: never) => boolean, (a: never, b: never) => boolean];
-    expect(added(boardWith([routine]), boardWith([]))).toBe(true);
+    expect(waits).toHaveLength(4);
+    const [once, added, skipped, ended] = waits as [(a: never, b: never) => boolean, (a: never, b: never) => boolean, (a: never, b: never) => boolean, (a: never, b: never) => boolean];
+    const dentist = { ...routine, startsOn: '2026-11-27', endsOn: '2026-11-27' };
+    expect(once(boardWith([dentist]), boardWith([]))).toBe(true);
+    expect(once(boardWith([routine]), boardWith([]))).toBe(false); // a weekly one is not "once"
+    expect(added(boardWith([dentist, routine]), boardWith([dentist]))).toBe(true);
+    expect(added(boardWith([dentist, { ...dentist, id: 'x' }]), boardWith([dentist]))).toBe(false); // another one-time event is not a repeating one
     expect(added(boardWith([{ ...routine, kind: undefined }]), boardWith([]))).toBe(false); // a habit is not a routine
     expect(skipped(boardWith([{ ...routine, exceptions: [{ date: '2026-11-09', skip: true }] }]), boardWith([routine]))).toBe(true);
     expect(ended(boardWith([{ ...routine, endsOn: '2026-11-08' }]), boardWith([routine]))).toBe(true);
@@ -157,5 +161,25 @@ describe('Separate boards tour (boards.md F12)', () => {
       expect(s.say && s.say.length > 10).toBe(true);
       expect(s.say).not.toMatch(/\[[A-Za-z ]+\]/);
     }
+  });
+});
+
+describe('Your layout tour (Decisions 54-60)', () => {
+  const t = tourById('layout')!;
+  it('shows My layout where it needs it and puts back the layout the user started in', () => {
+    expect(t.restoreLayout).toBe(true);
+    expect(t.steps.filter((s) => s.layout === 'station').length).toBeGreaterThanOrEqual(2);
+    expect(t.steps.some((s) => s.target === '[data-testid="layout-option-free"]')).toBe(true);
+  });
+  it('waits for a swap and for the Free canvas', () => {
+    const waits = t.steps.filter((s) => s.waitFor && 'board' in s.waitFor).map((s) => (s.waitFor as { board: (a: never, b: never) => boolean }).board);
+    expect(waits).toHaveLength(2);
+    const [swapped, free] = waits as [(a: never, b: never) => boolean, (a: never, b: never) => boolean];
+    const mother = (id: string, x: number) => ({ id, kind: 'todo', isMother: true, position: { x, y: 0 }, config: {}, state: {} });
+    const b = (nodes: unknown[], layoutMode = 'station') => ({ version: 1, schemaVersion: 2, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 }, edges: [], layoutMode, nodes }) as never;
+    expect(swapped(b([mother('a', 0), mother('b', 300)]), b([mother('a', 300), mother('b', 0)]))).toBe(true);
+    expect(swapped(b([mother('a', 0)]), b([mother('a', 0)]))).toBe(false);
+    expect(free(b([], 'canvas'), b([]))).toBe(true);
+    expect(free(b([], 'station'), b([]))).toBe(false);
   });
 });

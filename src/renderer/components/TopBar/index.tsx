@@ -12,7 +12,7 @@ import { SettingsIcon } from '../ui/SettingsIcons';
 import { useState, useEffect, useLayoutEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
-import { LayoutModeToggle } from '../ui/LayoutModeToggle';
+import { LayoutMenu } from '../ui/LayoutMenu';
 import { useDockStyle, DOCK_STYLES, type DockStyle } from '../ChassisLayer/useDockStyle';
 import { isDarkOnly } from '../ChassisLayer/dockRegistry';
 import { StationToolbar } from '../Station/StationToolbar';
@@ -225,9 +225,11 @@ export function TopBar() {
             before the switch, so the switch never moves when it appears. The
             light / dark switch lives in Settings → General. */}
         {!stationShown && <TopBarButton label="Fit" title="Fit everything in view" onClick={handleFit} testId="topbar-fit" />}
-        <LayoutModeToggle />
+        <LayoutMenu />
         <HelpMenu />
         <TopBarButton label={<SettingsIcon name="settings" size={13} />} title="Settings" onClick={() => { setSettingsSection('general'); setSettingsOpen(true); }} testId="topbar-settings" />
+        {/* Decision 55 — in the Station the orb rests here, small, instead of on a window. */}
+        {stationShown && <span data-orb-dock="" aria-hidden style={{ width: 34, height: 28, flexShrink: 0 }} />}
       </div>
 
       {settingsOpen && (

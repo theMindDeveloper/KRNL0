@@ -260,23 +260,10 @@
   font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
 }
 [data-testid="topbar"] .krnl-topbar-btn:hover { background: var(--paper-3) !important; color: var(--ink) !important; }
-/* Station / Free: a two-way switch you can see is a switch. A darker track holds
-   both words; the chosen one is a raised thumb in the bar's own colour. (It was
-   two bare words with a grey box behind one of them.) */
-[data-testid="layout-mode-toggle"] {
-  height: 28px; box-sizing: border-box; padding: 2px; gap: 2px; border: 0 !important; border-radius: 8px !important;
-  background: color-mix(in srgb, var(--ink) 9%, transparent); overflow: visible !important;
-}
-[data-testid="layout-mode-toggle"] > button {
-  height: 24px; min-height: 0; min-width: 62px; padding: 0 12px !important; border: 0 !important; border-radius: 6px;
-  background: transparent !important; color: var(--ink-3) !important;
-  font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
-}
-[data-testid="layout-mode-toggle"] > button:hover { color: var(--ink) !important; }
-[data-testid="layout-mode-toggle"] > button[aria-pressed="true"] {
-  background: var(--node-bg) !important; color: var(--ink) !important; font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
-}
+/* The layout menu (Decision 54): one filled button like the board menu, and a
+   list of layouts that shows each arrangement as a line drawing. */
+[data-testid="layout-menu"]:hover { background: var(--paper-3) !important; }
+.krnl-layout-option:hover { background: var(--paper-2) !important; }
 [data-testid="topbar-panel-toggles"] .krnl-panel-toggle {
   font-family: var(--font-read) !important; font-size: 12.5px !important; letter-spacing: 0 !important; text-transform: none !important;
 }
@@ -291,6 +278,9 @@
         (the full word stays in the tooltip and for screen readers).
    The name is never shortened. */
 .kw-head, .kw-range { container-type: inline-size; }
+/* Decision 59 — a header's view switch always sits at the right, also when
+   the narrow rule below hides the one fact that used to push it there. */
+.kw-head > .kw-views { margin-left: auto; }
 @container (max-width: 400px) {
   .kw-head:has(.kw-views) .kw-ctx { display: none; }
   .kw-title { flex-shrink: 0; overflow: visible; }
@@ -301,6 +291,15 @@
 /* Only a header's own switch with four or more views needs the letters
    (Day Week Month Year); three always fit, and ranges like 7d / 30d never shorten. */
 @container (max-width: 295px) {
-  .kw-head > .kw-views:has(> button:nth-child(4)) > button { font-size: 0; padding: 0 8px; }
-  .kw-head > .kw-views:has(> button:nth-child(4)) > button::first-letter { font-size: 12px; }
+  .kw-head > .kw-views:not([aria-label="Range"]):has(> button:nth-child(4)) > button { font-size: 0; padding: 0 8px; }
+  .kw-head > .kw-views:not([aria-label="Range"]):has(> button:nth-child(4)) > button::first-letter { font-size: 12px; }
 }
+
+/* Decision 58 — the Clock's big-clock icon: quiet until you reach for it. */
+.clock-expand { opacity: 0.5; margin-left: 4px; }
+.clock-expand:hover, .clock-expand:focus-visible, .clock-expand[aria-pressed='true'] { opacity: 1; }
+.clock-list { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent; }
+
+/* Decision 60 — the Calendar's resize grip on the Free canvas: quiet until reached for. */
+.mother-resize--xy .mother-resize__grip { opacity: 0.7; transition: opacity 120ms ease, color 120ms ease; }
+.mother-resize--xy:hover .mother-resize__grip { opacity: 1; color: var(--ink-2); }

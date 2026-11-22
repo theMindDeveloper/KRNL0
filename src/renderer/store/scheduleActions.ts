@@ -71,21 +71,16 @@ export function placementOf(taskId: string): { startISO: string; endISO: string 
 }
 
 /**
- * Take this task — and only it — off the calendar (CLI: task unschedule).
- * Tasks timed by the chain keep their current times; this task stops
- * following its predecessor so the chain cannot pull it back
- * (chainSchedule.ts). Goes through the dispatcher so linked Todo rows' times
- * follow.
+ * Take this task (and only it) off the calendar (CLI: task unschedule). Its
+ * connections stay as drawn (Decision 63). Goes through the dispatcher so the
+ * linked Todo row's time follows.
  */
 export async function unscheduleTask(taskId: string): Promise<void> {
   const board = useBoardStore.getState().board;
   if (!board) return;
-  const plan = unscheduleOne(board as Board, taskId);
-  if (!plan) return;
-  if (plan.edges !== board.edges) {
-    useBoardStore.setState((s) => (s.board ? { ...pushHistory(s), board: { ...s.board, edges: plan.edges } } : s));
-  }
-  for (const w of plan.writes) await dispatchToTask(w.taskId, 'task.setSchedule', { scheduledFor: w.scheduledFor });
+  const writes = unscheduleOne(board as Board, taskId);
+  if (!writes) return;
+  for (const w of writes) await dispatchToTask(w.taskId, 'task.setSchedule', { scheduledFor: w.scheduledFor });
 }
 
 async function dispatchToTask(taskId: string, command: string, args: Record<string, unknown> = {}): Promise<void> {
@@ -246,6 +241,13 @@ export async function deleteRoutine(habitId: string): Promise<void> {
 export const FOCUS_NODE_EVENT = 'krnl:focus-node';
 /** Window event the canvas listens for to fit several nodes on screen (`detail.nodeIds`). */
 export const FIT_NODES_EVENT = 'krnl:fit-nodes';
+
+/** Window event: the canvas moves its camera so this element (drawn on the canvas) is in view. detail: { el }. */
+export const REVEAL_ELEMENT_EVENT = 'krnl:reveal-element';
+/** Moves the camera onto something drawn inside a canvas window (a block in the Calendar); nothing in a docked window. */
+export function revealElement(el: Element): void {
+  window.dispatchEvent(new CustomEvent(REVEAL_ELEMENT_EVENT, { detail: { el } }));
+}
 
 export function focusNode(nodeId: string): void {
   window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { nodeId } }));

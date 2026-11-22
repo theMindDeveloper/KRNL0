@@ -38,6 +38,8 @@ import {
 } from 'react-resizable-panels';
 import { useBoardStore } from '../../store/boardStore';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
+import { MIN_WINDOW, minSizeOf } from './minSize';
+import { useElementSize } from '../../analytics/useElementSize';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 import { StationCell } from './StationCell';
 import { EmbeddedCanvasCell } from './EmbeddedCanvasCell';
@@ -50,6 +52,9 @@ import type { Node } from '../../../shared/types/node';
 import { dividers, snapPercent, snapRow, type RowLayout } from './softSnap';
 import { restoredSizes, restoredSizesAround } from './restoredSizes';
 import { bottomUnchanged, columnsUnchanged, rowUnchanged, useSnapshot } from './layoutGeometry';
+import { RowsStationLayout } from './RowsStationLayout';
+import { presetOf } from '../../../shared/stationLayouts';
+import { CellWrapper, EmptyShellHint } from './StationShell';
 
 const PANEL_IDS = {
   outerTop:    'station-top-row',
@@ -104,12 +109,22 @@ const TOP_ROW_DEFS: ReadonlyArray<{
 // isStationHidden moved to ./stationVisibility; re-exported for existing callers.
 export { isStationHidden } from './stationVisibility';
 
+/** Decision 54 — the Station picks its arrangement from the saved preset (the top bar's layout menu). */
 export function StationLayout() {
+  const preset = useBoardStore((s) => presetOf(s.board?.layoutGeometry?.station));
+  // Decision 59 — a reset (or picking a ready-made layout) bumps `rev`: the
+  // panels lay out afresh from the saved (or designed) sizes.
+  const rev = useBoardStore((s) => s.board?.layoutGeometry?.station?.rev ?? 0);
+  return preset === 'classic' ? <ClassicStationLayout key={`classic-${rev}`} /> : <RowsStationLayout key={`${preset}-${rev}`} preset={preset} />;
+}
+
+function ClassicStationLayout() {
   const panelSlot = useFrameTheme().manifest.slots.panelToggles;
   const setLayoutGeometry = useBoardStore((s) => s.setLayoutGeometry);
   const storedGeometry = useBoardStore((s) => s.board?.layoutGeometry?.station);
   const board = useBoardStore((s) => s.board);
   const [dockStyle] = useDockStyle();
+  const [areaRef, area] = useElementSize<HTMLDivElement>();
 
   const canvasHidden = storedGeometry?.canvasHidden ?? false;
 
@@ -171,6 +186,7 @@ export function StationLayout() {
     if (rowUnchanged(current, rowFraction)) return;
     setLayoutGeometry({
       station: {
+        ...current,
         rowFraction,
         columnFractions: current?.columnFractions ?? [],
         rightColumnSplit: current?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
@@ -189,6 +205,7 @@ export function StationLayout() {
     if (columnsUnchanged(current, columnFractions)) return;
     setLayoutGeometry({
       station: {
+        ...current,
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
         columnFractions,
         rightColumnSplit: current?.rightColumnSplit ?? SLOT_DEFAULTS.bottom.canvas / 100,
@@ -207,6 +224,7 @@ export function StationLayout() {
     for (const [id, size] of Object.entries(layout)) bottomFractions[id] = size / 100;
     setLayoutGeometry({
       station: {
+        ...current,
         rowFraction: current?.rowFraction ?? SLOT_DEFAULTS.rowPercent / 100,
         columnFractions: current?.columnFractions ?? [],
         rightColumnSplit,
@@ -247,6 +265,8 @@ export function StationLayout() {
     );
   });
   const topRowChildren: React.ReactNode[] = [];
+  // Decision 59 — real minimums in px (see minSize.ts), from the measured area.
+  const minTop = minSizeOf(MIN_WINDOW.width, area.width, visibleTopDefs.length);
   visibleTopDefs.forEach((d, i) => {
     if (i > 0) topRowChildren.push(<Separator key={`sep-${d.panelId}`} className="station-splitter" style={verticalHandleStyle} />);
     topRowChildren.push(
@@ -254,7 +274,7 @@ export function StationLayout() {
         key={d.panelId}
         id={d.panelId}
         defaultSize={topSizes[i]}
-        minSize={SLOT_DEFAULTS.minColumn}
+        minSize={minTop}
       >
         <CellWrapper><StationCell slot={d.slot} /></CellWrapper>
       </Panel>
@@ -306,10 +326,11 @@ export function StationLayout() {
     bottomDefault: defaultLines(bottomItems.map((it) => (it.id === PANEL_IDS.bottomCanvas ? canvasSize : it.id === PANEL_IDS.bottomTerminal ? terminalSize : it.id === PANEL_IDS.bottomAnalytics ? analyticsSize : clockSize))),
     mins: Object.fromEntries([...visibleTopDefs.map((d) => [d.panelId, SLOT_DEFAULTS.minColumn] as const), ...bottomItems.map((it) => [it.id, it.min] as const)]),
   };
+  const minBottom = minSizeOf(MIN_WINDOW.width, area.width, bottomItems.length);
   bottomItems.forEach((it, i) => {
     if (i > 0) bottomRowChildren.push(<Separator key={`sep-${it.id}`} className="station-splitter" style={verticalHandleStyle} />);
     bottomRowChildren.push(
-      <Panel key={it.id} id={it.id} defaultSize={it.size} minSize={it.min}>
+      <Panel key={it.id} id={it.id} defaultSize={it.size} minSize={minBottom}>
         {it.node}
       </Panel>
     );
@@ -333,6 +354,7 @@ export function StationLayout() {
       {Chrome ? <Chrome /> : null}
 
       <div
+        ref={areaRef}
         style={{
           position: 'absolute',
           top: padding.top,
@@ -363,7 +385,7 @@ export function StationLayout() {
               <Panel
                 id={PANEL_IDS.outerTop}
                 defaultSize={bottomRowVisible ? topRowPercent : 100}
-                minSize={SLOT_DEFAULTS.minRow}
+                minSize={minSizeOf(MIN_WINDOW.height, area.height, 2)}
               >
                 <Group
                   orientation="horizontal"
@@ -384,7 +406,7 @@ export function StationLayout() {
               <Panel
                 id={PANEL_IDS.outerBottom}
                 defaultSize={topRowVisible ? 100 - topRowPercent : 100}
-                minSize={SLOT_DEFAULTS.minCanvas}
+                minSize={minSizeOf(MIN_WINDOW.height, area.height, 2)}
               >
                 <Group
                   orientation="horizontal"
@@ -399,46 +421,6 @@ export function StationLayout() {
           </Group>
         )}
       </div>
-    </div>
-  );
-}
-
-/** Thin wrapper that sizes a station cell to fill its panel. Transparent so
- *  the dock chrome's themed background shows between cards. */
-function CellWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        overflow: 'hidden',
-        background: 'transparent',
-        padding: 'var(--k-cell-gap, 3px)',
-        boxSizing: 'border-box',
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function EmptyShellHint() {
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--ink-3)',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 11,
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        opacity: 0.6,
-      }}
-    >
-      every panel is hidden — toggle one back on
     </div>
   );
 }

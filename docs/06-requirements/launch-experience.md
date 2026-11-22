@@ -30,7 +30,7 @@ Everything here is about the moments around using KRNL0: opening it, after an up
 
 **Welcome back**
 - **F12** After 2 or more days without using KRNL0, a Welcome back dialog opens once on launch (after What's new, if both apply) — only when something slipped.
-- **F13** It lists tasks whose planned day is before today and that are not done. Tasks chained after one (`task.next`) are listed under it as `follows the task above`; only the first task of a chain gets buttons, and the rest move with it.
+- **F13** It lists tasks whose planned day is before today and that are not done. (**Decision 63:** each slipped task is listed on its own; nothing is listed under another.) Tasks chained after one (`task.next`) are listed under it as `follows the task above`; only the first task of a chain gets buttons, and the rest move with it.
 - **F14** Buttons: **Move all to today**, and per task **Today**, **Tomorrow**, **Unplan** (takes it off the calendar; the task stays). Moves keep the time of day. Nothing moves by itself; every change goes through the task node's own command.
 - **F14b** (UX review 2026-11-18) Per task also **Did it** (✓: ticks it done where it was planned, `completedAt` = the end of its block, never later than now, so analytics count it on that day — `krnl task toggle <id> --at <YYYY-MM-DDTHH:MM>`) and **Won't do** (⊘: the Todo row's Won't do — off the calendar, not missed, not deleted). The dialog's main button is **Keep as is** and moves nothing; a bulk move is only the explicit **Move all to today**. (Before, the main button was "Bring all N to today", and owners pressed it to close the dialog, moving plans they had already done to today.)
 - **F14c** (UX review pick 1A, 2026-11-18) **Checklist first.** The task section is one list, fixed when the dialog opens: each slipped task and each open follower of it is a row with a checkbox. Ticking a row marks it done **on the day it was planned** (`completedAt` = the end of its calendar block, never later than now); unticking reopens it. A done row stays in the list, struck through, with "done · counts <day>". Open rows show **Move** (Today · Tomorrow · Off the calendar) and **Won't do**. The footer counts "N done · M open", offers **Move the M open to today** as a line button, and closes with **Close** (moves nothing). A follower without its own time is listed under its head with its own checkbox.
@@ -122,6 +122,7 @@ Feature: Update states (F9)
     Then "Couldn't reach GitHub" shows with Retry
 
 Feature: Welcome back (F12–F15)
+  # Superseded by Decision 63: each slipped task on its own.
   Scenario: Away three days with a slipped chain
     Given KRNL0 was last used 3 days ago
     And task A was planned for 2 days ago with task B chained after it

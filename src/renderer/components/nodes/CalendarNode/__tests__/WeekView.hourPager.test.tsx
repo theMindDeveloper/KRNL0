@@ -11,7 +11,8 @@ import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import type { CalendarState, CalendarConfig } from '../types';
 
-const state: CalendarState = { selectedDate: null, anchorDate: '2026-05-11', zoom: 1 };
+// Zoomed in (Decision 61: at the default zoom the whole day fits, no pages).
+const state: CalendarState = { selectedDate: null, anchorDate: '2026-05-11', zoom: 6 };
 const config: CalendarConfig = { view: 'week', weekStartsOn: 'monday', showHabits: true, showPomoHeatmap: true, hourRange: { start: 0, end: 24 } };
 
 let heightSpy: { mockRestore: () => void } | null = null;

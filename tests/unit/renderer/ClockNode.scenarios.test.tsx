@@ -14,6 +14,7 @@
  *   - Link UI when linkedTodoId === null
  */
 
+import { migrateChainTimes } from '../../../src/renderer/store/chainTimes';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import React from 'react';
@@ -142,7 +143,8 @@ function seedBoard(nodes: Node[], edges: Edge[] = [], pomoCfg: Partial<PomoConfi
     nodes: [makePomoNode(pomoCfg), ...nodes],
     edges,
   };
-  useBoardStore.setState({ board });
+  // As the board opens (Decision 63): chained tasks keep their times as their own.
+  useBoardStore.setState({ board: migrateChainTimes(board) as Board });
 }
 
 function renderClockNode(
@@ -299,10 +301,12 @@ describe('Task arcs reflect past / future state', () => {
 // ── Header ───────────────────────────────────────────────────────────────────
 
 describe('Header', () => {
-  it('shows the Big Clock (dial-only) toggle', () => {
+  it('the Big Clock is a quiet icon beside the views, not a third view (Decision 58)', () => {
     seedBoard([]);
     renderClockNode(makeClockState());
-    expect(screen.getByTestId('clock-dial-only').textContent).toMatch(/BIG CLOCK/);
+    const btn = screen.getByTestId('clock-dial-only');
+    expect(btn.getAttribute('aria-label')).toMatch(/Big clock/);
+    expect(btn.closest('[data-testid="clock-view-switch"]')).toBeNull();
   });
 
   it('is named Clock, like its toggle in the top bar (window-frame.md)', () => {

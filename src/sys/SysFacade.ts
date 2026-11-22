@@ -310,6 +310,12 @@ export class SysFacade {
         ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
       }, command.value);
     }
+    if (command.kind === 'settings' && command.sub === 'station-layout') {
+      return infoCmd.settingsStationLayout({
+        boardPath: this.deps.boardPath,
+        ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+      }, command.preset);
+    }
     if (command.kind === 'settings' && command.sub === 'layout') {
       return infoCmd.settingsLayout({
         boardPath: this.deps.boardPath,
@@ -593,6 +599,7 @@ export class SysFacade {
         case 'window':
           if (command.sub === 'list') return windowCmd.windowList(wctx, command.json);
           if (command.sub === 'swap') return windowCmd.windowSwap(wctx, command.a, command.b);
+          if (command.sub === 'size') return windowCmd.windowSize(wctx, command.name, command.width, command.height);
           return windowCmd.windowSetShown(wctx, command.name, command.sub === 'show');
         case 'pomoLabel': return windowCmd.pomoLabel(wctx, command.text, command.tag);
         case 'analyticsSet': return windowCmd.analyticsSet(wctx, {
@@ -843,7 +850,7 @@ export class SysFacade {
         ...(this.deps.cliDispatch ? { cliDispatch: this.deps.cliDispatch } : {}),
       };
       switch (command.sub) {
-        case 'add':     return habit.cliRoutineAdd(ctx, command.name, command.days, command.at, command.forMin);
+        case 'add':     return habit.cliRoutineAdd(ctx, command.name, command.days, command.at, command.forMin, command.on);
         case 'list':    return habit.cliRoutineList(ctx, command.json);
         case 'skip':    return habit.cliRoutineSkip(ctx, command.ref, command.on);
         case 'unskip':  return habit.cliRoutineUnskip(ctx, command.ref, command.on);

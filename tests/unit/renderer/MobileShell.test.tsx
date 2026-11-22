@@ -69,12 +69,18 @@ describe('MobileShell', () => {
     expect(screen.queryByTestId('m-focus-open')).toBeNull();
   });
 
-  it('the Calendar view offers the Clock beside it', () => {
+  it('the phone gives the Calendar the whole screen: no Calendar / Clock switch (Decision 56)', () => {
     render(<MobileShell ff="phone" />);
     fireEvent.click(screen.getByTestId('m-nav-calendar'));
-    expect(screen.getByRole('tab', { name: 'Calendar' }).getAttribute('aria-selected')).toBe('true');
-    fireEvent.click(screen.getByRole('tab', { name: 'Clock' }));
-    expect(screen.getByRole('tab', { name: 'Clock' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByTestId('m-calendar')).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Clock' })).toBeNull();
+  });
+
+  it('Today opens with Your day and a way to the Calendar (phone-web F1; the list itself: dayAgenda.test.ts)', () => {
+    render(<MobileShell ff="phone" />);
+    expect(screen.getByTestId('m-day')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('m-day-calendar'));
+    expect(screen.getByTestId('m-nav-calendar').getAttribute('aria-current')).toBe('page');
   });
 
   it('has a settings button on the phone', () => {

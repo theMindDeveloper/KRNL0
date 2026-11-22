@@ -1,35 +1,70 @@
-// Touch screens in the web app (Decision 51). The board's windows put row
-// actions (edit, delete, move, colour…) on right-click, as the desktop does.
-// Android turns a long-press into a right-click by itself; iPhone and iPad do
-// not. So on a touch screen a long-press (≈ half a second, finger still)
-// sends the same right-click, at the finger, and the lift that ends it is not
-// also a tap. Android's own long-press then adds nothing (one menu, not two).
+// Touch screens in the web app (Decision 51, Decision 56). The board's
+// windows put row actions (edit, delete, move, colour…) on right-click, as
+// the desktop does. On a touch screen a long-press (≈ half a second, finger
+// still) is that right-click, at the finger, and nothing else:
+//
+//   - one menu: the phone's own long-press menu (Android sends its own
+//     right-click) is dropped while a finger is down and just after ours;
+//   - no text selection: nothing starts selecting while a finger is down,
+//     and anything the phone selected anyway is cleared when the menu opens
+//     (web.css also makes UI text unselectable on touch screens);
+//   - no tap: the lift that ends a long-press is not a tap, and the click a
+//     phone may still send after it is dropped, so it never picks a row of
+//     the menu that just opened under the finger.
+//
+// Fields keep the system's own long-press (select, paste). A second finger
+// (a pinch) or a move cancels it.
 
-const HOLD_MS = 480;
-const SLOP_PX = 10;
+export const HOLD_MS = 480;
+export const SLOP_PX = 10;
+/** How long after a long-press the phone's own right-click and click are dropped. */
+const AFTER_MS = 900;
 
-export function installLongPressMenu(doc: Document = document): () => void {
+const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], [data-selectable], .xterm';
+
+export interface LongPressOptions {
+  /** Whether an event came from the phone itself (tests stand in for `isTrusted`). */
+  isNative?: (e: Event) => boolean;
+}
+
+export function installLongPressMenu(doc: Document = document, opts: LongPressOptions = {}): () => void {
+  const isNative = opts.isNative ?? ((e: Event): boolean => e.isTrusted);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let start: { x: number; y: number; target: EventTarget } | null = null;
+  let fingerDown = false;
   let fired = false;
-  let swallowNative = 0;
+  /** Until when the phone's own right-click is dropped and text cannot be selected. */
+  let swallowUntil = 0;
+  /** Where and when the finger lifted after a long-press: a click there is not a tap. */
+  let lift: { x: number; y: number; until: number } | null = null;
 
+  const now = (): number => Date.now();
   const clear = (): void => { if (timer) clearTimeout(timer); timer = null; start = null; };
+  const inField = (t: EventTarget | null): boolean => t instanceof Element && t.closest(EDITABLE) !== null;
+  const clearSelection = (): void => {
+    const sel = doc.getSelection?.();
+    if (!sel || sel.rangeCount === 0) return;
+    // A caret in a field is not a selection to clear.
+    if (inField(sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement ?? null)) return;
+    sel.removeAllRanges();
+  };
 
   const onStart = (e: TouchEvent): void => {
     clear();
     fired = false;
+    lift = null;
+    fingerDown = e.touches.length > 0;
     if (e.touches.length !== 1) return;
     const t = e.touches[0]!;
     const target = e.target;
-    // Fields keep the system's own long-press (select, paste).
-    if (target instanceof Element && target.closest('input, textarea, [contenteditable="true"]')) return;
+    if (inField(target)) return;
     start = { x: t.clientX, y: t.clientY, target: target ?? doc };
     timer = setTimeout(() => {
       if (!start) return;
       fired = true;
-      swallowNative = Date.now() + 1200;
-      const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: start.x, clientY: start.y, button: 2, buttons: 2, view: doc.defaultView });
+      swallowUntil = now() + AFTER_MS;
+      clearSelection();
+      const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: start.x, clientY: start.y, button: 2, buttons: 2 });
       start.target.dispatchEvent(ev);
       timer = null;
     }, HOLD_MS);
@@ -38,32 +73,67 @@ export function installLongPressMenu(doc: Document = document): () => void {
   const onMove = (e: TouchEvent): void => {
     if (!start) return;
     const t = e.touches[0];
-    if (!t || Math.hypot(t.clientX - start.x, t.clientY - start.y) > SLOP_PX) clear();
+    if (e.touches.length !== 1 || !t || Math.hypot(t.clientX - start.x, t.clientY - start.y) > SLOP_PX) clear();
   };
 
   const onEnd = (e: TouchEvent): void => {
+    const at = start;
     clear();
+    fingerDown = e.touches.length > 0;
     // The lift after a long-press is not a tap on what is under the finger.
-    if (fired) { e.preventDefault(); fired = false; }
+    if (fired) {
+      if (e.cancelable) e.preventDefault();
+      clearSelection();
+      swallowUntil = now() + AFTER_MS;
+      const t = e.changedTouches?.[0];
+      const x = t?.clientX ?? at?.x;
+      const y = t?.clientY ?? at?.y;
+      lift = x !== undefined && y !== undefined ? { x, y, until: now() + AFTER_MS } : null;
+      fired = false;
+    }
   };
 
-  // Android's own long-press right-click, right after ours: drop it.
+  const onCancel = (e: TouchEvent): void => { clear(); fingerDown = e.touches.length > 0; };
+
+  // The phone's own right-click (Android sends one on a long-press, sometimes
+  // before ours): dropped while a finger is down and just after ours. Ours is
+  // synthetic (not trusted) and always goes through.
   const onNativeMenu = (e: MouseEvent): void => {
-    if (e.isTrusted && Date.now() < swallowNative) { e.preventDefault(); e.stopPropagation(); }
+    if (!isNative(e) || inField(e.target)) return;
+    if (fingerDown || now() < swallowUntil) { e.preventDefault(); e.stopImmediatePropagation(); }
   };
 
-  const opts: AddEventListenerOptions = { capture: true, passive: true };
-  doc.addEventListener('touchstart', onStart, opts);
-  doc.addEventListener('touchmove', onMove, opts);
-  doc.addEventListener('touchcancel', clear as EventListener, opts);
+  // The click some phones still send for the lift, at the finger, is dropped
+  // (it would pick the menu row that just opened under it). A tap anywhere
+  // else, even right away, goes through.
+  const onClick = (e: MouseEvent): void => {
+    if (!isNative(e) || !lift) return;
+    const near = Math.hypot(e.clientX - lift.x, e.clientY - lift.y) <= 2 * SLOP_PX;
+    if (now() < lift.until && near) { e.preventDefault(); e.stopImmediatePropagation(); }
+    lift = null;
+  };
+
+  // Nothing starts selecting while a finger is down, outside fields.
+  const onSelectStart = (e: Event): void => {
+    if ((fingerDown || now() < swallowUntil) && !inField(e.target instanceof Node ? (e.target instanceof Element ? e.target : e.target.parentElement) : null)) e.preventDefault();
+  };
+
+  const listen: AddEventListenerOptions = { capture: true, passive: true };
+  doc.addEventListener('touchstart', onStart, listen);
+  doc.addEventListener('touchmove', onMove, listen);
+  doc.addEventListener('touchcancel', onCancel, listen);
   doc.addEventListener('touchend', onEnd, { capture: true, passive: false });
   doc.addEventListener('contextmenu', onNativeMenu, true);
+  doc.addEventListener('click', onClick, true);
+  doc.addEventListener('selectstart', onSelectStart, true);
   return () => {
     clear();
-    doc.removeEventListener('touchstart', onStart, opts);
-    doc.removeEventListener('touchmove', onMove, opts);
-    doc.removeEventListener('touchcancel', clear as EventListener, opts);
+    doc.removeEventListener('touchstart', onStart, listen);
+    doc.removeEventListener('touchmove', onMove, listen);
+    doc.removeEventListener('touchcancel', onCancel, listen);
     doc.removeEventListener('touchend', onEnd, { capture: true });
     doc.removeEventListener('contextmenu', onNativeMenu, true);
+    doc.removeEventListener('click', onClick, true);
+    doc.removeEventListener('selectstart', onSelectStart, true);
   };
 }

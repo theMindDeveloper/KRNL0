@@ -16,7 +16,7 @@ Rules from the research:
 - **F3** A done task never shows an overrun. The card reads `PLAN 1H · TOOK 1H 28` and the calendar block reads "· took 1h 28", both in neutral ink and with no rust strip.
 
 **Done list and finished cards (C12)**
-- **F4** Finished task cards leave the canvas by themselves. Hiding is render-only: the node, its Todo row, the completion ledger and analytics are untouched. A chain (edges between task cards), or a task and its subtasks, leaves together, once every task in it is done, timed from its last completion. A legacy done task without `completedAt` counts as done long ago.
+- **F4** Finished task cards leave the canvas by themselves. (**Decision 63:** connected cards leave on their own; only a task's own steps keep it.) Hiding is render-only: the node, its Todo row, the completion ledger and analytics are untouched. A chain (edges between task cards), or a task and its subtasks, leaves together, once every task in it is done, timed from its last completion. A legacy done task without `completedAt` counts as done long ago.
 - **F5** Settings → Finished cards offers three policies. **Overnight** is the default: cards leave on the next local day. **After 1 hour** and **Keep** are the other two. A separate switch shows finished cards anyway. These settings are per install (`localStorage`), not board data.
 - **F6** `sys finished status|overnight|hour|keep|show|hide` reads and sets the same settings.
 - **F7** The Todo list shows only **Done today**: today's done items fold there. Done items from earlier days leave the list (the data, Analytics and `todo list --archived` keep them; `todo clear-archive` still deletes them). The "ARCHIVE DONE" button is gone, and `todo.archiveDone` stays for the CLI. The buckets are unchanged (ADR 0016).
@@ -38,7 +38,7 @@ Rules from the research:
 - **F17** When the last scheduled day before today was missed and the scheduled day before that was done, the row asks "Missed yesterday? Tick it if you did it." **I DID IT** ticks that day. **No, start fresh** hides the prompt for that day. The CLI equivalent is `habit done <id> --date`.
 - **F18** The Clock draws an outer ring that closes as the day's planned blocks are ticked, shown only when there is a plan. Under the dial, one small ring per day of this week: a check when complete, dotted when nothing was planned. Clicking a day opens it.
 - **F19** A missed calendar block (its time passed, not done) has a dashed outline and a **↻ REPLAN** badge in its corner at any size ("didn't happen? drag it to a new time" when the block is wide). REPLAN makes the block itself lift and hop once, with a tiny "drag to a new time" chip beside it. Nothing covers the Calendar. Right-click → Unschedule takes it off. The CLI equivalent is `task schedule` / `task unschedule`.
-- **F20** (UX review pick 3A, 2026-11-18) **A done card says why it stays.** When the finished-cards policy would have taken a done card off the board but its chain or subtasks are not all done, its meta row reads **waits on chain** (tooltip: the open task that holds it). Every done card has an Archive button (task-node F22).
+- **F20** (UX review pick 3A, 2026-11-18) **A done card says why it stays.** (**Decision 63:** only its own steps hold it: "waits on its steps".) When the finished-cards policy would have taken a done card off the board but its chain or subtasks are not all done, its meta row reads **waits on chain** (tooltip: the open task that holds it). Every done card has an Archive button (task-node F22).
 
 ## Non-Functional Requirements
 
@@ -68,6 +68,7 @@ Feature: Finished cards leave the board
   Scenario: F4 overnight
     Given a task completed yesterday
     Then its card is hidden on the canvas today
+  # Superseded by Decision 63: connected cards leave on their own.
   Scenario: F4 chains leave together
     Given a chain of two tasks where only the first is done
     Then neither card is hidden

@@ -132,8 +132,8 @@ describe('ADR 0004 §1 — parallel task.next forks survive save/load', () => {
       true,
     );
 
-    // Fork structure reaches selectSchedule: both B and C share a startISO
-    // (parallel) and report the same parallelGroupId.
+    // Decision 63: the fork no longer places B and C; opening the board gave
+    // them the start the fork gave them, as their own time (nothing moved).
     const { placements } = selectSchedule(loaded as unknown as Board);
     expect(placements.size).toBe(3);
     const pA = placements.get('taskA');
@@ -142,8 +142,8 @@ describe('ADR 0004 §1 — parallel task.next forks survive save/load', () => {
     expect(pA?.startISO).toBe('2026-05-20T10:00');
     expect(pB?.startISO).toBe('2026-05-20T10:25');
     expect(pC?.startISO).toBe('2026-05-20T10:25');
-    expect(pB?.parallelGroupId).not.toBeNull();
-    expect(pB?.parallelGroupId).toBe(pC?.parallelGroupId);
+    expect(pB?.isAnchor).toBe(true);
+    expect(pC?.isAnchor).toBe(true);
 
     // Range selector picks up both parallel placements for the anchored day.
     const inRange = selectScheduledTasksForRange(

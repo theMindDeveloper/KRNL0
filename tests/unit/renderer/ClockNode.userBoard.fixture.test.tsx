@@ -13,6 +13,7 @@
  * for today's date which the new ClockNode always displays.
  */
 
+import { migrateChainTimes } from '../../../src/renderer/store/chainTimes';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
@@ -206,13 +207,15 @@ describe('User-board fixture — focus vs event tasks pre-drawing (Issue #166)',
   });
 
   it('renders event tasks as thin hollow arcs (3 paths per event task)', () => {
-    const board = buildUserBoard();
+    const raw = buildUserBoard();
     // Set all tasks to events
-    for (const n of board.nodes) {
+    for (const n of raw.nodes) {
       if (n.kind === 'todo.task') {
         n.state = { ...n.state, kind: 'event' };
       }
     }
+    // As the board opens (Decision 63): the chained tasks keep their times as their own.
+    const board = migrateChainTimes(raw) as typeof raw;
     useBoardStore.setState({ board });
 
     const clockNode = board.nodes.find((n) => n.kind === 'clock')! as Node<ClockState, ClockConfig>;

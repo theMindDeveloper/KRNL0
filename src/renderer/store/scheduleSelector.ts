@@ -1,5 +1,10 @@
-// ADR 0005 — Multi-anchor cascade scheduling selector.
+// Decision 63 — a task is on the Calendar only at its own time. Connections
+// between cards are only drawn: they do not place tasks any more. The old
+// chain rule below (`buildWithChains`) is kept only so a board that had tasks
+// placed by a chain gives them that time as their own, once, when it opens
+// (chainTimes.ts, from migrateBoard).
 //
+// The old rule (ADR 0005, multi-anchor cascade), for that step only:
 // Single source of truth for "where does each task land on the wall clock?".
 // Each anchor (task with scheduledFor set) is an independent fixpoint.
 // The selector walks a chain's connected component and uses every anchor it
@@ -24,8 +29,8 @@
 // scheduledFor, the anchor (and everything after it) is pushed to that end so
 // the chain never overlaps itself. Anchors placed later keep their own time.
 //
-// Memoized at module level on (board.nodes, board.edges, pomoConfig) by
-// reference identity. Config edits create a new node array (immutable updates)
+// Memoized at module level on (board.nodes, pomoConfig) by reference identity
+// (connections do not change where tasks are). Config edits create a new node array (immutable updates)
 // so reference identity is sufficient and cheap.
 
 import { droppedTaskIds } from '../../shared/droppedPlans';
@@ -88,7 +93,7 @@ export interface ScheduleResult {
 
 // ── Memoization ───────────────────────────────────────────────────────────────
 
-let _cacheKey: { nodes: unknown; edges: unknown; pomoConfig: unknown } | null = null;
+let _cacheKey: { nodes: unknown; pomoConfig: unknown } | null = null;
 let _cache: ScheduleResult = { placements: new Map(), computedAt: 0 };
 
 export function selectSchedule(board: Board | null): ScheduleResult {
@@ -102,12 +107,11 @@ export function selectSchedule(board: Board | null): ScheduleResult {
   if (
     _cacheKey !== null &&
     _cacheKey.nodes === board.nodes &&
-    _cacheKey.edges === board.edges &&
     _cacheKey.pomoConfig === pomoConfig
   ) {
     return _cache;
   }
-  _cacheKey = { nodes: board.nodes, edges: board.edges, pomoConfig };
+  _cacheKey = { nodes: board.nodes, pomoConfig };
   _cache = build(board, pomoConfig);
   return _cache;
 }
@@ -250,7 +254,40 @@ function computeEffective(
   return { effectiveMin, cursorAdvanceMin: effectiveMin, breakdown };
 }
 
+/**
+ * Decision 63 — where each task is: at its own time, nowhere else. A subtask
+ * is in its parent; a "Won't do" plan is off the Calendar.
+ */
 function build(board: Board, cfg: PomoConfig): ScheduleResult {
+  const placements = new Map<string, ScheduledTaskPlacement>();
+  const dropped = droppedTaskIds(board.nodes);
+  for (const n of board.nodes) {
+    if (n.kind !== 'todo.task') continue;
+    const ts = n.state as TaskState;
+    if (ts.parentTaskId !== null || dropped.has(n.id)) continue;
+    if (typeof ts.scheduledFor !== 'string' || ts.scheduledFor.length === 0) continue;
+    const { effectiveMin, breakdown } = computeEffective(ts, true, cfg);
+    placements.set(n.id, {
+      taskId: n.id,
+      startISO: ts.scheduledFor,
+      endISO: addMinutesISO(ts.scheduledFor, effectiveMin),
+      anchorTaskId: n.id,
+      parallelGroupId: null,
+      parallelBranchIndex: null,
+      isAnchor: true,
+      kind: ts.kind ?? 'focus',
+      breakdown,
+    });
+  }
+  return { placements, computedAt: Date.now() };
+}
+
+/**
+ * The old rule (before Decision 63): a task with no time of its own was
+ * placed by the chain it was connected into. Used only to give such tasks
+ * that time as their own, once (chainTimes.ts). Not for drawing.
+ */
+export function buildWithChains(board: Board, cfg: PomoConfig): ScheduleResult {
   const placements = new Map<string, ScheduledTaskPlacement>();
 
   const chainIndex = buildChainIndex(board.edges);

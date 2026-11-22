@@ -32,10 +32,10 @@ describe('F4–F5 — finished cards leave the board', () => {
     expect(finishedTaskIds(b, 'keep', NOW).size).toBe(0);
   });
 
-  it('a chain leaves together, only when all of it is done', () => {
+  it('connected cards leave on their own (Decision 63: connections are only drawn)', () => {
     const old = iso(at(2026, 11, 4));
     const half = board([task('a', { done: true, completedAt: old }), task('b', {})], [edge('a', 'b')]);
-    expect(finishedTaskIds(half, 'overnight', NOW).size).toBe(0);
+    expect(finishedTaskIds(half, 'overnight', NOW)).toEqual(new Set(['a']));
     const whole = board([task('a', { done: true, completedAt: old }), task('b', { done: true, completedAt: old })], [edge('a', 'b')]);
     expect(finishedTaskIds(whole, 'overnight', NOW)).toEqual(new Set(['a', 'b']));
   });

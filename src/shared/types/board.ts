@@ -32,6 +32,26 @@ export type StationSlot =
   | 'bottom-strip'
   | 'bottom-right-pre';
 
+/** Decision 54 — Classic: four windows over canvas, terminal, analytics, clock.
+ *  Grid: Timer, Todos, Habits over Calendar and Clock. Planner: Timer, Todos,
+ *  Habits, Clock over a full-width Calendar. The names live in shared/stationLayouts.ts. */
+export type StationPreset = 'classic' | 'grid' | 'planner';
+
+export interface StationGridGeometry {
+  /** Top row height as a fraction. */
+  rowFraction?: number;
+  /** Top-row window widths as fractions, in the preset's order (shared/stationLayouts.ts). */
+  top?: number[];
+  /** Bottom-row window widths as fractions, in the preset's order. */
+  bottom?: number[];
+  /** Decision 58 — where each window sits (window kinds, 'canvas' for the canvas); dragging rearranges it. */
+  order?: { top: string[]; bottom: string[] };
+  /** Decision 58 — each window's share of its row, by window. */
+  sizes?: Record<string, number>;
+  /** Decision 59 — the windows this ready-made layout shows (absent = its own set). */
+  windows?: string[];
+}
+
 // ADR 0008 § 2.4 — station geometry (rowFraction, columnFractions,
 // rightColumnSplit) persisted per-board only when user resizes panels.
 // Defaults are applied at render-time if absent.
@@ -46,6 +66,14 @@ export interface StationGeometry {
   // Bottom-row panel widths by panel id, as fractions — canvas, terminal,
   // analytics and clock each keep the width the user dragged them to.
   bottomFractions?: Record<string, number>;
+  // Decision 54 — which arrangement the Station uses; absent = classic.
+  preset?: StationPreset;
+  // Panel sizes of the Grid and Planner presets, each kept apart so switching
+  // never disturbs another preset.
+  grid?: StationGridGeometry;
+  planner?: StationGridGeometry;
+  /** Decision 59 — bumped by a reset, so the panels lay out afresh. */
+  rev?: number;
 }
 
 // Structural mixin for mother-node config objects.

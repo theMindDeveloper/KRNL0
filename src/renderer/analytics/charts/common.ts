@@ -24,12 +24,17 @@ export function linearScale(domainMax: number, rangeMax: number): (v: number) =>
 // Series colors (task / habit / focus) stay theme-aware — they pick up
 // the user's brand tone choices and contrast against the chart's dark bg
 // regardless.
-export const COLOR_TASK = 'var(--cyan)';
-export const COLOR_HABIT = 'var(--acid)';
-export const COLOR_FOCUS = 'var(--rust)';
-export const COLOR_GRID = 'var(--k-an-line-2, #2a2e33)';
-export const COLOR_AXIS = 'var(--k-an-ink-2b, #aab0b7)';
-export const COLOR_LABEL = 'var(--k-an-ink-2, #c8cdd3)';
+// Decision 58 — one hue for the data (the accent, as text-safe ink on light
+// paper), the theme's own ink for labels: every chart reads as one family.
+// Analytics now follows the theme in every style (Decision 57), so the
+// labels can use the themed --k-an-* inks.
+export const COLOR_ACCENT = 'var(--k-an-accent-ink, var(--acid-ink, var(--acid)))';
+export const COLOR_TASK = COLOR_ACCENT;
+export const COLOR_HABIT = COLOR_ACCENT;
+export const COLOR_FOCUS = COLOR_ACCENT;
+export const COLOR_GRID = 'var(--k-an-line, var(--paper-3))';
+export const COLOR_AXIS = 'var(--k-an-ink-4, var(--ink-4))';
+export const COLOR_LABEL = 'var(--k-an-ink-3, var(--ink-3))';
 
 // ── Text containment rule ────────────────────────────────────────────────────
 // No chart text may touch or cross the edge of the shape it sits in (a donut

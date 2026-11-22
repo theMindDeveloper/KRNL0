@@ -54,6 +54,8 @@ interface Props {
   anchorAbove?: { left: number; top: number };
   /** The main button's words ("Save ↵" when editing, "Add ↵" when adding). */
   primaryLabel?: string;
+  /** Decision 60 — double-click the name to rename it (Enter keeps, Escape cancels). */
+  onRename?: (text: string) => void;
 }
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -86,7 +88,17 @@ export function dayWord(day: string, today: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, onClose, title, actions, onChange, anchorAbove, primaryLabel }: Props) {
+export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, onClose, title, actions, onChange, anchorAbove, primaryLabel, onRename }: Props) {
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(title?.text ?? '');
+  const [shownName, setShownName] = useState(title?.text ?? '');
+  const commitName = () => {
+    const t = nameDraft.trim();
+    setRenaming(false);
+    if (!t || t === shownName || !onRename) return;
+    setShownName(t);
+    onRename(t);
+  };
   const easy = useEasyMode();
   // One card, no second pane (owner, 2026-11-20): the deadline opens in place under its line.
   const tab = 'when' as 'when' | 'deadline';
@@ -127,6 +139,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && e.target.dataset['rename'] === 'true') return;
       if (e.key === 'Escape') { if (pickerOpen()) return; e.stopPropagation(); onClose(); }
       if (e.key === 'Enter' && !(e.target instanceof HTMLInputElement) && !pickerOpen()) { e.preventDefault(); apply(); }
     };
@@ -144,8 +157,8 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
   const tomorrow = addDays(today, 1);
   const third = [friday, nextMon].filter((d) => d !== tomorrow).sort()[0] ?? nextMon;
   const quick: Array<[string, string, string]> = tab === 'when'
-    ? [['today', 'Today', today], ['tmrw', 'Tomorrow', tomorrow], [third === friday ? 'fri' : 'next-mon', dayWord(third, today), third]]
-    : [['today', 'Today', today], ['tmrw', 'Tomorrow', tomorrow], ['in-a-week', 'In a week', addDays(today, 7)]];
+    ? [['today', 'Today', today], ['tmrw', 'Tmrw', tomorrow], [third === friday ? 'fri' : 'next-mon', dayWord(third, today), third]]
+    : [['today', 'Today', today], ['tmrw', 'Tmrw', tomorrow], ['in-a-week', 'In a week', addDays(today, 7)]];
   const selected = tab === 'when' ? v.day : v.deadline;
   const pick = (d: string) => setV((p) => (tab === 'when' ? { ...p, day: d } : { ...p, deadline: d }));
   const clearDay = () => { setV((p) => ({ ...p, day: null, time: null })); setTimeText(''); setTimeTouched(true); };
@@ -233,7 +246,30 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
           <div style={{ ...cardHead, alignItems: 'flex-start' }}>
             {title.tone && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: title.tone, flexShrink: 0, marginTop: 6 }} />}
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span data-testid="plan-card-title" style={{ ...cardTitle, flex: 'none', overflowWrap: 'anywhere' }}>{title.text}</span>
+              {renaming ? (
+                <input
+                  autoFocus
+                  data-rename="true"
+                  data-testid="plan-card-rename"
+                  aria-label="Name"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') { e.preventDefault(); commitName(); }
+                    if (e.key === 'Escape') { e.preventDefault(); setRenaming(false); setNameDraft(shownName); }
+                  }}
+                  onBlur={commitName}
+                  style={{ ...cardTitle, flex: 'none', width: '100%', boxSizing: 'border-box', border: 'none', borderRadius: 6, padding: '0 4px', margin: '0 -4px', background: 'var(--paper-2)', color: 'var(--ink)', outline: 'none' }}
+                />
+              ) : (
+                <span
+                  data-testid="plan-card-title"
+                  title={onRename ? 'Double-click to rename' : undefined}
+                  onDoubleClick={onRename ? () => { setNameDraft(shownName); setRenaming(true); } : undefined}
+                  style={{ ...cardTitle, flex: 'none', overflowWrap: 'anywhere', cursor: onRename ? 'text' : undefined }}
+                >{onRename ? shownName : title.text}</span>
+              )}
               {title.sub && <span data-testid="plan-card-sub" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', overflowWrap: 'anywhere' }}>{title.sub}</span>}
             </span>
             <CardClose onClick={onClose} />
@@ -302,7 +338,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
             {dlOpen && (!easy || !!value.deadline) && (
               <div data-testid="when-deadline-open">
                 <div style={cardDays}>
-                  {([['today', 'Today', today], ['tmrw', 'Tomorrow', tomorrow], ['in-a-week', 'In a week', addDays(today, 7)]] as const).map(([key, label, ymd]) => (
+                  {([['today', 'Today', today], ['tmrw', 'Tmrw', tomorrow], ['in-a-week', 'In a week', addDays(today, 7)]] as const).map(([key, label, ymd]) => (
                     <button key={key} type="button" data-testid={`when-deadline-${key}`} aria-pressed={v.deadline === ymd} onClick={() => setV((p) => ({ ...p, deadline: p.deadline === ymd ? null : ymd }))} style={cardDay(v.deadline === ymd)}>{label}</button>
                   ))}
                   <button type="button" data-testid="when-no-deadline" aria-pressed={!v.deadline} onClick={clearDeadline} style={cardDay(false)}>None</button>

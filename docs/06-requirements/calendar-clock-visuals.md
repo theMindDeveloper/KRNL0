@@ -35,10 +35,105 @@
 | F27 | **App open/close markers** (time-log F14) and **month hours** (Calendar month cells show the day's recorded work, top-left). |
 | F28 | **Clashing plans are letter bars.** When a clash does not fit side by side with names (F15), every plan stays its own slim bar at its own time and is named by its first character (`clashLabels.ts`): when two bars of one clash would share a letter they add the first letter of their last word ("Read chapter A/B/C" → RA, RB, RC), then more letters, then a number — never two equal names in one clash. The letter shows when it fits the bar (one line tall, wide enough); a name too wide for a narrow bar stands its letters one above the other (never rotated) when the bar is tall enough, so a bar is never left unnamed. A title with no letter or digit is numbered (#1, #2). It sits centred in a short bar, at the top of a tall one with a tick under it when done; missed bars keep the rust outline. The full name is the bar's tooltip and in its popup. Every bar is clickable and **draggable** like any block. **While any plan from the calendar is dragged, a strip appears at the bottom: "Drop here to unschedule"** — dropping there sends it back to Todo (`unscheduleTask`, CLI `task unschedule`); any other drop or drag end clears the strip. A clash with two or more chains still ahead gets a **Line up** tab just above it (or below), drawn only where it covers no plan or habit pill: the chains go one after another in start order from the first start, never before now; a chain moves as one. CLI: `krnl cal lineup <task> <task> [...]`. |
 | F29 | **Tracked time is the Clock rail** ("Clock rail · refined", version A4). Each day has a track at its left, 4 px inside its own day line (3 px in a Station-width day), drawn like the Clock's ring track: one shade lighter than the day (`--paper-3`; halved on light paper), rounded at both ends, 5 px wide (6 px day view, 4 px Station). The track only covers time that has passed: the whole day before today, up to now today, nothing on days still ahead, and nothing on a past day with no recorded time (a week of bare tracks read as scrollbars) — it fills up as the day goes, and the grey left is time you did not record. Each focus span fills the track at its full width with round caps, in its tag or task colour (untagged lime uses a deeper mix on light paper); a span still running has crawling stripes (still under reduced motion); a break is the empty track. Today's "now" is a knob on the track in the now line's red; the now line then draws no dot of its own. Plans start 5 px after the track (3 px Station) and never sit on it. The day header shows the day's tracked total when the column has room (>= 110 px). The other versions stay one constant away (`RAIL_STYLE` in WeekView: A1 full ring track, A2 with hour marks, A3 thin 4 px). In a day too narrow for a one-line name (under 64 px), a block alone in its column wraps its name (F31); plans that clash stay letter bars (F28). |
-| F30 | (UX review pick 5A, 2026-11-18) **Chains are named on the calendar.** A planned block that follows another task in its chain shows a small "after <task>" line under its name when the block has room (always in its tooltip), and the plan popup of a chained plan says "after <task>" too. In both modes (Easy keeps chains, easy-mode D14). Drawn connectors between blocks are out of scope. |
+| F30 | ~~(UX review pick 5A, 2026-11-18) **Chains are named on the calendar.**~~ **Superseded by Decision 63:** a connection says nothing about time; no "after" line. Was: A planned block that follows another task in its chain shows a small "after <task>" line under its name when the block has room (always in its tooltip), and the plan popup of a chained plan says "after <task>" too. In both modes (Easy keeps chains, easy-mode D14). Drawn connectors between blocks are out of scope. |
 | F31 | (Owner pick A, 2026-11-19) **A narrow block alone in its column wraps its name.** In a day column too narrow for a one-line name (under 64 px, `MIN_LANE_PX`: the week in a Station-width Calendar), a block that is not part of a clash shows its name in 10 px mono (`.cal-wrap`), wrapped down the block: words first, a long word breaks where it must, and only whole 11 px lines are drawn, so a short block shows its first line and a tall one the whole name. A done block keeps its tick under the name when there is room. It falls back to the first character only when fewer than three letters fit across. Plans that clash keep their letters (F28): a slim bar holds no word. The full name stays in the tooltip and the plan card. It was the first character alone ("S", "P"), which showed that a day had plans but not which. |
+| F32 | (Owner, 2026-11-21 — Decision 55) **Readable events.** A repeating event is a calm tinted card (its colour at about 15 % over the paper, a thin border in its colour, rounded) — no hatching. Its whole name wraps over as many lines as the block has, in the reading font at 12 px; then its time ("16:00–17:30"), then its place when it has one ("WH C 442": the part after a long dash with a digit in it, or the first short line of its note). The name gets the first lines (up to two), then the time, then the rest of the name, then the place; nothing is cut in half (`eventText.ts`). A lane too thin for words writes the name sideways. Plans name themselves in the same reading font and use every line a tall block has. |
+| F33 | (Decision 55) **A calm grid.** The gutter labels the hours only (no ":30"); a half hour is a faint dashed line. Hour and day lines are drawn at ink 11 % (frame styles may set `--k-cal-grid`; Pro dark is #2c2c2c). |
+| F34 | (Decision 55) **Today is clear.** The day header shows the weekday small and the date large; today's date sits in an accent circle, days gone by step back to grey, weekend names are quieter. Today's column is a neutral lift (no olive wash; none in the day view). The now line is solid and 2 px across today only, a faint trace across the other days, with no glow; the time now ("04:53") sits in the gutter on the line and the hour label under it gives way. |
+| F35 | (Decision 55) **The Orb stays off the windows.** In a Station layout the Orb rests in the top bar, at half size, after the Settings button (`[data-orb-dock]`): a click opens it as before, it does not drag there, and its full-size box never takes clicks from the windows under the bar. In Free it keeps its own place. |
+
+| F36 | (Owner, 2026-11-21 — Decision 58) **Smooth hours.** The hour grid scrolls smoothly with the wheel, a trackpad or a finger; the arrows glide by most of a screen; dragging near the top or bottom edge keeps it moving. (Replaces whole-hour windows.) |
+| F37 | (Decision 58) **Zoom by gesture.** Pinch on a trackpad, Ctrl/⌘ + wheel, two fingers on a touch screen, or dragging the hour gutter up and down zooms the hours; the hour under the pointer stays under it; the zoom is saved once the gesture rests (`calendar.setZoom`, `krnl cal zoom`). No zoom buttons. |
+| F38 | (Decision 58) **Depth.** Every other hour is a shade deeper; plans float with a soft shadow and a tick box before the name; repeating events lie flat (tint and border, no box). The hour labels sit on their lines in a 48 px gutter with room above 00:00. |
+| F39 | ~~(Decision 58) No recorded rail.~~ Replaced by F43 (Decision 59): the line is back, restyled. |
+| F40 | (Decision 58) **Habits are tick boxes.** A habit set for a time is a small box centred on its time line at the right of the day, in its colour, filled with a check when done; its name beside it when there is room; a click ticks it. |
+| F41 | (Decision 58) **Add by typing at the bottom.** The Calendar's "add a plan" opens a field in the footer, as in Todo. "Gym fri 18:00 1h" adds the plan at once (the parsed day and time show beside the field); a name without a time opens the plan card with the name filled in. Escape closes the field. |
+| F42 | (Decision 58) **A bigger Clock.** The dial takes the room the list does not need; the day's list sits at the bottom, about four rows tall, and scrolls beyond that (the row going on now stays in view). The big clock is a quiet icon at the end of the header. |
+| F43 | (Decision 59) **The recorded line, calm.** Recorded time is a thin line at each day's left (4 px, 5 in a day view, 3 px from the day line; plans start 3 px after it); spans that follow each other touch; a running span is a solid fill (no stripes); the now line's dot sits centred on it; only the line itself (3 px either side) takes a click, never a plan beside it. "Recorded time" is back in the Calendar's menu. |
+| F44 | (Decision 59) **Drag a repeating event.** Drag an event to another time (a weekly one also to another weekday), or pull its top or bottom edge: the event changes for every week (`habit.setSchedule`). While dragging, a ghost shows the new time; the menu has no "Move this one…". |
+| F45 | (Decision 59) **Click to see, Details to change.** A left click on a plan or an event opens its info card (time, length, recorded; Start, Done, Details); Details there, or Details in the right-click menu, opens the card that changes it. |
+| F46 | (Decision 59) **Lines meet.** The day-name row and the ANY TIME row leave the same room at their right as the hours' scrollbar, so every day line runs straight down. |
+| F47 | (Decision 59) **Zoom you can find.** The Calendar's menu has "Bigger hours" and "Smaller hours" (it stays open between presses), with the gestures named beside them. |
+| F48 | (Decision 59) **A task's mark.** A task shows a small list mark at its top right (a done one the check, a repeating event ⟳); there is no tick box before its name. Day chips say "Tmrw". |
+| F49 | (Decision 59) **Habits you can tell apart.** A narrow day's habit box carries the habit's icon (or its first letter) in its colour; a habit on a day still ahead is faded with a dashed box and says "not yet"; a double-click on a habit never opens the new-plan card. |
+| F50 | (Decision 59) **Edges where they are drawn.** A task's top and bottom edges are found in screen pixels on the block, so a resize starts at its drawn edge at any canvas zoom; a press on an edge that does not move changes nothing. |
+| F51 | (Decision 59) **The same Clock in Free.** The dial grows with the window in Free as in the Station. A habit on the dial is a small tick box on its lane at its time, filled with a check when done; a click ticks it (not on a day still ahead). |
+| F52 | (Decision 59) **One rule for adding.** While you type in the Calendar's field the plan card shows above it, filled from the words (day, time, length, deadline), as in Todo and Habits; Enter adds what it shows; "every…" opens the repeating-event card. |
+| F53 | (Decision 60) **No habits on the Clock.** Habits are not drawn on the Clock's dial or in its list; repeating events are. The outer ring (the day's planned blocks ticked) shows its fill only once something is done. |
+| F54 | (Decision 60) **Steady blocks.** Pointing at a block tints it; nothing else on the Calendar moves or re-renders its text. |
+| F55 | (Decision 60) **One block style.** A block's mark sits at its top right whenever the block is at least ~22 px tall; names are 13 px in a full block, 12.5 px in a narrow one; events 13 px. |
+| F56 | (Decision 60) **Overlaps stay as placed.** No "Fix overlap" tab over overlapping plans. |
+| F57 | (Decision 60) **One look at every size.** A block 40 px or taller shows its name (up to three lines), then its time small (mono 10 px) — for an event with how often ("every week") — wrapping when narrow, then the rest of the name and the place. |
+| F58 | (Decision 60) **Cards behave alike.** The Calendar's add card hides on a click away; a plan's Details card renames it on a double-click of its name; only one card or menu shows at a time; the info card shows name, when, category, planned, recorded and its buttons, nothing more. |
+| F59 | (Decision 60) **Steady edits.** A resized plan or a dragged event never flashes back to its old place before it lands; letting go is not a click; the plan being resized keeps its tint; events light up under the pointer. |
+| F60 | (Decision 60) **A resizable Calendar on the Free canvas.** Its right edge, bottom edge and corner resize it (420 × 360 to 1800 × 1400); the windows beside it move along and notes under it move down, so nothing overlaps, also after a swap; `krnl window size calendar <width> <height>`. |
+| F61 | (Decision 61) **One lane plan.** A plan and a repeating event at the same time sit side by side, never on top of each other. |
+| F62 | (Decision 61) **One drag look.** Anything carried onto the Calendar (Todo row, task card, Calendar block, canvas card, event, habit, an edge being pulled) shows as the same solid ghost at its landing slot with its name and times, gliding smoothly; what is moved or resized steps back; no browser drag picture anywhere; habits can be carried to another time. |
+| F63 | (Decision 61) **A canvas card onto the Calendar** is planned (or moved) where it is let go; the card glides back to its place. |
+| F64 | (Decision 61) **The day fits.** By default the whole day fits the Calendar (no scroll, no empty band); zoom only makes it taller; "Fit the day" goes back; small hours drop the half-hour marks. |
+| F65 | (Decision 61) **The canvas Calendar** starts at 1400 × 1400, keeps its shape, 540 to 1400 with snaps at both ends, resizes smoothly (written once on release); the row never jumps when notes are placed. |
+| F66 | (Decision 61) **Per device:** window places, visibility and canvas size never sync. No fade masks anywhere; the Year view fills its window. |
+| F67 | (Decision 61) **Carried from outside:** a small box in the plan's colour follows just below-right of the pointer; a canvas card shrinks into it while over the Calendar, so the hours stay in view. |
+| F68 | (Decision 61) **Pulling an edge** (plan or event) shows the new length as the ghost; the block steps back, with no tint or highlight on it. |
+| F69 | (Decision 61) **A moved plan keeps the spot it was grabbed by** under the pointer (like an event); off the hours the ghost hides and the box shows. |
+| F70 | (Decision 61) **Resizing the canvas Calendar keeps up:** the inside follows the edge in the same frame (scaled while moving, laid out on a pause and on release); the windows to its right never jump on release. |
+| F71 | (Decision 61) **The wheel on the Free canvas:** over a Calendar whose day fits, the wheel zooms or moves the canvas; zoomed into the hours, it scrolls them; Ctrl + wheel and a pinch always zoom the hours. |
+| F72 | (Decision 61) **Readable hour numbers** in My layout and on the canvas: at least 22 px apart, each on its line; the time now hides only the number under it. |
+| F73 | (Decision 61) **The hours follow the window by CSS:** resizing (or a short Station cell) never leaves a band under 23:00 and never freezes the inside; the wheel scrolls the hours exactly when they scroll. |
+| F74 | (Decision 61) **A time line on what is carried:** a line to its top (or pulled bottom) edge with the exact time in the hour column; the carried block keeps its text layout. |
+| F75 | (Decision 61) **The package:** carried from outside, a 3D parcel in the plan's colour packs over the Calendar and unpacks on the drop. |
+| F76 | (Decision 61) **Out of the Calendar:** a plan carried out and let go elsewhere in the app comes off the Calendar. |
+| F77 | (Decision 61) **A habit moves as itself:** all its boxes glide, the time line shows the time, no jump when let go. |
+| F78 | (Decision 61) **The Clock follows:** while something is carried on the Calendar, the Clock (same day and half) shows it at the ghost's time. |
+| F79 | (Decision 61) **A small Calendar still reads:** short events and plans keep a small one-line name. |
+| F80 | (Decision 63) **One drag engine:** a task, an event and a habit are carried the same way from every place (Todo rows, card corners, canvas cards, list and layer rows, Month chips, on the Calendar): the ghost follows the pointer every frame, with no system drag box. |
+| F81 | (Decision 63) **The same rules for every kind:** the step, the day (a habit and a daily event keep their days), the edges, the grab spot; Esc cancels; letting a task go elsewhere in the app takes it off the Calendar. |
+| F82 | (Decision 63) **Canvas cards onto the Calendar:** a task card is planned there; a habit card gets that time; a weekly event card gets that time on its days; a one-time event card moves to that date and time. The card glides back to its place. |
+| F83 | (Decision 63) **The ghost keeps its mark** (task, event, repeating event) while carried; a habit shows only its time line, across the whole week and under the habit boxes; the cursor stays "grabbing" the whole time. |
+| F84 | (Decision 63) **One sound for every move:** moving a task, an event or a habit plays the move sound. |
+| F85 | (Decision 63) **One overlay at a time:** opening a right-click menu closes an open info card and the other way round, anywhere in the app; one right-click with a card open opens the menu. |
+| F86 | (Decision 63) **The menu button in every view:** Day, Week, Month and Year have it in the same place; Month has Habits and the events list, Year the events list. |
+| F87 | (Decision 63) **Kind marks:** each Calendar block and canvas card shows its kind in its top-right corner (task, event, repeating event, habit); a missed task shows the red replan instead. |
+| F88 | (Decision 63) **On the line:** a block, an event and the ghost start exactly on their time line. |
+| F89 | (Decision 63) **Connections are only drawn:** a connection never moves, unschedules, groups or finishes another task. |
+| F90 | (Decision 63) **Nothing moves when connections stop placing tasks:** a task placed by a chain keeps that time as its own. |
+| F91 | (Decision 63) **"Add next" gives a time:** a task made after another starts where that one ends (the card and the CLI). |
+| F92 | (Decision 63) **Small connection dots:** smaller, shown on hover, as easy to drag from as before; no line from a hidden card. |
+## Non-Functional Requirements
+
+| ID | Requirement |
+|---|---|
+| NF1 | (Decision 63) **No layout read while the pointer moves** in a drag: the Calendar is measured when the drag starts (and after a scroll, a wheel or a resize). |
+| NF2 | (Decision 63) **No page-wide restyle** at the start or end of a drag: no style rule reads the drag marker. |
+| NF3 | (Decision 63) **A drop is drawn where it lands** in the first frame after letting go; the board changes after it. |
+| NF4 | (Decision 63) **A move does not redraw the moved card** or the canvas's own layers. |
+| NF5 | (Decision 63) **Pulling an edge shows the block as it will be:** the Calendar draws it at its new times while pulled (same text, same style); nothing changes when it is let go. |
+| NF6 | (Decision 63) **Nothing pops when it lands:** no landing or press-in animation on a plan, like a repeating event. |
+| NF8 | (Decision 63) **The Clock follows a carried item smoothly:** one arc of its own glides with the ghost; the Clock window is not drawn again on every step; the original steps back while carried. |
+| NF7 | (Decision 63) **The canvas holds still under a carried card:** no auto-pan over a Calendar or outside the canvas; the hidden card is not redrawn on every move; a carried card lands in the same moment as a move on the Calendar and goes home unseen, then fades in; the package fades (no bounce or spin). |
 
 ## Gherkin Scenarios (ATDD)
+
+```gherkin
+Feature: Carrying a canvas card onto the Calendar is as calm as moving a repeating event (NF6, NF7)
+  Scenario: The canvas holds still while a card is held over the Calendar
+    Given a task card on the canvas and the Calendar docked beside it (or reaching past the window edge)
+    When I carry the card over the hours and hold it there
+    Then the canvas does not pan and the card is not redrawn
+    And the ghost follows the hours under the pointer
+
+  Scenario: Letting go lands it like a move on the Calendar
+    When I let go over a slot
+    Then the ghost stands where it lands and the block appears there with no pop
+    And the card is back in its own place on the canvas, fading in (it never grows over the hours)
+    And the package fades into the slot
+
+  Scenario: Pulling an edge shows the block as it will be (NF5)
+    Given a repeating event from 14:00 to 15:30
+    When I pull its bottom edge down three steps
+    Then the block is drawn longer and its times read "14:00–15:50" in the same style
+    And when I let go nothing changes
+```
 
 ```gherkin
 Feature: Plan and reality stay readable when tasks overlap
@@ -142,4 +237,70 @@ Feature: No scrolling in Calendar and Clock
     Given a Calendar panel that fits 6 hours
     When I scroll down once over the grid
     Then the grid shows the next 6 whole hours and the pager reads the new range
+```
+
+```gherkin
+Feature: Readable events (F32)
+  Given a class "B112 Front-End Development (PÜ) – WH C 442" on Thursday 14:00–15:30
+  When I look at the week at the default zoom
+  Then its block reads "B112 Front-End Development (PÜ)", "14:00–15:30" and "WH C 442"
+  And the block is a flat tint with no hatching
+
+Feature: Calm grid and clear today (F33, F34)
+  Then the gutter shows "13", "14" and no ":30"
+  And today's date is in the accent circle
+  And the time now is in the gutter on the now line
+
+Feature: The recorded line (F43)
+  Given I recorded 09:00–09:25 and 09:25–09:50 today
+  Then today's column shows one unbroken line from 09:00 to 09:50 at its left
+  And the now dot sits on that line
+  When I click a plan right beside the line
+  Then the plan's card opens, not the recorded span's
+
+Feature: Drag a repeating event (F44)
+  Given "Lab" repeats on Tuesdays 14:00–16:00
+  When I drag it down an hour and over to Wednesday
+  Then "Lab" repeats on Wednesdays 15:00–17:00, every week
+  When I pull its bottom edge down 30 minutes
+  Then it lasts 2h 30m every week
+
+Feature: Click to see (F45)
+  When I click a plan
+  Then its info card shows its time and length with Start, Done and Details
+  When I press Details
+  Then the card that changes it opens
+
+Feature: Habits (F49)
+  Given tomorrow has "Gym" at 11:00
+  Then its box is faded and dashed and says "not yet"
+  When I double-click today's "Gym" box
+  Then it is ticked and unticked, and no new-plan card opens
+
+Feature: One rule for adding (F52)
+  When I type "Gym fri 18:00" in the Calendar's field
+  Then the plan card shows Fri 18:00 above the field before I press Enter
+  When I press Enter
+  Then "Gym" is on Friday at 18:00
+
+Feature: One drag for everything (F80-F84)
+  Given "Write report" is a row in Todo
+  When I drag the row onto Wednesday at 10:00
+  Then a ghost with the task mark follows the pointer to 10:00, and no grey box shows
+  When I let go
+  Then "Write report" is on Wednesday at 10:00 and the move sound plays
+  When I drag the "Run" habit card from the canvas onto 18:00
+  Then "Run" is at 18:00 on its days, and the card glides back to its place
+
+Feature: One overlay at a time (F85)
+  Given a plan's info card is open
+  When I right-click another plan
+  Then the info card closes and that plan's menu opens
+
+Feature: Connections are only drawn (F89-F91)
+  Given "Draft" (09:00-10:00) is connected to "Review", which has no time of its own
+  When KRNL0 opens this board
+  Then "Review" is at 10:00 as its own time
+  When I move "Draft" to 14:00
+  Then "Review" stays at 10:00
 ```

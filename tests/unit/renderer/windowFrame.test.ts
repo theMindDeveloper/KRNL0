@@ -51,8 +51,10 @@ describe('The thing you do sits in the footer', () => {
   });
   it('the Calendar adds from its footer, not from a + in the time row', () => {
     const s = src('CalendarNode/WeekView.tsx');
+    // Decision 58 — the footer is a field like Todo's; "add a plan" opens it.
     const foot = s.slice(s.indexOf('className="kw-foot"'));
-    expect(foot.slice(0, 600)).toContain('data-testid="calendar-new"');
+    expect(foot.slice(0, 5000)).toContain('data-testid="calendar-add-input"');
+    expect(foot.slice(0, 5000)).toContain('data-testid="calendar-new"');
     expect(s.split('data-testid="calendar-new"').length - 1).toBe(1);
   });
   it('"log past time" is a button in the Timer footer, not a link under START', () => {
@@ -117,7 +119,7 @@ describe('One name per window; no second summary rows (window-frame.md)', () => 
     expect(src('PomoNode/index.tsx')).not.toContain('CycleCounter');
   });
   it('Analytics: pages are a row of icons in the time row, the current one named (owner, 2026-11-20)', () => {
-    expect(src('AnalyticsNode/index.tsx')).toContain('<div className="kw-range" style={toolbarStyle}>');
+    expect(src('AnalyticsNode/index.tsx')).toContain('<div className="kw-range an-toolbar" style={toolbarStyle}>');
     const nav = src('AnalyticsNode/PageNav.tsx');
     expect(nav).toContain('data-testid={`analytics-page-${p.id}`}');
     expect(nav).toContain('data-testid="analytics-page-label"');
@@ -190,7 +192,7 @@ describe('Cards are a list you read; the Timer is a clock first (window-frame.md
   });
   it('the plan card: the day is one line of at most four choices, named in full', () => {
     const c = read('components/ui/WhenPopover.tsx');
-    expect(c).toContain("['tmrw', 'Tomorrow', tomorrow]");
+    expect(c).toContain("['tmrw', 'Tmrw', tomorrow]");
     expect(c).toContain('<div style={cardDays}>');
   });
   it('the Timer face: the time, today as one line; no total tiles', () => {
@@ -357,9 +359,10 @@ describe('Visual bugs fixed (owner list, 2026-11-20)', () => {
     const css = read('renderer/styles/window-frame.css');
     expect(css).toContain('[data-testid="topbar"] .krnl-topbar-btn {');
     expect(css).toContain('[data-testid="topbar-panel-toggles"] .krnl-panel-toggle {');
-    const t = read('renderer/components/ui/LayoutModeToggle.tsx');
-    expect(t).toContain('label="Station"');
-    expect(t).toContain('label="Free"');
+    // Decision 54 — the Station / Free switch became the layout menu.
+    const t = read('renderer/components/ui/LayoutMenu.tsx');
+    expect(t).toContain('data-testid="layout-menu"');
+    expect(read('shared/stationLayouts.ts')).toContain("label: 'Free canvas'");
   });
   it('no second frame inside a window: Analytics draws no border of its own, Pro light has no inset highlight', () => {
     expect(read('renderer/components/nodes/AnalyticsNode/index.tsx')).toContain("borderRadius: 'calc(var(--k-mother-radius, 8px) - 1px)'");
@@ -378,16 +381,19 @@ describe('The Timer clock, the layout switch and a flat Analytics header (owner,
     const d = read('components/nodes/PomoNode/ObserveDash.tsx');
     expect(d).toContain("text.length > 5 ? 'clamp(44px, 14cqw, 112px)' : 'clamp(60px, 20cqw, 152px)'");
     expect(d).toContain("alignItems: 'center', fontFamily: 'var(--font-clock)'");
-    expect(d).toContain('data-testid="pomo-colon" role="presentation"');
+    expect(d).toContain("'pomo-colon' : 'pomo-colon-h'} role=\"presentation\"");
+    // Every colon is drawn, the one after the hours too (owner, 2026-11-21).
+    expect(d).toContain("text.split(':')");
   });
-  it('Fit sits before the Station / Free switch, so the switch never moves when Fit appears', () => {
+  it('Fit sits before the layout menu, so the menu never moves when Fit appears', () => {
     const bar = read('components/TopBar/index.tsx');
     expect(bar.indexOf('testId="topbar-fit"')).toBeGreaterThan(0);
-    expect(bar.indexOf('testId="topbar-fit"')).toBeLessThan(bar.indexOf('<LayoutModeToggle />'));
+    expect(bar.indexOf('testId="topbar-fit"')).toBeLessThan(bar.indexOf('<LayoutMenu />'));
   });
-  it('the switch is a track with a raised thumb', () => {
-    expect(read('styles/window-frame.css')).toContain('[data-testid="layout-mode-toggle"] > button[aria-pressed="true"] {');
-    expect(read('components/ui/LayoutModeToggle.tsx')).toContain('aria-pressed={active}');
+  it('the layout menu lists every layout as a radio item with a drawing of it (Decision 54)', () => {
+    const m = read('components/ui/LayoutMenu.tsx');
+    expect(m).toContain('role="menuitemradio"');
+    expect(m).toContain('<LayoutGlyph rects={o.glyph}');
   });
   it('the Analytics header is flat: no gradient, no shadow', () => {
     const a = read('components/nodes/AnalyticsNode/index.tsx');

@@ -3,6 +3,7 @@ export type SysCommand =
   | { kind: 'window'; sub: 'list'; json: boolean }
   | { kind: 'window'; sub: 'show' | 'hide'; name: string | undefined }
   | { kind: 'window'; sub: 'swap'; a: string | undefined; b: string | undefined }
+  | { kind: 'window'; sub: 'size'; name: string | undefined; width: number | undefined; height: number | undefined }
   | { kind: 'pomoLabel'; text: string | undefined; tag: string | undefined }
   | { kind: 'analyticsSet'; view: string | undefined; range: number | undefined; metric: string | undefined; year: number | undefined }
   | { kind: 'mediaTitle'; id: string | undefined; title: string | undefined }
@@ -113,6 +114,7 @@ export type SysCommand =
   | { kind: 'settings'; sub: 'show'; json: boolean }
   | { kind: 'settings'; sub: 'mode'; mode: string | undefined }
   | { kind: 'settings'; sub: 'layout'; layout: string | undefined }
+  | { kind: 'settings'; sub: 'station-layout'; preset: string | undefined }
   | { kind: 'settings'; sub: 'grid'; value: string | undefined }
   | { kind: 'text'; sub: 'add'; text: string | undefined; at: { x: number; y: number } | undefined; near: string | undefined; look: { kind: string; color?: string } | undefined }
   | { kind: 'text'; sub: 'set'; id: string | undefined; text: string | undefined }
@@ -186,7 +188,7 @@ export type SysCommand =
   | { kind: 'habit'; sub: 'pin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'unpin'; ref: string | undefined }
   | { kind: 'habit'; sub: 'kind'; ref: string | undefined; habitKind: string | undefined }
-  | { kind: 'routine'; sub: 'add'; name: string | undefined; days: string | undefined; at: string | undefined; forMin: number | undefined }
+  | { kind: 'routine'; sub: 'add'; name: string | undefined; days: string | undefined; at: string | undefined; forMin: number | undefined; on?: string | undefined }
   | { kind: 'routine'; sub: 'list'; json: boolean }
   | { kind: 'routine'; sub: 'skip' | 'unskip' | 'end'; ref: string | undefined; on: string | undefined }
   | { kind: 'routine'; sub: 'move'; ref: string | undefined; on: string | undefined; at: string | undefined }
@@ -321,6 +323,10 @@ export class SysParser {
       if (sub === 'list' || sub === undefined) return { kind: 'window', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'show' || sub === 'hide') return { kind: 'window', sub, name: rest[0] };
       if (sub === 'swap') return { kind: 'window', sub: 'swap', a: rest[0], b: rest[1] };
+      if (sub === 'size') {
+        const n = (v: string | undefined) => (v === undefined || v.trim() === '' ? undefined : Number(v));
+        return { kind: 'window', sub: 'size', name: rest[0], width: n(rest[1]), height: n(rest[2]) };
+      }
     }
     if (cmd === 'pomo' && sub === 'label') return { kind: 'pomoLabel', text: rest[0] !== undefined && !rest[0].startsWith('--') ? rest[0] : undefined, tag: flag(rest, 'tag') };
     if (cmd === 'analytics' && sub === 'set') {
@@ -471,6 +477,7 @@ export class SysParser {
       }
       if (sub === 'mode') return { kind: 'settings', sub: 'mode', mode: rest[0] };
       if (sub === 'layout') return { kind: 'settings', sub: 'layout', layout: rest[0] };
+      if (sub === 'station-layout') return { kind: 'settings', sub: 'station-layout', preset: rest[0] };
       if (sub === 'grid') return { kind: 'settings', sub: 'grid', value: rest[0] };
     }
 
@@ -795,7 +802,8 @@ export class SysParser {
         const forRaw = flag(rest, 'for');
         // "90", "90m", "2h", "1.5h", "1h30"; anything else is NaN, which the
         // command refuses (it used to become 60 minutes without a word).
-        return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: padHM(flag(rest, 'at')), forMin: forRaw === undefined ? undefined : parseLengthMin(forRaw) };
+        // Decision 62 — `--on YYYY-MM-DD`: an event that happens once.
+        return { kind: 'routine', sub: 'add', name: rest[0], days: flag(rest, 'days'), at: padHM(flag(rest, 'at')), forMin: forRaw === undefined ? undefined : parseLengthMin(forRaw), on: flag(rest, 'on') };
       }
       if (sub === 'list' || sub === undefined) return { kind: 'routine', sub: 'list', json: hasFlag(rest, 'json') };
       if (sub === 'skip' || sub === 'unskip' || sub === 'end') return { kind: 'routine', sub, ref: rest[0], on: flag(rest, 'on') };

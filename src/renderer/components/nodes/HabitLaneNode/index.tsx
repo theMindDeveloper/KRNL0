@@ -23,7 +23,8 @@ import type { NodeProps } from '../types';
 import type { HabitLaneConfig, HabitLaneState } from './types';
 import type { Habit, HabitColor, HabitSchedule } from '../HabitNode/types';
 import { habitStreak } from '../HabitNode/commands';
-import { HABIT_COLORS, countOn, isDayScheduled, isRoutine, routineOccurrence, toYMD, weeklyTarget } from '../HabitNode/types';
+import { HABIT_COLORS, countOn, isDayScheduled, isOneTimeEvent, isRoutine, lastRoutineDate, routineOccurrence, toYMD, weeklyTarget } from '../HabitNode/types';
+import { KindIcon } from '../../ui/kindIcons';
 import { routineStatus } from '../HabitNode/RoutineShelf';
 import { useBoardStore } from '../../../store/boardStore';
 import { useLocalDay } from '../../../hooks/useLocalDay';
@@ -154,7 +155,8 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
     <button type="button" data-testid="habit-card-menu" className="nodrag task-card-action" aria-label={`${habit.name}: options`} title="Days, time, name, colour…"
       onClick={openMenu} onMouseDown={(e) => e.stopPropagation()}
       style={{ width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'pointer', border: 'none', padding: 0, color: 'var(--ink-3)', background: 'var(--paper-2)' }}>
-      <MenuIcon name="edit" size={13} />
+      {/* Its kind in the corner: a habit, a one-time event or a repeating one. */}
+      <KindIcon kind={!event ? 'habit' : isOneTimeEvent(habit) ? 'event' : 'repeat'} size={13} />
     </button>
   );
   const title = (
@@ -186,9 +188,13 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
     // The date the page shows: today while it happens or later today, else the next one.
     const date = status.kind === 'now' || status.kind === 'today' ? today
       : status.kind === 'next' || status.kind === 'skipped' ? status.date : null;
-    const occ = date ? routineOccurrence(habit, date) : null;
-    const d = date ? new Date(`${date}T00:00:00`) : null;
-    const top = now ? 'NOW' : date === today ? 'TODAY' : d ? d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase() : 'ENDED';
+    // Ended, or no more dates: the last time it happened (the page shows it
+    // and "Show" goes there), never today.
+    const last = date ? null : lastRoutineDate(habit, today);
+    const pageDate = date ?? last;
+    const occ = pageDate ? routineOccurrence(habit, pageDate) : null;
+    const d = pageDate ? new Date(`${pageDate}T00:00:00`) : null;
+    const top = now ? 'NOW' : date === today ? 'TODAY' : date && d ? d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase() : 'ENDED';
     const days = date ? Math.round((new Date(`${date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000) : 0;
     const when = now ? (() => { const left = Math.max(1, status.until - nowMin); return left >= 60 ? `${Math.round(left / 60)} h left` : `${left} min left`; })()
       : status.kind === 'today' ? inWords(status.at - nowMin)
@@ -210,11 +216,11 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
         style={{ ...cardFrameStyle(tone), cursor: 'grab', overflow: 'visible', ['--habit-color' as string]: color } as React.CSSProperties}>
         <div style={{ display: 'flex', gap: 10, minWidth: 0 }}>
           {/* The page: the next date it happens, like a little calendar. */}
-          <div data-testid="event-card-date" aria-label={date ? `Next: ${date}` : 'No more dates'}
+          <div data-testid="event-card-date" aria-label={date ? `Next: ${date}` : last ? `Last: ${last}` : 'No more dates'}
             style={{ width: 46, flexShrink: 0, borderRadius: 9, overflow: 'hidden', display: 'flex', flexDirection: 'column', textAlign: 'center', boxSizing: 'border-box',
               border: `1px solid ${now ? 'var(--acid)' : `color-mix(in srgb, ${color} 30%, var(--paper-3))`}`, background: 'var(--paper-1, var(--node-bg))' }}>
             <span style={{ background: pageHead, color: pageInk, fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.06em', padding: '3px 0', lineHeight: 1.1 }}>{top}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 19, fontWeight: 600, color: status.kind === 'skipped' ? 'var(--ink-3)' : 'var(--ink)', padding: '4px 0 1px', lineHeight: 1, fontVariantNumeric: 'tabular-nums', textDecoration: status.kind === 'skipped' ? 'line-through' : 'none' }}>{d ? d.getDate() : '–'}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 19, fontWeight: 600, color: status.kind === 'skipped' || !date ? 'var(--ink-3)' : 'var(--ink)', padding: '4px 0 1px', lineHeight: 1, fontVariantNumeric: 'tabular-nums', textDecoration: status.kind === 'skipped' ? 'line-through' : 'none' }}>{d ? d.getDate() : '–'}</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--ink-3)', paddingBottom: 5, lineHeight: 1.2 }}>{d ? d.toLocaleDateString('en-GB', { month: 'short' }) : ''}</span>
           </div>
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -249,8 +255,8 @@ export function HabitLaneNode({ node, onCommand }: NodeProps<HabitLaneState, Hab
             ))}
             <button type="button" data-testid="event-card-show" className="nodrag" style={smallBtn}
               onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); showEventOnCalendar(habit.id, date ?? today); }}
-              title="Show it on the Calendar">
+              onClick={(e) => { e.stopPropagation(); showEventOnCalendar(habit.id, pageDate); }}
+              title={date ? 'Show it on the Calendar' : last ? `Show the last time on the Calendar (${last})` : 'Show the Calendar'}>
               <MenuIcon name="show" size={11} />Show
             </button>
           </div>

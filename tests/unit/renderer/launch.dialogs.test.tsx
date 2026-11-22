@@ -75,7 +75,7 @@ describe('launch flow (F5, F12)', () => {
 });
 
 describe('Welcome back (F13, F14, F14c)', () => {
-  it('lists the head and its follower as checklist rows; Close moves nothing', () => {
+  it('lists what slipped as checklist rows (a connected task without a time is not one); Close moves nothing', () => {
     bridge();
     useBoardStore.setState({ board: slippedBoard as never });
     act(() => { openWelcomeBack(true, 4 * 86_400_000); });
@@ -83,11 +83,10 @@ describe('Welcome back (F13, F14, F14c)', () => {
     const dialog = screen.getByTestId('welcome-back');
     expect(dialog.textContent).toContain('Outline chapter 3');
     expect(dialog.textContent).toContain('4 days');
-    // The follower without its own time is its own row, under its head.
+    // Decision 63: the connected task has no time of its own, so it did not slip.
     expect(screen.getByTestId('welcome-check-a')).toBeTruthy();
-    expect(screen.getByTestId('welcome-check-b')).toBeTruthy();
-    expect(screen.getByTestId('welcome-row-b').textContent).toContain('after Outline chapter 3');
-    expect(screen.getByTestId('welcome-tally').textContent).toBe('0 done · 2 open');
+    expect(screen.queryByTestId('welcome-check-b')).toBeNull();
+    expect(screen.getByTestId('welcome-tally').textContent).toBe('0 done · 1 open');
     fireEvent.click(screen.getByTestId('welcome-done'));
     expect(useLaunchStore.getState().welcome).toBeNull();
     expect((useBoardStore.getState().board!.nodes.find((n) => n.id === 'a')!.state as { scheduledFor?: string }).scheduledFor).toBe('2020-01-02T09:00');

@@ -157,6 +157,8 @@ Resizable nodes (TextNode, ImageNode) may persist `state.width` and `state.heigh
 
 When a non-mother node is connected to another non-mother node via Handle drag, the resulting edge carries `from.event = 'link'`, `to.command = 'link'`. These edges are purely visual; the kernel does not dispatch on `'link'`. Other edges (e.g. `task.next → task.activate`, `pomo.onComplete → habit.markDone`) keep their typed semantics.
 
+**Decision 63 (2026-11-22):** the connections between task cards (`task.next → task.activate`) are **only drawn** too. They are kept in `edges` as they are (older boards and apps read them), but nothing reads them to place, push, unschedule, group or finish tasks: a task is on the Calendar only at its own time. A board with tasks placed only by a chain gives them that time as their own when it opens (`src/renderer/store/chainTimes.ts`).
+
 ---
 
 ## 7.6 Codebase structure (source, not user data)

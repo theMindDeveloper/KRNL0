@@ -1,0 +1,136 @@
+/* Analytics (Decision 57). Theme tokens only (ink, paper, the accent), so the
+   window follows light and dark and every frame style. Words in the reading
+   font, figures in tabular digits, one hue for the data. */
+
+/* ── The Summary page ───────────────────────────────────────────────────── */
+.an-summary {
+  container-type: inline-size;
+  display: flex; flex-direction: column; gap: 14px;
+  min-width: 0; min-height: 0; overflow: hidden; box-sizing: border-box;
+  padding: 4px 2px 0;
+  font-family: var(--font-read, var(--font-sans));
+  color: var(--k-an-ink, var(--ink));
+}
+.an-summary__headline {
+  margin: 0; font-size: 20px; font-weight: 600; line-height: 1.3; letter-spacing: -0.015em;
+  text-wrap: balance; color: var(--k-an-ink, var(--ink));
+}
+@container (max-width: 420px) { .an-summary__headline { font-size: 17px; } }
+
+/* One divided band: hairlines between the figures, no tile per figure. */
+.an-kpis {
+  margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px; border-radius: 12px; overflow: hidden; flex-shrink: 0;
+  background: var(--k-an-line, var(--paper-3));
+  border: 1px solid var(--k-an-line, var(--paper-3));
+}
+@container (max-width: 560px) { .an-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.an-kpi { margin: 0; padding: 10px 12px 11px; background: var(--k-an-bg, var(--node-bg)); min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.an-kpi dt { font-size: 12.5px; color: var(--k-an-ink-3, var(--ink-3)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.an-kpi dd { margin: 0; }
+.an-kpi__value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.an-kpi__delta { font-size: 12px; line-height: 1.3; color: var(--k-an-ink-3, var(--ink-3)); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.an-kpi__delta[data-trend='up'] { color: var(--k-an-accent-ink, var(--acid-ink, var(--acid))); }
+
+/* Focus per day: a real chart with its scale and dates. */
+.an-fpd { margin: 0; display: flex; flex-direction: column; gap: 6px; flex: 0 1 190px; min-height: 104px; }
+.an-fpd__head { display: flex; align-items: baseline; gap: 10px; }
+.an-fpd__title { font-size: 14px; font-weight: 600; color: var(--k-an-ink, var(--ink)); }
+.an-fpd__note { font-size: 12.5px; color: var(--k-an-ink-3, var(--ink-3)); }
+.an-fpd__plot { flex: 1 1 auto; min-height: 0; width: 100%; overflow: hidden; }
+.an-fpd__plot svg { display: block; }
+.an-fpd__base { stroke: var(--k-an-line, var(--paper-3)); stroke-width: 1; }
+.an-fpd__grid { stroke: var(--k-an-line, var(--paper-3)); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.8; }
+.an-fpd__avg { stroke: var(--k-an-ink-3, var(--ink-3)); stroke-width: 1; stroke-dasharray: 5 4; }
+.an-fpd__tick { font-family: var(--font-mono); font-size: 10.5px; fill: var(--k-an-ink-4, var(--ink-4)); font-variant-numeric: tabular-nums; }
+.an-fpd__bar { fill: color-mix(in srgb, var(--k-an-accent-ink, var(--acid-ink, var(--acid))) 72%, transparent); }
+.an-fpd__bar--now { fill: var(--k-an-accent-ink, var(--acid-ink, var(--acid))); }
+.an-fpd__bar:hover { fill: var(--k-an-accent-ink, var(--acid-ink, var(--acid))); }
+
+.an-summary__notes {
+  margin: 0; padding: 0; list-style: none; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 13.5px; line-height: 1.45; color: var(--k-an-ink-2, var(--ink-2));
+}
+.an-summary__notes li { padding-left: 12px; position: relative; }
+.an-summary__notes li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 4px; height: 4px; border-radius: 999px; background: var(--k-an-ink-4, var(--ink-4)); }
+
+/* ── Every card: its title in words, not a tracked uppercase label ─────── */
+.an-card-title {
+  font-family: var(--font-read, var(--font-sans)); font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em;
+  color: var(--k-an-ink, var(--ink)); line-height: 1.35;
+}
+.an-card-title[data-pinned] { color: var(--k-an-accent-ink, var(--acid-ink, var(--acid))); }
+
+/* ── Plain charts (PlainCharts.tsx) ─────────────────────────────────────── */
+.an-empty { margin: auto; font-family: var(--font-read, var(--font-sans)); font-size: 13px; color: var(--k-an-ink-3, var(--ink-3)); }
+
+.an-barlist { container-type: inline-size; list-style: none; margin: 0; padding: 0; width: 100%; height: 100%; align-self: stretch; overflow: hidden; display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start; column-gap: 40px; row-gap: 7px; font-family: var(--font-read, var(--font-sans)); }
+.an-barlist li { width: 100%; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+/* Room for both: the name and its figure share a line, the bar under them. */
+@container (min-width: 230px) {
+  .an-barlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 5px; align-items: baseline; }
+  .an-barlist__label { grid-column: 1; grid-row: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .an-barlist__value { grid-column: 2; grid-row: 1; text-align: right; white-space: nowrap; }
+  .an-barlist__track { grid-column: 1 / -1; grid-row: 2; }
+  .an-barlist__note { grid-column: 1 / -1; }
+}
+.an-barlist__row { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.an-barlist__label { min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.25; color: var(--k-an-ink, var(--ink)); overflow-wrap: break-word; }
+.an-barlist__value { font-size: 12px; line-height: 1.25; color: var(--k-an-ink-2, var(--ink-2)); font-variant-numeric: tabular-nums; }
+.an-barlist__share { color: var(--k-an-ink-4, var(--ink-4)); }
+.an-barlist__track { display: block; height: 5px; border-radius: 999px; background: var(--k-an-line, var(--paper-3)); overflow: hidden; }
+.an-barlist__track i { display: block; height: 100%; border-radius: inherit; }
+.an-barlist__note { font-size: 12px; color: var(--k-an-ink-3, var(--ink-3)); }
+
+.an-compare { margin: 0; width: 100%; height: 100%; align-self: stretch; overflow: hidden; display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start; column-gap: 40px; font-family: var(--font-read, var(--font-sans)); font-variant-numeric: tabular-nums; }
+.an-compare__row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; column-gap: 8px; padding: 4px 2px; border-bottom: 1px solid color-mix(in srgb, var(--k-an-line, var(--paper-3)) 70%, transparent); }
+.an-compare__row:last-child { border-bottom: 0; }
+.an-compare dt { font-size: 12.5px; color: var(--k-an-ink-2, var(--ink-2)); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-compare dd { margin: 0; }
+.an-compare__now { font-size: 13.5px; font-weight: 600; color: var(--k-an-ink, var(--ink)); text-align: right; white-space: nowrap; }
+.an-compare__diff { min-width: 3.2em; font-size: 12px; text-align: right; white-space: nowrap; color: var(--k-an-ink-3, var(--ink-3)); }
+.an-compare__diff[data-trend='up'] { color: var(--k-an-accent-ink, var(--acid-ink, var(--acid))); }
+
+.an-weekdays-host { container-type: inline-size; width: 100%; }
+.an-weekdays__short { display: none; }
+@container (max-width: 230px) { .an-weekdays__long { display: none; } .an-weekdays__short { display: inline; } .an-weekdays__value { font-size: 10px; } .an-weekdays { gap: 3px; } }
+.an-weekdays { width: 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: end; font-family: var(--font-read, var(--font-sans)); }
+.an-weekdays__col { height: 100%; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 4px; min-width: 0; }
+.an-weekdays__value { font-size: 11px; text-align: center; color: var(--k-an-ink-3, var(--ink-3)); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: visible; }
+.an-weekdays__col[data-best] .an-weekdays__value { color: var(--k-an-ink, var(--ink)); font-weight: 600; }
+.an-weekdays__bar { display: block; border-radius: 5px 5px 2px 2px; min-height: 1px; }
+.an-weekdays__label { font-size: 12px; text-align: center; color: var(--k-an-ink-3, var(--ink-3)); }
+.an-weekdays__col[data-best] .an-weekdays__label { color: var(--k-an-ink, var(--ink)); font-weight: 600; }
+
+.an-hours { width: 100%; display: flex; flex-direction: column; gap: 6px; font-family: var(--font-read, var(--font-sans)); }
+.an-hours__bars { flex: 1 1 auto; min-height: 40px; display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; align-items: end; }
+.an-hours__bar { display: block; border-radius: 3px 3px 1px 1px; min-height: 2px; }
+.an-hours__axis { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10.5px; color: var(--k-an-ink-4, var(--ink-4)); font-variant-numeric: tabular-nums; }
+.an-hours__note { margin: 0; font-size: 12.5px; color: var(--k-an-ink-3, var(--ink-3)); }
+.an-hours__note b { color: var(--k-an-ink, var(--ink)); font-weight: 600; }
+
+/* Decision 58 — every card is its own surface: one tone step from the
+   window, rounded, with room inside; no hairline on top. */
+.an-card {
+  background: color-mix(in srgb, var(--k-an-ink, var(--ink)) 3.5%, transparent);
+  border-radius: 12px;
+  padding: 12px 14px 10px !important;
+}
+.an-card[data-pinned] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-an-accent-ink, var(--acid)) 45%, transparent); }
+
+/* The page row stays one line: the page's name gives way first. */
+.an-toolbar { container-type: inline-size; flex-wrap: nowrap !important; }
+.an-toolbar [data-testid='analytics-page-nav'] { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.an-toolbar [data-testid='analytics-page-nav']::-webkit-scrollbar { display: none; }
+.an-toolbar .kw-views { flex-shrink: 0; }
+@container (max-width: 560px) { .an-toolbar [data-testid='analytics-page-label'] { display: none; } }
+
+/* The pages scroll smoothly and settle on whole pages. */
+.an-scroll { overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y proximity; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--k-an-ink, var(--ink)) 18%, transparent) transparent; }
+.an-scroll [data-page-start] { scroll-snap-align: start; scroll-margin-top: 0; }
+
+/* The summary's sentences: whole lines only (a sentence that does not fit
+   moves out of sight whole; nothing is cut at the edge). */
+.an-summary__notes { overflow: hidden !important; flex-wrap: wrap; align-content: flex-start; column-gap: 40px; }
+.an-summary__notes li { width: 100%; }

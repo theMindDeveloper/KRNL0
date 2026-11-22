@@ -12,6 +12,8 @@
  * - No push-to-talk: questions are typed (they go to Claude Code, Decision 41).
  * - Click toggles a chat panel anchored above the orb.
  * - Orb is draggable. Position is persisted to localStorage.
+ * - In the Station (Decision 55) it rests in the top bar, small, at its dock
+ *   (`[data-orb-dock]`), so it never covers a window. Free keeps its own place.
  * - Quick-action buttons trigger pre-recorded voice flows with live camera
  *   movement and krnl command execution.
  */
@@ -34,6 +36,7 @@ import { LineGlyph } from '../ui/LineGlyph';
 import {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   type FormEvent,
@@ -263,6 +266,26 @@ export function Orb() {
     return () => window.clearTimeout(t);
   }, [tourAt]);
   const [settleKey, setSettleKey] = useState(0);
+  // Decision 55 — in the Station the orb rests in the top bar's dock, half
+  // size, so it never sits on a window (it covered the Calendar's hours).
+  const inStation = useBoardStore((s) => s.board?.layoutMode === 'station');
+  const [dockAt, setDockAt] = useState<OrbPos | null>(null);
+  useLayoutEffect(() => {
+    if (!inStation) { setDockAt(null); return; }
+    const place = (): void => {
+      const el = document.querySelector<HTMLElement>('[data-orb-dock]');
+      if (!el) { setDockAt(null); return; }
+      const r = el.getBoundingClientRect();
+      const next = { x: Math.round(r.left + r.width / 2 - ORB_SIZE / 2), y: Math.round(r.top + r.height / 2 - ORB_SIZE / 2) };
+      setDockAt((p) => (p && p.x === next.x && p.y === next.y ? p : next));
+    };
+    place();
+    // The dock is the last item of the top bar: it only moves with the window.
+    window.addEventListener('resize', place);
+    const late = window.setTimeout(place, 250);
+    return () => { window.removeEventListener('resize', place); window.clearTimeout(late); };
+  }, [inStation]);
+  const docked = dockAt !== null && !tourAt && !tourActive;
   const draggingRef    = useRef(false);
   const dragMovedRef   = useRef(false);
   const dragOffsetRef  = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
@@ -409,6 +432,8 @@ export function Orb() {
   // ── Drag handlers ─────────────────────────────────────────────────────────
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
+    // Docked in the top bar (Station): a click, never a drag.
+    if (docked) return;
     draggingRef.current   = true;
     dragMovedRef.current  = false;
     dragStartRef.current  = { x: e.clientX, y: e.clientY };
@@ -435,7 +460,7 @@ export function Orb() {
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-  }, [pos.x, pos.y]);
+  }, [pos.x, pos.y, docked]);
 
   // ── Click handler ─────────────────────────────────────────────────────────
   const onOrbClick = useCallback(() => {
@@ -599,18 +624,23 @@ export function Orb() {
     cursor: draggingRef.current ? 'grabbing' : 'pointer',
     display: 'block',
     filter: glowFilter,
-    animation: (open || activeFlowId) ? 'none' : 'ai-float 6s ease-in-out infinite',
+    // Docked in the top bar: half size, still (no bob over the bar).
+    ...(docked ? { transform: 'scale(0.5)' } : {}),
+    pointerEvents: 'auto',
+    animation: (open || activeFlowId || docked) ? 'none' : 'ai-float 6s ease-in-out infinite',
     transition: 'transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), filter 0.25s ease',
     willChange: 'filter, transform',
   };
 
   // Caption panel position — anchored relative to orb.
-  const captionAboveOrb = pos.y > 120;
+  // Where the orb is drawn: the tour's spot, the top-bar dock, or its own place.
+  const at = tourAt ?? (docked ? dockAt! : pos);
+  const captionAboveOrb = at.y > 120;
   // Open the panel / caption toward the room: right-aligned to the orb near
   // the right edge, below it near the top (they used to leave the window).
-  const panelAlignRight = pos.x + PANEL_W > window.innerWidth - ORB_MARGIN;
-  const panelBelow = pos.y < PANEL_H + 80;
-  const captionAlignRight = pos.x + CAPTION_W > window.innerWidth - ORB_MARGIN;
+  const panelAlignRight = at.x + PANEL_W > window.innerWidth - ORB_MARGIN;
+  const panelBelow = at.y < PANEL_H + 80;
+  const captionAlignRight = at.x + CAPTION_W > window.innerWidth - ORB_MARGIN;
 
   // Commander launch handler — closes popup, runs sessionFromCommanderFlow with params.
   const onCommanderLaunch = useCallback((params: { label: string; tasks: string; startISO?: string }) => {
@@ -636,8 +666,13 @@ export function Orb() {
       data-orb-root
       style={{
         position: 'fixed',
-        left: tourAt ? tourAt.x : pos.x,
-        top: tourAt ? tourAt.y : pos.y,
+        left: at.x,
+        top: at.y,
+        // Above the top bar's drag strip when docked there: clicks reach it.
+        WebkitAppRegion: 'no-drag',
+        // Docked, only the small orb (and what it opens) takes clicks: its
+        // full-size box would otherwise hang over the windows under the bar.
+        pointerEvents: docked ? 'none' : undefined,
         // Above a tour's dimming, at its own place and size.
         zIndex: tourAt || tourActive ? Z.tour + 1 : Z.widget,
         fontFamily: 'var(--font-mono)',
@@ -646,7 +681,7 @@ export function Orb() {
           ? 'left 460ms cubic-bezier(0.22, 1, 0.36, 1), top 460ms cubic-bezier(0.22, 1, 0.36, 1), transform 460ms cubic-bezier(0.22, 1, 0.36, 1)'
           : 'none',
         animation: settleKey > 0 ? 'orb-drop-settle 0.5s cubic-bezier(0.22, 1, 0.36, 1)' : 'none',
-      }}
+      } as CSSProperties}
     >
       {/* Voice caption — shown during flows */}
       {caption !== null && !open && !tourAt && !tourActive && (
@@ -685,6 +720,7 @@ export function Orb() {
           data-testid="orb-chat-panel"
           style={{
             position: 'absolute',
+            pointerEvents: 'auto',
             ...(panelAlignRight ? { right: 0 } : { left: 0 }),
             ...(panelBelow ? { top: 80 } : { bottom: 80 }),
             width: PANEL_W,
