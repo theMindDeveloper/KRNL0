@@ -1442,14 +1442,24 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       zoomAnchor.current = { min, offset };
     }
     liveZoomRef.current = z;
-    setLiveZoom(z);
+    // Decision 61 — smooth: the hours take the new height at once (CSS), and
+    // the hour under the pointer stays put in the same frame; the week's
+    // text catches up in the background.
+    const a = zoomAnchor.current;
+    if (el && fillRow > 0 && a) {
+      const k = Math.max(1, z / ZOOM_FIT);
+      el.style.setProperty('--rh', `calc(100cqh / ${rowCount} * ${k})`);
+      el.scrollTop = Math.max(0, (a.min / 60) * (fillRow * k) + GRID_PAD - a.offset);
+      zoomAnchor.current = null;
+      startTransition(() => setLiveZoom(z));
+    } else setLiveZoom(z);
     if (zoomCommit.current !== null) window.clearTimeout(zoomCommit.current);
     zoomCommit.current = window.setTimeout(() => {
       zoomCommit.current = null;
       onCommand('calendar.setZoom', { zoom: Math.round(z * 20) / 20 });
     }, 320);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onCommand, state.zoom, fillRow, zoomFloor]);
+  }, [onCommand, state.zoom, fillRow, zoomFloor, rowCount]);
   // Once the saved zoom has caught up, the live one steps aside.
   useEffect(() => {
     if (liveZoom !== null && zoomCommit.current === null && Math.abs((state.zoom ?? 2) - liveZoom) < 0.06) { liveZoomRef.current = null; setLiveZoom(null); }
