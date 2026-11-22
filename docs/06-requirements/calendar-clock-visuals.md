@@ -99,6 +99,16 @@
 | F90 | (Decision 63) **Nothing moves when connections stop placing tasks:** a task placed by a chain keeps that time as its own. |
 | F91 | (Decision 63) **"Add next" gives a time:** a task made after another starts where that one ends (the card and the CLI). |
 | F92 | (Decision 63) **Small connection dots:** smaller, shown on hover, as easy to drag from as before; no line from a hidden card. |
+## Non-Functional Requirements
+
+| ID | Requirement |
+|---|---|
+| NF1 | (Decision 63) **No layout read while the pointer moves** in a drag: the Calendar is measured when the drag starts (and after a scroll, a wheel or a resize). |
+| NF2 | (Decision 63) **No page-wide restyle** at the start or end of a drag: no style rule reads the drag marker. |
+| NF3 | (Decision 63) **A drop is drawn where it lands** in the first frame after letting go; the board changes after it. |
+| NF4 | (Decision 63) **A move does not redraw the moved card** or the canvas's own layers. |
+| NF5 | (Decision 63) **Pulling an edge keeps the block's text as it is** (the block stretches itself). |
+
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin
