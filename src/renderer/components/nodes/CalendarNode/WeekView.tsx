@@ -234,13 +234,18 @@ interface WeekViewProps {
   singleDay?: boolean;
   /** window-frame.md — where the Calendar's menu button goes: a slot in the
    *  window's header (the header is drawn by the Calendar window itself). */
-  headSlot?: HTMLElement | null;
+  /** The Calendar's header menu button opens this view's menu through it. */
+  menuRef?: { current: ((x: number, y: number) => void) | null };
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 /** Window event: scroll the hour window to this week's first routine (routines tour). */
 export const SHOW_ROUTINES_EVENT = 'krnl:calendar-show-routines';
+// The Month and Year menus open the events list in the week (it lives here).
+let eventsListAt: { x: number; y: number } | null = null;
+export function requestEventsList(x: number, y: number): void { eventsListAt = { x, y }; }
+function takeEventsListRequest(): { x: number; y: number } | null { const a = eventsListAt; eventsListAt = null; return a; }
 const GUTTER_WIDTH = 48; // px — time gutter: the hours on their lines, and the time now (owner, 2026-11-21: "06:13" touched the edge at 40)
 // Room above 00:00 and below 24:00, so the first and last hour labels sit on
 // their lines without touching the ANY TIME row or the footer.
@@ -311,7 +316,7 @@ type HabitScheduleKind = 'weekly' | 'daily';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function WeekView({ state, config, onCommand, singleDay = false, headSlot = null }: WeekViewProps) {
+export function WeekView({ state, config, onCommand, singleDay = false, menuRef }: WeekViewProps) {
   // Width of the per-day reality rail (left edge of each column), as a CSS
   // length so it scales with the column: wide in the day view (carries a
   // minutes label), at most 12% of a narrow week column (station panels can
@@ -969,6 +974,17 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   useOneOverlay(!!routineMove, () => setRoutineMove(null));
   useOneOverlay(!!eventsOpen, () => setEventsOpen(null));
   useOneOverlay(!!eventRemind, () => setEventRemind(null));
+  // The Calendar's header menu (in every view, Decision 63): this view's items.
+  useEffect(() => {
+    if (!menuRef) return undefined;
+    menuRef.current = (x, y) => setCalMenu({ x, y });
+    return () => { menuRef.current = null; };
+  }, [menuRef]);
+  // Asked for from the Month or Year menu: the events list opens here.
+  useEffect(() => {
+    const at = takeEventsListRequest();
+    if (at) setEventsOpen(at);
+  }, []);
   const DAY_LETTER = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const daysOf = (h: Habit): number[] => !h.schedule || h.schedule.kind === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : h.schedule.kind === 'weekdays' ? [1, 2, 3, 4, 5] : [...h.schedule.days];
   const [calAdding, setCalAdding] = useState(false);
@@ -3201,21 +3217,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       </div>
 
 
-      {headSlot && createPortal(
-        <button
-          type="button"
-          className="kw-btn nodrag"
-          data-testid="week-legend"
-          aria-label="Calendar menu"
-          aria-expanded={!!calMenu}
-          title={easy ? 'Repeating events' : 'What the Calendar shows, repeating events, zoom'}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setCalMenu({ x: r.right - 200, y: r.bottom + 4 }); }}
-        >
-          <MenuIcon name="list" size={12} />
-        </button>,
-        headSlot,
-      )}
       {calMenu && (
         <ContextMenu
           x={calMenu.x}

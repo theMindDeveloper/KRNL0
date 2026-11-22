@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 // ADR 0001 — CalendarNode (Slice 2: MonthView wired).
 // Slice 1 shell upgraded: 'month' case now renders the real MonthView.
 // Week and year remain placeholder stubs for Slices 3/4.
@@ -10,7 +10,11 @@ import type { NodeProps } from '../types';
 import type { CalendarConfig, CalendarState } from './types';
 import { defaultCalendarConfig } from './types';
 import { MonthView } from './MonthView';
-import { WeekView } from './WeekView';
+import { WeekView, requestEventsList } from './WeekView';
+import { ContextMenu } from '../../ContextMenu';
+import { MenuIcon } from '../../ui/menuIcons';
+import { useEasyMode } from '../../../store/uiMode';
+import { calendarLayersOf } from './types';
 import { YearView } from './YearView';
 
 export function CalendarNode({
@@ -20,8 +24,17 @@ export function CalendarNode({
   slotTotal = MOTHER_TOTAL,
 }: NodeProps<CalendarState, CalendarConfig>) {
   const config = (node.config ?? defaultCalendarConfig()) as CalendarConfig;
-  // window-frame.md — the header's last slot: the day and week views put the Calendar's menu there.
-  const [headSlot, setHeadSlot] = useState<HTMLElement | null>(null);
+  // The Calendar's menu button is in the header in every view (it never comes
+  // and goes when the view changes): the day and week views fill it with their
+  // items; Month and Year have their own.
+  const weekMenu = useRef<((x: number, y: number) => void) | null>(null);
+  const [ownMenu, setOwnMenu] = useState<{ x: number; y: number } | null>(null);
+  const easy = useEasyMode();
+  const layers = calendarLayersOf(node.state as CalendarState);
+  const openMenu = (x: number, y: number) => {
+    if ((config.view === 'week' || config.view === 'day') && weekMenu.current) weekMenu.current(x, y);
+    else setOwnMenu({ x, y });
+  };
 
   // Placeholder body — replaced by real views in Slices 2/3/4.
   const renderBody = () => {
@@ -33,7 +46,7 @@ export function CalendarNode({
             config={config}
             onCommand={onCommand}
             singleDay
-            headSlot={headSlot}
+            menuRef={weekMenu}
           />
         );
       case 'week':
@@ -42,7 +55,7 @@ export function CalendarNode({
             state={node.state as CalendarState}
             config={config}
             onCommand={onCommand}
-            headSlot={headSlot}
+            menuRef={weekMenu}
           />
         );
       case 'month':
@@ -95,8 +108,41 @@ export function CalendarNode({
             </button>
           ))}
         </span>
-        <span ref={setHeadSlot} style={{ display: 'inline-flex' }} />
+        <button
+          type="button"
+          className="kw-btn nodrag"
+          data-testid="week-legend"
+          aria-label="Calendar menu"
+          aria-haspopup="menu"
+          title={easy ? 'Repeating events' : config.view === 'month' ? 'What the month shows, repeating events' : config.view === 'year' ? 'Repeating events' : 'What the Calendar shows, repeating events, zoom'}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); openMenu(r.right - 200, r.bottom + 4); }}
+        >
+          <MenuIcon name="list" size={12} />
+        </button>
       </div>
+      {ownMenu && (
+        <ContextMenu
+          x={ownMenu.x}
+          y={ownMenu.y}
+          onDismiss={() => setOwnMenu(null)}
+          items={[
+            ...(config.view === 'month' && !easy ? [{
+              label: 'Habits',
+              icon: layers.habits ? <MenuIcon name="check" /> : <span />,
+              hint: layers.habits ? 'shown' : 'hidden',
+              onSelect: () => onCommand('calendar.setLayers', { habits: !layers.habits }),
+            }] : []),
+            {
+              label: 'Repeating events…',
+              icon: <MenuIcon name="repeat" />,
+              ...(config.view === 'month' && !easy ? { divider: true } : {}),
+              // The list lives in the week: it opens there.
+              onSelect: () => { requestEventsList(ownMenu.x, ownMenu.y); onCommand('calendar.setView', { view: 'week' }); },
+            },
+          ]}
+        />
+      )}
 
       {/* View placeholder body */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>

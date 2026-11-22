@@ -15,6 +15,7 @@ import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { useShallow } from 'zustand/react/shallow';
 import { selectSchedule, selectScheduledTasksForRange } from '../../../store/scheduleSelector';
 import type { CalendarConfig, CalendarState } from './types';
+import { calendarLayersOf } from './types';
 import { getMonthDays, getMondayOf, toYMD, isRoutine } from '../HabitNode/types';
 import { useLocalDay } from '../../../hooks/useLocalDay';
 import { selectPomoReality } from '../../../store/pomoReality';
@@ -157,7 +158,8 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
     }
     return out;
   }, [pomoNode, todayYMD]);
-  const showHabits = config?.showHabits !== false;
+  // The Calendar's Habits layer (its menu) hides the dots here too.
+  const showHabits = config?.showHabits !== false && calendarLayersOf(state).habits;
   const cells = useMemo(() => buildMonthGrid(anchor), [state.anchorDate]);
   const monthLabel = formatMonthLabel(anchor);
   // Determine which month's days belong to this calendar page.
