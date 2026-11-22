@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <!-- GSAP is vendored (assets/) so renders never depend on a CDN. -->
+    <script src="assets/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+      @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+      @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+      @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+      @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+      :root {
+        --acid: #c9f158; --lav: #a98bf6; --cyan: #22d3ee; --coral: #ee8466;
+        --dark: #141414; --black: #0a0908; --paper: #f4efe2;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--black); }
+      #root { width: 100%; height: 100%; position: relative; overflow: hidden; font-family: "KGeist", sans-serif; }
+      .full { position: absolute; inset: 0; }
+      .h { font-weight: 800; letter-spacing: -0.055em; line-height: 0.92; }
+
+      /* 1 — slot words */
+      #s1-ground { background: var(--black); }
+      #s1-line { position: absolute; left: 120px; top: 560px; color: var(--paper); font-size: 136px; }
+      #s1-slot { position: absolute; left: 120px; top: 720px; width: 860px; height: 300px; overflow: hidden; }
+      .s1-word { position: absolute; left: 0; top: 0; font-size: 136px; opacity: 0; color: var(--paper); white-space: nowrap; }
+
+      /* 2 — the cube */
+      #s2-ground { background: var(--black); }
+      #s2-stage { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; perspective: 2600px; }
+      #s2-pos { position: absolute; left: 540px; top: 760px; width: 0; height: 0; transform-style: preserve-3d; }
+      #s2-cube { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-style: preserve-3d; }
+      .holder { position: absolute; left: -210px; top: -210px; width: 420px; height: 420px; transform-style: preserve-3d; }
+      .holder.top { transform: rotateX(90deg) translateZ(210px); }
+      .holder.left { transform: translateZ(210px); }
+      .holder.right { transform: rotateY(90deg) translateZ(210px); }
+      .face { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 14px; background: #070707; border-radius: 26px; }
+      .face i { display: block; border-radius: 22px; }
+      .top i { background: #4a4a4a; } .left i { background: #303030; } .right i { background: #1d1d1d; }
+      .face i.lit { background: #3a3a3a; }
+      #s2-word { position: absolute; left: 0; right: 0; top: 1060px; text-align: center; font-family: "KMono", monospace; font-weight: 800; font-size: 120px; color: var(--paper); letter-spacing: 0.02em; }
+      #s2-sub { position: absolute; left: 0; right: 0; top: 1200px; text-align: center; font-family: "KMono", monospace; font-weight: 500; font-size: 36px; color: #8f8572; }
+      #s2-zoom { position: absolute; left: 540px; top: 600px; width: 120px; height: 120px; margin: -60px 0 0 -60px; background: var(--acid); border-radius: 22px; }
+
+      /* 3 — the real app, card by card */
+      #s3-ground { background: var(--acid); }
+      #s3-ghost { display: none; position: absolute; left: 0; right: 0; top: -80px; text-align: center; font-family: "KMono", monospace; font-weight: 800; font-size: 400px; color: rgba(0,0,0,0.07); letter-spacing: -0.04em; }
+      #s3-words { position: absolute; left: 120px; top: 330px; width: 860px; height: 170px; overflow: hidden; }
+      .s3-word { position: absolute; left: 0; top: 0; font-size: 150px; opacity: 0; color: var(--black); white-space: nowrap; }
+      #s3-deck { position: absolute; left: 140px; top: 560px; width: 800px; height: 760px; }
+      .card { position: absolute; left: 0; top: 0; width: 800px; border-radius: 30px; overflow: hidden; background: #0d0d0d;
+        box-shadow: 0 60px 140px rgba(0,0,0,0.42), 0 14px 40px rgba(0,0,0,0.3); }
+      .card img { display: block; width: 100%; }
+
+      /* 4 — claim and end card */
+      #s4-ground { background: var(--dark); }
+      #s4-claim { position: absolute; left: 120px; top: 470px; color: var(--paper); font-size: 140px; }
+      #s4-claim span { display: inline-block; }
+      #s4-tiles { position: absolute; left: 0; right: 0; top: 820px; display: flex; justify-content: center; gap: 14px; }
+      .tile { width: 160px; height: 184px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 160px; color: var(--black); letter-spacing: -0.04em; }
+      .tile.zero { font-family: "KMono", monospace; font-size: 140px; }
+      #s4-cta { position: absolute; left: 0; right: 0; top: 1050px; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+      #s4-btn { background: var(--acid); color: var(--black); font-weight: 700; font-size: 42px; padding: 24px 44px; border-radius: 22px; }
+      #s4-os { font-family: "KMono", monospace; font-weight: 500; font-size: 32px; color: #b3aa94; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="14.6" data-width="1080" data-height="1920">
+
+      <!-- 1 · 0–2.4 s: "Your day," then the second word rolls like a slot machine -->
+      <section id="s1" class="clip full" data-start="0" data-duration="2.4" data-track-index="0">
+        <div id="s1-ground" class="full"></div>
+        <div id="s1-line" class="h">Your day,</div>
+        <div id="s1-slot">
+          <div class="s1-word h" id="s1-w0">planned.</div>
+          <div class="s1-word h" id="s1-w1">focused.</div>
+          <div class="s1-word h" id="s1-w2">tracked.</div>
+          <div class="s1-word h" id="s1-w3">kept.</div>
+          <div class="s1-word h" id="s1-w4">one canvas.</div>
+        </div>
+      </section>
+
+      <!-- 2 · 2.4–6.0 s: the KRNL0 cube builds itself in 3D -->
+      <section id="s2" class="clip full" data-start="2.4" data-duration="3.6" data-track-index="0">
+        <div id="s2-ground" class="full"></div>
+        <div id="s2-stage">
+          <div id="s2-pos">
+            <div id="s2-cube">
+              <div class="holder top"><div class="face" id="s2-top"><i></i><i></i><i></i><i></i><i class="lit" id="s2-lit-top"></i><i></i><i></i><i></i><i></i></div></div>
+              <div class="holder left"><div class="face" id="s2-left"><i></i><i></i><i></i><i></i><i class="lit" id="s2-lit-left"></i><i></i><i></i><i></i><i></i></div></div>
+              <div class="holder right"><div class="face" id="s2-right"><i></i><i></i><i></i><i></i><i class="lit" id="s2-lit-right"></i><i></i><i></i><i></i><i></i></div></div>
+            </div>
+          </div>
+        </div>
+        <div id="s2-word">KRNL0</div>
+        <div id="s2-sub">your whole day, one canvas</div>
+        <div id="s2-zoom"></div>
+      </section>
+
+      <!-- 3 · 6.0–10.6 s: the real app, one window at a time -->
+      <section id="s3" class="clip full" data-start="6.0" data-duration="4.6" data-track-index="0">
+        <div id="s3-ground" class="full"></div>
+        <div id="s3-words">
+          <div class="s3-word h" id="s3-w0">Type it.</div>
+          <div class="s3-word h" id="s3-w1">See it.</div>
+          <div class="s3-word h" id="s3-w2">Run it.</div>
+          <div class="s3-word h" id="s3-w3">Keep it.</div>
+          <div class="s3-word h" id="s3-w4">Pin it.</div>
+        </div>
+        <div id="s3-deck">
+          <div class="card" id="s3-c0"><img src="assets/ui/todo.jpg" alt="KRNL0 Todos: Call mom, today 20:00, 30 minutes" /></div>
+          <div class="card" id="s3-c1"><img src="assets/ui/calendar.jpg" alt="KRNL0 Calendar day view" /></div>
+          <div class="card" id="s3-c2"><img src="assets/ui/timer.jpg" alt="KRNL0 Timer recording" /></div>
+          <div class="card" id="s3-c3"><img src="assets/ui/habits.jpg" alt="KRNL0 Habits with streaks" /></div>
+          <div class="card" id="s3-c4"><img src="assets/ui/canvas.jpg" alt="Sticky notes on the KRNL0 canvas" /></div>
+        </div>
+      </section>
+
+      <!-- 4 · 10.6–14 s: the claim, then the mark -->
+      <section id="s4" class="clip full" data-start="10.6" data-duration="4.0" data-track-index="0">
+        <div id="s4-ground" class="full"></div>
+        <div id="s4-claim" class="h"><span id="s4-a">One app</span><br /><span id="s4-b">instead</span><br /><span id="s4-c">of nine.</span></div>
+        <div id="s4-tiles">
+          <div class="tile" id="s4-t0" style="background: var(--acid)">K</div>
+          <div class="tile" id="s4-t1" style="background: var(--cyan)">R</div>
+          <div class="tile" id="s4-t2" style="background: var(--coral)">N</div>
+          <div class="tile" id="s4-t3" style="background: var(--lav)">L</div>
+          <div class="tile zero" id="s4-t4" style="background: var(--paper)">0</div>
+        </div>
+        <div id="s4-cta"><div id="s4-btn">Free download · link in bio</div><div id="s4-os">Windows · macOS · Linux</div></div>
+      </section>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      const A = "expo.out";
+
+      // ── 1: slot machine. Ground floods a new colour on every roll.
+      const ground = ["#0a0908", "#a98bf6", "#22d3ee", "#ee8466", "#c9f158"];
+      const ink = ["#f4efe2", "#0a0908", "#0a0908", "#0a0908", "#0a0908"];
+      for (let i = 0; i < 5; i++) {
+        const t = 0.25 + i * 0.36;
+        tl.fromTo(`#s1-w${i}`, { y: 300, opacity: 0 }, { y: 0, opacity: 1, duration: 0.22, ease: "power3.out" }, t);
+        if (i < 4) tl.fromTo(`#s1-w${i}`, { y: 0, opacity: 1 }, { y: -300, opacity: 0, duration: 0.2, ease: "power3.in", immediateRender: false }, t + 0.3);
+        if (i > 0) {
+          tl.fromTo("#s1-ground", { backgroundColor: ground[i - 1] }, { backgroundColor: ground[i], duration: 0.18, ease: "power2.inOut", immediateRender: i > 1 ? false : true }, t);
+          tl.fromTo(["#s1-line", ".s1-word"], { color: ink[i - 1] }, { color: ink[i], duration: 0.18, immediateRender: i > 1 ? false : true }, t);
+        }
+      }
+
+      // ── 2: cube. Faces fly in along their normals, the cube spins into the logo pose.
+      const S2 = 2.4;
+      tl.fromTo("#s2-top", { z: 900, opacity: 0 }, { z: 0, opacity: 1, duration: 0.7, ease: A }, S2 + 0.05);
+      tl.fromTo("#s2-left", { z: 900, opacity: 0 }, { z: 0, opacity: 1, duration: 0.7, ease: A }, S2 + 0.15);
+      tl.fromTo("#s2-right", { z: 900, opacity: 0 }, { z: 0, opacity: 1, duration: 0.7, ease: A }, S2 + 0.25);
+      tl.fromTo("#s2-cube", { rotationY: -250 }, { rotationY: -45, duration: 2.0, ease: "power3.out" }, S2);
+      tl.fromTo("#s2-pos", { scale: 0.7, rotationX: 10 }, { scale: 1, rotationX: -35.26, duration: 2.0, ease: "power3.out" }, S2);
+      tl.fromTo("#s2-lit-top", { backgroundColor: "#3a3a3a", boxShadow: "0 0 0px rgba(216,255,110,0)" }, { backgroundColor: "#e2ff9c", boxShadow: "0 0 60px rgba(216,255,110,0.9)", duration: 0.25, ease: "power2.out" }, S2 + 1.55);
+      tl.fromTo("#s2-lit-left", { backgroundColor: "#3a3a3a" }, { backgroundColor: "#b5e13f", duration: 0.25 }, S2 + 1.7);
+      tl.fromTo("#s2-lit-right", { backgroundColor: "#3a3a3a" }, { backgroundColor: "#9cc235", duration: 0.25 }, S2 + 1.82);
+      tl.fromTo("#s2-word", { opacity: 0, scale: 1.35, filter: "blur(10px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.6, ease: A }, S2 + 1.9);
+      tl.fromTo("#s2-sub", { opacity: 0 }, { opacity: 1, duration: 0.3 }, S2 + 1.95);
+      // Zoom through the lit tile: it grows past the frame and its acid becomes the next ground.
+      tl.fromTo("#s2-zoom", { opacity: 0 }, { opacity: 1, duration: 0.1 }, S2 + 3.05);
+      tl.fromTo("#s2-zoom", { scale: 0.2, rotation: 45 }, { scale: 32, rotation: 0, duration: 0.5, ease: "power3.in" }, S2 + 3.05);
+
+      // ── 3: deck of real windows. Each arrives from below; the one before sinks back.
+      const S3 = 6.0;
+      const g3 = ["#c9f158", "#a98bf6", "#22d3ee", "#ee8466", "#141414"];
+      for (let i = 0; i < 5; i++) {
+        const t = S3 + 0.1 + i * 0.86;
+        tl.fromTo(`#s3-c${i}`, { y: 1500, rotation: i % 2 ? 5 : -5, opacity: 1 }, { y: 0, rotation: 0, duration: 0.55, ease: A }, t);
+        if (i > 0) tl.fromTo(`#s3-c${i - 1}`, { scale: 1, opacity: 1, filter: "brightness(1)" }, { scale: 0.9, opacity: 0, filter: "brightness(0.5)", duration: 0.45, ease: "power3.in", immediateRender: false }, t);
+        tl.fromTo(`#s3-w${i}`, { y: 180, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, t + 0.05);
+        if (i < 4) tl.fromTo(`#s3-w${i}`, { y: 0, opacity: 1 }, { y: -180, opacity: 0, duration: 0.22, ease: "power3.in", immediateRender: false }, t + 0.82);
+        if (i > 0) tl.fromTo("#s3-ground", { backgroundColor: g3[i - 1] }, { backgroundColor: g3[i], duration: 0.3, ease: "power2.inOut", immediateRender: i > 1 ? false : true }, t);
+      }
+      tl.fromTo(".s3-word", { color: "#0a0908" }, { color: "#f4efe2", duration: 0.2 }, S3 + 0.1 + 4 * 0.86);
+
+      // ── 4: claim slams in word by word, then the tiles drop and the CTA lands.
+      const S4 = 10.6;
+      ["#s4-a", "#s4-b", "#s4-c"].forEach((id, i) => {
+        tl.fromTo(id, { scale: 1.6, opacity: 0, filter: "blur(14px)" }, { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.28, ease: A }, S4 + 0.05 + i * 0.16);
+      });
+      tl.fromTo("#s4-claim", { y: 0 }, { y: -140, duration: 0.6, ease: "power3.inOut" }, S4 + 1.0);
+      for (let i = 0; i < 5; i++) {
+        tl.fromTo(`#s4-t${i}`, { y: -1300, rotation: i % 2 ? 10 : -10 }, { y: 0, rotation: 0, duration: 0.7, ease: "back.out(1.4)" }, S4 + 1.05 + i * 0.08);
+      }
+      tl.fromTo("#s4-cta", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.5, ease: A }, S4 + 1.75);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>
