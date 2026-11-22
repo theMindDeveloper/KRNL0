@@ -1015,7 +1015,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   const [calCardHidden, setCalCardHidden] = useState(false);
   const calDefaultDay = (): string => (weekDays.includes(todayYMD()) ? todayYMD() : weekDays[0]!);
   const calDraftOf = (raw: string): { text: string; hint: boolean; d: PlanDraft } => {
-    const q = parseQuickAdd(raw);
+    // Events can be up to 12 h (the event card's limit).
+    const q = parseQuickAdd(raw, new Date(), { maxMin: 720 });
     const fromWords: PlanDraft = { day: q.day ?? calDefaultDay(), time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: q.deadline ?? null };
     return { text: q.text || raw, hint: !!q.hint, d: effectiveDraft(fromWords, calOv) };
   };
@@ -1314,6 +1315,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     const el = gridBodyRef.current;
     const key = `${baseYMD}:${dayCount}`;
     if (!el || autoScrolledFor.current === key) return;
+    // The hours box has a size but is not measured yet: the rows are drawn
+    // from a stand-in height this once (28 px x zoom), so a scroll now lands
+    // hours too late once they are sized (13:00 at 07:48 on a phone). It runs
+    // again as soon as they are (rowHeight changes).
+    if (!cssRows && el.clientHeight > 0) return;
     autoScrolledFor.current = key;
     let target = 8 * 60;
     let found = false;
@@ -1333,9 +1339,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       const nearNow = (slicesByDay.get(todayYmd) ?? []).some((sl) => sl.sliceEndMin > nowMin - 180 && sl.sliceStartMin < nowMin + 180);
       if (nowMin >= 6 * 60 || nearNow) target = Math.max(0, nowMin - 90);
     }
+    // The hour as it is drawn (sized by the browser, Decision 61).
+    const drawnHour = el.scrollHeight > 2 * GRID_PAD ? (el.scrollHeight - 2 * GRID_PAD) / rowCount : 0;
+    const hourPx = drawnHour > 0 ? drawnHour : rowHeight;
     // Open on a whole hour (the last page too — the browser would stop
     // mid-hour) and never on a block cut in half: step back to its start.
-    const maxHour = Math.max(0, Math.floor((el.scrollHeight - el.clientHeight) / rowHeight));
+    const maxHour = Math.max(0, Math.floor((el.scrollHeight - el.clientHeight) / hourPx));
     let hour = Math.min(maxHour, Math.max(0, Math.floor((target - 20) / 60)));
     for (let moved = true; moved && hour > 0;) {
       moved = false;
@@ -1345,9 +1354,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
         }
       }
     }
-    el.scrollTop = hour * rowHeight;
+    el.scrollTop = hour * hourPx;
     setGridTop(el.scrollTop);
-  }, [baseYMD, dayCount, weekDays, slicesByDay, rowHeight]);
+  }, [baseYMD, dayCount, weekDays, slicesByDay, rowHeight, cssRows]);
 
   // ── No scrolling: the hour grid shows whole-hour windows ───────────────────
   // The grid never shows a scrollbar. The wheel (and the ‹ › pager, and a

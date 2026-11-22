@@ -4,6 +4,10 @@
 
 import type { Habit, HabitColor, HabitConfig, HabitSchedule, HabitState, HabitView, IsoDow } from './types';
 import { countOn, isHabitColor, isHabitView, isValidTimeOfDay, isDayScheduled, isoDowOf, todayLocal } from './types';
+import { isValidYMD } from '../../../../shared/ymd';
+
+/** The longest an event or a timed habit can be (the repeat editor's and the CLI's limit). */
+export const MAX_ROUTINE_MIN = 720;
 
 export interface HabitEnv {
   uuid: () => string;
@@ -33,8 +37,10 @@ export function habitAdd(
   // Decision 39 — a routine needs days and a time; without them it is a habit.
   const routine = args.kind === 'routine' && schedule !== undefined && schedule.timeOfDay !== undefined;
   // Decision 62 — an event that happens once, on `on`: its weekday, first and
-  // last day (a shape an older KRNL0 still reads).
-  const on = routine && typeof args.on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.on) ? args.on : null;
+  // last day (a shape an older KRNL0 still reads). A date that does not exist
+  // (2026-02-30) adds nothing: it would have become a weekly event instead.
+  if (args.on !== undefined && args.on !== null && !isValidYMD(args.on)) return state;
+  const on = routine && isValidYMD(args.on) ? args.on : null;
   if (on && schedule?.timeOfDay) schedule = { kind: 'weekly', days: [isoDowOf(on)], timeOfDay: schedule.timeOfDay, ...(schedule.durationMin !== undefined ? { durationMin: schedule.durationMin } : {}) };
   const color: HabitColor = args.color && isHabitColor(args.color) ? args.color : 'acid';
   const habit: Habit = {
@@ -142,7 +148,9 @@ function parseAddSchedule(raw: unknown): HabitSchedule | undefined {
   // No time = "Any time" (Decision 39); a time, when given, must be HH:MM.
   if (r.timeOfDay !== undefined && r.timeOfDay !== null && (typeof r.timeOfDay !== 'string' || !isValidTimeOfDay(r.timeOfDay))) return undefined;
   const tod = typeof r.timeOfDay === 'string' ? { timeOfDay: r.timeOfDay } : {};
-  const dur = tod.timeOfDay && typeof r.durationMin === 'number' && r.durationMin >= 5 && r.durationMin <= 480 ? { durationMin: r.durationMin } : {};
+  // Up to 12 h, as the repeat editor and the CLI allow (8 h here dropped a
+  // 9-hour event's length silently: it came out 60 minutes long).
+  const dur = tod.timeOfDay && typeof r.durationMin === 'number' && r.durationMin >= 5 && r.durationMin <= MAX_ROUTINE_MIN ? { durationMin: r.durationMin } : {};
   if (r.kind === 'daily') return { kind: 'daily', ...tod, ...dur };
   if (r.kind === 'weekdays') return { kind: 'weekdays', ...tod, ...dur };
   if (r.kind === 'weekly' && Array.isArray(r.days)) {

@@ -480,3 +480,6 @@ body.cal-resizing .cal-block:hover::after, body.cal-resizing .cal-event.is-hot::
   .react-flow__node[data-over-calendar] > *, .react-flow__node[data-calendar-carry] > * { transition: none; }
   .react-flow__node[data-calendar-back] > * { animation: none; }
 }
+
+/* A phone or tablet has no keyboard: the tool dock's shortcut letters are noise there. */
+@media (hover: none) and (pointer: coarse) { .dock-key-hint { display: none; } }

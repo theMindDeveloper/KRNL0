@@ -118,13 +118,30 @@ function useTheme(): [Theme, (t: Theme) => void] {
  */
 let canvasFitted = false;
 function FitOnFirstOpen({ phone }: { phone: boolean }) {
-  const { fitView, getNodes } = useReactFlow();
+  const { fitView, getNodes, getNodesBounds } = useReactFlow();
   // After the cards are measured: a fit before that frames nothing.
   const measured = useNodesInitialized();
   useEffect(() => {
     if (canvasFitted || !measured) return;
     const id = window.setTimeout(() => {
-      const tasks = phone ? getNodes().filter((n) => n.type === 'task').map((n) => ({ id: n.id })) : [];
+      // A plan card's node type is its kind, 'todo.task' ('task' matched none,
+      // so a phone framed every card at 55% and opened on empty canvas).
+      let cards = phone ? getNodes().filter((n) => n.type === 'todo.task' && !n.hidden) : [];
+      // Cards too far apart to read together: framing them all centred on the
+      // empty space between them. Start at the first card (top, then left)
+      // and the cards that fit beside it; you pan to the rest.
+      if (phone && cards.length > 1) {
+        const roomW = Math.max(120, window.innerWidth - 92) / 0.55;
+        const roomH = Math.max(160, window.innerHeight - 200) / 0.55;
+        const all = getNodesBounds(cards);
+        if (all.width > roomW || all.height > roomH) {
+          const first = [...cards].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)[0]!;
+          const near = cards.filter((n) => n.position.x >= first.position.x - 40 && n.position.x + (n.measured?.width ?? 0) <= first.position.x + roomW
+            && n.position.y >= first.position.y - 40 && n.position.y + (n.measured?.height ?? 0) <= first.position.y + roomH);
+          cards = near.length > 0 ? near : [first];
+        }
+      }
+      const tasks = cards.map((n) => ({ id: n.id }));
       try {
         void fitView({
           padding: phone ? { top: '24px', right: '20px', bottom: '72px', left: '72px' } : CANVAS_FIT_PADDING,
@@ -139,7 +156,7 @@ function FitOnFirstOpen({ phone }: { phone: boolean }) {
       } catch { /* not ready: Fit is in the corner */ }
     }, 80);
     return () => window.clearTimeout(id);
-  }, [fitView, getNodes, phone, measured]);
+  }, [fitView, getNodes, getNodesBounds, phone, measured]);
   return null;
 }
 

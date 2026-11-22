@@ -25,7 +25,9 @@ const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
 const DEADLINE_RE = /\b(?:by|due|before|deadline)\s+((?:on\s+)?(?:next\s+)?(?:today|tonight|tomorrow|tmrw|tmr|(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d{1,2}[./]\d{1,2}\.?|the\s+\d{1,2}(?:st|nd|rd|th)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*))\b/i;
 const DAY_RE = /\b(?:on\s+)?(next\s+)?(mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/i;
 
-export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
+/** `maxMin`: the longest length the words may give (a plan 8 h; the Calendar's events 12 h). */
+export function parseQuickAdd(raw: string, now: Date = new Date(), opts: { maxMin?: number } = {}): QuickAdd {
+  const maxLen = opts.maxMin ?? 480;
   let s = ` ${raw} `;
   const out: QuickAdd = { text: raw.trim() };
   // "every day", "every monday": a plan happens once. Something that repeats
@@ -68,8 +70,9 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
     const h1 = to24(Number(m[1]), m[3] ?? endAp);
     const h2 = to24(Number(m[4]), endAp);
     const a1 = h1 * 60 + Number(m[2] ?? 0);
-    const a2 = h2 * 60 + Number(m[5] ?? 0);
-    if (h1 <= 23 && h2 <= 23 && a2 > a1) {
+    // "22:00-02:00": past midnight (it was read as a plan named "-02:00").
+    const a2 = h2 * 60 + Number(m[5] ?? 0) + (h2 * 60 + Number(m[5] ?? 0) <= a1 ? 24 * 60 : 0);
+    if (h1 <= 23 && h2 <= 23 && a2 > a1 && a2 - a1 <= maxLen) {
       out.time = `${pad(h1)}:${pad(Number(m[2] ?? 0))}`;
       out.durationMin = a2 - a1;
       cut(m);
@@ -86,7 +89,8 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
     m = /\b(?:at\s+)?([01]?\d|2[0-3]):([0-5]\d)\b/i.exec(s);
     if (m) { out.time = `${pad(Number(m[1]))}:${m[2]}`; cut(m); }
     else {
-      m = /\bat\s+([01]?\d|2[0-3])\b(?!\s*(?:min|h\b|hr|hour))/i.exec(s);
+      // Not "at 9:60" (a time that does not exist): it stays in the name.
+      m = /\bat\s+([01]?\d|2[0-3])\b(?!\s*(?:min|h\b|hr|hour)|:)/i.exec(s);
       // "at 3" means 3 pm to almost everyone; 1–7 without am/pm read as afternoon.
       if (m) { const n = Number(m[1]); out.time = `${pad(n >= 1 && n <= 7 ? n + 12 : n)}:00`; cut(m); }
     }
@@ -96,17 +100,19 @@ export function parseQuickAdd(raw: string, now: Date = new Date()): QuickAdd {
   if (!out.time && (m = /\b(?:at\s+)?(?:noon|midday)\b/i.exec(s))) { out.time = '12:00'; cut(m); }
 
   // Length: "1h30", "1.5h", "2 hours", "45m", "45 min" (a range already gave one).
+  // A length it can't take stays in the name, so it is seen (the words were
+  // taken out and the length thrown away: "for 9h" made a 1-hour block).
+  const takeLen = (min: number, mm: RegExpExecArray): void => { if (min >= 1 && min <= maxLen) { out.durationMin = min; cut(mm); } };
   m = out.durationMin !== undefined ? null : /\b(\d{1,2})h([0-5]\d)\b/i.exec(s);
-  if (m) { out.durationMin = Number(m[1]) * 60 + Number(m[2]); cut(m); }
+  if (m) takeLen(Number(m[1]) * 60 + Number(m[2]), m);
   else if (out.durationMin === undefined) {
     m = /\b(?:for\s+)?(\d{1,2}(?:\.\d)?)\s?(?:h|hr|hrs|hour|hours)\b/i.exec(s);
-    if (m) { out.durationMin = Math.round(Number(m[1]) * 60); cut(m); }
+    if (m) takeLen(Math.round(Number(m[1]) * 60), m);
     else {
       m = /\b(?:for\s+)?(\d{1,3})(?:\s?(?:min|mins|minute|minutes)|m)\b/i.exec(s);
-      if (m) { out.durationMin = Number(m[1]); cut(m); }
+      if (m) takeLen(Number(m[1]), m);
     }
   }
-  if (out.durationMin !== undefined && !(out.durationMin >= 1 && out.durationMin <= 480)) delete out.durationMin;
 
   const today = ymd(now);
 

@@ -949,7 +949,8 @@ export async function cliRoutineAdd(
   const usage = 'event add "<name>" (--days mon,wed | --on YYYY-MM-DD) --at HH:MM --for <minutes>';
   if (!name?.trim()) return { ok: false, message: usage };
   // Decision 62 — `--on`: an event that happens once, on that day.
-  if (on !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(on)) return { ok: false, message: 'event add: --on needs a date, YYYY-MM-DD' };
+  if (on !== undefined && !YMD.test(on)) return { ok: false, message: 'event add: --on needs a real date, YYYY-MM-DD' };
+  if (on !== undefined && daysRaw !== undefined) return { ok: false, message: 'event add: --days repeats it, --on is one day; give one of them' };
   const days = on !== undefined ? { kind: 'weekly' as const, days: [1 as const] } : parseRoutineDays(daysRaw);
   if ('error' in days) return { ok: false, message: `routine add: ${days.error}` };
   if (!at || !isValidTimeOfDay(at)) return { ok: false, message: `routine add: needs --at HH:MM (24-hour)` };

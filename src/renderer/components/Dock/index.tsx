@@ -51,7 +51,7 @@ export function anchorFor(x: number, y: number, w: number, h: number): DockAncho
 /** Faint keyboard-shortcut letter in a dock button's corner. */
 function KeyHint({ k }: { k: string }) {
   return (
-    <span aria-hidden style={{
+    <span aria-hidden className="dock-key-hint" style={{
       position: 'absolute', right: 3, bottom: 1, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1,
       opacity: 0.38, pointerEvents: 'none', color: 'currentColor',
     }}>{k}</span>
