@@ -323,14 +323,14 @@
       "todo"
     ]
   },
-  "487ef16a": {
-    "text": "The Calendar holds your plan, the blocks, and what really happened: the thin track at the left of each day.",
+  "7895036d": {
+    "text": "The Calendar holds your plans, your events, and what really happened: the thin line at the left of each day.",
     "tours": [
       "calendar"
     ]
   },
-  "fe134724": {
-    "text": "Drag a plan from the To-do onto a time here, to plan it.",
+  "5dbff111": {
+    "text": "Drag a plan from the To-do onto a time. A line shows the exact time while you carry it.",
     "tours": [
       "calendar"
     ]
@@ -341,20 +341,26 @@
       "calendar"
     ]
   },
-  "5c32bed4": {
-    "text": "Double-click empty hours, or click \"add a plan\" at the bottom, to add a plan right on the Calendar. Switch it to \"Repeats\" for a class or a shift that comes back every week.",
+  "38932edd": {
+    "text": "Click a plan to see its card, with Done. Right-click it to change it: another day or any time, its length, or delete it.",
     "tours": [
       "calendar"
     ]
   },
-  "8bba553f": {
-    "text": "Click a plan to open its card. Move it to another day or to any time, change how long it takes, mark it done, or delete it.",
+  "9eaec4b3": {
+    "text": "Pull a block's bottom edge to make it longer or shorter. Its times change as you pull.",
     "tours": [
       "calendar"
     ]
   },
-  "3e1b102e": {
-    "text": "The thin track at the left of each day fills with recorded time. Click a filled stretch to see it, and double-click its start or end time to fix it.",
+  "5643de24": {
+    "text": "Zoom the hours with a pinch, with Control and the mouse wheel, or by dragging the hour numbers.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "4ebec5fa": {
+    "text": "The thin line at the left of each day fills with recorded time. Click it to see that session, and double-click its start or end time to fix it.",
     "tours": [
       "calendar"
     ]
@@ -365,20 +371,32 @@
       "calendar"
     ]
   },
+  "ab20b745": {
+    "text": "The menu button in the Calendar's header lists all your events, in every view.",
+    "tours": [
+      "calendar"
+    ]
+  },
   "2c928a2b": {
     "text": "On a day, but no set time? Drop it in the \"any time\" strip under the day names, and drag it into the hours later to give it a time. A dashed flag there is a deadline.",
     "tours": [
       "calendar"
     ]
   },
-  "49dd502a": {
-    "text": "Click a plan to open its card. Move it to another day or to any time, change how long it takes, set a reminder, mark it done, or delete it.",
+  "71b5751d": {
+    "text": "Click a plan to see its card, with Start and Done. Right-click it to change it: another day or any time, its length, a reminder, or delete it.",
     "tours": [
       "calendar"
     ]
   },
   "c299cc45": {
     "text": "Once you work on it, the planned block tells you how it went: \"started twenty minutes late\", or \"thirty minutes over\".",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "0924b286": {
+    "text": "The menu button in the Calendar's header has the rest, in every view: your events, what to show, and zoom.",
     "tours": [
       "calendar"
     ]
@@ -437,46 +455,100 @@
       "habits"
     ]
   },
-  "eacc8e33": {
-    "text": "A class, a work shift, a weekly call: that's a repeating event. It sits on your Calendar every week, and it's never ticked or missed. Habits are the things you tick.",
+  "3e868127": {
+    "text": "An appointment, an exam, a class, a shift: those are events. They happen, and they're never ticked or missed. Habits are the things you tick.",
     "tours": [
       "routines"
     ]
   },
-  "3d3df6f8": {
-    "text": "Click \"add a plan\" at the bottom of the Calendar, or double-click empty hours, and pick \"Repeats\". Name it Class, pick its days and time, and press Enter.",
+  "87372e1d": {
+    "text": "Click add an event at the bottom of the Calendar, and type Dentist, Friday, and a time. Press Enter, and it's on your Calendar.",
     "tours": [
       "routines"
     ]
   },
-  "1eb2b749": {
-    "text": "It has a card on the board too! It's never ticked: its page shows the next date, with \"Skip this one\", and \"Show\" on the Calendar.",
+  "5a8a1566": {
+    "text": "Now type Class, with no time. Its card opens. Pick Repeats, its days and its time, and press Enter.",
     "tours": [
       "routines"
     ]
   },
-  "ff37aeb3": {
-    "text": "On the Calendar it's a hatched band, every week, with your plans on top. The menu button in the Calendar's header lists all your repeating events.",
+  "df1152fd": {
+    "text": "Each event has a card on the board too. Its page shows the next date, with Skip this one, and Show, which takes you straight to it.",
     "tours": [
       "routines"
     ]
   },
-  "7a2fecb4": {
-    "text": "No class next time? Click the band, and choose \"Skip this one\". Only that day changes.",
+  "831360a3": {
+    "text": "On the Calendar, an event is a calm card with its time and room, and your plans sit beside it. The menu button in the header lists them all.",
     "tours": [
       "routines"
     ]
   },
-  "67eb2b0d": {
-    "text": "Semester over? Click the band and choose \"End after this day\". The days before it stay, and \"Restart\" is in the events list.",
+  "ccea2cc0": {
+    "text": "No class next time? Right-click it, and choose Skip this one. Only that day changes.",
     "tours": [
       "routines"
     ]
   },
-  "ebab56ac": {
-    "text": "On the Calendar it's a hatched band, every week, with your plans on top. The menu button in the Calendar's header hides them, and lists them all.",
+  "56de1977": {
+    "text": "Semester over? Right-click it, and choose End after this day. The days before it stay, and Restart is in the events list.",
     "tours": [
       "routines"
+    ]
+  },
+  "dc39459a": {
+    "text": "On the Calendar, an event is a calm card with its time and room, and your plans sit beside it. The menu button in the header lists them all, and can hide them.",
+    "tours": [
+      "routines"
+    ]
+  },
+  "e590d258": {
+    "text": "This menu picks how your windows are arranged: My layout, or the Free canvas.",
+    "tours": [
+      "layout"
+    ]
+  },
+  "aaa749c1": {
+    "text": "In My layout, drag a window by its grip onto another window to swap them.",
+    "tours": [
+      "layout"
+    ]
+  },
+  "8721861f": {
+    "text": "Drag the line between two windows to give one more room. It stays as you leave it.",
+    "tours": [
+      "layout"
+    ]
+  },
+  "095b2d04": {
+    "text": "The window buttons in the top bar show or hide a window.",
+    "tours": [
+      "layout"
+    ]
+  },
+  "cf16d84b": {
+    "text": "Want to start over? Reset, in this menu, brings back the Timer, the Clock and the To-do, over a full-width Calendar.",
+    "tours": [
+      "layout"
+    ]
+  },
+  "fcd0d9f8": {
+    "text": "Pick Free canvas. Every window becomes a card on the canvas, and you can put anything anywhere.",
+    "tours": [
+      "layout"
+    ]
+  },
+  "7168d2df": {
+    "text": "Drag the Calendar's edge to make it bigger. The windows beside it make room.",
+    "tours": [
+      "layout"
+    ]
+  },
+  "3b0beabe": {
+    "text": "Each computer keeps its own layout, and your plans are the same everywhere. Switch back here any time, or press Control, Shift and L.",
+    "tours": [
+      "layout"
     ]
   },
   "c2d2fe4d": {
@@ -571,18 +643,6 @@
   },
   "0df33288": {
     "text": "When done cards leave is up to you. Settings, then Finished cards: overnight, after an hour, or keep them.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "f6d9e5ae": {
-    "text": "Plans in a chain leave the board together, once all of them are done. Until then, a done card says \"waits on chain\". Hover it to see which plan is holding it, or archive it.",
-    "tours": [
-      "plans-change"
-    ]
-  },
-  "6087a3f3": {
-    "text": "On the Calendar, a plan in a chain says \"after\", and the one before it. It starts when that one ends.",
     "tours": [
       "plans-change"
     ]
@@ -683,8 +743,8 @@
       "modes"
     ]
   },
-  "814f0333": {
-    "text": "Plans get deadlines, like \"by Friday\", and reminders. And cards can be chained. A card's \"Add next\" plans what comes after, and wires show the order.",
+  "0c262aaf": {
+    "text": "Plans get deadlines, like \"by Friday\", and reminders. A card's \"Add next\" plans what comes right after it, and a line shows the order.",
     "tours": [
       "modes"
     ]
@@ -725,8 +785,8 @@
       "modes"
     ]
   },
-  "2fa89dc3": {
-    "text": "This is your board. Every plan, habit and repeating event has a card here, and you can put your own notes and pictures around them.",
+  "19c88e42": {
+    "text": "This is your board. Every plan, habit and event has a card here, and you can put your own notes and pictures around them.",
     "tours": [
       "board"
     ]
@@ -749,8 +809,8 @@
       "board"
     ]
   },
-  "9b5b9aae": {
-    "text": "Habits and repeating events have cards too. On a habit, today's square ticks it. An event shows its next date, with \"Skip this one\" and \"Show\".",
+  "bd8015c1": {
+    "text": "Habits and events have cards too. On a habit, today's square ticks it. An event shows its next date, or once it's over, the last one, with \"Skip this one\" and \"Show\".",
     "tours": [
       "board"
     ]
@@ -779,8 +839,8 @@
       "board"
     ]
   },
-  "cd72261d": {
-    "text": "Drag from the dot on a card's side to another card, to put plans in order. The wire shows what comes next.",
+  "a24d5ae1": {
+    "text": "Drag from the dot on a card's side to another card, to show an order. The line shows what comes next. It never moves their times.",
     "tours": [
       "board"
     ]
@@ -833,24 +893,6 @@
       "boards"
     ]
   },
-  "b64a60c8": {
-    "text": "The Terminal runs a real shell. Everything in the app can also be done with kernel commands. Try \"kernel help\"!",
-    "tours": [
-      "terminal"
-    ]
-  },
-  "4c73044b": {
-    "text": "Click me, the orb, to open my menu.",
-    "tours": [
-      "terminal"
-    ]
-  },
-  "0f67188a": {
-    "text": "\"Claude code\" starts Claude Code in the terminal, ready to work on your board. It runs without asking permission for each step.",
-    "tours": [
-      "terminal"
-    ]
-  },
   "38ffecf2": {
     "text": "This badge says your board is saved. It saves itself as you go, so there is nothing to save by hand.",
     "tours": [
@@ -875,16 +917,34 @@
       "sync"
     ]
   },
+  "5421deb9": {
+    "text": "When your server has a new version, a small dot appears on this badge. Its menu updates the server in one click, with your password: a backup first, and back by itself if anything fails. Settings, Updates, shows your server too.",
+    "tours": [
+      "sync"
+    ]
+  },
   "96b07a92": {
     "text": "On your phone, open your server's address and log in. Today, the timer, your calendar, habits and the canvas, laid out for the phone. The terminal and the AI stay in this app.",
     "tours": [
       "sync"
     ]
   },
-  "5421deb9": {
-    "text": "When your server has a new version, a small dot appears on this badge. Its menu updates the server in one click, with your password: a backup first, and back by itself if anything fails. Settings, Updates, shows your server too.",
+  "b64a60c8": {
+    "text": "The Terminal runs a real shell. Everything in the app can also be done with kernel commands. Try \"kernel help\"!",
     "tours": [
-      "sync"
+      "terminal"
+    ]
+  },
+  "4c73044b": {
+    "text": "Click me, the orb, to open my menu.",
+    "tours": [
+      "terminal"
+    ]
+  },
+  "0f67188a": {
+    "text": "\"Claude code\" starts Claude Code in the terminal, ready to work on your board. It runs without asking permission for each step.",
+    "tours": [
+      "terminal"
     ]
   }
 }
