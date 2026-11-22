@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 // ADR 0001 — CalendarNode (Slice 2: MonthView wired).
 // Slice 1 shell upgraded: 'month' case now renders the real MonthView.
 // Week and year remain placeholder stubs for Slices 3/4.
@@ -16,6 +16,7 @@ import { MenuIcon } from '../../ui/menuIcons';
 import { useEasyMode } from '../../../store/uiMode';
 import { calendarLayersOf } from './types';
 import { YearView } from './YearView';
+import { OtherCalendarsCard } from './OtherCalendars';
 
 export function CalendarNode({
   node,
@@ -29,7 +30,29 @@ export function CalendarNode({
   // items; Month and Year have their own.
   const weekMenu = useRef<((x: number, y: number) => void) | null>(null);
   const [ownMenu, setOwnMenu] = useState<{ x: number; y: number } | null>(null);
+  // Decision 64 (Manage A): the Other calendars card, opened from the menu.
+  // `n` remounts the card on every open, so it always starts on its list.
+  const [otherCals, setOtherCals] = useState<{ x: number; y: number; n: number } | null>(null);
+  const openOtherCals = (x: number, y: number) => setOtherCals({ x, y, n: Date.now() });
+  const menuBtn = useRef<HTMLButtonElement>(null);
+  // The tour (and anything else) can open the card: under the menu button.
+  useEffect(() => {
+    const open = () => {
+      const r = menuBtn.current?.getBoundingClientRect();
+      setOtherCals({ x: r ? r.right - 330 : 200, y: r ? r.bottom + 4 : 120, n: Date.now() });
+    };
+    const close = () => setOtherCals(null);
+    window.addEventListener('krnl:open-other-calendars', open);
+    window.addEventListener('krnl:close-other-calendars', close);
+    window.addEventListener('krnl:tour-ended', close);
+    return () => {
+      window.removeEventListener('krnl:open-other-calendars', open);
+      window.removeEventListener('krnl:close-other-calendars', close);
+      window.removeEventListener('krnl:tour-ended', close);
+    };
+  }, []);
   const easy = useEasyMode();
+  const hasLinks = useBoardStore((s) => Array.isArray((s.board as { calendarLinks?: unknown[] } | null)?.calendarLinks) && ((s.board as { calendarLinks?: unknown[] }).calendarLinks?.length ?? 0) > 0);
   const layers = calendarLayersOf(node.state as CalendarState);
   const openMenu = (x: number, y: number) => {
     if ((config.view === 'week' || config.view === 'day') && weekMenu.current) weekMenu.current(x, y);
@@ -47,6 +70,7 @@ export function CalendarNode({
             onCommand={onCommand}
             singleDay
             menuRef={weekMenu}
+            onOtherCalendars={openOtherCals}
           />
         );
       case 'week':
@@ -56,6 +80,7 @@ export function CalendarNode({
             config={config}
             onCommand={onCommand}
             menuRef={weekMenu}
+            onOtherCalendars={openOtherCals}
           />
         );
       case 'month':
@@ -109,6 +134,7 @@ export function CalendarNode({
           ))}
         </span>
         <button
+          ref={menuBtn}
           type="button"
           className="kw-btn nodrag"
           data-testid="week-legend"
@@ -127,6 +153,15 @@ export function CalendarNode({
           y={ownMenu.y}
           onDismiss={() => setOwnMenu(null)}
           items={[
+            // Decision 64 — first and tinted, so people find it.
+            {
+              label: hasLinks ? 'Your other calendars' : 'Add your calendars',
+              icon: <MenuIcon name={hasLinks ? 'link' : 'plus'} />,
+              hint: hasLinks ? 'Google · iPhone · links' : 'Google · iPhone',
+              accent: true,
+              testId: 'calendar-menu-othercals',
+              onSelect: () => openOtherCals(ownMenu.x, ownMenu.y),
+            },
             ...(config.view === 'month' && !easy ? [{
               label: 'Habits',
               icon: layers.habits ? <MenuIcon name="check" /> : <span />,
@@ -140,9 +175,12 @@ export function CalendarNode({
               // The list lives in the week: it opens there.
               onSelect: () => { requestEventsList(ownMenu.x, ownMenu.y); onCommand('calendar.setView', { view: 'week' }); },
             },
+
           ]}
         />
       )}
+
+      {otherCals && <OtherCalendarsCard key={otherCals.n} x={otherCals.x} y={otherCals.y} onClose={() => setOtherCals(null)} />}
 
       {/* View placeholder body */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>

@@ -42,6 +42,12 @@ const P: Record<string, ReactNode> = {
   // menus.md — the rare things of a menu sit behind "More".
   more: <g strokeWidth="2.6"><path d="M5 12h.01M12 12h.01M19 12h.01" /></g>,
   back: <path d="M15 6l-6 6 6 6" />,
+  // Decision 64 — other calendars, and their .ics files.
+  link: <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />,
+  download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
+  upload: <path d="M12 20V9M7 14l5-5 5 5M5 4h14" />,
+  copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
+  hide: <path d="M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 9 6 9 6a17 17 0 0 1-2.6 3.2M6.6 6.6C4.4 8 3 12 3 12s4 6 9 6a9 9 0 0 0 4.4-1.1" />,
 };
 
 export type MenuIconName = keyof typeof P;

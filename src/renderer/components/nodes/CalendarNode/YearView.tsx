@@ -6,6 +6,8 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useBoardStore } from '../../../store/boardStore';
+import { allDayOn, linksOf, nextYMD, type CalendarLink } from '../../../../shared/calsync/types';
+import { calendarLayersOf } from './types';
 import type { NodeProps } from '../types';
 import type { CalendarConfig, CalendarState } from './types';
 import { yearActivity } from './yearActivity';
@@ -64,6 +66,30 @@ export function YearView({ state, onCommand }: Props) {
   const board = useBoardStore((s) => s.board);
   const { tasks, focus } = useMemo(() => yearActivity(board, year, Date.now()), [board, year]);
   const maxFocus = Math.max(30, ...focus.values());
+  // Decision 64 — days with events from other calendars (Google, iCloud, links).
+  const calendarLinksRaw = (board as { calendarLinks?: unknown } | null)?.calendarLinks;
+  const linkedOn = calendarLayersOf(state).linked;
+  const linked = useMemo(() => {
+    const map = new Map<string, { n: number; link: CalendarLink }>();
+    if (!linkedOn) return map;
+    const y0 = `${year}-01-01`;
+    const y1 = `${year}-12-31`;
+    for (const link of linksOf({ calendarLinks: calendarLinksRaw }).filter((l) => l.on)) {
+      for (const ev of link.events) {
+        if (ev.start.slice(0, 10) > y1) break;
+        if (ev.allDay) {
+          for (let d = ev.start; d < ev.end && d <= y1; d = nextYMD(d)) if (d >= y0 && allDayOn(ev, d)) { const cur = map.get(d); map.set(d, { n: (cur?.n ?? 0) + 1, link: cur?.link ?? link }); }
+          continue;
+        }
+        const d = ev.start.slice(0, 10);
+        if (d < y0) continue;
+        const cur = map.get(d);
+        map.set(d, { n: (cur?.n ?? 0) + 1, link: cur?.link ?? link });
+      }
+    }
+    return map;
+  }, [calendarLinksRaw, linkedOn, year]);
+  const linkedNames = useMemo(() => [...new Set([...linked.values()].map((v) => v.link.name))], [linked]);
   const today = ymd(new Date());
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [fit, setFit] = useState({ cols: 6, cell: 16 });
@@ -125,26 +151,30 @@ export function YearView({ state, onCommand }: Props) {
                   const f = focus.get(day) ?? 0;
                   const t = tasks.get(day) ?? 0;
                   const pct = f > 0 ? Math.round(18 + (f / maxFocus) * 70) : 0;
+                  const lk = linked.get(day);
                   return (
                     <button
                       key={day}
                       type="button"
                       data-testid={`calendar-year-day-${day}`}
-                      title={`${day}${f > 0 ? ` · ${Math.round(f)}m focus` : ''}${t > 0 ? ` · ${t} planned` : ''}`}
+                      title={`${day}${f > 0 ? ` · ${Math.round(f)}m focus` : ''}${t > 0 ? ` · ${t} planned` : ''}${lk ? ` · ${lk.n} from ${lk.link.name}` : ''}`}
                       onClick={() => openDay(day)}
                       style={{
                         position: 'relative', minHeight: 0, padding: 0, cursor: 'pointer', aspectRatio: '1 / 1',
-                        border: day === today ? '1px solid var(--acid)' : '1px solid transparent',
+                        border: day === today ? '1px solid var(--acid)' : lk ? `1px solid color-mix(in srgb, var(--${lk.link.color}) 80%, transparent)` : '1px solid transparent',
                         borderRadius: fit.cell >= 34 ? 6 : 2,
                         // An empty day is one clear shade above the window, so the month's shape reads.
                         background: pct > 0 ? `color-mix(in srgb, var(--acid) ${pct}%, var(--paper-3))` : 'var(--paper-3)',
                         // A heat map: no numbers in the cells (too small to read at
                         // any year size); the date and minutes are in the tooltip.
                       }}
-                      aria-label={`${day}${f > 0 ? `, ${Math.round(f)} minutes focus` : ''}${t > 0 ? `, ${t} planned` : ''}`}
+                      aria-label={`${day}${f > 0 ? `, ${Math.round(f)} minutes focus` : ''}${t > 0 ? `, ${t} planned` : ''}${lk ? `, ${lk.n} from ${lk.link.name}` : ''}`}
                     >
                       {fit.cell >= DATE_MIN_CELL && (
                         <span aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: 'center', fontFamily: 'var(--font-read, var(--font-sans))', fontSize: Math.round(Math.min(14, fit.cell * 0.36)), fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: pct > 45 ? 'var(--ink-on-bright, #111)' : day < today ? 'var(--ink-3)' : 'var(--ink-2)', pointerEvents: 'none' }}>{Number(day.slice(8))}</span>
+                      )}
+                      {lk && (
+                        <span aria-hidden data-testid={`calendar-year-linked-${day}`} style={{ position: 'absolute', left: 2, bottom: 2, width: fit.cell >= 34 ? 5 : 3, height: fit.cell >= 34 ? 5 : 3, borderRadius: 999, background: `var(--${lk.link.color})` }} />
                       )}
                       {t > 0 && (
                         <span aria-hidden style={{ position: 'absolute', right: 2, top: 2, width: fit.cell >= 34 ? 5 : 3, height: fit.cell >= 34 ? 5 : 3, borderRadius: 999, background: 'var(--cyan)' }} />
@@ -162,6 +192,9 @@ export function YearView({ state, onCommand }: Props) {
       <div data-testid="calendar-year-legend" style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14, fontFamily: 'var(--font-read)', fontSize: 12, color: 'var(--ink-3)' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden style={{ width: 9, height: 9, borderRadius: 2, background: 'color-mix(in srgb, var(--acid) 70%, var(--paper-3))' }} />time recorded</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden style={{ width: 5, height: 5, borderRadius: 999, background: 'var(--cyan)' }} />something planned</span>
+        {linkedNames.length > 0 && (
+          <span data-testid="calendar-year-legend-linked" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden style={{ width: 9, height: 9, boxSizing: 'border-box', borderRadius: 2, border: `1px solid var(--${[...linked.values()][0]!.link.color})` }} />from {linkedNames.length === 1 ? linkedNames[0] : 'your other calendars'}</span>
+        )}
       </div>
     </div>
   );

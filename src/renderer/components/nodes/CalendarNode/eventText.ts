@@ -15,6 +15,12 @@ export function eventTitleAndPlace(name: string, note?: string): { title: string
   return { title: name.trim(), place: first && first.length <= 40 ? first : null };
 }
 
+/** The title and place of an event, with its own `place` first (Decision 64), else the old rule. */
+export function eventTitleAndPlaceOf(h: { name: string; note?: string | undefined; place?: string | undefined }): { title: string; place: string | null } {
+  const tp = eventTitleAndPlace(h.name, h.note);
+  return h.place !== undefined ? { title: tp.title, place: h.place.trim() || null } : tp;
+}
+
 export interface EventLines {
   /** Lines the name may use (0 = none fit). */
   titleLines: number;

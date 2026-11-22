@@ -23,9 +23,24 @@ import {
 /** Undo/redo restore content, not where the user is looking: keep the current
  *  canvas when the restored snapshot still has it. */
 function keepActiveCanvas(snapshot: Board, current: Board): Board {
+  const withLinks = keepCalendarLinks(snapshot, current);
   const id = current.activeCanvasId;
-  if (!id || snapshot.activeCanvasId === id || !(snapshot.canvases ?? []).some((c) => c.id === id)) return snapshot;
-  return { ...snapshot, activeCanvasId: id };
+  if (!id || withLinks.activeCanvasId === id || !(withLinks.canvases ?? []).some((c) => c.id === id)) return withLinks;
+  return { ...withLinks, activeCanvasId: id };
+}
+
+/**
+ * Decision 64 — the other calendars and what was matched with them are the
+ * sync's, not an edit of the user's: undo and redo keep them as they are now
+ * (rolling them back would make the next sync redo or undo calendar changes).
+ */
+function keepCalendarLinks(snapshot: Board, current: Board): Board {
+  const now = (current as { calendarLinks?: unknown }).calendarLinks;
+  const then = (snapshot as { calendarLinks?: unknown }).calendarLinks;
+  if (now === then) return snapshot;
+  const next = { ...snapshot } as Board & { calendarLinks?: unknown };
+  if (now === undefined) delete next.calendarLinks; else next.calendarLinks = now;
+  return next;
 }
 
 const INITIAL_VIEWPORT: BoardViewport = { x: 0, y: 160, zoom: 1 };

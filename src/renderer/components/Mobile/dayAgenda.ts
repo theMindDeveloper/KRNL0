@@ -5,7 +5,8 @@
 import type { Board } from '../../../shared/types';
 import type { TodoItem } from '../nodes/TodoNode/types';
 import { hasTimeOfDay, isDayScheduled, isRoutine, routineSpansOn, type Habit } from '../nodes/HabitNode/types';
-import { eventTitleAndPlace } from '../nodes/CalendarNode/eventText';
+import { eventTitleAndPlaceOf } from '../nodes/CalendarNode/eventText';
+import { linksOf, partOnDay } from '../../../shared/calsync/types';
 
 export type AgendaKind = 'plan' | 'event' | 'habit';
 
@@ -72,7 +73,7 @@ export function dayAgenda(board: Board | null, ymd: string, nowMin: number): Day
       if (isRoutine(h)) {
         for (const occ of routineSpansOn(h, ymd)) {
           if (occ.skipped) continue;
-          const { title, place } = eventTitleAndPlace(h.name, h.note);
+          const { title, place } = eventTitleAndPlaceOf(h);
           items.push({ id: `${h.id}${occ.spill ? ':spill' : ''}`, kind: 'event', title, place, startMin: occ.startMin, endMin: occ.endMin, done: false, color: h.color, taskId: null });
         }
       } else if (hasTimeOfDay(h) && isDayScheduled(h.schedule, ymd)) {
@@ -80,6 +81,17 @@ export function dayAgenda(board: Board | null, ymd: string, nowMin: number): Day
         const len = Math.max(5, h.schedule.durationMin ?? 15);
         items.push({ id: h.id, kind: 'habit', title: h.name, place: null, startMin: start, endMin: Math.min(24 * 60, start + len), done: h.log.includes(ymd), color: h.color, taskId: null });
       }
+    }
+  }
+
+  // Decision 64: events from other calendars (read-only), shown like events.
+  for (const link of linksOf(board)) {
+    if (!link.on) continue;
+    for (const ev of link.events) {
+      if (ev.start.slice(0, 10) > ymd) break;
+      const part = partOnDay(ev, ymd);
+      if (!part) continue;
+      items.push({ id: `ln:${link.id}:${ev.id}`, kind: 'event', title: ev.title, place: ev.place ?? null, startMin: part.startMin, endMin: part.endMin, done: false, color: link.color, taskId: null });
     }
   }
 
