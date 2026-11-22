@@ -5,6 +5,7 @@
  * overflow:hidden ancestor. Dismisses on click-outside (capture phase) or ESC.
  */
 
+import { useOneOverlay } from '../ui/oneOverlay';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Z } from '../ui/layers';
@@ -65,13 +66,19 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
         onDismiss();
       }
     };
+    // A press that stops its mouse events (preventDefault on pointerdown)
+    // still closes the menu.
+    document.addEventListener('pointerdown', handleMouseDown, true);
     document.addEventListener('mousedown', handleMouseDown, true);
     document.addEventListener('keydown', handleKeyDown, true);
     return () => {
+      document.removeEventListener('pointerdown', handleMouseDown, true);
       document.removeEventListener('mousedown', handleMouseDown, true);
       document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [onDismiss]);
+  // One overlay at a time: this menu closes the card or menu that was open.
+  useOneOverlay(true, onDismiss);
 
   const hasIcons = shown.some((it) => !!it.icon);
   const menu = (

@@ -5,6 +5,7 @@
 // HabitSwapModal. NowLine is rendered as an overlay.
 
 import { pickerOpen } from '../../ui/Popover';
+import { useOneOverlay } from '../../ui/oneOverlay';
 import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragMode } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
 import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost } from './DropGhost';
@@ -959,6 +960,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // Decision 40 — "New here…" / "Edit event…": the card that makes a plan or a repeating event.
   const [eventCard, setEventCard] = useState<{ x: number; y: number; day: string; initial: EventDraft; allowOnce: boolean; editId?: string } | null>(null);
   const [eventRemind, setEventRemind] = useState<{ id: string; x: number; y: number; value: number | null } | null>(null);
+  // One overlay at a time (the owner's rule): each of these, when it opens,
+  // closes whatever else was open, here or anywhere in the app (menus and
+  // info cards do the same themselves).
+  useOneOverlay(!!taskPopup, () => setTaskPopup(null));
+  useOneOverlay(!!realityPopup, () => setRealityPopup(null));
+  useOneOverlay(!!layerMenu, () => setLayerMenu(null));
+  useOneOverlay(!!routineMove, () => setRoutineMove(null));
+  useOneOverlay(!!eventsOpen, () => setEventsOpen(null));
+  useOneOverlay(!!eventRemind, () => setEventRemind(null));
   const DAY_LETTER = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const daysOf = (h: Habit): number[] => !h.schedule || h.schedule.kind === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : h.schedule.kind === 'weekdays' ? [1, 2, 3, 4, 5] : [...h.schedule.days];
   const [calAdding, setCalAdding] = useState(false);

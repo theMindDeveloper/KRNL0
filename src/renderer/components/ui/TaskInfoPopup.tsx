@@ -3,6 +3,7 @@
 // planned time, time actually tracked on it, and quick actions. Mirrors the
 // tracked-span popup so tasks, habits and observed time behave the same on click.
 
+import { useOneOverlay } from './oneOverlay';
 import { LineGlyph } from './LineGlyph';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -55,6 +56,8 @@ export function TaskInfoPopup(props: TaskInfoPopupProps) {
 }
 
 function Shell({ x, y, onClose, children }: { x: number; y: number; onClose: () => void; children: React.ReactNode }) {
+  // One overlay at a time: this card closes the menu or card that was open.
+  useOneOverlay(true, onClose);
   // Esc closes, like the Calendar's task popup.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };

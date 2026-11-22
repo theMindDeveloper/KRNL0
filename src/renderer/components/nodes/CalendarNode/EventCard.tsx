@@ -7,6 +7,7 @@
 // switch, the days as circles, labelled Time and Length rows, one full-width
 // button. One fixed height: nothing jumps while you set it.
 
+import { useOneOverlay } from '../../ui/oneOverlay';
 import { pickerOpen } from '../../ui/Popover';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -50,6 +51,8 @@ const NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday
 const SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onSubmit, onClose, attached }: Props) {
+  // One overlay at a time (the card that follows typing is part of the add itself).
+  useOneOverlay(!attached, onClose);
   const [own, setOwn] = useState<EventDraft>(initial);
   const d = attached ? attached.value : own;
   const setD = (fn: (p: EventDraft) => EventDraft) => {
