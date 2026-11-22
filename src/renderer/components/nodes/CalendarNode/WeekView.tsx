@@ -473,7 +473,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     if (cur && cur.testId === 'calendar-snap-band' && cur.day === day && cur.startMin === minute) return;
     const p = previewOf(ref);
     const len = Math.max(gran, Math.min(1440 - minute, p.len));
-    setCalendarGhost({ day, startMin: minute, endMin: minute + len, name: p.name, times: ghostTimes(minute, minute + len), tone: p.tone, testId: 'calendar-snap-band' });
+    setCalendarGhost({ day, startMin: minute, endMin: minute + len, name: p.name, times: ghostTimes(minute, minute + len), tone: p.tone, testId: 'calendar-snap-band', ...(ref?.taskId ? { refId: ref.taskId, refKind: 'task' as const } : {}) });
   };
   // The band must never outlive the drag: a drop on a task block stops
   // propagation before the cell can clear it, and a cancelled drag (Esc, drop
@@ -528,7 +528,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // shows the new length, moving on its own.
       if (!carried) { carried = true; setResizeDraft({ taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 }); }
       const s0 = Math.max(0, sliceStartMin + last.startMinDelta);
-      setCalendarGhost({ day: dayYMD, startMin: s0, endMin: s0 + last.durationMin, name: task.text, times: ghostTimes(s0, s0 + last.durationMin), tone: toneVarForTask(task.id), testId: 'calendar-resize-ghost', edge: edge === 'bottom' ? 'bottom' : 'top' });
+      setCalendarGhost({ day: dayYMD, startMin: s0, endMin: s0 + last.durationMin, name: task.text, times: ghostTimes(s0, s0 + last.durationMin), tone: toneVarForTask(task.id), testId: 'calendar-resize-ghost', edge: edge === 'bottom' ? 'bottom' : 'top', refId: task.id, refKind: 'task' });
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
@@ -849,6 +849,26 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     startCarry(e, toneVarForTask(task.id), 'offCalendar');
     // After the drag has begun: changing the DOM inside dragstart cancels it.
     window.setTimeout(() => setDragTaskId(task.id), 0);
+    // Decision 61 — carried out of the Calendar and let go anywhere else in
+    // the app (the canvas, Todo…): it comes off the Calendar (back to Todo
+    // with no time). Let go outside the window: nothing happens.
+    const id = task.id;
+    const onCalendar = (t: EventTarget | null): boolean =>
+      t instanceof Element && (!!rootRef.current?.contains(t) || !!t.closest('[data-cal-day], [data-cal-anytime], .krnl-month-cell'));
+    let landedOnCalendar = false;
+    const onDrop = (ev: globalThis.DragEvent) => { if (onCalendar(ev.target)) landedOnCalendar = true; };
+    const onEnd = (ev: globalThis.DragEvent) => {
+      window.removeEventListener('drop', onDrop, true);
+      window.removeEventListener('dragend', onEnd, true);
+      if (landedOnCalendar) return;
+      const x = ev.clientX;
+      const y = ev.clientY;
+      if (!(x > 0 || y > 0) || x >= window.innerWidth || y >= window.innerHeight) return;
+      if (typeof document.elementFromPoint !== 'function' || onCalendar(document.elementFromPoint(x, y))) return;
+      void unscheduleTask(id);
+    };
+    window.addEventListener('drop', onDrop, true);
+    window.addEventListener('dragend', onEnd, true);
   };
   const endTaskDrag = () => { setDragTaskId(null); setUnschedHot(false); setAnyHot(null); };
   // Decision 40 — the ANY TIME cell a plan is dragged over.
@@ -1133,7 +1153,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // Decision 61 — the week is re-drawn once (the event steps back); the
       // ghost then moves on its own.
       if (!carried) { carried = true; setRtDrag({ id: r.h.id, name: r.h.name, color: r.h.color, fromDay: dayYMD, ...last }); }
-      setCalendarGhost({ day: last.toDay, startMin, endMin, name: r.h.name, times: isOneTimeEvent(r.h) ? ghostTimes(startMin, endMin) : `${ghostTimes(startMin, endMin)} · every week`, tone: `var(--${r.h.color})`, testId: 'calendar-routine-ghost', edge: mode === 'bottom' ? 'bottom' : 'top' });
+      setCalendarGhost({ day: last.toDay, startMin, endMin, name: r.h.name, times: isOneTimeEvent(r.h) ? ghostTimes(startMin, endMin) : `${ghostTimes(startMin, endMin)} · every week`, tone: `var(--${r.h.color})`, testId: 'calendar-routine-ghost', edge: mode === 'bottom' ? 'bottom' : 'top', refId: r.h.id, refKind: 'event' });
     };
     const clearRoutineGhost = () => { if (calendarGhost()?.testId === 'calendar-routine-ghost') setCalendarGhost(null); };
     const onUp = () => {
@@ -1209,21 +1229,46 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const fromWords: PlanDraft = { day: q.day ?? calDefaultDay(), time: q.time ?? null, lengthMin: q.durationMin ?? null, deadline: q.deadline ?? null };
     return { text: q.text || raw, hint: !!q.hint, d: effectiveDraft(fromWords, calOv) };
   };
+  // Decision 62 — what the field will add: from the words, with whatever was
+  // changed on its card (Once / Repeats, days, time, length).
+  const [calEvOv, setCalEvOv] = useState<Partial<EventDraft>>({});
+  const calEventDraft = (): { draft: EventDraft; words: EventDraft; day: string } | null => {
+    const raw = calAddText.trim();
+    if (!raw) return null;
+    const { text, hint, d } = calDraftOf(raw);
+    const day = d.day ?? calDefaultDay();
+    const words: EventDraft = { name: text || raw, mode: hint ? 'repeat' : 'once', days: [isoDowOfYMD(day)], time: d.time ?? '09:00', lengthMin: d.lengthMin ?? 60 };
+    return { draft: { ...words, ...calEvOv }, words, day };
+  };
+  const submitCalEvent = (draft: EventDraft, day: string) => {
+    const name = draft.name.trim();
+    if (!name) return;
+    if (draft.mode === 'once') addOneTimeEvent(name, day, draft.time, draft.lengthMin);
+    else {
+      if (draft.days.length === 0) return;
+      const days = [...draft.days].sort() as Array<1 | 2 | 3 | 4 | 5 | 6 | 7>;
+      const schedule = days.length === 7
+        ? { kind: 'daily' as const, timeOfDay: draft.time, durationMin: draft.lengthMin }
+        : { kind: 'weekly' as const, days, timeOfDay: draft.time, durationMin: draft.lengthMin };
+      void habitMotherCommand('habit.add', { name, kind: 'routine', schedule });
+    }
+    setCalAddText('');
+    setCalOv({});
+    setCalEvOv({});
+  };
   const calAddRowRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const raw = calAdding ? calAddText.trim() : '';
-    const { text, hint, d } = raw ? calDraftOf(raw) : { text: '', hint: false, d: { day: null, time: null, lengthMin: null, deadline: null } as PlanDraft };
-    const day = d.day ?? calDefaultDay();
-    if (!raw || hint || !d.time || !weekDays.includes(day)) {
+    const ev = calAdding && !calCardHidden ? calEventDraft() : null;
+    if (!ev || ev.draft.mode !== 'once' || !weekDays.includes(ev.day)) {
       if (calendarGhost()?.testId === 'calendar-add-ghost') setCalendarGhost(null);
       return;
     }
-    const startMin = Number(d.time.slice(0, 2)) * 60 + Number(d.time.slice(3));
-    const endMin = Math.min(1440, startMin + (d.lengthMin ?? 60));
-    setCalendarGhost({ day, startMin, endMin, name: text, times: ghostTimes(startMin, endMin), tone: 'var(--acid)', testId: 'calendar-add-ghost' });
-  }, [calAdding, calAddText, weekDays.join(',')]);
+    const startMin = Number(ev.draft.time.slice(0, 2)) * 60 + Number(ev.draft.time.slice(3));
+    const endMin = Math.min(1440, startMin + ev.draft.lengthMin);
+    setCalendarGhost({ day: ev.day, startMin, endMin, name: ev.draft.name, times: ghostTimes(startMin, endMin), tone: 'var(--acid)', testId: 'calendar-add-ghost', refKind: 'event' });
+  }, [calAdding, calAddText, calCardHidden, calEvOv, weekDays.join(',')]);
   useEffect(() => () => { if (calendarGhost()?.testId === 'calendar-add-ghost') setCalendarGhost(null); }, []);
-  useDismissOutside(calAdding && calAddText.trim() !== '' && !calCardHidden, ['[data-testid="when-popover"]', calAddRowRef], () => setCalCardHidden(true));
+  useDismissOutside(calAdding && calAddText.trim() !== '' && !calCardHidden, ['[data-testid="event-card"]', '[data-testid="when-popover"]', calAddRowRef], () => setCalCardHidden(true));
   const calAddInputRef = useRef<HTMLInputElement>(null);
   const openNewAt = (dayYMD: string, minute: number, x: number, y: number) => {
     const snapMin = Math.max(0, Math.min(1425, Math.floor(minute / 15) * 15));
@@ -2090,7 +2135,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       const detail: 'none' | 'wrap' | 'letter' | 'title' | 'full' =
         wrap ? 'wrap'
         : letter !== undefined ? 'letter'
-        : heightPx < 14 || widthPx < 34 ? 'none'
+        // Decision 61 — a short or slim plan still says what it is (one small line); only a sliver is bare.
+        : heightPx < 9 || widthPx < 16 ? 'none'
         // Decision 60 — the same look at every width (the owner's pick): a tall
         // block shows its name and, small, its time; only a short one centres its name.
         : heightPx < 40 || widthPx < 44 ? 'title' : 'full';
@@ -2291,7 +2337,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 // Decision 55 — names in the reading font, like the events beside them.
                 fontFamily: 'var(--font-read, var(--font-sans))',
                 // Decision 60 — a size up (the owner liked how the zoomed Free canvas read).
-                fontSize: detail === 'full' ? 13 : 12.5,
+                fontSize: detail === 'full' ? 13 : heightPx < 14 ? 9.5 : heightPx < 18 ? 11 : 12.5,
                 fontWeight: 600,
                 color: isDone ? 'var(--ink-2)' : 'var(--ink)',
                 textDecoration: 'none',
@@ -2307,7 +2353,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 pointerEvents: 'none',
                 position: 'relative',
                 zIndex: 1,
-                lineHeight: 1.2,
+                lineHeight: heightPx < 18 ? 1 : 1.2,
               }}
             >
               {task.text}
@@ -2669,6 +2715,20 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 11, fontWeight: 600, lineHeight: '13px', color: `color-mix(in srgb, ${col} 22%, var(--ink))`,
             }}>{title}</span>
           )}
+          {/* Decision 61 — a short event in a small Calendar still says what it is:
+              one small line of its name (it read nothing before). */}
+          {!sideways && lines.titleLines === 0 && blockH >= 9 && textW >= 10 && (
+            <span
+              data-testid={`calendar-routine-title-${h.id}`}
+              style={{
+                position: 'absolute', left: Math.max(3, lead - 2), right: 3, top: 0, bottom: 0, display: 'flex', alignItems: 'center', minWidth: 0,
+                fontFamily: 'var(--font-read, var(--font-sans))', fontSize: blockH >= 13 ? 10.5 : 9, fontWeight: 600, lineHeight: 1,
+                color: `color-mix(in srgb, ${col} 22%, var(--ink))`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
+            </span>
+          )}
           {lines.titleLines > 0 && (
             <div style={{ position: 'absolute', inset: 0, padding: `${EVENT_TEXT.padY}px 6px ${EVENT_TEXT.padY}px ${lead}px`, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, minWidth: 0 }}>
@@ -2797,39 +2857,73 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
 
   // Decision 60 — a habit's box can be carried to another time on the
   // Calendar (the same ghost as everything else); the habit moves for every day.
-  const [habitDrag, setHabitDrag] = useState<{ id: string; day: string; startMin: number; len: number; name: string; tone: string } | null>(null);
   const habitClickBlock = useRef(0);
+  // Decision 61 — a habit is moved as itself: all of its boxes (every day it
+  // is on) glide with the pointer by transform, no re-draw while moving; the
+  // time line shows the exact time. Let go, they stay exactly there until the
+  // board has the new time, and hand over in the same frame (no stutter).
+  const habitMove = useRef<{ id: string; timeOfDay: string; els: HTMLElement[]; timer: number } | null>(null);
+  const releaseHabitMove = () => {
+    const m = habitMove.current;
+    if (!m) return;
+    habitMove.current = null;
+    window.clearTimeout(m.timer);
+    // No glide back: the board has already put it there.
+    for (const el of m.els) { el.style.transition = 'none'; el.style.transform = ''; el.classList.remove('is-moving'); }
+    requestAnimationFrame(() => { for (const el of m.els) el.style.transition = ''; });
+    if (calendarGhost()?.testId === 'calendar-habit-ghost') setCalendarGhost(null);
+  };
+  useLayoutEffect(() => {
+    // The board has the habit at its new time: hand over before this frame is drawn.
+    const m = habitMove.current;
+    if (!m) return;
+    for (const n of boardForCal?.nodes ?? []) {
+      if (n.kind !== 'habit') continue;
+      const h = ((n.state as { habits?: Habit[] } | null)?.habits ?? []).find((x) => x.id === m.id);
+      if (h && h.schedule?.timeOfDay === m.timeOfDay) { releaseHabitMove(); return; }
+    }
+  }, [boardForCal]);
   const startHabitDrag = (e: ReactPointerEvent<HTMLButtonElement>, habit: ScheduledHabit, dayYMD: string, startMin: number, tone: string) => {
     if (e.button !== 0) return;
     const col = e.currentTarget.closest('[data-cal-day]') as HTMLElement | null;
     if (!col) return;
+    releaseHabitMove();
     const scale = screenScale(col);
     const y0 = e.clientY;
+    // One hour as drawn (the hours are sized by CSS).
+    const hourPx = col.offsetHeight > 0 ? col.offsetHeight / rowCount : rowHeight;
     const len = habit.schedule.durationMin && habit.schedule.durationMin > 0 ? habit.schedule.durationMin : 30;
+    const els = Array.from(rootRef.current?.querySelectorAll<HTMLElement>(`[data-habit-id="${habit.id}"]`) ?? []);
     let moved = false;
-    let carried = false;
     let last = startMin;
-    const clearHabitGhost = () => { if (calendarGhost()?.testId === 'calendar-habit-ghost') setCalendarGhost(null); };
+    const paint = () => {
+      const dy = ((last - startMin) / 60) * hourPx;
+      for (const el of els) el.style.transform = dy ? `translateY(${dy}px)` : '';
+    };
     const move = (ev: PointerEvent) => {
       const dy = ev.clientY - y0;
       if (!moved && Math.abs(dy) < 4) return;
+      if (!moved) for (const el of els) el.classList.add('is-moving');
       moved = true;
-      const dMin = Math.round(((dy / scale / rowHeight) * 60) / gran) * gran;
-      last = Math.max(0, Math.min(1440 - gran, startMin + dMin));
-      if (!carried) { carried = true; setHabitDrag({ id: habit.id, day: dayYMD, startMin: last, len, name: habit.name, tone }); }
-      setCalendarGhost({ day: dayYMD, startMin: last, endMin: last + len, name: habit.name, times: `${fmtMinOfDay(last)} · habit, every day it is on`, tone, testId: 'calendar-habit-ghost' });
+      const dMin = Math.round(((dy / scale / hourPx) * 60) / gran) * gran;
+      const next = Math.max(0, Math.min(1440 - gran, startMin + dMin));
+      if (next === last && dMin !== 0) return;
+      last = next;
+      paint();
+      setCalendarGhost({ day: dayYMD, startMin: last, endMin: last + len, name: habit.name, times: fmtMinOfDay(last), tone, testId: 'calendar-habit-ghost', ruleOnly: true });
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      if (!moved) { setHabitDrag(null); clearHabitGhost(); return; }
+      const clear = () => { for (const el of els) { el.style.transform = ''; el.classList.remove('is-moving'); } if (calendarGhost()?.testId === 'calendar-habit-ghost') setCalendarGhost(null); };
+      if (!moved) { clear(); return; }
       habitClickBlock.current = Date.now();
-      if (last === startMin) { setHabitDrag(null); clearHabitGhost(); return; }
+      if (last === startMin) { clear(); return; }
       const timeOfDay = `${String(Math.floor(last / 60)).padStart(2, '0')}:${String(last % 60).padStart(2, '0')}`;
+      // Held where it was let go until the board has it (never stuck).
+      habitMove.current = { id: habit.id, timeOfDay, els, timer: window.setTimeout(releaseHabitMove, 1500) };
       void habitMotherCommand('habit.setSchedule', { habitId: habit.id, schedule: { ...habit.schedule, timeOfDay } });
-      // The ghost stays until the habit is drawn at its new time.
-      window.setTimeout(() => { setHabitDrag((d) => (d && d.id === habit.id ? null : d)); clearHabitGhost(); }, 600);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -2866,6 +2960,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           type="button"
           key={`habit-block-${habit.id}`}
           data-testid={`habit-block-${habit.id}-${dayYMD}`}
+          data-habit-id={habit.id}
           data-habit-done={done ? 'true' : undefined}
           aria-disabled={isFuture || undefined}
           title={`${habit.name} · ${habit.schedule.timeOfDay}${titleSuffix} — ${isFuture ? 'not yet: tick it on the day' : done ? 'done · click to undo' : 'click to tick it'}`}
@@ -2917,8 +3012,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             // A day still ahead can't be ticked yet: faded, with a dashed box.
-            // While carried, it steps back (the ghost shows where it goes).
-            opacity: habitDrag && habitDrag.id === habit.id ? 0.35 : isFuture ? 0.5 : 1,
+            opacity: isFuture ? 0.5 : 1,
           }}
         >
           {/* Decision 59 — a narrow day has no room for the name, so the box
@@ -3525,48 +3619,50 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               autoFocus
               value={calAddText}
               placeholder="Add an event — try: Dentist fri 15:00 1h"
-              onChange={(e) => { setCalAddText(e.target.value); setCalCardHidden(false); }}
+              onChange={(e) => { setCalAddText(e.target.value); setCalCardHidden(false); if (!e.target.value.trim()) setCalEvOv({}); }}
               onFocus={() => setCalCardHidden(false)}
               onClick={() => setCalCardHidden(false)}
               onKeyDown={(e) => {
                 e.stopPropagation();
-                if (e.key === 'Escape') { setCalAdding(false); setCalAddText(''); setCalOv({}); return; }
+                if (e.key === 'Escape') { setCalAdding(false); setCalAddText(''); setCalOv({}); setCalEvOv({}); return; }
                 if (e.key !== 'Enter') return;
-                const raw = calAddText.trim();
-                if (!raw) return;
-                const { text, hint, d } = calDraftOf(raw);
-                const day = d.day ?? calDefaultDay();
-                const done = () => { setCalAddText(''); setCalOv({}); };
-                if (hint || !d.time) {
-                  // "every Monday…" (Repeats), or no time yet: the event card, the name in it.
-                  const r = e.currentTarget.getBoundingClientRect();
-                  setEventCard({ x: r.left, y: r.top - 340, day, allowOnce: true, initial: { name: hint ? raw : text, mode: hint ? 'repeat' : 'once', days: [isoDowOfYMD(day)], time: d.time ?? '09:00', lengthMin: d.lengthMin ?? 60 } });
-                  done();
-                  setCalAdding(false);
-                  return;
-                }
-                addOneTimeEvent(text, day, d.time, d.lengthMin ?? 60);
-                done();
+                // Decision 62 — Enter adds what the card above shows (as in Todo).
+                const ev = calEventDraft();
+                if (ev) submitCalEvent(ev.draft, ev.day);
               }}
               onBlur={() => { if (!calAddText.trim()) setCalAdding(false); }}
               style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', caretColor: 'var(--acid)' }}
             />
             {calAddText.trim() !== '' && !calCardHidden && (() => {
-              const raw = calAddText.trim();
-              const { hint, d } = calDraftOf(raw);
+              // Decision 62 — the event card, live while you type (the same
+              // standard as Todo's card): filled from the words, changed with
+              // the mouse, added with Enter or its button.
+              const ev = calEventDraft();
+              if (!ev) return null;
               const r = calAddRowRef.current?.getBoundingClientRect();
-              const day = d.day ?? calDefaultDay();
-              const dayWords = new Date(`${day}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-              const len = d.lengthMin ?? 60;
-              const startMin = d.time ? Number(d.time.slice(0, 2)) * 60 + Number(d.time.slice(3)) : 0;
-              const words = hint ? 'Repeats — press Enter to pick its days'
-                : d.time ? `Event · ${dayWords} · ${ghostTimes(startMin, startMin + len)} — Enter adds it`
-                : `Event · ${dayWords} — press Enter to pick its time`;
-              return createPortal(
-                <div data-testid="calendar-add-preview" className="kw-card" style={{ position: 'fixed', left: (r?.left ?? 8) + 8, top: (r?.top ?? window.innerHeight) - 44, zIndex: Z.popover, padding: '8px 12px', fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-2)', background: 'var(--paper)', border: '1px solid var(--paper-3)', borderRadius: 10 }}>
-                  {words}
-                </div>,
-                document.body,
+              return (
+                <EventCard
+                  x={0}
+                  y={0}
+                  dayLabel={new Date(`${ev.day}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}
+                  initial={ev.draft}
+                  allowOnce
+                  attached={{
+                    value: ev.draft,
+                    onChange: (next) => {
+                      const words = ev.words;
+                      const ov: Partial<EventDraft> = {};
+                      if (next.mode !== words.mode) ov.mode = next.mode;
+                      if (next.days.join() !== words.days.join()) ov.days = next.days;
+                      if (next.time !== words.time) ov.time = next.time;
+                      if (next.lengthMin !== words.lengthMin) ov.lengthMin = next.lengthMin;
+                      setCalEvOv(ov);
+                    },
+                    anchorAbove: r ? { left: r.left + 8, top: r.top } : { left: 8, top: window.innerHeight - 60 },
+                  }}
+                  onSubmit={(d) => submitCalEvent(d, ev.day)}
+                  onClose={() => setCalCardHidden(true)}
+                />
               );
             })()}
           </>

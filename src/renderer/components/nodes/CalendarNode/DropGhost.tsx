@@ -31,13 +31,18 @@ export interface GhostSpec {
   testId: string;
   /** Which edge the time line marks: the start (moving, the top edge) or the end (a bottom edge pulled). */
   edge?: 'top' | 'bottom';
+  /** Only the time line (the thing moves itself, e.g. a habit's boxes). */
+  ruleOnly?: boolean;
+  /** Decision 61 — what is carried, so the Clock can show it moving too: a task's id, or a repeating/one-time event's habit id. */
+  refId?: string;
+  refKind?: 'task' | 'event';
 }
 
 let ghost: GhostSpec | null = null;
 const ghostSubs = new Set<() => void>();
 
 const sameGhost = (a: GhostSpec | null, b: GhostSpec | null): boolean =>
-  a === b || (!!a && !!b && a.day === b.day && a.startMin === b.startMin && a.endMin === b.endMin && a.name === b.name && a.times === b.times && a.tone === b.tone && a.testId === b.testId && a.edge === b.edge);
+  a === b || (!!a && !!b && a.day === b.day && a.startMin === b.startMin && a.endMin === b.endMin && a.name === b.name && a.times === b.times && a.tone === b.tone && a.testId === b.testId && a.edge === b.edge && a.ruleOnly === b.ruleOnly && a.refId === b.refId);
 
 /** Shows the ghost (or hides it with null). Cheap to call on every move: nothing happens unless it changed. */
 export function setCalendarGhost(next: GhostSpec | null): void {
@@ -48,6 +53,12 @@ export function setCalendarGhost(next: GhostSpec | null): void {
 
 export function calendarGhost(): GhostSpec | null {
   return ghost;
+}
+
+/** For other views (the Clock) that show what is being carried: called when the ghost changes. */
+export function subscribeCalendarGhost(f: () => void): () => void {
+  ghostSubs.add(f);
+  return () => { ghostSubs.delete(f); };
 }
 
 const frame = (f: () => void): number =>
@@ -124,6 +135,7 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       el.style.height = `${h}px`;
       el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       el.style.setProperty('--ghost-tone', g.tone);
+      if (shown) el.style.visibility = g.ruleOnly ? 'hidden' : 'visible';
       el.setAttribute('data-testid', g.testId);
       el.setAttribute('data-day', g.day);
       el.setAttribute('data-start-min', String(g.startMin));
@@ -148,7 +160,7 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       if (!shown) {
         void el.offsetWidth;
         el.style.transition = '';
-        el.style.visibility = 'visible';
+        el.style.visibility = g.ruleOnly ? 'hidden' : 'visible';
         el.classList.add('is-shown');
         if (rule) { rule.style.transition = ''; rule.style.visibility = 'visible'; rule.classList.add('is-shown'); }
         shown = true;

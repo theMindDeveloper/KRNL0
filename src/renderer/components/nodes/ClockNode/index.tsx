@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { calendarGhost, subscribeCalendarGhost } from '../CalendarNode/DropGhost';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '../types';
@@ -35,7 +36,7 @@ import { msAtWallHours } from './wallHours';
 import { localYMD } from '../../../../shared/ymd';
 import { CX, CY, R_FACE, pt, arcPath, sectorPath } from './dialGeometry';
 import {
-  planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, type TaskEntry,
+  planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, withCarried, type TaskEntry,
 } from './dayModel';
 import { halfOf, startupFollow, rolloverFollow, claimStartup, type ClockNowMark } from './follow';
 import { LineGlyph } from '../../ui/LineGlyph';
@@ -295,10 +296,14 @@ export function ClockNode({
 
   // Flatten placements + scheduled habits → TaskEntry[].
   // Filter by selected day and 12-hour viewWindow.
-  const tasks: TaskEntry[] = useMemo(
+  const planned: TaskEntry[] = useMemo(
     () => (placementsMap ? planForDay(placementsMap.values(), taskInfo, scheduledHabits, selectedDate, viewWindow) : []),
     [placementsMap, taskInfo, viewWindow, scheduledHabits, selectedDate],
   );
+  // Decision 61 — what is being moved on the Calendar moves here too, live
+  // (the ghost changes only when the slot does: a few redraws, never per move).
+  const carried = useSyncExternalStore(subscribeCalendarGhost, calendarGhost, calendarGhost);
+  const tasks: TaskEntry[] = useMemo(() => withCarried(planned, carried, selectedDate, viewWindow), [planned, carried, selectedDate, viewWindow]);
 
   // Issue #166 — tracked REALITY segments for the selected day, clipped to the
   // 12-hour window. These are the filled "what actually happened" arcs (work +

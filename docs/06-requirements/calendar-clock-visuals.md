@@ -82,6 +82,10 @@
 | F73 | (Decision 61) **The hours follow the window by CSS:** resizing (or a short Station cell) never leaves a band under 23:00 and never freezes the inside; the wheel scrolls the hours exactly when they scroll. |
 | F74 | (Decision 61) **A time line on what is carried:** a line to its top (or pulled bottom) edge with the exact time in the hour column; the carried block keeps its text layout. |
 | F75 | (Decision 61) **The package:** carried from outside, a 3D parcel in the plan's colour packs over the Calendar and unpacks on the drop. |
+| F76 | (Decision 61) **Out of the Calendar:** a plan carried out and let go elsewhere in the app comes off the Calendar. |
+| F77 | (Decision 61) **A habit moves as itself:** all its boxes glide, the time line shows the time, no jump when let go. |
+| F78 | (Decision 61) **The Clock follows:** while something is carried on the Calendar, the Clock (same day and half) shows it at the ghost's time. |
+| F79 | (Decision 61) **A small Calendar still reads:** short events and plans keep a small one-line name. |
 ## Gherkin Scenarios (ATDD)
 
 ```gherkin

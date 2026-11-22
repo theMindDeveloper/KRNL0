@@ -111,6 +111,8 @@ function settleNodes(ids: readonly string[]): void {
 let calendarDragRaf = 0;
 function calendarDragStart(id: string, x: number, y: number): void {
   const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+  // Only this card animates into the package (a transition on every card cost the whole canvas).
+  el?.setAttribute('data-calendar-carry', '1');
   if (el && el.offsetWidth > 0) {
     // Each part of the card (the card, its connection dots) shrinks toward
     // the pointer, measured in its own box.
@@ -137,7 +139,9 @@ function calendarDragOver(id: string, x: number, y: number): void {
 }
 function calendarDragEnd(id: string, dropped = false): void {
   if (calendarDragRaf) { cancelAnimationFrame(calendarDragRaf); calendarDragRaf = 0; }
-  document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`)?.removeAttribute('data-over-calendar');
+  const node = document.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+  node?.removeAttribute('data-over-calendar');
+  window.setTimeout(() => node?.removeAttribute('data-calendar-carry'), 220);
   // Let go on the Calendar: the package opens there.
   endCarry({ unpack: dropped });
   window.dispatchEvent(new CustomEvent('krnl:calendar:drag-end', { detail: { taskId: id } }));
@@ -1961,9 +1965,18 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // Pure module-level write — no React state, no Zustand, no re-renders.
   // Badges and swap-buttons call rfToScreen() inside their rAF read() slots
   // and see the updated numbers without triggering any component updates.
+  // Decision 61 — while the canvas pans or zooms, it moves as one picture
+  // (will-change on the viewport: scaled by the GPU, not redrawn every frame;
+  // a big Calendar made each zoom step redraw thousands of parts). It is
+  // drawn sharp again a moment after the gesture ends.
+  const movingTimer = useRef(0);
   const onMove = useCallback(
     (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
       updateViewport(viewport.x, viewport.y, viewport.zoom);
+      const el = canvasContainerRef.current;
+      if (el && !el.classList.contains('is-canvas-moving')) el.classList.add('is-canvas-moving');
+      window.clearTimeout(movingTimer.current);
+      movingTimer.current = window.setTimeout(() => canvasContainerRef.current?.classList.remove('is-canvas-moving'), 160);
     },
     []
   );

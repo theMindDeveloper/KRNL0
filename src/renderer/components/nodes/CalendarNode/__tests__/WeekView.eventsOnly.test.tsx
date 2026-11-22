@@ -76,24 +76,41 @@ describe('the Calendar adds only events (Decision 62)', () => {
     expect(todoItems()).toHaveLength(0);
   });
 
-  it('without a time, the event card opens on Once; adding makes an event, not a task', async () => {
+  it('the event card shows while you type (as in Todo): Once, filled from the words; Enter adds it — never a task', async () => {
     seed();
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    fireEvent.keyDown(typeInField('Dentist thu'), { key: 'Enter' });
+    const input = typeInField('Dentist thu');
     await settle();
     expect(document.querySelector('[data-testid="event-card"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="event-name"]')!.textContent).toBe('Dentist');
     expect(document.querySelector('[data-testid="event-mode-once"]')!.getAttribute('aria-selected')).toBe('true');
     expect(document.querySelector('[data-testid="event-submit"]')!.textContent).toContain('Add event');
-    fireEvent.click(document.querySelector('[data-testid="event-submit"]')!);
+    // The field keeps the focus while the card is up.
+    expect(document.activeElement).toBe(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
     await settle();
     expect(habits()[0]).toMatchObject({ name: 'Dentist', startsOn: '2026-05-14', schedule: { timeOfDay: '09:00' } });
     expect(todoItems()).toHaveLength(0);
   });
 
-  it('"every monday 10:00" opens the card on Repeats', async () => {
+  it('a change on the card is kept: Repeats with its days, then Enter', async () => {
     seed();
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    fireEvent.keyDown(typeInField('Class every monday 10:00'), { key: 'Enter' });
+    const input = typeInField('Choir thu 19:00');
+    await settle();
+    fireEvent.click(document.querySelector('[data-testid="event-mode-repeat"]')!);
+    await settle();
+    expect(document.querySelector('[data-testid="event-mode-repeat"]')!.getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await settle();
+    expect(habits()[0]).toMatchObject({ name: 'Choir', kind: 'routine', schedule: { kind: 'weekly', days: [4], timeOfDay: '19:00' } });
+    expect(habits()[0]!['startsOn']).toBeUndefined();
+  });
+
+  it('"every monday 10:00" shows the card on Repeats', async () => {
+    seed();
+    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
+    typeInField('Class every monday 10:00');
     await settle();
     expect(document.querySelector('[data-testid="event-mode-repeat"]')!.getAttribute('aria-selected')).toBe('true');
   });

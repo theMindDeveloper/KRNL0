@@ -36,20 +36,41 @@ interface Props {
   submitLabel?: string;
   onSubmit: (d: EventDraft) => void;
   onClose: () => void;
+  /**
+   * Decision 62 — the card of the Calendar's field, shown while you type (as
+   * Todo's): its name comes from the field (no name box, no focus taken), it
+   * follows the words (`value`), changes go back through `onChange`, and it
+   * sits above the field (`anchorAbove`) with no backdrop.
+   */
+  attached?: { value: EventDraft; onChange: (d: EventDraft) => void; anchorAbove: { left: number; top: number } };
 }
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onSubmit, onClose }: Props) {
-  const [d, setD] = useState<EventDraft>(initial);
-  const [timeText, setTimeText] = useState(initial.time);
+export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onSubmit, onClose, attached }: Props) {
+  const [own, setOwn] = useState<EventDraft>(initial);
+  const d = attached ? attached.value : own;
+  const setD = (fn: (p: EventDraft) => EventDraft) => {
+    if (attached) attached.onChange(fn(attached.value));
+    else setOwn(fn);
+  };
+  const [timeText, setTimeTextRaw] = useState(d.time);
+  // Attached: the words can change the time; the field follows them.
+  useEffect(() => { if (attached) setTimeTextRaw(attached.value.time); }, [attached?.value.time]);
+  const setTimeText = (t: string) => {
+    setTimeTextRaw(t);
+    const ok = parseTime(t);
+    if (attached && ok && ok !== attached.value.time) attached.onChange({ ...attached.value, time: ok });
+  };
   useEffect(() => {
+    // Attached: Escape belongs to the field (it stops adding).
+    if (attached) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pickerOpen()) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [onClose]);
+  }, [onClose, !!attached]);
 
   const time = parseTime(timeText);
   const endMin = time ? Number(time.slice(0, 2)) * 60 + Number(time.slice(3)) + d.lengthMin : 0;
@@ -65,27 +86,32 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
 
   const W = CARD_W;
   const H = 330;
-  const left = Math.max(8, Math.min(x, window.innerWidth - W - 8));
-  const top = Math.max(8, Math.min(y, window.innerHeight - H - 8));
+  const ax = attached ? attached.anchorAbove.left : x;
+  const ay = attached ? attached.anchorAbove.top - H - 8 : y;
+  const left = Math.max(8, Math.min(ax, window.innerWidth - W - 8));
+  const top = Math.max(8, Math.min(ay, window.innerHeight - H - 8));
   const toggleDay = (n: number) => setD((p) => ({ ...p, days: p.days.includes(n) ? p.days.filter((v) => v !== n) : [...p.days, n] }));
 
   return createPortal(
     <>
-      <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />
+      {!attached && <div onMouseDown={(e) => { e.stopPropagation(); onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popoverBackdrop }} />}
       <div
         data-testid="event-card"
         className="kw-card"
         data-owns-keys="true"
         role="dialog"
         aria-label={allowOnce ? 'New here' : 'Edit event'}
-        onMouseDown={(e) => e.stopPropagation()}
+        // Attached: a press on the card never takes the focus from the field.
+        onMouseDown={(e) => { e.stopPropagation(); if (attached && !(e.target instanceof HTMLInputElement)) e.preventDefault(); }}
         style={{
           ...cardBox, position: 'fixed', left, top, zIndex: Z.popover,
         }}
       >
         {/* The name is the title, like the habit card's. */}
         <div style={cardHead}>
-          <input
+          {attached ? (
+            <span data-testid="event-name" style={{ ...cardTitle, height: 28, display: 'flex', alignItems: 'center', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', color: d.name ? 'var(--ink)' : 'var(--ink-4)' }}>{d.name || 'Name it'}</span>
+          ) : <input
             autoFocus
             data-testid="event-name"
             aria-label="Name"
@@ -94,7 +120,7 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
             onChange={(e) => setD((p) => ({ ...p, name: e.target.value }))}
             onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
             style={{ ...cardTitle, height: 28, border: 'none', background: 'transparent', color: 'var(--ink)', padding: 0, outline: 'none' }}
-          />
+          />}
           <CardClose onClick={onClose} />
         </div>
 
