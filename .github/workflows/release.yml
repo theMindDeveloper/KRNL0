@@ -105,6 +105,12 @@ jobs:
 
       - name: Build renderer + main
         run: npm run build
+        # Decision 64 P4 — "Sign in with Google" uses the owner's OAuth client
+        # (an installed app's client, not a secret to users). Unset = the app
+        # says Google sign-in is not set up yet; everything else still works.
+        env:
+          KRNL0_GOOGLE_CLIENT_ID: ${{ secrets.KRNL0_GOOGLE_CLIENT_ID }}
+          KRNL0_GOOGLE_CLIENT_SECRET: ${{ secrets.KRNL0_GOOGLE_CLIENT_SECRET }}
 
       # Package via electron-builder. GitHub renders unset secrets as the
       # empty string, and electron-builder treats CSC_LINK="" as "user

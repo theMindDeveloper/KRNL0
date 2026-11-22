@@ -84,6 +84,14 @@ contextBridge.exposeInMainWorld('krnl', {
   // Run one krnl command in main (the CLI's facade), argv as given — no shell.
   sysRun: (argv: string[]): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('sys:run', argv),
   clipboardWriteText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:writeText', text),
+  // Decision 64 — the file dialogs of Calendar › Other calendars › Export / Import .ics.
+  calPickIcs: (): Promise<string | null> => ipcRenderer.invoke('cal:pickIcs'),
+  calSaveIcs: (): Promise<string | null> => ipcRenderer.invoke('cal:saveIcs'),
+  // Decision 64 P2/P4 — sign in to iCloud / CalDAV / Google, pick calendars.
+  calConnect: (kind: 'apple' | 'caldav' | 'google', a?: string, b?: string, c?: string): Promise<unknown> => ipcRenderer.invoke('cal:connect', kind, a, b, c),
+  calAccountCalendars: (accountId: string): Promise<unknown> => ipcRenderer.invoke('cal:accountCalendars', accountId),
+  calAddAccount: (accountId: string, show: string[], send: boolean): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('cal:addAccount', accountId, show, send),
+  calAccountHelp: (which: 'apple'): Promise<void> => ipcRenderer.invoke('cal:accountHelp', which),
 
   // Decision 41 — the orb asks Claude Code; the answer streams back as events.
   assistantAsk: (id: string, prompt: string, resume?: string): Promise<{ ok: boolean }> =>

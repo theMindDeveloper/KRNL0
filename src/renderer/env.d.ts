@@ -62,6 +62,14 @@ interface KrnlBridge {
   clipboardReadText: () => Promise<string>
   clipboardWriteText: (text: string) => Promise<void>
   sysRun?: (argv: string[]) => Promise<{ ok: boolean; message: string }>
+  /** Decision 64 — file dialogs for Export / Import .ics (desktop only). */
+  calPickIcs?: () => Promise<string | null>
+  calSaveIcs?: () => Promise<string | null>
+  /** Decision 64 P2/P4 — sign in to a calendar account (the result is a ConnectResult). */
+  calConnect?: (kind: 'apple' | 'caldav' | 'google', a?: string, b?: string, c?: string) => Promise<unknown>
+  calAccountCalendars?: (accountId: string) => Promise<unknown>
+  calAddAccount?: (accountId: string, show: string[], send: boolean) => Promise<{ ok: boolean; message: string }>
+  calAccountHelp?: (which: 'apple') => Promise<void>
   // Decision 41 — the orb asks Claude Code. Use renderer/store/askClaude.ts.
   assistantAsk?: (id: string, prompt: string, resume?: string) => Promise<{ ok: boolean }>
   assistantCancel?: (id: string) => Promise<void>

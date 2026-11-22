@@ -38,13 +38,14 @@ export const calendarSetZoom = (
 // Only booleans are taken; anything else keeps the current value.
 export const calendarSetLayers = (
   state: CalendarState,
-  args: { recorded?: unknown; habits?: unknown; routines?: unknown },
+  args: { recorded?: unknown; habits?: unknown; routines?: unknown; linked?: unknown },
 ): CalendarState => {
   const cur = calendarLayersOf(state);
   const next = {
     recorded: typeof args.recorded === 'boolean' ? args.recorded : cur.recorded,
     habits: typeof args.habits === 'boolean' ? args.habits : cur.habits,
     routines: typeof args.routines === 'boolean' ? args.routines : cur.routines,
+    linked: typeof args.linked === 'boolean' ? args.linked : cur.linked,
   };
   return { ...state, layers: next };
 };

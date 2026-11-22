@@ -8,6 +8,11 @@ const APP_VERSION = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    // Decision 64 P4 — the owner's Google OAuth client for "Sign in with Google"
+    // (an installed app's client: not secret). Empty = Google sign-in not set up.
+    define: {
+      __KRNL0_GOOGLE_CLIENT__: JSON.stringify({ id: process.env.KRNL0_GOOGLE_CLIENT_ID ?? '', secret: process.env.KRNL0_GOOGLE_CLIENT_SECRET ?? '' }),
+    },
     build: {
       rollupOptions: {
         input: {

@@ -60,6 +60,16 @@ export type SysCommand =
   | { kind: 'cal'; sub: 'zoom'; zoom: number | undefined }
   | { kind: 'cal'; sub: 'layers'; layer: string | undefined; on: string | undefined; json: boolean }
   | { kind: 'cal'; sub: 'lineup'; refs: string[]; json: boolean }
+  // Decision 64 — other calendars (calendar-sync F21)
+  | { kind: 'cal'; sub: 'link'; mode: 'ics' | 'check' | 'set' | undefined; target: string | undefined; name: string | undefined; color: string | undefined; on: boolean | undefined; json: boolean }
+  | { kind: 'cal'; sub: 'account'; mode: 'apple' | 'caldav' | 'google'; server: string | undefined; user: string | undefined; password: string | undefined; calendars: string | undefined; send: boolean; json: boolean }
+  | { kind: 'cal'; sub: 'signout'; ref: string | undefined }
+  | { kind: 'cal'; sub: 'accounts'; json: boolean }
+  | { kind: 'cal'; sub: 'links'; json: boolean }
+  | { kind: 'cal'; sub: 'unlink'; ref: string | undefined }
+  | { kind: 'cal'; sub: 'sync'; ref: string | undefined }
+  | { kind: 'cal'; sub: 'export'; out: string | undefined }
+  | { kind: 'cal'; sub: 'import'; file: string | undefined; dryRun: boolean; json: boolean }
   // Decision 35 — durable time log reads (time-log F13)
   | { kind: 'time'; sub: 'log'; from: string | undefined; to: string | undefined; json: boolean }
   | { kind: 'time'; sub: 'report'; month: string | undefined; by: string | undefined; json: boolean }
@@ -657,6 +667,21 @@ export class SysParser {
 
     if (cmd === 'cal') {
       if (sub === 'view') return { kind: 'cal', sub: 'view', view: rest[0], date: flag(rest, 'date') };
+      if (sub === 'link' && (rest[0] === 'apple' || rest[0] === 'caldav' || rest[0] === 'google')) {
+        return { kind: 'cal', sub: 'account', mode: rest[0], server: rest[0] === 'caldav' && rest[1] !== undefined && !rest[1].startsWith('--') ? rest[1] : undefined, user: flag(rest, 'user'), password: flag(rest, 'password'), calendars: flag(rest, 'calendars'), send: !hasFlag(rest, 'no-send'), json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'signout') return { kind: 'cal', sub: 'signout', ref: rest[0] };
+      if (sub === 'accounts') return { kind: 'cal', sub: 'accounts', json: hasFlag(rest, 'json') };
+      if (sub === 'link') {
+        const mode = rest[0] === 'ics' || rest[0] === 'check' || rest[0] === 'set' ? rest[0] : undefined;
+        const on = hasFlag(rest, 'show') ? true : hasFlag(rest, 'hide') ? false : undefined;
+        return { kind: 'cal', sub: 'link', mode, target: rest[1] !== undefined && !rest[1].startsWith('--') ? rest[1] : undefined, name: flag(rest, 'name'), color: flag(rest, 'color'), on, json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'links') return { kind: 'cal', sub: 'links', json: hasFlag(rest, 'json') };
+      if (sub === 'unlink') return { kind: 'cal', sub: 'unlink', ref: rest[0] };
+      if (sub === 'sync') return { kind: 'cal', sub: 'sync', ref: rest[0] !== undefined && !rest[0].startsWith('--') ? rest[0] : undefined };
+      if (sub === 'export') return { kind: 'cal', sub: 'export', out: flag(rest, 'out') };
+      if (sub === 'import') return { kind: 'cal', sub: 'import', file: rest[0] !== undefined && !rest[0].startsWith('--') ? rest[0] : undefined, dryRun: hasFlag(rest, 'dry-run'), json: hasFlag(rest, 'json') };
       if (sub === 'lineup') return { kind: 'cal', sub: 'lineup', refs: rest.filter((r) => !r.startsWith('--')), json: hasFlag(rest, 'json') };
       if (sub === 'layers') return { kind: 'cal', sub: 'layers', layer: rest.find((r) => !r.startsWith('--')), on: rest.filter((r) => !r.startsWith('--'))[1], json: hasFlag(rest, 'json') };
       if (sub === 'zoom') {
