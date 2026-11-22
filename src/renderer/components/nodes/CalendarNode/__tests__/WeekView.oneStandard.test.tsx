@@ -12,7 +12,8 @@ import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
-import { setCalendarGhost } from '../DropGhost';
+import { calendarGhost, setCalendarGhost } from '../DropGhost';
+import { mockCalendarLayout, nextFrame } from './calendarLayout';
 import type { CalendarState, CalendarConfig } from '../types';
 
 const state: CalendarState = { selectedDate: null, anchorDate: '2026-05-11', zoom: 1 };
@@ -87,31 +88,23 @@ describe('plans and repeating events never cover each other (Decision 61)', () =
 });
 
 describe('one ghost, no browser picture (Decision 61)', () => {
-  const dt = () => {
-    const data: Record<string, string> = {};
-    const setDragImage = vi.fn();
-    return {
-      data, setDragImage,
-      setData: (k: string, v: string) => { data[k] = v; },
-      getData: (k: string) => data[k] ?? '',
-      get types() { return Object.keys(data); },
-      effectAllowed: 'move', dropEffect: 'move',
-    };
-  };
-
-  it('dragging a plan on the Calendar: the browser gets an empty picture, and the plan steps back', async () => {
+  it('moving a plan (Decision 63): no browser drag, the plan steps back, the ghost shows where with its mark', async () => {
     seed([task('t-plan', 'Read chapter', '2026-05-14T10:00', 60)]);
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const block = document.querySelector('[data-testid="task-block-t-plan"]') as HTMLElement;
-    const d = dt();
-    fireEvent.dragStart(block, { dataTransfer: d });
-    expect(d.setDragImage).toHaveBeenCalledTimes(1);
-    const pic = d.setDragImage.mock.calls[0]![0] as unknown;
-    expect(pic).toBeInstanceOf(HTMLImageElement);
-    expect((pic as HTMLImageElement).width).toBe(1);
-    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
-    expect((document.querySelector('[data-testid="task-block-t-plan"]') as HTMLElement).style.opacity).toBe('0.35');
-    fireEvent.dragEnd(document.querySelector('[data-testid="task-block-t-plan"]')!);
+    const restore = mockCalendarLayout();
+    try {
+      const block = document.querySelector('[data-testid="task-block-t-plan"]') as HTMLElement;
+      expect(block.getAttribute('draggable')).toBeNull();
+      // Thursday is the 4th column (x 300-400); grabbed at 10:15, carried two hours down.
+      fireEvent.pointerDown(block, { button: 0, clientX: 350, clientY: 10.25 * 40 });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: 12.25 * 40 }));
+      await act(async () => { await nextFrame(); });
+      expect((document.querySelector('[data-testid="task-block-t-plan"]') as HTMLElement).style.opacity).toBe('0.35');
+      expect(calendarGhost()).toMatchObject({ day: '2026-05-14', startMin: 12 * 60, endMin: 13 * 60, mark: 'list', refId: 't-plan' });
+      act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); });
+      expect((document.querySelector('[data-testid="task-block-t-plan"]') as HTMLElement).style.opacity).toBe('1');
+      expect(calendarGhost()).toBeNull();
+    } finally { restore(); }
   });
 
   it('there is one ghost element per grid, whatever is carried', () => {

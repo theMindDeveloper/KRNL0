@@ -33,6 +33,8 @@ export interface GhostSpec {
   edge?: 'top' | 'bottom';
   /** Only the time line (the thing moves itself, e.g. a habit's boxes). */
   ruleOnly?: boolean;
+  /** The kind mark the block draws at its top right (kept while carried). */
+  mark?: 'list' | 'repeat' | 'event';
   /** Decision 61 — what is carried, so the Clock can show it moving too: a task's id, or a repeating/one-time event's habit id. */
   refId?: string;
   refKind?: 'task' | 'event';
@@ -42,7 +44,7 @@ let ghost: GhostSpec | null = null;
 const ghostSubs = new Set<() => void>();
 
 const sameGhost = (a: GhostSpec | null, b: GhostSpec | null): boolean =>
-  a === b || (!!a && !!b && a.day === b.day && a.startMin === b.startMin && a.endMin === b.endMin && a.name === b.name && a.times === b.times && a.tone === b.tone && a.testId === b.testId && a.edge === b.edge && a.ruleOnly === b.ruleOnly && a.refId === b.refId);
+  a === b || (!!a && !!b && a.day === b.day && a.startMin === b.startMin && a.endMin === b.endMin && a.name === b.name && a.times === b.times && a.tone === b.tone && a.testId === b.testId && a.edge === b.edge && a.ruleOnly === b.ruleOnly && a.refId === b.refId && a.mark === b.mark);
 
 /** Shows the ghost (or hides it with null). Cheap to call on every move: nothing happens unless it changed. */
 export function setCalendarGhost(next: GhostSpec | null): void {
@@ -88,6 +90,7 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
   const ref = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLDivElement>(null);
   const timesRef = useRef<HTMLDivElement>(null);
+  const markRef = useRef<HTMLSpanElement>(null);
   const ruleRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLSpanElement>(null);
   const geo = useRef({ rowHeight, rowCount, planLeft });
@@ -141,6 +144,10 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       el.setAttribute('data-start-min', String(g.startMin));
       el.setAttribute('data-end-min', String(g.endMin));
       // The same look as the block: the name wraps over the lines it has room for.
+      if (markRef.current) {
+        markRef.current.innerHTML = g.mark ? MARK_SVG[g.mark] : '';
+        markRef.current.style.display = g.mark && w >= 60 ? '' : 'none';
+      }
       if (nameRef.current) {
         nameRef.current.textContent = g.name;
         nameRef.current.style.setProperty('-webkit-line-clamp', String(Math.max(1, Math.floor((h - 6 - (h >= 34 ? 13 : 0)) / 15))));
@@ -152,7 +159,11 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
       if (rule) {
         const atEnd = g.edge === 'bottom';
         const ly = atEnd ? y + h : y - 1;
-        rule.style.width = `${x + w + RULE_LEFT}px`;
+        // A habit moves on every day it is on: its line crosses the whole
+        // week, under the habit boxes (they ride on it).
+        const parent = el.parentElement;
+        rule.style.width = g.ruleOnly && parent ? `${parent.clientWidth + RULE_LEFT}px` : `${x + w + RULE_LEFT}px`;
+        rule.style.zIndex = g.ruleOnly ? '2' : '9';
         rule.style.transform = `translate3d(${-RULE_LEFT}px, ${ly}px, 0)`;
         rule.style.setProperty('--ghost-tone', g.tone);
         if (chipRef.current) chipRef.current.textContent = hm(atEnd ? g.endMin : g.startMin);
@@ -184,12 +195,20 @@ export function CalendarGhostLayer({ rowHeight, rowCount, planLeft }: {
         <span ref={chipRef} className="cal-drop-rule-time" />
       </div>
       <div ref={ref} className="cal-drop-ghost" aria-hidden style={GHOST_STYLE}>
+        <span ref={markRef} className="cal-drop-ghost-mark" />
         <div ref={nameRef} className="cal-drop-ghost-name" />
         <div ref={timesRef} className="cal-drop-ghost-times" />
       </div>
     </>
   );
 }
+
+/** The kind marks the blocks draw at their top right (the ghost keeps them). Static markup. */
+const MARK_SVG: Record<'list' | 'repeat' | 'event', string> = {
+  list: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>',
+  repeat: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>',
+  event: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+};
 
 /** How far into the hour column (left of the days) the time line starts. */
 const RULE_LEFT = 46;

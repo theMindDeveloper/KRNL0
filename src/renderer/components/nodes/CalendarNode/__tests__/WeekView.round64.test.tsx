@@ -14,6 +14,7 @@ import { useBoardStore } from '../../../../store/boardStore';
 import { calendarGhost, setCalendarGhost } from '../DropGhost';
 import { withCarried, type TaskEntry } from '../../ClockNode/dayModel';
 import type { CalendarState, CalendarConfig } from '../types';
+import { mockCalendarLayout, nextFrame } from './calendarLayout';
 
 const unscheduleTask = vi.fn(async (_id: string) => undefined);
 vi.mock('../../../../store/scheduleActions', async (orig) => ({
@@ -38,10 +39,6 @@ function task(id: string, text: string, scheduledFor: string, plannedMin: number
 function seed(nodes: unknown[]) {
   useBoardStore.setState({ board: { version: 1, schemaVersion: 2, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 }, nodes: nodes as never, edges: [], layoutMode: 'canvas' } });
 }
-const dt = () => {
-  const data: Record<string, string> = {};
-  return { data, setData: (k: string, v: string) => { data[k] = v; }, getData: (k: string) => data[k] ?? '', get types() { return Object.keys(data); }, setDragImage: () => undefined, effectAllowed: 'move', dropEffect: 'move' };
-};
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -57,40 +54,51 @@ afterEach(() => {
 });
 
 describe('carried out of the Calendar (Decision 61)', () => {
-  it('let go elsewhere in the app: it comes off the Calendar', () => {
+  it('let go elsewhere in the app: it comes off the Calendar', async () => {
     seed([task('t-a', 'Write report', '2026-05-14T10:00', 60)]);
     render(<div><div data-testid="outside" /><WeekView state={state} config={config} onCommand={() => undefined} /></div>);
-    const outside = document.querySelector('[data-testid="outside"]')!;
-    (document as unknown as { elementFromPoint: (x: number, y: number) => Element | null }).elementFromPoint = () => outside;
-    fireEvent.dragStart(document.querySelector('[data-testid="task-block-t-a"]')!, { dataTransfer: dt() });
-    window.dispatchEvent(Object.assign(new Event('dragend', { bubbles: true }), { clientX: 30, clientY: 30 }));
-    expect(unscheduleTask).toHaveBeenCalledWith('t-a');
+    const restore = mockCalendarLayout({ outside: () => document.querySelector('[data-testid="outside"]') });
+    try {
+      fireEvent.pointerDown(document.querySelector('[data-testid="task-block-t-a"]')!, { button: 0, clientX: 350, clientY: 10.25 * 40 });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 900, clientY: 300 }));
+      await act(async () => { await nextFrame(); });
+      act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 900, clientY: 300 })); });
+      expect(unscheduleTask).toHaveBeenCalledWith('t-a');
+    } finally { restore(); }
   });
 
-  it('let go on the Calendar: it stays planned', () => {
+  it('let go on the Calendar: it stays planned, at the new time', async () => {
     seed([task('t-a', 'Write report', '2026-05-14T10:00', 60)]);
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-14-12"]')!;
-    (document as unknown as { elementFromPoint: (x: number, y: number) => Element | null }).elementFromPoint = () => cell;
-    fireEvent.dragStart(document.querySelector('[data-testid="task-block-t-a"]')!, { dataTransfer: dt() });
-    window.dispatchEvent(Object.assign(new Event('dragend', { bubbles: true }), { clientX: 30, clientY: 30 }));
-    expect(unscheduleTask).not.toHaveBeenCalled();
+    const restore = mockCalendarLayout();
+    try {
+      fireEvent.pointerDown(document.querySelector('[data-testid="task-block-t-a"]')!, { button: 0, clientX: 350, clientY: 10.25 * 40 });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: 12.25 * 40 }));
+      await act(async () => { await nextFrame(); });
+      act(() => { window.dispatchEvent(new MouseEvent('pointerup', { clientX: 350, clientY: 12.25 * 40 })); });
+      expect(unscheduleTask).not.toHaveBeenCalled();
+    } finally { restore(); }
   });
 });
 
 describe('a habit is moved as itself (Decision 61)', () => {
-  it('all of its boxes glide together; only the time line shows', () => {
+  it('all of its boxes glide together; only the time line shows', async () => {
     seed([{ id: 'mother-habit', kind: 'habit', isMother: true, position: { x: 0, y: 0 }, config: {}, state: { habits: [
       { id: 'h-run', name: 'Run', color: 'acid', createdAt: '2026-05-01T00:00:00.000Z', log: [], archived: false, schedule: { kind: 'daily', timeOfDay: '07:00' } },
     ] } }]);
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const boxes = Array.from(document.querySelectorAll<HTMLElement>('[data-habit-id="h-run"]'));
-    expect(boxes.length).toBe(7);
-    fireEvent.pointerDown(boxes[2]!, { button: 0, clientY: 100 });
-    window.dispatchEvent(new MouseEvent('pointermove', { clientY: 100 + 28 * 2 }));
-    for (const b of boxes) expect(b.style.transform).toMatch(/translateY\(\d/);
-    expect(calendarGhost()).toMatchObject({ ruleOnly: true, startMin: 9 * 60 });
-    window.dispatchEvent(new MouseEvent('pointerup'));
+    const restore = mockCalendarLayout();
+    try {
+      const boxes = Array.from(document.querySelectorAll<HTMLElement>('[data-habit-id="h-run"]'));
+      expect(boxes.length).toBe(7);
+      fireEvent.pointerDown(boxes[2]!, { button: 0, clientX: 250, clientY: 7 * 40 });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 9 * 40 }));
+      await act(async () => { await nextFrame(); });
+      for (const b of boxes) expect(b.style.transform).toMatch(/translateY\(\d/);
+      expect(calendarGhost()).toMatchObject({ ruleOnly: true, startMin: 9 * 60 });
+      act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); });
+      for (const b of boxes) expect(b.style.transform).toBe('');
+    } finally { restore(); }
   });
 });
 

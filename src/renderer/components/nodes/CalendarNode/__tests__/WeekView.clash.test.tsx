@@ -11,6 +11,7 @@ import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import type { CalendarState, CalendarConfig } from '../types';
+import { mockCalendarLayout, nextFrame } from './calendarLayout';
 
 const unscheduleTask = vi.fn(async (_id: string) => undefined);
 vi.mock('../../../../store/scheduleActions', async (orig) => ({
@@ -38,18 +39,6 @@ function seed(nodes: ReturnType<typeof task>[]) {
     board: { version: 1, schemaVersion: 2, savedAt: new Date().toISOString(), viewport: { x: 0, y: 0, zoom: 1 }, nodes, edges: [], layoutMode: 'canvas' },
   });
 }
-
-const dt = () => {
-  const data: Record<string, string> = {};
-  return {
-    data,
-    setData: (k: string, v: string) => { data[k] = v; },
-    getData: (k: string) => data[k] ?? '',
-    get types() { return Object.keys(data); },
-    setDragImage: () => undefined,
-    effectAllowed: 'move', dropEffect: 'move',
-  };
-};
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -82,19 +71,23 @@ describe('WeekView — clashing plans as letter bars (F28)', () => {
     expect(document.querySelector('[data-testid="task-block-t-c"]')!.getAttribute('title')).toContain('Call with Sam');
   });
 
-  it('every bar is draggable, and a drag shows no extra bars or outlines (Decision 60)', async () => {
+  it('every bar is carried by the one drag (Decision 63), with no extra bars or outlines', async () => {
     seed(three());
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
-    const row = document.querySelector('[data-testid="task-block-t-c"]') as HTMLElement;
-    expect(row.getAttribute('draggable')).toBe('true');
-    const d = dt();
-    fireEvent.dragStart(row, { dataTransfer: d });
-    expect(JSON.parse(d.data['application/krnl-task']!)).toEqual({ taskId: 't-c', durationMin: 90, grabMin: 0 });
-    await act(async () => { await new Promise((r) => setTimeout(r, 5)); });
-    expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeNull();
-    expect(document.querySelector('.cal-anytime.is-target')).toBeNull();
-    fireEvent.dragEnd(row);
-    expect(unscheduleTask).not.toHaveBeenCalled();
+    const restore = mockCalendarLayout();
+    try {
+      const row = document.querySelector('[data-testid="task-block-t-c"]') as HTMLElement;
+      expect(row.getAttribute('draggable')).toBeNull();
+      fireEvent.pointerDown(row, { button: 0, clientX: 350, clientY: 10.5 * 40 });
+      window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: 12 * 40 }));
+      await act(async () => { await nextFrame(); });
+      expect(document.body.classList.contains('krnl-cal-dragging')).toBe(true);
+      expect(document.querySelector('[data-testid="calendar-unschedule-drop"]')).toBeNull();
+      expect(document.querySelector('.cal-anytime.is-target')).toBeNull();
+      act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); });
+      expect(document.body.classList.contains('krnl-cal-dragging')).toBe(false);
+      expect(unscheduleTask).not.toHaveBeenCalled();
+    } finally { restore(); }
   });
 
   it('no "Fix overlap" tab: overlapping plans stay as placed (Decision 60)', () => {

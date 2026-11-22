@@ -5,6 +5,7 @@
 // HabitSwapModal. NowLine is rendered as an overlay.
 
 import { pickerOpen } from '../../ui/Popover';
+import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragMode } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
 import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost, startCarry } from './DropGhost';
 import { beginTaskDragInfo, endTaskDragInfo, taskDragInfo } from '../../../store/taskDrag';
@@ -488,73 +489,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     };
   }, []);
 
-  // #7 — live resize draft. While dragging a task block's top/bottom edge we
-  // hold a transient override (start-minute delta + duration) so the block
-  // grows/shrinks under the cursor; commit on mouse-up, snapped to granularity.
-  const [resizeDraft, setResizeDraft] = useState<
-    // Decision 60 — `committing`: the edge was let go; the block keeps the new
-    // start (`absStartMin`) and length until the board shows them, so it never
-    // snaps back to the old size for a frame.
-    { taskId: string; durationMin: number; startMinDelta: number; absStartMin?: number; committing?: boolean } | null
-  >(null);
-  // The click that ends a resize is not "open this plan".
-  const resizeClickBlock = useRef(0);
-
-  function startResize(
-    edge: 'top' | 'bottom',
-    task: ScheduledTask,
-    sliceStartMin: number,
-    origDurationMin: number,
-    e: ReactMouseEvent<HTMLDivElement>,
-  ) {
-    e.preventDefault();
-    e.stopPropagation();
-    const originY = e.clientY;
-    const scale = screenScale(e.currentTarget);
-    const dayYMD = task.startISO.slice(0, 10);
-    let last = { taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 };
-    let carried = false;
-    document.body.classList.add('cal-resizing');
-    const onMove = (ev: MouseEvent) => {
-      const deltaMin = Math.round((((ev.clientY - originY) / scale / rowHeight) * 60) / gran) * gran;
-      if (edge === 'bottom') {
-        last = { taskId: task.id, durationMin: Math.max(gran, origDurationMin + deltaMin), startMinDelta: 0 };
-      } else {
-        // Top edge: don't let the start cross the end; clamp the delta.
-        const clamped = Math.min(deltaMin, origDurationMin - gran);
-        last = { taskId: task.id, durationMin: Math.max(gran, origDurationMin - clamped), startMinDelta: clamped };
-      }
-      // Decision 61 — like an event: the block steps back (once) and the ghost
-      // shows the new length, moving on its own.
-      if (!carried) { carried = true; setResizeDraft({ taskId: task.id, durationMin: origDurationMin, startMinDelta: 0 }); }
-      const s0 = Math.max(0, sliceStartMin + last.startMinDelta);
-      setCalendarGhost({ day: dayYMD, startMin: s0, endMin: s0 + last.durationMin, name: task.text, times: ghostTimes(s0, s0 + last.durationMin), tone: toneVarForTask(task.id), testId: 'calendar-resize-ghost', edge: edge === 'bottom' ? 'bottom' : 'top', refId: task.id, refKind: 'task' });
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      document.body.classList.remove('cal-resizing');
-      // A press on the edge that did not move changes nothing.
-      if (calendarGhost()?.testId === 'calendar-resize-ghost') setCalendarGhost(null);
-      if (last.startMinDelta === 0 && last.durationMin === origDurationMin) { setResizeDraft(null); return; }
-      resizeClickBlock.current = Date.now();
-      const newStartMin = Math.max(0, sliceStartMin + last.startMinDelta);
-      setResizeDraft({ taskId: task.id, durationMin: last.durationMin, startMinDelta: 0, absStartMin: newStartMin, committing: true });
-      // Never stuck: whatever the board says after a moment is what shows.
-      window.setTimeout(() => setResizeDraft((d) => (d && d.committing && d.taskId === task.id ? null : d)), 1500);
-      const h = Math.floor(newStartMin / 60);
-      const m = newStartMin % 60;
-      const scheduledFor = `${dayYMD}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-      const durN = last.durationMin;
-      // The length on the task, the time through the same path as a drag:
-      // the Todo row follows, and a chained task lands where it was put.
-      applyTaskState(task.id, (s) => taskSetPlannedMin(s, { minutes: durN }));
-      scheduleTaskRef.current(task.id, scheduledFor, durN);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }
-
   // Sub-header nav handlers — step a day in day view, a week otherwise.
   const handlePrev = () => {
     onCommand('calendar.setAnchor', { date: addDays(baseYMD, -dayCount) });
@@ -721,54 +655,27 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // block shows where it will land (it glides as you move); once let go, the
   // plan lands there with a short flash.
   const [landedTaskId, setLandedTaskId] = useState<string | null>(null);
-  const pointToSlot = (x: number, y: number): { day: string; startMin: number } | null => {
-    for (const col of Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-cal-day]') ?? [])) {
-      const r = col.getBoundingClientRect();
-      if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
-      const minute = ((y - r.top) / screenScale(col) / rowHeight) * 60;
-      return { day: col.dataset['calDay']!, startMin: Math.max(0, Math.min(1440 - gran, Math.floor(minute / gran) * gran)) };
-    }
-    return null;
-  };
-  useEffect(() => {
-    const over = (e: Event) => {
-      const d = (e as CustomEvent<{ taskId?: string; x?: number; y?: number }>).detail;
-      if (!d?.taskId || typeof d.x !== 'number' || typeof d.y !== 'number') return;
-      const slot = pointToSlot(d.x, d.y);
-      if (!slot) { if (calendarGhost()?.testId === 'calendar-snap-band') setCalendarGhost(null); return; }
-      showPlanGhost(slot.day, slot.startMin, { taskId: d.taskId });
-    };
-    const end = () => { if (calendarGhost()?.testId === 'calendar-snap-band') setCalendarGhost(null); endTaskDragInfo(); };
-    window.addEventListener('krnl:calendar:drag-over', over);
-    window.addEventListener('krnl:calendar:drag-end', end);
-    return () => { window.removeEventListener('krnl:calendar:drag-over', over); window.removeEventListener('krnl:calendar:drag-end', end); };
-  });
+  // Decision 63 — the one thing being carried from this view (it steps back).
+  const [carriedId, setCarriedId] = useState<string | null>(null);
+  // The habit boxes that glide while a habit is carried (DOM only).
+  const glide = useRef<{ id: string; els: HTMLElement[] } | null>(null);
+  const surfaceImpl = useRef<CalendarSurface | null>(null);
+  // Stable, registered once; it reads this render's functions through the ref.
+  const surface = useMemo<CalendarSurface>(() => ({
+    get el() { return rootRef.current; },
+    slotAt: (x, y) => surfaceImpl.current?.slotAt(x, y) ?? null,
+    gran: () => surfaceImpl.current?.gran() ?? 15,
+    commit: (item, result, origin, mode) => surfaceImpl.current?.commit(item, result, origin, mode) ?? null,
+    setCarried: (id) => surfaceImpl.current?.setCarried?.(id),
+    preview: (item, target, origin) => surfaceImpl.current?.preview?.(item, target, origin),
+  }), []);
+  useEffect(() => registerCalendarSurface(surface), [surface]);
   useEffect(() => {
     if (!landedTaskId) return;
     const t = window.setTimeout(() => setLandedTaskId(null), 700);
     return () => window.clearTimeout(t);
   }, [landedTaskId]);
 
-  useEffect(() => {
-    const on = (e: Event) => {
-      const d = (e as CustomEvent<{ taskId?: string; day?: string; clientY?: number; anyTime?: boolean }>).detail;
-      if (!d?.taskId || !d.day || !weekDays.includes(d.day)) return;
-      if (d.anyTime) { void putPlanOnDay({ taskId: d.taskId }, d.day); return; }
-      const col = rootRef.current?.querySelector<HTMLElement>(`[data-cal-day="${d.day}"]`);
-      if (!col || typeof d.clientY !== 'number') return;
-      const rect = col.getBoundingClientRect();
-      const minute = ((Math.max(0, d.clientY - rect.top) / screenScale(col)) / rowHeight) * 60;
-      const snapped = Math.max(0, Math.min(1440 - gran, Math.floor(minute / gran) * gran));
-      const task = useBoardStore.getState().board?.nodes.find((n) => n.id === d.taskId);
-      const ts = task?.state as { plannedMin?: number; durationMin?: number } | undefined;
-      const len = ts?.plannedMin ?? ts?.durationMin ?? 30;
-      scheduleTask(d.taskId, `${d.day}T${String(Math.floor(snapped / 60)).padStart(2, '0')}:${String(snapped % 60).padStart(2, '0')}`, len);
-      setCalendarGhost(null);
-      setLandedTaskId(d.taskId);
-    };
-    window.addEventListener('krnl:calendar:drop-task', on);
-    return () => window.removeEventListener('krnl:calendar:drop-task', on);
-  });
 
   // Popup shown when a task block is clicked (PR #122).
   const [taskPopup, setTaskPopup] = useState<{
@@ -829,62 +736,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // A task row dragged out of the layer picker: the picker goes see-through so
   // the drop reaches the grid underneath, and closes when the drag ends.
   const [layerDragging, setLayerDragging] = useState(false);
-  // A plan being dragged from this calendar: shows the unschedule drop zone.
-  const [dragTaskId, setDragTaskId] = useState<string | null>(null);
-  const [unschedHot, setUnschedHot] = useState(false);
-  const beginTaskDrag = (e: DragEvent<HTMLDivElement>, task: ScheduledTask) => {
-    setTaskPopup(null);
-    // The payload carries WORK time (plannedMin), not block height: the
-    // selector adds breaks on top, so the block height would grow every nudge.
-    // Decision 61 — the spot it was grabbed by stays under the pointer (as
-    // when an event is moved): the landing start is the pointer's slot minus it.
-    const r = e.currentTarget.getBoundingClientRect();
-    const grabRaw = ((e.clientY - r.top) / screenScale(e.currentTarget) / rowHeight) * 60;
-    const grabMin = Number.isFinite(grabRaw) ? Math.max(0, Math.min(Math.max(0, task.plannedMin - gran), Math.floor(grabRaw / gran) * gran)) : 0;
-    e.dataTransfer.setData('application/krnl-task', JSON.stringify({ taskId: task.id, durationMin: task.plannedMin, grabMin }));
-    e.dataTransfer.effectAllowed = 'move';
-    beginTaskDragInfo({ taskId: task.id, durationMin: task.plannedMin, grabMin });
-    // Decision 61 — no browser picture: the block steps back and the ghost
-    // shows where it lands; off the hours, the small box carries it.
-    startCarry(e, toneVarForTask(task.id), 'offCalendar');
-    // After the drag has begun: changing the DOM inside dragstart cancels it.
-    window.setTimeout(() => setDragTaskId(task.id), 0);
-    // Decision 61 — carried out of the Calendar and let go anywhere else in
-    // the app (the canvas, Todo…): it comes off the Calendar (back to Todo
-    // with no time). Let go outside the window: nothing happens.
-    const id = task.id;
-    const onCalendar = (t: EventTarget | null): boolean =>
-      t instanceof Element && (!!rootRef.current?.contains(t) || !!t.closest('[data-cal-day], [data-cal-anytime], .krnl-month-cell'));
-    let landedOnCalendar = false;
-    const onDrop = (ev: globalThis.DragEvent) => { if (onCalendar(ev.target)) landedOnCalendar = true; };
-    const onEnd = (ev: globalThis.DragEvent) => {
-      window.removeEventListener('drop', onDrop, true);
-      window.removeEventListener('dragend', onEnd, true);
-      if (landedOnCalendar) return;
-      const x = ev.clientX;
-      const y = ev.clientY;
-      if (!(x > 0 || y > 0) || x >= window.innerWidth || y >= window.innerHeight) return;
-      if (typeof document.elementFromPoint !== 'function' || onCalendar(document.elementFromPoint(x, y))) return;
-      void unscheduleTask(id);
-    };
-    window.addEventListener('drop', onDrop, true);
-    window.addEventListener('dragend', onEnd, true);
-  };
-  const endTaskDrag = () => { setDragTaskId(null); setUnschedHot(false); setAnyHot(null); };
-  // Decision 40 — the ANY TIME cell a plan is dragged over.
+  // Decision 40 — the ANY TIME cell a plan is dragged over (browser drags that remain: agenda and picker rows).
   const [anyHot, setAnyHot] = useState<string | null>(null);
-  // A drop that moves the plan unmounts the element it was dragged from, and
-  // then no dragend reaches it — so any drop or dragend in the window ends it.
-  useEffect(() => {
-    if (!dragTaskId) return;
-    const end = () => { setDragTaskId(null); setUnschedHot(false); };
-    window.addEventListener('drop', end, true);
-    window.addEventListener('dragend', end, true);
-    return () => {
-      window.removeEventListener('drop', end, true);
-      window.removeEventListener('dragend', end, true);
-    };
-  }, [dragTaskId]);
+  const endTaskDrag = () => { setAnyHot(null); };
   // Right-click menu (shared with the Clock — ContextMenu/scheduleMenus.ts).
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   // Decision 59 — a left click shows what it is (the info card, as on the
@@ -1089,8 +943,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // edge: the event changes for every week, not just this one (owner,
   // 2026-11-21). The bands take no pointer events (drops on the hours under
   // them must still land), so the day column finds the event under the press.
-  const [rtDrag, setRtDrag] = useState<{ id: string; name: string; color: string; fromDay: string; toDay: string; startMin: number; endMin: number; committing?: { timeOfDay: string; durationMin: number } } | null>(null);
-  const rtSuppressClick = useRef(false);
   const RT_EDGE_PX = 6;
   const routineEdgeAt = (dayYMD: string, e: { clientX: number; clientY: number; currentTarget: HTMLElement }) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1107,7 +959,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // Decision 60 — the event under the pointer lights up like a plan does.
   const [rtHover, setRtHover] = useState<string | null>(null);
   const onColumnPointerMove = (dayYMD: string, e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.buttons !== 0 || rtDrag) return;
+    if (e.buttons !== 0 || isCalendarDragging()) return;
     const t = e.target as HTMLElement;
     if (t.closest?.('.cal-block, .cal-habit, button')) { if (e.currentTarget.style.cursor) e.currentTarget.style.cursor = ''; if (rtHover) setRtHover(null); return; }
     const hit = layers.routines ? routineEdgeAt(dayYMD, e) : null;
@@ -1121,90 +973,19 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     if ((e.target as HTMLElement).closest?.('.cal-block, .cal-habit, button')) return;
     const hit = routineEdgeAt(dayYMD, e);
     if (!hit) return;
-    const { r, mode, scale } = hit;
-    const colW = e.currentTarget.getBoundingClientRect().width;
+    const { r, mode } = hit;
     const span = r.occ as RoutineSpan;
     const len = Math.max(15, span.fullEnd - span.fullStart);
-    const origStart = span.fullStart;
-    const origEnd = origStart + len;
-    const x0 = e.clientX;
-    const y0 = e.clientY;
-    const fromIdx = weekDays.indexOf(dayYMD);
-    const kind = r.h.schedule?.kind ?? 'daily';
-    let moved = false;
-    let carried = false;
-    let last: { toDay: string; startMin: number; endMin: number } | null = null;
-    const snap = (m: number) => Math.round(m / 15) * 15;
-    const onMove = (ev: PointerEvent) => {
-      const dx = ev.clientX - x0;
-      const dy = ev.clientY - y0;
-      if (!moved && Math.hypot(dx, dy) < 4) return;
-      moved = true;
-      const dMin = snap(((dy / scale) / rowHeight) * 60);
-      let startMin = origStart;
-      let endMin = origEnd;
-      if (mode === 'move') { startMin = Math.max(0, Math.min(1440 - 15, origStart + dMin)); endMin = startMin + len; }
-      else if (mode === 'bottom') endMin = Math.max(origStart + 15, Math.min(origStart + 24 * 60, origEnd + dMin));
-      else startMin = Math.max(0, Math.min(origEnd - 15, origStart + dMin));
-      // Only a weekly event changes its day (a daily one is on every day).
-      const shift = mode === 'move' && kind === 'weekly' && !singleDay && colW > 0 ? Math.round(dx / colW) : 0;
-      const toIdx = Math.max(0, Math.min(weekDays.length - 1, fromIdx + shift));
-      last = { toDay: weekDays[toIdx] ?? dayYMD, startMin, endMin };
-      // Decision 61 — the week is re-drawn once (the event steps back); the
-      // ghost then moves on its own.
-      if (!carried) { carried = true; setRtDrag({ id: r.h.id, name: r.h.name, color: r.h.color, fromDay: dayYMD, ...last }); }
-      setCalendarGhost({ day: last.toDay, startMin, endMin, name: r.h.name, times: isOneTimeEvent(r.h) ? ghostTimes(startMin, endMin) : `${ghostTimes(startMin, endMin)} · every week`, tone: `var(--${r.h.color})`, testId: 'calendar-routine-ghost', edge: mode === 'bottom' ? 'bottom' : 'top', refId: r.h.id, refKind: 'event' });
-    };
-    const clearRoutineGhost = () => { if (calendarGhost()?.testId === 'calendar-routine-ghost') setCalendarGhost(null); };
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
-      if (!moved || !last) { setRtDrag(null); clearRoutineGhost(); return; }
-      rtSuppressClick.current = true;
-      window.setTimeout(() => { rtSuppressClick.current = false; }, 400);
-      const hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-      const sched = r.h.schedule;
-      if (!sched) { setRtDrag(null); clearRoutineGhost(); return; }
-      const durationMin = Math.max(15, last.endMin - last.startMin);
-      const timeOfDay = hm(last.startMin);
-      let next = { ...sched, timeOfDay, durationMin } as typeof sched;
-      if (sched.kind === 'weekly' && last.toDay !== dayYMD) {
-        const fromDow = ymdToIsoDow(dayYMD);
-        const toDow = ymdToIsoDow(last.toDay);
-        const days = [...new Set([...sched.days.filter((d) => d !== fromDow), toDow])].sort((a, b) => a - b);
-        next = { ...sched, days, timeOfDay, durationMin } as typeof sched;
-      }
-      if (sched.timeOfDay === timeOfDay && sched.durationMin === durationMin && last.toDay === dayYMD) { setRtDrag(null); clearRoutineGhost(); return; }
-      const movedOnce = isOneTimeEvent(r.h) && last.toDay !== dayYMD ? last.toDay : null;
-      // Decision 60 — the ghost stays until the event is drawn at its new time
-      // (no flash back to the old place); never longer than a moment.
-      const done = last;
-      setRtDrag({ id: r.h.id, name: r.h.name, color: r.h.color, fromDay: dayYMD, ...done, committing: { timeOfDay, durationMin } });
-      window.setTimeout(() => {
-        setRtDrag((d) => (d && d.committing && d.id === r.h.id ? null : d));
-        clearRoutineGhost();
-      }, 1500);
-      // A one-off moved occurrence follows the series again.
-      if (r.occ.moved) void habitMotherCommand('routine.unskip', { id: r.h.id, date: r.occ.date });
-      void habitMotherCommand('habit.setSchedule', { habitId: r.h.id, schedule: next });
-      // Decision 62 — a one-time event carried to another day happens there.
-      if (movedOnce) void habitMotherCommand('routine.setOn', { id: r.h.id, date: movedOnce });
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
+    // Decision 63 — the one engine (the same drag as a plan or a habit).
+    beginCalendarDrag(e, {
+      item: { kind: 'event', id: r.h.id, name: r.h.name, tone: `var(--${r.h.color})`, lenMin: len, repeat: isOneTimeEvent(r.h) ? 'once' : r.h.schedule?.kind === 'weekly' ? 'weekly' : 'daily' },
+      origin: { day: dayYMD, startMin: span.fullStart, endMin: span.fullStart + len },
+      mode,
+      home: surface,
+    });
     e.stopPropagation();
     e.preventDefault();
   };
-  useEffect(() => {
-    if (!rtDrag?.committing) return;
-    const h = routinesForCal.find((x) => x.id === rtDrag.id);
-    if (!h || (h.schedule?.timeOfDay === rtDrag.committing.timeOfDay && h.schedule?.durationMin === rtDrag.committing.durationMin)) {
-      setRtDrag(null);
-      if (calendarGhost()?.testId === 'calendar-routine-ghost') setCalendarGhost(null);
-    }
-  }, [routinesForCal, rtDrag]);
   useEffect(() => {
     if (!routineMove) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pickerOpen()) setRoutineMove(null); };
@@ -1312,6 +1093,106 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       void habitMotherCommand('habit.add', { name: d.name, kind: 'routine', schedule });
     }
   };
+  // ── Decision 63 — what this view does as a drop surface ───────────────────
+  const hmOfMin = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const habitById = (id: string): Habit | undefined => {
+    for (const n of boardForCal?.nodes ?? []) {
+      if (n.kind !== 'habit') continue;
+      const h = ((n.state as { habits?: Habit[] } | null)?.habits ?? []).find((x) => x.id === id);
+      if (h) return h;
+    }
+    return undefined;
+  };
+  surfaceImpl.current = {
+    el: rootRef.current,
+    slotAt: (x, y) => {
+      const root = rootRef.current;
+      if (!root) return null;
+      for (const cell of Array.from(root.querySelectorAll<HTMLElement>('[data-cal-anytime]'))) {
+        const r = cell.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return { anyTime: cell.dataset['calAnytime']! };
+      }
+      for (const col of Array.from(root.querySelectorAll<HTMLElement>('[data-cal-day]'))) {
+        const r = col.getBoundingClientRect();
+        if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+        // One hour as the browser drew it (CSS-sized hours, any canvas zoom).
+        const hourPx = r.height / rowCount;
+        if (!(hourPx > 0)) return null;
+        return { day: col.dataset['calDay']!, min: Math.max(0, Math.min(1439, ((y - r.top) / hourPx) * 60 + hourRange.start * 60)) };
+      }
+      return null;
+    },
+    gran: () => gran,
+    setCarried: (id) => { setCarriedId(id); if (id) setTaskPopup(null); },
+    preview: (item, target, origin) => {
+      if (item.kind !== 'habit') return;
+      const g = glide.current;
+      if (!target || !origin) {
+        if (g) { for (const el of g.els) { el.style.transition = 'none'; el.style.transform = ''; el.classList.remove('is-moving'); } requestAnimationFrame(() => { for (const el of g.els) el.style.transition = ''; }); }
+        glide.current = null;
+        return;
+      }
+      const els = g && g.id === item.id ? g.els : Array.from(rootRef.current?.querySelectorAll<HTMLElement>(`[data-habit-id="${item.id}"]`) ?? []);
+      glide.current = { id: item.id, els };
+      const col = rootRef.current?.querySelector<HTMLElement>('[data-cal-day]');
+      const hourPx = col && col.offsetHeight > 0 ? col.offsetHeight / rowCount : rowHeight;
+      const dy = ((target.startMin - origin.startMin) / 60) * hourPx;
+      for (const el of els) { el.classList.add('is-moving'); el.style.transform = dy ? `translateY(${dy}px)` : ''; }
+    },
+    commit: (item, result, origin, mode) => {
+      const st = useBoardStore.getState();
+      if (item.kind === 'task') {
+        if ('anyTime' in result) { void putPlanOnDay(item.itemOnly ? { itemId: item.id } : { taskId: item.id }, result.anyTime); return null; }
+        if ('monthDay' in result) return null;
+        const iso = `${result.day}T${hmOfMin(result.startMin)}`;
+        if (item.itemOnly) {
+          onCommand('calendar.schedule', { itemId: item.id, scheduledFor: iso, scheduledDurationMin: item.plannedMin ?? item.lenMin });
+          return null;
+        }
+        const node = st.board?.nodes.find((n) => n.id === item.id);
+        const ts = node?.state as { plannedMin?: number; durationMin?: number } | undefined;
+        const planned = item.plannedMin ?? ts?.plannedMin ?? ts?.durationMin ?? item.lenMin;
+        if (origin && mode !== 'move') {
+          const durN = Math.max(gran, result.endMin - result.startMin);
+          applyTaskState(item.id, (s0) => taskSetPlannedMin(s0, { minutes: durN }));
+          scheduleTaskRef.current(item.id, iso, durN);
+        } else scheduleTask(item.id, iso, planned);
+        setLandedTaskId(item.id);
+        return () => {
+          const n = useBoardStore.getState().board?.nodes.find((x) => x.id === item.id);
+          return ((n?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor ?? '').slice(0, 16) === iso;
+        };
+      }
+      const h = habitById(item.id);
+      const sched = h?.schedule;
+      if (!h || !sched || 'anyTime' in result || 'monthDay' in result) return null;
+      const timeOfDay = hmOfMin(result.startMin);
+      if (item.kind === 'habit') {
+        void habitMotherCommand('habit.setSchedule', { habitId: h.id, schedule: { ...sched, timeOfDay } });
+        return () => habitById(item.id)?.schedule?.timeOfDay === timeOfDay;
+      }
+      // An event: the same for every week (a one-time event moves its date).
+      const durationMin = Math.max(15, result.endMin - result.startMin);
+      let next = { ...sched, timeOfDay, durationMin } as typeof sched;
+      const once = isOneTimeEvent(h);
+      if (!once && origin && sched.kind === 'weekly' && result.day !== origin.day) {
+        const fromDow = ymdToIsoDow(origin.day);
+        const toDow = ymdToIsoDow(result.day);
+        next = { ...sched, days: [...new Set([...sched.days.filter((d) => d !== fromDow), toDow])].sort((a, b) => a - b), timeOfDay, durationMin } as typeof sched;
+      }
+      // A one-off moved occurrence follows the series again.
+      if (origin) { const occ = routineOccurrence(h, origin.day); if (occ?.moved) void habitMotherCommand('routine.unskip', { id: h.id, date: origin.day }); }
+      void habitMotherCommand('habit.setSchedule', { habitId: h.id, schedule: next });
+      if (once && h.startsOn !== result.day) void habitMotherCommand('routine.setOn', { id: h.id, date: result.day });
+      return () => {
+        const now = habitById(item.id);
+        return !!now && now.schedule?.timeOfDay === timeOfDay && now.schedule?.durationMin === durationMin && (!once || now.startsOn === result.day);
+      };
+    },
+  };
+  // The board has what was let go: hand over before this frame is drawn.
+  useLayoutEffect(() => { checkCalendarDragLanded(); }, [boardForCal]);
+
   const routineMenuItems = (h: Habit, occ: RoutineOccurrence | RoutineSpan, x: number, y: number): ContextMenuItem[] => {
     const hmOf = (m: number) => { const mm = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(mm / 60)).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}`; };
     const s0 = 'fullStart' in occ ? occ.fullStart : occ.startMin;
@@ -1354,13 +1235,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   };
 
   // Decision 60 — the committed resize gives way once the plan is drawn there.
-  useEffect(() => {
-    if (!resizeDraft?.committing) return;
-    const t = scheduledTasks.find((x) => x.id === resizeDraft.taskId);
-    if (!t) { setResizeDraft(null); return; }
-    const startMin = Number(t.startISO.slice(11, 13)) * 60 + Number(t.startISO.slice(14, 16));
-    if (startMin === resizeDraft.absStartMin && Math.abs(t.scheduledDurationMin - resizeDraft.durationMin) < 1) setResizeDraft(null);
-  }, [scheduledTasks, resizeDraft]);
 
   // Build a map from YYYY-MM-DD → TaskSlice[], splitting any task whose
   // duration crosses midnight into one slice per affected day.
@@ -1945,14 +1819,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
     const blocks = slices.map((slice) => {
       const { task, sliceStartMin, sliceEndMin, isContinuation, hasContinuation } = slice;
 
-      // #7 — apply a live resize draft (if this block is being dragged) so it
-      // grows/shrinks under the cursor before the commit on mouse-up.
-      const draft = resizeDraft && resizeDraft.taskId === task.id ? resizeDraft : null;
-      // While the edge is held the block keeps its size (the ghost shows the
-      // new one); once let go it takes the new size until the board has it.
-      const held = draft && draft.committing ? draft : null;
-      const effStartMin = held?.absStartMin ?? sliceStartMin;
-      const effLenMin = held ? held.durationMin : Math.max(1, sliceEndMin - sliceStartMin);
+      const effStartMin = sliceStartMin;
+      const effLenMin = Math.max(1, sliceEndMin - sliceStartMin);
+      // Decision 63 — carried (moved or resized): it steps back, the ghost shows where.
+      const carried = carriedId === task.id;
 
       // Convert minutes-from-midnight to grid-row offsets (rowHeight per hour).
       const topPx = (effStartMin / 60) * rowHeight;
@@ -1999,10 +1869,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
       // Labels show the task's real start/end, not this day's slice edges
       // (a 22:30–01:00 block must not read "22:30–00:00").
       const taskStartDate = new Date(task.startISO);
-      const blockStartMin = draft
-        ? effStartMin
-        : taskStartDate.getHours() * 60 + taskStartDate.getMinutes();
-      const blockEndMin = blockStartMin + (draft ? effLenMin : task.scheduledDurationMin);
+      const blockStartMin = taskStartDate.getHours() * 60 + taskStartDate.getMinutes();
+      const blockEndMin = blockStartMin + task.scheduledDurationMin;
       // #207 storyboard B — when real work on this task began vs the plan:
       // the first work span tagged with it that touches the planned window
       // (±3h) on the plan's day. |delta| < 5 min reads as on time.
@@ -2018,76 +1886,26 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
         ? (startDeltaMin === null || task.timeOpen ? '' : ' · on time')
         : ` · started ${fmtDur(Math.abs(startDeltaMin))} ${startDeltaMin > 0 ? 'late' : 'early'}`;
 
-      const handleBlockDragStart = (e: DragEvent<HTMLDivElement>) => {
-        beginTaskDrag(e, task);
-      };
-
-      // Only opt into being a drop target for TASK payloads. Habit drags are
-      // ignored here so they bubble down to the underlying hour cell and
-      // trigger the radial weekly/daily chooser.
-      const handleBlockDragOver = (e: DragEvent<HTMLDivElement>) => {
-        const t = e.dataTransfer.types;
-        let isTask = false;
-        for (let i = 0; i < t.length; i++) {
-          if (t[i] === 'application/krnl-task') { isTask = true; break; }
-        }
-        if (!isTask) return; // fall through to cell
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        // Band = the slot under the cursor, where the drop lands.
-        const rect = e.currentTarget.getBoundingClientRect();
-        const relY = Math.max(0, (Number.isFinite(e.clientY) ? e.clientY : 0) - (Number.isFinite(rect.top) ? rect.top : 0));
-        const abs = sliceStartMin + (relY / screenScale(e.currentTarget) / rowHeight) * 60;
-        const minute = Math.max(0, Math.min(1440 - gran, Math.floor(abs / gran) * gran));
-        showPlanGhost(dayYMD, minute);
-      };
-
-      const handleDropOnBlock = (e: DragEvent<HTMLDivElement>) => {
-        const t = e.dataTransfer.types;
-        let isTask = false;
-        for (let i = 0; i < t.length; i++) {
-          if (t[i] === 'application/krnl-task') { isTask = true; break; }
-        }
-        if (!isTask) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const raw = e.dataTransfer.getData('application/krnl-task');
-        if (!raw) return;
-        const payload = JSON.parse(raw) as { taskId?: string; durationMin: number; grabMin?: number };
-        if (!payload.taskId) return;
-
-        // Snap to the 15-min slot under the cursor within THIS block.
-        // Works for both self-drop (nudge within own span) and other-drop
-        // (place a second task at any slot inside this block's window — at
-        // the exact same start the two render as a parallel pair, at a
-        // different start they run consecutively / overlap partially).
-        // Guarded against jsdom (clientY/rect.top undefined → NaN propagation).
-        const rect = e.currentTarget.getBoundingClientRect();
-        const clientY = Number.isFinite(e.clientY) ? e.clientY : 0;
-        const rectTop = Number.isFinite(rect.top) ? rect.top : 0;
-        const relY = Math.max(0, clientY - rectTop);
-        const minutesIntoBlock = (relY / screenScale(e.currentTarget) / rowHeight) * 60;
-        const absMinute = sliceStartMin + (Number.isFinite(minutesIntoBlock) ? minutesIntoBlock : 0);
-        // Lands on the slot under the cursor. Another task dropped here also
-        // leaves the chain that would push it behind this one (parallelWith),
-        // so it stays exactly where it was dropped, overlapping this block.
-        const grab = Number.isFinite(payload.grabMin) ? payload.grabMin! : 0;
-        const snappedMin = Math.max(0, Math.min(1440 - gran, Math.floor(absMinute / gran) * gran - grab));
-        const hour = Math.floor(snappedMin / 60);
-        const minute = snappedMin % 60;
-        scheduleTask(
-          payload.taskId,
-          `${dayYMD}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
-          payload.durationMin,
-          payload.taskId !== task.id ? task.id : undefined,
-        );
-        setLandedTaskId(payload.taskId);
+      // Decision 63 — the one engine: a press on the block moves it; on its
+      // top or bottom edge, that edge moves.
+      const startBlockDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+        if (e.button !== 0 || isContinuation) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        const zone = Math.min(7, r.height / 3);
+        const mode: DragMode = resizable && r.bottom - e.clientY <= zone ? 'bottom' : resizable && e.clientY - r.top <= zone && r.height >= 18 ? 'top' : 'move';
+        if (mode !== 'move') { e.preventDefault(); e.stopPropagation(); }
+        beginCalendarDrag(e, {
+          item: { kind: 'task', id: task.id, name: task.text, tone: taskTone, lenMin: Math.max(1, sliceEndMin - sliceStartMin), plannedMin: task.plannedMin },
+          origin: { day: dayYMD, startMin: sliceStartMin, endMin: sliceEndMin },
+          mode,
+          home: surface,
+          // Let go elsewhere in the app: it comes off the Calendar.
+          onOutside: (it) => { void unscheduleTask(it.id); },
+        });
       };
 
       const handleBlockClick = (e: ReactMouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
-        // Decision 60 — letting go of a resize is not a click.
-        if (Date.now() - resizeClickBlock.current < 400) return;
         openTaskInfo(task, e.clientX, e.clientY);
       };
 
@@ -2166,24 +1984,16 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           key={`${task.id}-${isContinuation ? 'cont' : 'head'}`}
           data-testid={`task-block-${task.id}${isContinuation ? '-cont' : ''}`}
           data-lane={`${colIndex}/${colCount}`}
-          draggable={!isContinuation}
-          onDragStart={isContinuation ? undefined : handleBlockDragStart}
-          onDragEnd={endTaskDrag}
-          onDragOver={handleBlockDragOver}
-          onDrop={handleDropOnBlock}
+          onPointerDown={startBlockDrag}
           onClick={handleBlockClick}
           // Decision 59 — the top and bottom edges are found in SCREEN pixels
           // on the block itself, so they sit exactly on its drawn edge at any
           // canvas zoom (the fixed 6 px strips shrank to 2 px zoomed out).
           onMouseMove={resizable ? (e) => {
+            if (isCalendarDragging()) return;
             const edge = edgeAt(e);
             const cur = edge ? 'ns-resize' : '';
             if (e.currentTarget.style.cursor !== cur) e.currentTarget.style.cursor = cur;
-          } : undefined}
-          onMouseDown={resizable ? (e) => {
-            if (e.button !== 0) return;
-            const edge = edgeAt(e);
-            if (edge) startResize(edge, task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e);
           } : undefined}
           data-time-open={task.timeOpen ? 'true' : undefined}
           data-plan-state={isDone ? 'done' : isMissed ? 'missed' : 'planned'}
@@ -2196,7 +2006,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             (afterOf.has(task.id) ? ` · after ${afterOf.get(task.id)}` : '') +
             (isContinuation ? ' (continued from previous day)' : '')
           }
-          className={`cal-block${landedTaskId === task.id ? ' is-landed' : ''}${dragTaskId === task.id || (draft && !draft.committing) ? ' is-carried' : ''}`}
+          className={`cal-block${landedTaskId === task.id ? ' is-landed' : ''}${carried ? ' is-carried' : ''}`}
           style={{
             position: 'absolute',
             // A fixed gap between stacked blocks so back-to-back tasks never
@@ -2227,7 +2037,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
             zIndex: 2,
             padding: detail === 'full' ? `3px ${BLOCK_TEXT_INSET + 2}px` : detail === 'title' ? `0 ${BLOCK_TEXT_INSET}px` : detail === 'letter' ? (letterTop ? '3px 0 0' : 0) : detail === 'wrap' ? '2px 0 0 1px' : 0,
             // Decision 61 — moved or resized: it steps back while the ghost shows the new place.
-            opacity: dragTaskId === task.id || (draft && !draft.committing) ? 0.35 : 1,
+            opacity: carried ? 0.35 : 1,
             // Decision 58 — a plan (a task) floats above the grid with a soft
             // shadow; a repeating event lies flat on it. A ring of the ground
             // keeps back-to-back plans apart.
@@ -2408,20 +2218,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
               tooltip) — no unexplained colour strip on the block's edge. */}
           {/* #7 — resize handles: drag the top edge to move the start, the
               bottom edge to change the duration. Snapped to granularity. */}
-          {resizable && (
-            <>
-              <div
-                data-testid={`task-resize-top-${task.id}`}
-                onMouseDown={(e) => startResize('top', task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e)}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, cursor: 'ns-resize', zIndex: 3 }}
-              />
-              <div
-                data-testid={`task-resize-bottom-${task.id}`}
-                onMouseDown={(e) => startResize('bottom', task, sliceStartMin, Math.max(1, sliceEndMin - sliceStartMin), e)}
-                style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 3 }}
-              />
-            </>
-          )}
         </div>
       );
     });
@@ -2697,13 +2493,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
           data-date={occ.date}
           data-lane={`${lane}/${lanes}`}
           data-skipped={occ.skipped ? 'true' : undefined}
-          className={`cal-event${rtHover === `${h.id}@${dayYMD}` && !rtDrag ? ' is-hot' : ''}`}
+          className={`cal-event${rtHover === `${h.id}@${dayYMD}` && carriedId === null ? ' is-hot' : ''}`}
           aria-label={`${h.name}, repeating event, ${time}${occ.skipped ? ', skipped this time' : ''}`}
           title={`${h.name} · ${time} · repeating event${occ.moved ? ' (moved this time)' : ''}${occ.skipped ? ' · skipped this time' : ''} · click for options`}
           style={{
             position: 'absolute', left: `calc(${railPx}px + (100% - ${railPx}px) * ${lane / lanes} + 2px)`, width: `calc((100% - ${railPx}px) / ${lanes} - 4px)`, top: rh(occ.startMin / 60, 1), height: rhMax(5, (occ.endMin - occ.startMin) / 60, -2),
             zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 6, overflow: 'hidden',
-            opacity: rtDrag && rtDrag.id === h.id ? 0.35 : 1,
+            opacity: carriedId === h.id ? 0.35 : 1,
             ...(occ.skipped
               ? { border: `1px dashed color-mix(in srgb, ${col} 55%, transparent)`, background: 'transparent' }
               : { border: `1px solid color-mix(in srgb, ${col} 30%, transparent)`, background: `color-mix(in srgb, ${col} 13%, var(--paper))` }),
@@ -2858,76 +2654,15 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
   // Decision 60 — a habit's box can be carried to another time on the
   // Calendar (the same ghost as everything else); the habit moves for every day.
   const habitClickBlock = useRef(0);
-  // Decision 61 — a habit is moved as itself: all of its boxes (every day it
-  // is on) glide with the pointer by transform, no re-draw while moving; the
-  // time line shows the exact time. Let go, they stay exactly there until the
-  // board has the new time, and hand over in the same frame (no stutter).
-  const habitMove = useRef<{ id: string; timeOfDay: string; els: HTMLElement[]; timer: number } | null>(null);
-  const releaseHabitMove = () => {
-    const m = habitMove.current;
-    if (!m) return;
-    habitMove.current = null;
-    window.clearTimeout(m.timer);
-    // No glide back: the board has already put it there.
-    for (const el of m.els) { el.style.transition = 'none'; el.style.transform = ''; el.classList.remove('is-moving'); }
-    requestAnimationFrame(() => { for (const el of m.els) el.style.transition = ''; });
-    if (calendarGhost()?.testId === 'calendar-habit-ghost') setCalendarGhost(null);
-  };
-  useLayoutEffect(() => {
-    // The board has the habit at its new time: hand over before this frame is drawn.
-    const m = habitMove.current;
-    if (!m) return;
-    for (const n of boardForCal?.nodes ?? []) {
-      if (n.kind !== 'habit') continue;
-      const h = ((n.state as { habits?: Habit[] } | null)?.habits ?? []).find((x) => x.id === m.id);
-      if (h && h.schedule?.timeOfDay === m.timeOfDay) { releaseHabitMove(); return; }
-    }
-  }, [boardForCal]);
+  // Decision 61/63 — a habit is moved as itself: the engine carries it, and
+  // all of its boxes (every day it is on) glide by transform while it moves.
   const startHabitDrag = (e: ReactPointerEvent<HTMLButtonElement>, habit: ScheduledHabit, dayYMD: string, startMin: number, tone: string) => {
-    if (e.button !== 0) return;
-    const col = e.currentTarget.closest('[data-cal-day]') as HTMLElement | null;
-    if (!col) return;
-    releaseHabitMove();
-    const scale = screenScale(col);
-    const y0 = e.clientY;
-    // One hour as drawn (the hours are sized by CSS).
-    const hourPx = col.offsetHeight > 0 ? col.offsetHeight / rowCount : rowHeight;
     const len = habit.schedule.durationMin && habit.schedule.durationMin > 0 ? habit.schedule.durationMin : 30;
-    const els = Array.from(rootRef.current?.querySelectorAll<HTMLElement>(`[data-habit-id="${habit.id}"]`) ?? []);
-    let moved = false;
-    let last = startMin;
-    const paint = () => {
-      const dy = ((last - startMin) / 60) * hourPx;
-      for (const el of els) el.style.transform = dy ? `translateY(${dy}px)` : '';
-    };
-    const move = (ev: PointerEvent) => {
-      const dy = ev.clientY - y0;
-      if (!moved && Math.abs(dy) < 4) return;
-      if (!moved) for (const el of els) el.classList.add('is-moving');
-      moved = true;
-      const dMin = Math.round(((dy / scale / hourPx) * 60) / gran) * gran;
-      const next = Math.max(0, Math.min(1440 - gran, startMin + dMin));
-      if (next === last && dMin !== 0) return;
-      last = next;
-      paint();
-      setCalendarGhost({ day: dayYMD, startMin: last, endMin: last + len, name: habit.name, times: fmtMinOfDay(last), tone, testId: 'calendar-habit-ghost', ruleOnly: true });
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', up);
-      const clear = () => { for (const el of els) { el.style.transform = ''; el.classList.remove('is-moving'); } if (calendarGhost()?.testId === 'calendar-habit-ghost') setCalendarGhost(null); };
-      if (!moved) { clear(); return; }
-      habitClickBlock.current = Date.now();
-      if (last === startMin) { clear(); return; }
-      const timeOfDay = `${String(Math.floor(last / 60)).padStart(2, '0')}:${String(last % 60).padStart(2, '0')}`;
-      // Held where it was let go until the board has it (never stuck).
-      habitMove.current = { id: habit.id, timeOfDay, els, timer: window.setTimeout(releaseHabitMove, 1500) };
-      void habitMotherCommand('habit.setSchedule', { habitId: habit.id, schedule: { ...habit.schedule, timeOfDay } });
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
+    beginCalendarDrag(e, {
+      item: { kind: 'habit', id: habit.id, name: habit.name, tone, lenMin: len },
+      origin: { day: dayYMD, startMin, endMin: startMin + len },
+      home: surface,
+    });
   };
 
   function renderHabitBlocks(dayYMD: string) {
@@ -3283,14 +3018,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                   data-testid={`calendar-day-only-${d.id}`}
                   className="nodrag"
                   lang="en"
-                  draggable
                   title={`${d.text} — this day, any time. Drag it into the hours to give it a time, or to another day.`}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('application/krnl-task', JSON.stringify(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin }));
-                    e.dataTransfer.effectAllowed = 'move';
-                    beginTaskDragInfo(d.taskId ? { taskId: d.taskId, durationMin: d.plannedMin } : { itemId: d.id, durationMin: d.plannedMin });
-                    startCarry(e, d.taskId ? toneVarForTask(d.taskId) : 'var(--acid)', 'offCalendar');
-                  }}
+                  // Decision 63 — the one engine.
+                  onPointerDown={(e) => beginCalendarDrag(e, { item: { kind: 'task', id: d.taskId ?? d.id, ...(d.taskId ? {} : { itemOnly: true }), name: d.text, tone: d.taskId ? toneVarForTask(d.taskId) : 'var(--acid)', lenMin: d.plannedMin ?? 30, plannedMin: d.plannedMin ?? 30 } })}
                   style={{
                     minHeight: 18, lineHeight: '14px', padding: '1px 5px', borderRadius: 4, boxSizing: 'border-box', cursor: 'grab',
                     fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, whiteSpace: 'normal', overflowWrap: 'anywhere', hyphens: 'auto',
@@ -3484,7 +3214,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, headSlot
                 onPointerDown={(e) => onColumnPointerDown(dayYMD, e)}
                 onPointerMove={(e) => onColumnPointerMove(dayYMD, e)}
                 onPointerLeave={() => { if (rtHover) setRtHover(null); }}
-                onClick={(e) => { if (rtSuppressClick.current) { rtSuppressClick.current = false; return; } handleColumnClick(dayYMD, e); }}
+                onClick={(e) => handleColumnClick(dayYMD, e)}
                 onDoubleClick={(e) => handleColumnDoubleClick(dayYMD, e)}
                 style={{
                   flex: 1,
