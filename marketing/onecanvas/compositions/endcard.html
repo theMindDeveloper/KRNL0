@@ -1,0 +1,38 @@
+<template>
+  <style>
+    
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "KGeist", sans-serif; }
+    
+    #flood { position: absolute; inset: 0; background: #c9f158; clip-path: circle(0px at 540px 1000px); }
+    #logo { position: absolute; left: 120px; top: 232px; width: 220px; height: 220px; border-radius: 50px; box-shadow: 0 30px 70px rgba(0,0,0,.3); opacity: 0; }
+    #tiles { position: absolute; left: 0; right: 0; top: 840px; display: flex; justify-content: center; gap: 14px; }
+    .etile { opacity: 0; width: 160px; height: 184px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 160px; color: #0a0908; letter-spacing: -0.04em; box-shadow: inset 0 0 0 5px #0a0908; }
+    .etile.zero { font-family: "KMono", monospace; font-size: 140px; }
+    #cta { position: absolute; left: 0; right: 0; top: 1100px; display: flex; flex-direction: column; align-items: center; gap: 26px; opacity: 0; }
+    #btn { background: #0a0908; color: #c9f158; font-weight: 700; font-size: 44px; padding: 26px 48px; border-radius: 22px; }
+    #os { font-family: "KMono", monospace; font-weight: 500; font-size: 32px; color: #0a0908; }
+  </style>
+  <div id="root" data-composition-id="endcard" data-width="1080" data-height="1920">
+    
+    <div id="flood"></div>
+    <img id="logo" src="assets/icon.svg" alt="KRNL0" />
+    <div id="tiles"><div class="etile" id="et0" style="background:#c9f158">K</div><div class="etile" id="et1" style="background:#22d3ee">R</div><div class="etile" id="et2" style="background:#ee8466">N</div><div class="etile" id="et3" style="background:#a98bf6">L</div><div class="etile zero" id="et4" style="background:#f4efe2">0</div></div>
+    <div id="cta"><div id="btn">Free download · link in bio</div><div id="os">Windows · macOS · Linux</div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const A = "expo.out";
+    
+    tl.fromTo("#flood", { clipPath: "circle(0px at 540px 1000px)" }, { clipPath: "circle(1500px at 540px 1000px)", duration: 0.7, ease: "power2.inOut" }, 31.99);
+    tl.fromTo("#logo", { opacity: 0, y: 40, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: A }, 32.19);
+    for (let i = 0; i < 5; i++) tl.fromTo(`#et${i}`, { y: 70, opacity: 0, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: A }, 32.29 + i * 0.06);
+    tl.fromTo("#cta", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: A }, 33.31);
+    window.__timelines["endcard"] = tl;
+  </script>
+</template>

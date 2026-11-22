@@ -1,0 +1,25 @@
+<template>
+  <style>
+    
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "KGeist", sans-serif; }
+    .gb { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; } .gb:first-child { height: 1920px; }
+  </style>
+  <div id="root" data-composition-id="ground" data-width="1080" data-height="1920">
+    <div class="gb" id="gb0" style="background:#c9f158"></div><div class="gb" id="gb1" style="background:#a98bf6"></div><div class="gb" id="gb2" style="background:#22d3ee"></div><div class="gb" id="gb3" style="background:#ee8466"></div><div class="gb" id="gb4" style="background:#c9f158"></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const A = "expo.out";
+    tl.fromTo("#gb1", { height: 0 }, { height: 1920, duration: 1.25, ease: "power2.inOut" }, 8.59);
+    tl.fromTo("#gb2", { height: 0 }, { height: 1920, duration: 1.25, ease: "power2.inOut" }, 14.78);
+    tl.fromTo("#gb3", { height: 0 }, { height: 1920, duration: 1.25, ease: "power2.inOut" }, 20.09);
+    tl.fromTo("#gb4", { height: 0 }, { height: 1920, duration: 1.25, ease: "power2.inOut" }, 26.44);
+    window.__timelines["ground"] = tl;
+  </script>
+</template>

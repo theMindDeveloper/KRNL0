@@ -1,0 +1,176 @@
+{
+ "total": 36.8,
+ "move": 1.25,
+ "beats": [
+  {
+   "name": "hook",
+   "start": 0.0,
+   "vo": 0.3,
+   "color": "#c9f158",
+   "focus": [
+    "mother-todo"
+   ],
+   "focus_at": [
+    [
+     5.007,
+     [
+      "mother-todo",
+      "mother-calendar"
+     ]
+    ]
+   ]
+  },
+  {
+   "name": "notes",
+   "start": 8.59,
+   "vo": 9.29,
+   "color": "#a98bf6",
+   "focus": [
+    "frame-notes"
+   ]
+  },
+  {
+   "name": "drag",
+   "start": 14.78,
+   "vo": 15.48,
+   "color": "#22d3ee",
+   "focus": [
+    "mother-todo",
+    "mother-calendar"
+   ]
+  },
+  {
+   "name": "habits",
+   "start": 20.09,
+   "vo": 20.79,
+   "color": "#ee8466",
+   "focus": [
+    "mother-habit"
+   ]
+  },
+  {
+   "name": "end",
+   "start": 26.44,
+   "vo": 27.14,
+   "color": "#c9f158",
+   "focus": [
+    "mother-todo",
+    "mother-calendar",
+    "mother-habit",
+    "mother-pomo"
+   ]
+  }
+ ],
+ "events": [
+  {
+   "t": 0.0,
+   "do": "fit",
+   "ids": [
+    "mother-todo"
+   ],
+   "instant": true
+  },
+  {
+   "t": 0.4,
+   "do": "timer"
+  },
+  {
+   "t": 1.1,
+   "do": "todotick",
+   "text": "Review the proposal"
+  },
+  {
+   "t": 2.7,
+   "do": "todotick",
+   "text": "Client call"
+  },
+  {
+   "t": 5.007,
+   "do": "fit",
+   "ids": [
+    "mother-todo",
+    "mother-calendar"
+   ],
+   "slow": 2.0
+  },
+  {
+   "t": 8.59,
+   "do": "fit",
+   "ids": [
+    "frame-notes"
+   ]
+  },
+  {
+   "t": 11.057,
+   "do": "edit",
+   "text": "Gift idea for Mom"
+  },
+  {
+   "t": 13.31,
+   "do": "commit"
+  },
+  {
+   "t": 14.78,
+   "do": "fit",
+   "ids": [
+    "mother-todo",
+    "mother-calendar"
+   ]
+  },
+  {
+   "t": 16.73,
+   "do": "grab"
+  },
+  {
+   "t": 17.13,
+   "do": "release"
+  },
+  {
+   "t": 20.09,
+   "do": "fit",
+   "ids": [
+    "mother-habit"
+   ]
+  },
+  {
+   "t": 21.32,
+   "do": "tick",
+   "habit": 0
+  },
+  {
+   "t": 22.19,
+   "do": "tick",
+   "habit": 1
+  },
+  {
+   "t": 23.92,
+   "do": "tick",
+   "habit": 2
+  },
+  {
+   "t": 26.44,
+   "do": "fit",
+   "ids": [
+    "mother-todo",
+    "mother-calendar",
+    "mother-habit",
+    "mother-pomo"
+   ],
+   "slow": 2.0
+  }
+ ],
+ "voice": {
+  "hook": 0.3,
+  "notes": 9.29,
+  "drag": 15.48,
+  "habits": 20.79,
+  "end": 27.14
+ },
+ "vend": {
+  "hook": 7.84,
+  "notes": 5.04,
+  "drag": 4.16,
+  "habits": 5.2,
+  "end": 7.36
+ }
+}
