@@ -1,13 +1,14 @@
 // The web app on a phone or an iPad (Decision 51, Decision 56). One shell,
 // two arrangements of the board's own windows:
-//   phone   header · one view · tab bar (Today, Calendar, Habits, Insights, Canvas)
-//   tablet  side rail with the same views · two-column Today
-// Today answers "what now?": the date, your day in time order with the item
-// going on now (or next) opened out, then the Timer, Plans, Habits and Clock.
-// While the timer runs, Today offers Focus: the Timer on its own, full size.
+//   phone   header · one view · tab bar (Today, Todos, Calendar, Habits, More)
+//   tablet  side rail (Today, Week, Habits, Insights, Canvas) · two-column Today
+// Today on a phone (design "KRNL0 phone Today", direction A, 2026-11-22) fits
+// one screen: the date and one line, the Clock with the day's plans as arcs,
+// the day's items as small chips, and one compact Timer card. Todos have their
+// own tab; Insights and Canvas sit under More. Focus: the Timer on its own.
 // The open view is this browser's own (sessionStorage), never synced.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNodesInitialized, useReactFlow } from '@xyflow/react';
 import { CANVAS_FIT_PADDING } from '../Canvas/fitPadding';
 import { useBoardStore } from '../../store/boardStore';
@@ -20,23 +21,29 @@ import { MothersElsewhereContext, setMothersElsewhere } from '../Station/useStat
 import { makeCommandHandler } from '../Canvas/commandDispatch';
 import { pomoClock, formatElapsed, formatRemaining, isObserve } from '../nodes/PomoNode/derive';
 import type { PomoConfig, PomoState } from '../nodes/PomoNode/types';
-import type { TodoItem } from '../nodes/TodoNode/types';
 import { MotherWindow } from './MotherWindow';
-import { DayList, useDayAgenda } from './DayList';
-import { dayLine } from './dayAgenda';
+import { toneOf, useDayAgenda } from './DayList';
+import { dayLine, type AgendaItem, type DayAgenda } from './dayAgenda';
 import type { FormFactor } from './useFormFactor';
 import logo from '../../assets/launch/logo.webp';
 import './mobile.css';
 
-type View = 'today' | 'calendar' | 'habits' | 'insights' | 'canvas';
+type View = 'today' | 'todos' | 'calendar' | 'habits' | 'insights' | 'canvas' | 'more';
 
 const VIEWS: ReadonlyArray<{ id: View; phone: string; tablet: string; d: string }> = [
   { id: 'today', phone: 'Today', tablet: 'Today', d: 'M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM4 9h16M8 3v4M16 3v4M12 14h.01' },
+  { id: 'todos', phone: 'Todos', tablet: 'Todos', d: 'M4 4h5v5H4zM5.5 6.5l1 1 1.5-2M12 6.5h8M4 15h5v5H4zM12 17.5h8' },
   { id: 'calendar', phone: 'Calendar', tablet: 'Week', d: 'M4 5h16v15H4zM4 9h16M9.5 9v11M14.5 9v11' },
   { id: 'habits', phone: 'Habits', tablet: 'Habits', d: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 17l2 2 4-4' },
   { id: 'insights', phone: 'Insights', tablet: 'Insights', d: 'M5 20V10M10 20V4M15 20v-7M20 20v-4' },
   { id: 'canvas', phone: 'Canvas', tablet: 'Canvas', d: 'M4 5h6v5H4zM14 14h6v5h-6zM10 7.5h3a2 2 0 0 1 2 2V14' },
+  { id: 'more', phone: 'More', tablet: 'More', d: 'M4.5 12h1M11.5 12h1M18.5 12h1' },
 ];
+const viewOf = (id: View) => VIEWS.find((v) => v.id === id)!;
+/** The phone's tab bar; Insights and Canvas open from More. */
+const PHONE_TABS: View[] = ['today', 'todos', 'calendar', 'habits', 'more'];
+/** The iPad's rail (its Today already holds the Plans). */
+const TABLET_RAIL: View[] = ['today', 'calendar', 'habits', 'insights', 'canvas'];
 
 const VIEW_KEY = 'krnl0-web-view';
 const readView = (): View => {
@@ -66,16 +73,6 @@ const ymd = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).
 /** The line under the date: plans done today and the day's events (dayAgenda.ts). */
 function useTodayLine(): string {
   return dayLine(useDayAgenda().agenda);
-}
-
-/** How many rows the Plans window shows (for its height). */
-function usePlansListed(): number {
-  const items = useBoardStore((s) => (s.board?.nodes.find((n) => n.isMother && n.kind === 'todo')?.state as { items?: TodoItem[] } | undefined)?.items);
-  return useMemo(() => {
-    const today = ymd(new Date());
-    return (items ?? []).filter((i) => !i.archivedAt && !(i as { droppedAt?: string }).droppedAt)
-      .filter((i) => !i.done || (i.completedAt !== null && ymd(new Date(i.completedAt)) === today)).length;
-  }, [items]);
 }
 
 /** The timer's live reading while it runs, or null when it is idle. */
@@ -226,31 +223,121 @@ function FocusPill({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+const hhmm = (min: number): string => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+
+/** The line under the date: the day so far, and what is on now or next. */
+function phoneDayLine(a: DayAgenda): string {
+  const base = dayLine(a);
+  if (!a.focus) return base;
+  const { item, state } = a.focus;
+  return `${base} · ${state === 'now' ? 'now' : 'next'} ${item.title} at ${hhmm(item.startMin)}`;
+}
+
+/** The day's timed items, small, in one row (every one readable: the row scrolls sideways). */
+function DayChips({ items, onOpenCalendar }: { items: AgendaItem[]; onOpenCalendar: () => void }) {
+  if (items.length === 0) {
+    return (
+      <div className="m-daychips" data-testid="m-day">
+        <button type="button" className="m-daychip m-daychip--quiet" onClick={onOpenCalendar} data-testid="m-day-calendar">Nothing timed today · Calendar</button>
+      </div>
+    );
+  }
+  return (
+    <div className="m-daychips" data-testid="m-day" role="list" aria-label="Your day">
+      {items.map((it, i) => (
+        <button
+          key={it.id}
+          type="button"
+          role="listitem"
+          className={`m-daychip${it.done ? ' m-daychip--done' : ''}`}
+          onClick={onOpenCalendar}
+          {...(i === 0 ? { 'data-testid': 'm-day-calendar' } : {})}
+        >
+          <span className="m-dot" style={{ background: toneOf(it) }} />
+          <span className="m-num">{hhmm(it.startMin)}</span>
+          <span>{it.title}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** One compact Timer (design A): what it reads, what it is for, and one button. Its full window is Focus. */
+function TimerCard({ onFocus }: { onFocus: () => void }) {
+  const easy = useEasyMode();
+  const pomo = useBoardStore((s) => s.board?.nodes.find((n) => n.isMother && n.kind === 'pomo') ?? null);
+  const reading = useTimerReading();
+  if (!pomo) return null;
+  const state = pomo.state as PomoState;
+  const config = (pomo.config ?? {}) as PomoConfig;
+  const observe = isObserve(config, easy);
+  const run = makeCommandHandler(pomo.id);
+  const sessionMin = config.sessionMin ?? 25;
+  const label = reading ? reading.label : observe ? 'Stopwatch' : `Focus · ${sessionMin} min`;
+  const text = reading ? reading.text : observe ? '00:00' : formatRemaining(sessionMin * 60_000);
+  const what = state.label?.trim() || 'What are you doing?';
+  const action = state.status === 'idle'
+    ? { word: 'Start', testId: 'm-timer-start', go: () => run('pomo.start', {}) }
+    : state.status === 'paused'
+      ? { word: 'Resume', testId: 'm-timer-resume', go: () => run('pomo.resume', {}) }
+      : state.status === 'running' && !observe
+        ? { word: 'Pause', testId: 'm-timer-pause', go: () => run('pomo.pause', {}) }
+        : { word: 'Open', testId: 'm-timer-open', go: onFocus };
+  return (
+    <section className="m-timercard" aria-label="Timer" data-testid="m-timer-card">
+      <div className="m-timercard__read">
+        <span className="m-timercard__label">{label}</span>
+        <button type="button" className="m-timercard__digits m-num" onClick={onFocus} aria-label={`Timer ${text}, open it`} {...(reading ? { 'data-testid': 'm-focus-open' } : {})}>{text}</button>
+        <button type="button" className="m-timercard__what" onClick={onFocus} data-testid="m-timer-what">
+          <span>{what}</span>
+          <svg width={13} height={13} viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" /></svg>
+        </button>
+      </div>
+      <button type="button" className="m-timercard__go" onClick={action.go} data-testid={action.testId}>
+        {action.word === 'Start' || action.word === 'Resume'
+          ? <svg width={16} height={16} viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor" /></svg>
+          : null}
+        {action.word}
+      </button>
+    </section>
+  );
+}
+
 function PhoneToday({ onFocus, onOpenCalendar }: { onFocus: () => void; onOpenCalendar: () => void }) {
-  const line = useTodayLine();
-  const listed = usePlansListed();
-  const habits = useBoardStore((s) => ((s.board?.nodes.find((n) => n.isMother && n.kind === 'habit')?.state as { habits?: Array<{ archived?: boolean; kind?: string }> } | undefined)?.habits ?? []).filter((h) => !h.archived && h.kind !== 'routine').length);
-  // The windows fill what they get: give each the height its rows need.
-  const plansH = Math.min(620, Math.max(250, 150 + listed * 34));
-  const habitsH = Math.min(560, Math.max(230, 150 + habits * 56));
+  const { agenda } = useDayAgenda();
   const now = new Date();
   return (
-    <div className="m-scroll m-enter" data-testid="m-today">
+    <div className="m-today-a m-enter" data-testid="m-today">
       <header className="m-headline">
         <h1>
           <span>{now.toLocaleDateString(undefined, { weekday: 'long' })}</span>{' '}
           <span className="m-headline__date">{now.toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}</span>
         </h1>
-        <div className="m-headline__row">
-          <p data-testid="m-today-line">{line}</p>
-          <FocusPill onOpen={onFocus} />
-        </div>
+        <p className="m-headline__line" data-testid="m-today-line">{phoneDayLine(agenda)}</p>
       </header>
-      <DayList onOpenCalendar={onOpenCalendar} />
-      <div className="m-slot m-slot--timer"><MotherWindow kind="pomo" label="Timer" /></div>
-      <div className="m-slot" style={{ height: plansH }}><MotherWindow kind="todo" label="Plans" /></div>
-      <div className="m-slot" style={{ height: habitsH }}><MotherWindow kind="habit" label="Habits" /></div>
-      <div className="m-slot m-slot--clock"><MotherWindow kind="clock" label="Clock" /></div>
+      {/* The Clock shows the day's plans as arcs: your day on the clock. */}
+      <div className="m-today-a__clock"><MotherWindow kind="clock" label="Clock" /></div>
+      <DayChips items={agenda.items} onOpenCalendar={onOpenCalendar} />
+      <TimerCard onFocus={onFocus} />
+    </div>
+  );
+}
+
+/** More (phone): the views that do not fit the tab bar. */
+function MoreView({ onOpen }: { onOpen: (v: View) => void }) {
+  const rows: Array<{ id: View; hint: string }> = [
+    { id: 'insights', hint: 'Where your time went' },
+    { id: 'canvas', hint: 'Your board, free to arrange' },
+  ];
+  return (
+    <div className="m-fill m-more m-enter" data-testid="m-more">
+      {rows.map((r) => (
+        <button key={r.id} type="button" className="m-more__row" onClick={() => onOpen(r.id)} data-testid={`m-more-${r.id}`}>
+          <Icon d={viewOf(r.id).d} />
+          <span className="m-more__text"><strong>{viewOf(r.id).phone}</strong><span>{r.hint}</span></span>
+          <Icon d="M9 6l6 6-6 6" size={18} />
+        </button>
+      ))}
     </div>
   );
 }
@@ -270,9 +357,11 @@ function TabletToday() {
   );
 }
 
-function ViewBody({ view, ff, onFocus, onOpenCalendar }: { view: View; ff: Exclude<FormFactor, 'desktop'>; onFocus: () => void; onOpenCalendar: () => void }) {
+function ViewBody({ view, ff, onFocus, onOpenCalendar, onOpen }: { view: View; ff: Exclude<FormFactor, 'desktop'>; onFocus: () => void; onOpenCalendar: () => void; onOpen: (v: View) => void }) {
   switch (view) {
     case 'today': return ff === 'phone' ? <PhoneToday onFocus={onFocus} onOpenCalendar={onOpenCalendar} /> : <TabletToday />;
+    case 'todos': return <div className="m-fill m-enter" data-testid="m-todos"><MotherWindow kind="todo" label="Todos" /></div>;
+    case 'more': return <MoreView onOpen={onOpen} />;
     case 'calendar': return <CalendarView ff={ff} />;
     case 'habits': return <div className="m-fill m-enter"><MotherWindow kind="habit" label="Habits" /></div>;
     case 'insights': return <div className="m-fill m-enter"><MotherWindow kind="analytics" label="Insights" /></div>;
@@ -323,8 +412,12 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
     if (cal) makeCommandHandler(cal.id)('calendar.setAnchor', { date: ymd(new Date()) });
     setView('calendar');
   };
-  // Focus closes by itself when the timer stops.
-  useEffect(() => { if (!reading) setFocus(false); }, [reading]);
+  // Focus closes by itself when a running timer stops (opened while idle, it stays).
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !reading) setFocus(false);
+    wasRunning.current = !!reading;
+  }, [reading]);
   // Help › What's new › "Show me" and others open Settings by event (as on the desktop).
   useEffect(() => {
     const open = (): void => setSettings(true);
@@ -334,12 +427,14 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
 
   if (!boardReady) return <div className="m-shell" />;
 
-  const nav = VIEWS.map((v) => (
+  // On a phone, Insights and Canvas live under More: the More tab stays marked there.
+  const tabOf = (v: View): View => (ff === 'phone' && (v === 'insights' || v === 'canvas') ? 'more' : v);
+  const nav = (ff === 'phone' ? PHONE_TABS : TABLET_RAIL).map(viewOf).map((v) => (
     <button
       key={v.id}
       type="button"
-      className={`m-nav__item${view === v.id ? ' on' : ''}`}
-      aria-current={view === v.id ? 'page' : undefined}
+      className={`m-nav__item${tabOf(view) === v.id ? ' on' : ''}`}
+      aria-current={tabOf(view) === v.id ? 'page' : undefined}
       onClick={() => setView(v.id)}
       data-testid={`m-nav-${v.id}`}
     >
@@ -394,7 +489,7 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
           {ff === 'phone' && settingsButton}
         </header>
         <main className="m-body">
-          <ViewBody view={view} ff={ff} onFocus={() => setFocus(true)} onOpenCalendar={openCalendarToday} />
+          <ViewBody view={view} ff={ff} onFocus={() => setFocus(true)} onOpenCalendar={openCalendarToday} onOpen={setView} />
         </main>
       </div>
 
