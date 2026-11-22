@@ -5,7 +5,7 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.15.0] — unreleased
+## [0.15.0] — 2026-11-22
 
 ### Added
 - A Calendar you can read: calm cards with the whole name, time and room; the day fits the window; zoom by pinch, Ctrl + wheel or the hour numbers; click for a card, right-click to change it; kind marks on blocks and cards; the menu button in every view (Decisions 58-61).
