@@ -51,7 +51,7 @@ import { WhenPopover } from '../../ui/WhenPopover';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
 import { HabitSwapModal } from '../../ui/HabitSwapModal';
-import { getHabitDrag, type HabitDragPayload } from '../../../dnd/habitDrag';
+import type { HabitDragPayload } from '../../../dnd/habitDrag';
 import { habitStreak } from '../HabitNode/commands';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { boardTagLibrary, spanTone } from '../../../store/spanTags';
@@ -1140,6 +1140,19 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
           return ((n?.state as { scheduledFor?: string | null } | undefined)?.scheduledFor ?? '').slice(0, 16) === iso;
         };
       }
+      // A habit from the Habit window: the swap card asks how it repeats, at that time.
+      if (item.kind === 'habit' && item.choose) {
+        if ('anyTime' in result || 'monthDay' in result) return null;
+        const mother = st.board?.nodes.find((n) => n.kind === 'habit' && ((n.state as { habits?: Habit[] } | null)?.habits ?? []).some((x) => x.id === item.id));
+        setSwapModal({
+          dayYMD: result.day,
+          hour: Math.floor(result.startMin / 60),
+          minute: result.startMin % 60,
+          habit: { habitId: item.id, habitMotherId: mother?.id ?? '', color: habitById(item.id)?.color ?? 'acid', name: item.name },
+          isoDow: ymdToIsoDow(result.day),
+        });
+        return null;
+      }
       const h = habitById(item.id);
       const sched = h?.schedule;
       if (!h || !sched || 'anyTime' in result || 'monthDay' in result) return null;
@@ -1483,6 +1496,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   const [swapModal, setSwapModal] = useState<{
     dayYMD: string;
     hour: number;
+    /** The minute it was let go at (the one drag engine is exact). */
+    minute?: number;
     habit: HabitDragPayload;
     isoDow: IsoDow;
   } | null>(null);
@@ -1504,49 +1519,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     return {
       habitRecord: idx >= 0 ? (habits[idx] ?? null) : null,
       habitIndex: idx,
-    };
-  }
-
-  // ── Drop target handler factory (ADR 0002 A1) ──────────────────────────────
-
-  function makeCellHandlers(dayYMD: string, hour: number) {
-    return {
-      onDragOver: (e: DragEvent<HTMLDivElement>) => {
-        const types = e.dataTransfer.types;
-
-        // A1: habit MIME — only prevent default + highlight. Do NOT open chooser.
-        if (types.includes('application/krnl-habit')) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'copy';
-          e.currentTarget.setAttribute('data-drop-target', 'true');
-          return;
-        }
-
-      },
-      onDragLeave: (e: DragEvent<HTMLDivElement>) => {
-        e.currentTarget.removeAttribute('data-drop-target');
-      },
-      onDrop: (e: DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.currentTarget.removeAttribute('data-drop-target');
-
-        // A1: habit drop — capture cell context AND habit payload at drop time,
-        // then open HabitSwapModal. We snapshot the habit here because `dragend`
-        // (which clears the habitDrag singleton) fires AFTER drop but BEFORE the
-        // user can click a card to confirm.
-        if (e.dataTransfer.types.includes('application/krnl-habit')) {
-          const habit = getHabitDrag();
-          if (!habit) return;
-          setSwapModal({
-            dayYMD,
-            hour,
-            habit,
-            isoDow: ymdToIsoDow(dayYMD),
-          });
-          return;
-        }
-
-      },
     };
   }
 
@@ -3140,7 +3112,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
                 {/* Hour rows — drop targets (15-min snap computed from mouse Y at drop time) */}
                 {Array.from({ length: rowCount }, (_, rowIdx) => {
                   const hour = hourRange.start + rowIdx;
-                  const handlers = makeCellHandlers(dayYMD, hour);
                   return (
                     <div
                       key={hour}
@@ -3148,9 +3119,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
                       data-testid={`week-cell-${dayYMD}-${String(hour).padStart(2, '0')}`}
                       data-day={dayYMD}
                       data-hour={hour}
-                      onDragOver={handlers.onDragOver}
-                      onDragLeave={handlers.onDragLeave}
-                      onDrop={handlers.onDrop}
                       style={{
                         height: rh(1),
                         boxSizing: 'border-box',
@@ -3712,7 +3680,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
           swapModal.habit.habitMotherId,
         );
         const todayStr = todayYMD();
-        const defaultTimeOfDay = `${String(swapModal.hour).padStart(2, '0')}:00`;
+        const defaultTimeOfDay = `${String(swapModal.hour).padStart(2, '0')}:${String(swapModal.minute ?? 0).padStart(2, '0')}`;
         return (
           <HabitSwapModal
             habitName={habitRecord?.name ?? swapModal.habit.name}

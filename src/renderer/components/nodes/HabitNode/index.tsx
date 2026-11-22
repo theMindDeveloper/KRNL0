@@ -29,7 +29,7 @@ import { AmountPopover, TargetPopover } from './HabitPopovers';
 import { HABIT_VIEWS, countOn, weeklyTarget } from './types';
 import { RoutineShelf, routineStatus } from './RoutineShelf';
 import { isRoutine } from './types';
-import { setHabitDrag, clearHabitDrag } from '../../../dnd/habitDrag';
+import { beginCalendarDrag } from '../CalendarNode/calendarDrag';
 import { useBoardStore } from '../../../store/boardStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { NodeProps } from '../types';
@@ -692,36 +692,23 @@ const WeekRow = memo(function WeekRow({
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  const handleDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      const payload = {
-        habitId: habit.id,
-        habitMotherId,
-        color: habit.color,
-        name: habit.name,
-      };
-      e.dataTransfer.setData('application/krnl-habit', JSON.stringify(payload));
-      e.dataTransfer.effectAllowed = 'copy';
-      setHabitDrag(payload);
-      const rowEl = rowRef.current;
-      if (rowEl) {
-        e.dataTransfer.setDragImage(rowEl, 0, rowEl.offsetHeight / 2);
-      }
+  // Decision 63 — the one drag engine carries the row to the Calendar; let go
+  // on the hours, the swap card asks how it repeats (no browser drag picture).
+  const startCarryToCalendar = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
+      if ((e.target as HTMLElement).closest('button, input, textarea, select, a, [contenteditable="true"]')) return;
+      const len = habit.schedule?.durationMin && habit.schedule.durationMin > 0 ? habit.schedule.durationMin : 30;
+      beginCalendarDrag(e, { item: { kind: 'habit', id: habit.id, name: habit.name, tone: `var(--${habitColor(habit.color)})`, lenMin: len, choose: true } });
     },
-    [habit.id, habit.color, habit.name, habitMotherId],
+    [habit.id, habit.name, habit.color, habit.schedule],
   );
-
-  const handleDragEnd = useCallback(() => {
-    clearHabitDrag();
-  }, []);
 
   return (
     <div
       ref={rowRef}
       data-habit-row={habit.id}
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
+      onPointerDown={startCarryToCalendar}
       onContextMenu={(e) => onContextMenu(e, habit.id)}
       style={{
         paddingBottom: 8,
@@ -1055,28 +1042,16 @@ const MonthRow = memo(function MonthRow({
   const glyph = habit.icon ?? fallbackGlyph(habitIdx);
   const monthRowRef = useRef<HTMLDivElement>(null);
 
-  const handleMonthDragStart = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      const payload = {
-        habitId: habit.id,
-        habitMotherId,
-        color: habit.color,
-        name: habit.name,
-      };
-      e.dataTransfer.setData('application/krnl-habit', JSON.stringify(payload));
-      e.dataTransfer.effectAllowed = 'copy';
-      setHabitDrag(payload);
-      const rowEl = monthRowRef.current;
-      if (rowEl) {
-        e.dataTransfer.setDragImage(rowEl, 0, rowEl.offsetHeight / 2);
-      }
+  // Decision 63 — the one drag engine (see the week rows).
+  const startMonthCarry = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
+      if ((e.target as HTMLElement).closest('button, input, textarea, select, a, [contenteditable="true"]')) return;
+      const len = habit.schedule?.durationMin && habit.schedule.durationMin > 0 ? habit.schedule.durationMin : 30;
+      beginCalendarDrag(e, { item: { kind: 'habit', id: habit.id, name: habit.name, tone: `var(--${habitColor(habit.color)})`, lenMin: len, choose: true } });
     },
-    [habit.id, habit.color, habit.name, habitMotherId],
+    [habit.id, habit.name, habit.color, habit.schedule],
   );
-
-  const handleMonthDragEnd = useCallback(() => {
-    clearHabitDrag();
-  }, []);
 
   const onRowClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1097,9 +1072,7 @@ const MonthRow = memo(function MonthRow({
     <div
       ref={monthRowRef}
       data-habit-row={habit.id}
-      draggable
-      onDragStart={handleMonthDragStart}
-      onDragEnd={handleMonthDragEnd}
+      onPointerDown={startMonthCarry}
       onContextMenu={(e) => onContextMenu(e, habit.id)}
       style={{
         paddingBottom: 10,

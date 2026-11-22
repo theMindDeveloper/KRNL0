@@ -35,6 +35,8 @@ export interface DragItem {
   plannedMin?: number;
   /** An event: how it repeats (decides whether it can change day). */
   repeat?: 'once' | 'weekly' | 'daily';
+  /** A habit from the Habit window: letting go asks how it repeats (the swap card). */
+  choose?: boolean;
 }
 
 /** Where it was on the Calendar (moved or resized there). */

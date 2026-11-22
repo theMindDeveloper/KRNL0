@@ -27,8 +27,8 @@ const rel = (f: string) => relative(ROOT, f).replace(/\\/g, '/');
 describe('one drag for plans (Decisions 61, 63)', () => {
   const all = files(ROOT);
 
-  it('no plan is carried by the browser drag', () => {
-    const browser = all.filter((f) => /setData\(\s*'application\/krnl-task'/.test(readFileSync(f, 'utf8'))).map(rel);
+  it('no plan or habit is carried by the browser drag', () => {
+    const browser = all.filter((f) => /setData\(\s*'application\/krnl-(task|habit)'/.test(readFileSync(f, 'utf8'))).map(rel);
     expect(browser).toEqual([]);
   });
 
@@ -39,6 +39,7 @@ describe('one drag for plans (Decisions 61, 63)', () => {
       'components/nodes/CalendarNode/MonthView.tsx',
       'components/nodes/TodoNode/index.tsx',
       'components/nodes/TaskNode/index.tsx',
+      'components/nodes/HabitNode/index.tsx',
     ]));
   });
 

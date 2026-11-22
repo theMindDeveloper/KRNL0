@@ -20,13 +20,12 @@ import React from 'react';
 import { WeekView } from '../WeekView';
 import { useBoardStore } from '../../../../store/boardStore';
 import type { CalendarState, CalendarConfig } from '../types';
-import { setHabitDrag, clearHabitDrag } from '../../../../dnd/habitDrag';
+import { beginCalendarDrag } from '../calendarDrag';
 import { carryIn, mockCalendarLayout, planItem } from './calendarLayout';
 
 afterEach(() => {
   cleanup();
   useBoardStore.setState({ board: null });
-  clearHabitDrag();
 });
 
 // ── Factories ─────────────────────────────────────────────────────────────────
@@ -432,76 +431,46 @@ describe('WeekView — early-morning task (PR #122 24h grid)', () => {
 // ── ADR 0002 A1 — Habit drag-to-schedule (WeekView) ──────────────────────────
 // A1 binding: HabitSwapModal opens on DROP (not dragover). Cell context = drop cell.
 
-describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
-  // Anchor: 2026-05-11 (Monday). Week: Mon=05-11 … Sun=05-17.
-  // 2026-05-13 = Wednesday = ISO dow 3.
-  // 2026-05-14 = Thursday  = ISO dow 4.
-
-  beforeEach(() => setEmptyBoard());
-
-  it('dragover habit MIME does NOT open modal (A1)', () => {
-    const onCommand = vi.fn();
-    render(
-      <WeekView
-        state={makeState({ anchorDate: '2026-05-11' })}
-        config={makeConfig()}
-        onCommand={onCommand}
-      />,
-    );
-
-    setHabitDrag({ habitId: 'h1', habitMotherId: 'hm1', color: 'acid', name: 'Run' });
-
-    // Drag over Monday cell — modal must NOT open.
-    const monCell = document.querySelector('[data-testid="week-cell-2026-05-11-09"]');
-    expect(monCell).toBeTruthy();
-
-    fireEvent.dragOver(monCell!, {
-      dataTransfer: {
-        types: ['application/krnl-habit'],
-        dropEffect: 'copy',
-      },
-    });
-
-    // A1: modal must still be closed after dragover.
-    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeNull();
-    expect(onCommand).not.toHaveBeenCalled();
+describe('WeekView — a habit from the Habit window: letting go opens the swap card (A1, Decision 63)', () => {
+  // Anchor: 2026-05-11 (Monday). Columns (jsdom layout, calendarLayout.ts):
+  // Mon 05-11 x 0-100, Tue 100-200, Wed 200-300, Thu 300-400. One hour = 40 px.
+  const seedHabits = () => useBoardStore.setState({
+    board: {
+      version: 1, schemaVersion: 2, savedAt: new Date().toISOString(), viewport: { x: 0, y: 0, zoom: 1 }, edges: [], layoutMode: 'canvas',
+      nodes: [makeHabitNode('hm1', [
+        { id: 'h1', name: 'Run', color: 'acid' }, { id: 'h2', name: 'Yoga', color: 'cyan' },
+        { id: 'h3', name: 'Swim', color: 'acid' },
+      ])],
+    } as never,
   });
+  const habitItem = (id: string, name: string) => ({ kind: 'habit' as const, id, name, tone: 'var(--acid)', lenMin: 30, choose: true });
+  let restore: () => void = () => undefined;
+  beforeEach(() => { seedHabits(); });
+  afterEach(() => restore());
 
-  it('drop on cell opens modal; picking daily dispatches calendar.scheduleHabit', () => {
-    const onCommand = vi.fn();
-    render(
-      <WeekView
-        state={makeState({ anchorDate: '2026-05-11' })}
-        config={makeConfig()}
-        onCommand={onCommand}
-      />,
-    );
+  const show = (onCommand = vi.fn()) => {
+    render(<WeekView state={makeState({ anchorDate: '2026-05-11' })} config={makeConfig()} onCommand={onCommand} />);
+    restore = mockCalendarLayout();
+    return onCommand;
+  };
 
-    // Simulate the habit drag payload being stored by HabitNode.WeekRow.onDragStart.
-    setHabitDrag({ habitId: 'h1', habitMotherId: 'hm1', color: 'acid', name: 'Run' });
-
-    // Drop on Wednesday (2026-05-13) at hour 09.
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-13-09"]');
-    expect(cell).toBeTruthy();
-
+  it('moving over the hours does not open it; letting go does, and daily schedules it there', async () => {
+    const onCommand = show();
+    beginCalendarDrag({ clientX: -50, clientY: -50, button: 0 }, { item: habitItem('h1', 'Run') });
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 50, clientY: 9 * 40 + 5 }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeNull();
+    // Let go on Wednesday 09:00.
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 9 * 40 + 5 }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     act(() => {
-      fireEvent.drop(cell!, {
-        dataTransfer: {
-          types: ['application/krnl-habit'],
-          getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
-        },
-      });
+      window.dispatchEvent(new MouseEvent('pointerup', { clientX: 250, clientY: 9 * 40 + 5 }));
+      // The browser's click that follows a release (the engine swallows it).
+      window.dispatchEvent(new MouseEvent('click', { clientX: 250, clientY: 9 * 40 + 5 }));
     });
-
-    // The modal should now be open.
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
-
-    // Simulate the user clicking the daily card (pre-selects kind).
     act(() => { pickSwapOption('daily'); });
-
-    // Set duration and click the confirm button in the modal.
     act(() => { confirmSwapModal(30); });
-
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h1',
       habitMotherId: 'hm1',
@@ -509,35 +478,12 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     });
   });
 
-  it('picking weekly dispatches calendar.scheduleHabit with correct IsoDow for the drop cell', () => {
-    const onCommand = vi.fn();
-    render(
-      <WeekView
-        state={makeState({ anchorDate: '2026-05-11' })}
-        config={makeConfig()}
-        onCommand={onCommand}
-      />,
-    );
-
-    setHabitDrag({ habitId: 'h2', habitMotherId: 'hm1', color: 'cyan', name: 'Yoga' });
-
-    // Drop on Thursday (2026-05-14 = ISO dow 4) at hour 07.
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-14-07"]');
-    expect(cell).toBeTruthy();
-
-    act(() => {
-      fireEvent.drop(cell!, {
-        dataTransfer: {
-          types: ['application/krnl-habit'],
-          getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
-        },
-      });
-    });
-
+  it('weekly uses the day it was let go on (Thursday 07:00 is ISO day 4)', async () => {
+    const onCommand = show();
+    await act(async () => { await carryIn(habitItem('h2', 'Yoga'), { x: 350, y: 7 * 40 + 5 }); });
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
     act(() => { pickSwapOption('weekly'); });
     act(() => { confirmSwapModal(45); });
-
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h2',
       habitMotherId: 'hm1',
@@ -545,91 +491,20 @@ describe('WeekView — habit drag-to-schedule (A1: drop-to-open)', () => {
     });
   });
 
-  // Regression: HTML5 drag fires `drop` → then `dragend` (source clears the
-  // habitDrag singleton). The modal stays open until the user clicks a card.
-  // The pick must still dispatch correctly because the payload was snapshotted
-  // at drop time, not read live at pick time.
-  it('modal still dispatches after dragend has cleared the habitDrag singleton', () => {
-    const onCommand = vi.fn();
-    render(
-      <WeekView
-        state={makeState({ anchorDate: '2026-05-11' })}
-        config={makeConfig()}
-        onCommand={onCommand}
-      />,
-    );
-
-    setHabitDrag({ habitId: 'h4', habitMotherId: 'hm1', color: 'plum', name: 'Read' });
-
-    const cell = document.querySelector('[data-testid="week-cell-2026-05-12-09"]');
-    expect(cell).toBeTruthy();
+  it('the day and time are where it is let go, whatever it passed on the way', async () => {
+    const onCommand = show();
+    beginCalendarDrag({ clientX: -50, clientY: -50, button: 0 }, { item: habitItem('h3', 'Swim') });
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 50, clientY: 9 * 40 + 5 }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 14 * 40 + 5 }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     act(() => {
-      fireEvent.drop(cell!, {
-        dataTransfer: {
-          types: ['application/krnl-habit'],
-          getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
-        },
-      });
+      window.dispatchEvent(new MouseEvent('pointerup', { clientX: 250, clientY: 14 * 40 + 5 }));
+      // The browser's click that follows a release (the engine swallows it).
+      window.dispatchEvent(new MouseEvent('click', { clientX: 250, clientY: 14 * 40 + 5 }));
     });
-
-    // Simulate the dragend clearing the singleton between drop and click.
-    clearHabitDrag();
-
-    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
-    act(() => { pickSwapOption('daily'); });
-    act(() => { confirmSwapModal(20); });
-
-    expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
-      habitId: 'h4',
-      habitMotherId: 'hm1',
-      schedule: { kind: 'daily', timeOfDay: '09:00', durationMin: 20 },
-    });
-  });
-
-  // Key discriminator test: drop cell, not first-hovered cell, is the schedule target.
-  it('drop cell is the schedule target regardless of which cells were hovered during drag', () => {
-    const onCommand = vi.fn();
-    render(
-      <WeekView
-        state={makeState({ anchorDate: '2026-05-11' })}
-        config={makeConfig()}
-        onCommand={onCommand}
-      />,
-    );
-
-    setHabitDrag({ habitId: 'h3', habitMotherId: 'hm1', color: 'acid', name: 'Swim' });
-
-    // Hover Monday first (old v1 bug: would lock to Monday).
-    const monCell = document.querySelector('[data-testid="week-cell-2026-05-11-09"]');
-    expect(monCell).toBeTruthy();
-    fireEvent.dragOver(monCell!, {
-      dataTransfer: {
-        types: ['application/krnl-habit'],
-        dropEffect: 'copy',
-      },
-    });
-
-    // Modal must NOT open during dragover.
-    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeNull();
-
-    // Now drop on Wednesday — completely different cell.
-    const wedCell = document.querySelector('[data-testid="week-cell-2026-05-13-14"]');
-    expect(wedCell).toBeTruthy();
-    act(() => {
-      fireEvent.drop(wedCell!, {
-        dataTransfer: {
-          types: ['application/krnl-habit'],
-          getData: (type: string) => (type === 'application/krnl-habit' ? '{}' : ''),
-        },
-      });
-    });
-
-    expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
-
-    // Pick weekly — should use Wednesday (ISO dow 3), NOT Monday (ISO dow 1).
     act(() => { pickSwapOption('weekly'); });
     act(() => { confirmSwapModal(15); });
-
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {
       habitId: 'h3',
       habitMotherId: 'hm1',
