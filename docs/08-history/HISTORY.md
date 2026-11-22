@@ -3342,3 +3342,15 @@ Typecheck clean; all tests pass.
 **Files changed:** `src/shared/whatsnew.ts`, `src/renderer/components/Launch/WhatsNewDialog.tsx`, `src/renderer/assets/launch/plate-calendar.webp`, `plate-events.webp`, `plate-move.webp`, `docs/releases/v0.15.0.md`, `CHANGELOG.md`, `src/renderer/components/Tour/tours.ts`, `src/renderer/components/Tour/TourHost.tsx`, `tests/unit/renderer/tours.test.tsx`
 
 **Summary:** The owner asked for the release drafts; they were laid out on the design canvas "KRNL0 0.15 · What's new and tours" (KRNL0 design system): two What's new directions drawn as the real 920 x 568 dialog with new pictures, the v0.15.0 release notes and the "more" list, and the tour scripts. The owner picked **Direction A**: "A Calendar you can read", "Events that happen once", "Pick it up, put it anywhere" (each with its picture, rendered from the canvas at 2x with a see-through background like the earlier plates; Show me starts the Calendar or Events tour); the phone and the layout menu are in the "more" list. `docs/releases/v0.15.0.md` and the CHANGELOG's `[0.15.0] — unreleased` section cover every feature on the branch. Tours: the Calendar tour is rewritten ("Calendar — your week": drag from the Todo with the time line, the card on click and the menu on right-click, pulling an edge, zoom, the recorded line, the header menu); the Repeating events tour becomes "Events — once or every week" (type "Dentist fri 15:00", then a weekly class, the card on the board, right-click to skip or end; new waits for a one-time and a repeating event); a new "Your layout" tour (the menu, swapping and resizing in My layout, the window buttons, Reset, the Free canvas, a bigger Calendar; it shows My layout for its steps and puts back the layout you started in); four lines in the Easy and Advanced and board tours no longer speak of chains. The tour host now moves the camera onto a step's target on the Free canvas (centring the window missed it on a large Calendar) and does not press a button when what the step points at is already showing (it closed the layout menu). Ran each tour in the browser in Free and Classic: every target on screen, the waits move on by themselves, no console errors; What's new checked in dark and light. Voice: 29 new clips recorded with `scripts/gen-tour-voice.ts` (3,225 characters; 19 clips no step says any more removed, 129 kept); every tour step in Easy, Observe and Pomo has its clip.
+
+## [2026-11-22] — Release v0.15.0
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.15.0`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.14.2 → 0.15.0`. Notes: `docs/releases/v0.15.0.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
