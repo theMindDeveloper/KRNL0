@@ -6,6 +6,7 @@ import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electro
 import { parkedBoardDirs, readBoardsIndex } from '../persistence/boards';
 import { join } from 'path';
 import { homedir } from 'os';
+import { writeFileSync } from 'fs';
 import { CalendarLinkService } from './service';
 import { setCalendars } from './registry';
 
@@ -25,7 +26,13 @@ export function initCalendars(deps: { boardPath: () => string; boardDir: () => s
     },
     notifyBoardChanged: deps.notifyBoardChanged,
     log: (m) => console.log(`[calendars] ${m}`),
-    openBrowser: (url) => shell.openExternal(url),
+    // Development only: KRNL0_OAUTH_URL_FILE hands the sign-in page to another browser
+    // (recording Google's review video) instead of opening the default one.
+    openBrowser: async (url) => {
+      const to = !app.isPackaged ? process.env['KRNL0_OAUTH_URL_FILE'] : undefined;
+      if (to) { writeFileSync(to, url); return; }
+      await shell.openExternal(url);
+    },
     otherBoardPaths: () => { try { return parkedBoardDirs(deps.boardDir()).map((d) => join(d, 'board.json')); } catch { return []; } },
     // With several boards, each sends to its own "KRNL0 · Name" calendar.
     boardName: () => {
