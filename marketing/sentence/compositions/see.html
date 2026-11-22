@@ -1,0 +1,58 @@
+<template>
+  <style>
+    
+    
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "KGeist", sans-serif; }
+    .ground { position: absolute; inset: 0; }
+    .ghost { position: absolute; top: -70px; left: 0; right: 0; text-align: center; font-family: "KMono", monospace; font-weight: 800; font-size: 400px; letter-spacing: -0.04em; line-height: 1; white-space: nowrap; }
+    .ghost span { display: inline-block; }
+    .chip { position: absolute; left: 120px; top: 196px; display: flex; align-items: center; gap: 20px; font-family: "KMono", monospace; font-weight: 700; font-size: 38px; }
+    .chip b { background: #0a0908; color: #f4efe2; padding: 8px 18px; border-radius: 12px; font-weight: 700; }
+    .hl { position: absolute; left: 120px; top: 270px; font-weight: 800; font-size: 130px; letter-spacing: -0.055em; line-height: 0.92; white-space: nowrap; }
+    .hl span { display: inline-block; margin-right: 0.2em; }
+    .vwrap { position: absolute; overflow: hidden; box-shadow: 0 60px 120px rgba(0,0,0,.34), 0 16px 36px rgba(0,0,0,.24); }
+    .pz { position: absolute; inset: 0; }
+    .vwrap video { position: absolute; display: block; }
+
+    
+  </style>
+  <div id="root" data-composition-id="see" data-width="1080" data-height="1920">
+    
+    <div class="ground" id="see-g" style="background:#22d3ee"></div>
+    <div class="ghost" id="see-ghost" data-layout-allow-overflow data-layout-allow-overlap aria-hidden="true" style="color:#14bfd9"><span data-layout-allow-overflow data-layout-allow-overlap>1</span><span data-layout-allow-overflow data-layout-allow-overlap>1</span><span data-layout-allow-overflow data-layout-allow-overlap>:</span><span data-layout-allow-overflow data-layout-allow-overlap>0</span><span data-layout-allow-overflow data-layout-allow-overlap>0</span></div>
+    <div class="chip" id="see-chip"><b>11:00</b><span style="color:#0a0908">Calendar</span></div>
+    <div class="hl" id="see-hl" style="color:#0a0908"><span id="see-w0-0">One</span><span id="see-w0-1">calendar</span><br /><span id="see-w1-0">for</span><span id="see-w1-1">all</span><span id="see-w1-2">of</span><span id="see-w1-3">it.</span></div>
+    
+    <div class="vwrap" id="see-vw" style="left:190.0px; top:690px; width:700px; height:933.3px; border-radius:10.4px; ">
+      <div class="pz" id="see-pz">
+        <video id="see-video" class="clip" src="assets/windows/cal.mp4" muted playsinline data-start="0.6" data-duration="4.48" data-track-index="2"
+          style="left:-142.6px; top:-142.6px; width:985.2px; height:1218.5px"></video>
+      </div>
+    </div>
+    
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const A = "expo.out";
+    
+    tl.fromTo("#see-g", { clipPath: "inset(100% 0 0 0)" }, { clipPath: "inset(0% 0 0 0)", duration: 0.55, ease: "power3.inOut" }, 0.0);
+    document.querySelectorAll("#see-ghost span").forEach((el, i) => tl.fromTo(el, { opacity: 0, y: 150, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "expo.out" }, 0.15 + i * 0.04));
+    tl.fromTo("#see-chip", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.5, ease: A }, 0.3);
+    tl.fromTo("#see-w0-0", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.35);
+    tl.fromTo("#see-w0-1", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.42);
+    tl.fromTo("#see-w1-0", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.49);
+    tl.fromTo("#see-w1-1", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.56);
+    tl.fromTo("#see-w1-2", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.63);
+    tl.fromTo("#see-w1-3", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.7);
+    tl.fromTo("#see-vw", { y: 130, opacity: 0, filter: "blur(8px)" }, { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.6, ease: A }, 0.5);
+    
+    window.__timelines["see"] = tl;
+  </script>
+</template>

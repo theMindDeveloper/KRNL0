@@ -9,6 +9,7 @@ headlines, JetBrains Mono time chips, and the coloured K·R·N·L·0 tiles.
 | [`reels/`](reels/) | [Remotion](https://remotion.dev) (React) | **Reel A**, ~29 s: a walk through one day (Plan → Calendar → Focus → Habits → Canvas → end card), each section showing the real app doing the thing |
 | [`teaser/`](teaser/) | [HyperFrames](https://hyperframes.heygen.com) (HTML + GSAP) | **Reel B**, ~15 s: kinetic slot-machine words, the KRNL0 cube built in 3D, a deck of real app windows, the end card |
 | [`nine/`](nine/) | HyperFrames | **"Nine become one"**, 26 s with sound effects: nine noisy tools collapse into the cube's nine tiles; Todos, Calendar, Timer and Habits open whole from their tiles and do their real job. Storyline B of [`STORYLINES.md`](STORYLINES.md); `SPEC.md` and `REVIEW.md` inside |
+| [`sentence/`](sentence/) | HyperFrames | **"Where did your day go?"**, 42 s, narrated, marketing cut: the benefit comes first (type a plan → one calendar → press start → *planned vs spent*), proven by the real app, ending on Free · No account · stays on your computer. Storyline C of [`STORYLINES.md`](STORYLINES.md); `SPEC.md` and `REVIEW.md` inside |
 
 Both are silent for now; the voiceover (ElevenLabs) and captions come next.
 

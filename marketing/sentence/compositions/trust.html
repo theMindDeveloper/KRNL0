@@ -1,0 +1,64 @@
+<template>
+  <style>
+    
+    
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "KGeist", sans-serif; }
+    .ground { position: absolute; inset: 0; }
+    .ghost { position: absolute; top: -70px; left: 0; right: 0; text-align: center; font-family: "KMono", monospace; font-weight: 800; font-size: 400px; letter-spacing: -0.04em; line-height: 1; white-space: nowrap; }
+    .ghost span { display: inline-block; }
+    .chip { position: absolute; left: 120px; top: 196px; display: flex; align-items: center; gap: 20px; font-family: "KMono", monospace; font-weight: 700; font-size: 38px; }
+    .chip b { background: #0a0908; color: #f4efe2; padding: 8px 18px; border-radius: 12px; font-weight: 700; }
+    .hl { position: absolute; left: 120px; top: 270px; font-weight: 800; font-size: 130px; letter-spacing: -0.055em; line-height: 0.92; white-space: nowrap; }
+    .hl span { display: inline-block; margin-right: 0.2em; }
+    .vwrap { position: absolute; overflow: hidden; box-shadow: 0 60px 120px rgba(0,0,0,.34), 0 16px 36px rgba(0,0,0,.24); }
+    .pz { position: absolute; inset: 0; }
+    .vwrap video { position: absolute; display: block; }
+
+    
+    .row { position: absolute; left: 120px; display: flex; align-items: center; gap: 34px; opacity: 0; }
+    .ck { width: 120px; height: 120px; border-radius: 30px; background: #c9f158; color: #0a0908; font-weight: 800; font-size: 84px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rt { font-weight: 800; font-size: 92px; letter-spacing: -0.045em; line-height: 0.95; color: #f4efe2; }
+    #trust-logo { position: absolute; left: 120px; top: 232px; width: 220px; height: 220px; border-radius: 50px; box-shadow: 0 30px 70px rgba(0,0,0,.35); }
+    #trust-r0 { top: 840px; } #trust-r1 { top: 1020px; } #trust-r2 { top: 1200px; }
+    #trust-r2 .rt { font-size: 64px; line-height: 1.02; letter-spacing: -0.04em; max-width: 700px; }
+    #trust-tiles { position: absolute; left: 0; right: 0; top: 840px; display: flex; justify-content: center; gap: 14px; }
+    .etile { opacity: 0; width: 160px; height: 184px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 160px; color: #0a0908; letter-spacing: -0.04em; box-shadow: inset 0 0 0 5px #0a0908; }
+    .etile.zero { font-family: "KMono", monospace; font-size: 140px; }
+    #trust-cta { position: absolute; left: 0; right: 0; top: 1100px; display: flex; flex-direction: column; align-items: center; gap: 26px; opacity: 0; }
+    #trust-btn { background: #0a0908; color: #c9f158; font-weight: 700; font-size: 44px; padding: 26px 48px; border-radius: 22px; }
+    #trust-os { font-family: "KMono", monospace; font-weight: 500; font-size: 32px; color: #0a0908; }
+    
+  </style>
+  <div id="root" data-composition-id="trust" data-width="1080" data-height="1920">
+    
+    <div class="ground" id="trust-g" style="background:#141414"></div>
+    <div class="ground" id="trust-flood" style="background:#c9f158; clip-path: circle(0px at 540px 1000px)"></div>
+    <img id="trust-logo" src="assets/icon.svg" alt="KRNL0" />
+    <div id="trust-rows"><div class="row" id="trust-r0"><div class="ck">✓</div><div class="rt">Free.</div></div><div class="row" id="trust-r1"><div class="ck">✓</div><div class="rt">No account.</div></div><div class="row" id="trust-r2"><div class="ck">✓</div><div class="rt">Your plans stay on your computer.</div></div></div>
+    <div id="trust-tiles"><div class="etile" id="trust-et0" style="background:#c9f158">K</div><div class="etile" id="trust-et1" style="background:#22d3ee">R</div><div class="etile" id="trust-et2" style="background:#ee8466">N</div><div class="etile" id="trust-et3" style="background:#a98bf6">L</div><div class="etile zero" id="trust-et4" style="background:#f4efe2">0</div></div>
+    <div id="trust-cta"><div id="trust-btn">Free download · link in bio</div><div id="trust-os">Windows · macOS · Linux</div></div>
+    
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const A = "expo.out";
+    
+    tl.fromTo("#trust-g", { clipPath: "inset(100% 0 0 0)" }, { clipPath: "inset(0% 0 0 0)", duration: 0.55, ease: "power3.inOut" }, 0.0);
+    tl.fromTo("#trust-logo", { opacity: 0, y: 40, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: A }, 0.45);
+    [0.97,1.85,3.01].forEach((at, i) => tl.fromTo(`#trust-r${i}`, { opacity: 0, x: -50, filter: "blur(8px)" }, { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.5, ease: A }, at - 0.05));
+    // "Kernel Zero": the ground floods acid from the middle, the rows leave, the tiles rise in
+    tl.fromTo("#trust-flood", { clipPath: "circle(0px at 540px 1000px)" }, { clipPath: "circle(1500px at 540px 1000px)", duration: 0.7, ease: "power2.inOut" }, 4.78);
+    tl.fromTo("#trust-rows", { opacity: 1 }, { opacity: 0, duration: 0.3, ease: "power2.in", immediateRender: false }, 4.78);
+    for (let i = 0; i < 5; i++) tl.fromTo(`#trust-et${i}`, { y: 70, opacity: 0, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: A }, 5.33 + i * 0.06);
+    tl.fromTo("#trust-cta", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: A }, 6.1);
+    
+    window.__timelines["trust"] = tl;
+  </script>
+</template>

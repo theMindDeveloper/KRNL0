@@ -1,0 +1,54 @@
+<template>
+  <style>
+    
+    
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "KGeist", sans-serif; }
+    .ground { position: absolute; inset: 0; }
+    .ghost { position: absolute; top: -70px; left: 0; right: 0; text-align: center; font-family: "KMono", monospace; font-weight: 800; font-size: 400px; letter-spacing: -0.04em; line-height: 1; white-space: nowrap; }
+    .ghost span { display: inline-block; }
+    .chip { position: absolute; left: 120px; top: 196px; display: flex; align-items: center; gap: 20px; font-family: "KMono", monospace; font-weight: 700; font-size: 38px; }
+    .chip b { background: #0a0908; color: #f4efe2; padding: 8px 18px; border-radius: 12px; font-weight: 700; }
+    .hl { position: absolute; left: 120px; top: 270px; font-weight: 800; font-size: 130px; letter-spacing: -0.055em; line-height: 0.92; white-space: nowrap; }
+    .hl span { display: inline-block; margin-right: 0.2em; }
+    .vwrap { position: absolute; overflow: hidden; box-shadow: 0 60px 120px rgba(0,0,0,.34), 0 16px 36px rgba(0,0,0,.24); }
+    .pz { position: absolute; inset: 0; }
+    .vwrap video { position: absolute; display: block; }
+
+    
+    .vwrap { left: 110px; }
+    
+  </style>
+  <div id="root" data-composition-id="hook" data-width="1080" data-height="1920">
+    
+    <div class="ground" id="hook-g" style="background:#c9f158"></div>
+    <div class="ghost" id="hook-ghost" data-layout-allow-overflow data-layout-allow-overlap aria-hidden="true" style="color:#b5dc45"><span data-layout-allow-overflow data-layout-allow-overlap>1</span><span data-layout-allow-overflow data-layout-allow-overlap>9</span><span data-layout-allow-overflow data-layout-allow-overlap>:</span><span data-layout-allow-overflow data-layout-allow-overlap>4</span><span data-layout-allow-overflow data-layout-allow-overlap>3</span></div>
+    <div class="hl" id="hook-hl" style="color:#0a0908"><span id="hook-a0">Where did</span><br /><span id="hook-a1">your day go?</span></div>
+    <div class="hl" id="hook-hl2" style="color:#0a0908; opacity:0"><span id="hook-b0">One place</span><br /><span id="hook-b1">for your day.</span></div>
+    
+    <div class="vwrap" id="hook-vw" style="left:110.0px; top:700px; width:860px; height:860.0px; border-radius:12.7px; ">
+      <div class="pz" id="hook-pz">
+        <video id="hook-video" class="clip" src="assets/windows/clock.mp4" muted playsinline data-start="0" data-duration="9.21" data-track-index="2"
+          style="left:-175.2px; top:-175.2px; width:1210.4px; height:1210.4px"></video>
+      </div>
+    </div>
+    
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const A = "expo.out";
+    
+    // Frame 0 already shows the question and the real Clock; the only motion is the line changing as the name lands.
+    tl.fromTo("#hook-hl", { opacity: 1, y: 0, filter: "blur(0px)" }, { opacity: 0, y: -60, filter: "blur(10px)", duration: 0.35, ease: "power3.in", immediateRender: false }, 5.677);
+    tl.fromTo("#hook-hl2", { opacity: 0, y: 60, filter: "blur(10px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: A }, 5.977);
+    document.querySelectorAll("#hook-ghost span").forEach((el, i) => tl.fromTo(el, { opacity: 0, y: 150, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "expo.out" }, 0.05 + i * 0.04));
+    
+    window.__timelines["hook"] = tl;
+  </script>
+</template>

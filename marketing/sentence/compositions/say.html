@@ -1,0 +1,62 @@
+<template>
+  <style>
+    
+    
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "KGeist", sans-serif; }
+    .ground { position: absolute; inset: 0; }
+    .ghost { position: absolute; top: -70px; left: 0; right: 0; text-align: center; font-family: "KMono", monospace; font-weight: 800; font-size: 400px; letter-spacing: -0.04em; line-height: 1; white-space: nowrap; }
+    .ghost span { display: inline-block; }
+    .chip { position: absolute; left: 120px; top: 196px; display: flex; align-items: center; gap: 20px; font-family: "KMono", monospace; font-weight: 700; font-size: 38px; }
+    .chip b { background: #0a0908; color: #f4efe2; padding: 8px 18px; border-radius: 12px; font-weight: 700; }
+    .hl { position: absolute; left: 120px; top: 270px; font-weight: 800; font-size: 130px; letter-spacing: -0.055em; line-height: 0.92; white-space: nowrap; }
+    .hl span { display: inline-block; margin-right: 0.2em; }
+    .vwrap { position: absolute; overflow: hidden; box-shadow: 0 60px 120px rgba(0,0,0,.34), 0 16px 36px rgba(0,0,0,.24); }
+    .pz { position: absolute; inset: 0; }
+    .vwrap video { position: absolute; display: block; }
+
+    
+    .pchip { position: absolute; top: 1590px; height: 74px; padding: 0 30px; border-radius: 37px; background: #0a0908; color: #c9f158; font-family: "KMono", monospace; font-weight: 700; font-size: 38px; display: flex; align-items: center; opacity: 0; }
+    #say-pc0 { left: 120px; } #say-pc1 { left: 360px; } #say-pc2 { left: 590px; }
+    
+  </style>
+  <div id="root" data-composition-id="say" data-width="1080" data-height="1920">
+    
+    <div class="ground" id="say-g" style="background:#a98bf6"></div>
+    <div class="ghost" id="say-ghost" data-layout-allow-overflow data-layout-allow-overlap aria-hidden="true" style="color:#9677e8"><span data-layout-allow-overflow data-layout-allow-overlap>1</span><span data-layout-allow-overflow data-layout-allow-overlap>1</span><span data-layout-allow-overflow data-layout-allow-overlap>:</span><span data-layout-allow-overflow data-layout-allow-overlap>0</span><span data-layout-allow-overflow data-layout-allow-overlap>0</span></div>
+    <div class="chip" id="say-chip"><b>11:00</b><span style="color:#0a0908">Plan</span></div>
+    <div class="hl" id="say-hl" style="color:#0a0908"><span id="say-w0-0">Type</span><span id="say-w0-1">it.</span><br /><span id="say-w1-0">It</span><span id="say-w1-1">is</span><span id="say-w1-2">planned.</span></div>
+    
+    <div class="vwrap" id="say-vw" style="left:110.0px; top:700px; width:860px; height:860.0px; border-radius:12.7px; ">
+      <div class="pz" id="say-pz">
+        <video id="say-video" class="clip" src="assets/windows/todo.mp4" muted playsinline data-start="0.6" data-duration="6.64" data-track-index="2"
+          style="left:-175.2px; top:-175.2px; width:1210.4px; height:1210.4px"></video>
+      </div>
+    </div>
+    <div id="say-chips"><div class="pchip" id="say-pc0">Today</div><div class="pchip" id="say-pc1">11:00</div><div class="pchip" id="say-pc2">1 hour</div></div>
+    
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const A = "expo.out";
+    
+    tl.fromTo("#say-g", { clipPath: "inset(100% 0 0 0)" }, { clipPath: "inset(0% 0 0 0)", duration: 0.55, ease: "power3.inOut" }, 0.0);
+    document.querySelectorAll("#say-ghost span").forEach((el, i) => tl.fromTo(el, { opacity: 0, y: 150, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "expo.out" }, 0.15 + i * 0.04));
+    tl.fromTo("#say-chip", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.5, ease: A }, 0.3);
+    tl.fromTo("#say-w0-0", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.35);
+    tl.fromTo("#say-w0-1", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.42);
+    tl.fromTo("#say-w1-0", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.49);
+    tl.fromTo("#say-w1-1", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.56);
+    tl.fromTo("#say-w1-2", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.28, ease: "power2.out" }, 0.63);
+    tl.fromTo("#say-vw", { y: 130, opacity: 0, filter: "blur(8px)" }, { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.6, ease: A }, 0.5);
+    [3.29, 4.33, 5.05].forEach((at, i) => tl.fromTo(`#say-pc${i}`, { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(1.7)" }, at));
+    
+    window.__timelines["say"] = tl;
+  </script>
+</template>
