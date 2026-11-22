@@ -439,6 +439,11 @@ body.cal-resizing .cal-block:active { transform: none; }
 .cal-drop-ghost-times { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 @keyframes cal-drop-in { from { opacity: 0; } to { opacity: 1; } }
 .cal-block.is-carried, .cal-event.is-carried { opacity: 0.35; }
+/* Decision 63 — an edge pulled: the block's times follow live (drawn from an
+   attribute; the block's own text is not touched). */
+[data-stretch] { top: var(--stretch-top) !important; height: var(--stretch-h) !important; }
+[data-live-times] { font-size: 0 !important; }
+[data-live-times]::after { content: attr(data-live-times); font-size: 10px; }
 /* Decision 63 — let go: the original's place empties in the same frame (the
    ghost already stands where it landed). */
 .is-landing .cal-block.is-carried, .is-landing .cal-event.is-carried { opacity: 0 !important; transition: none !important; }

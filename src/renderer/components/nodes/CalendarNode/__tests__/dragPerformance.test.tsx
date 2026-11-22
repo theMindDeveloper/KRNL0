@@ -134,11 +134,19 @@ describe('pulling an edge stretches the block itself', () => {
       fireEvent.pointerDown(block, { button: 0, clientX: 350, clientY: 439 });
       window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350, clientY: 12 * 40 }));
       await act(async () => { await nextFrame(); });
-      expect(block.style.height).not.toBe(h0);
+      // Its own sizes are not written: an attribute stretches it (the Calendar's sizes stay underneath).
+      expect(block.hasAttribute('data-stretch')).toBe(true);
+      expect(block.style.getPropertyValue('--stretch-h')).not.toBe('');
+      expect(block.style.height).toBe(h0);
       expect(block.classList.contains('is-carried')).toBe(false);
       expect(block.textContent).toBe(text0);
+      // Its times follow the pull (drawn from an attribute), where the block shows them.
+      const times = block.querySelector('[data-cal-times]');
+      if (times) expect(times.getAttribute('data-live-times')).toBe('10:00–12:00');
       expect(calendarGhost()).toMatchObject({ boxless: true, edge: 'bottom', endMin: 12 * 60 });
       act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); });
+      expect(block.hasAttribute('data-stretch')).toBe(false);
+      if (times) expect(times.hasAttribute('data-live-times')).toBe(false);
       expect(block.style.height).toBe(h0);
     } finally { restore(); }
   });

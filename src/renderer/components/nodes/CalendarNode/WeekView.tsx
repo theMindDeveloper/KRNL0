@@ -620,15 +620,18 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   const surfaceImpl = useRef<CalendarSurface | null>(null);
   // Decision 63 — an edge pulled: the block itself follows (DOM only, no
   // redraw), so its text keeps its form, during the pull and after it.
-  const stretch = useRef<{ key: string; els: Array<{ el: HTMLElement; top: string; height: string; setTop: string; setH: string }> } | null>(null);
+  // The block's own sizes (React's) are never written: an attribute and two
+  // custom properties override them (reactflow-theme.css). Taking them off
+  // always shows what the Calendar drew last, landed or not.
+  const stretch = useRef<{ key: string; els: HTMLElement[] } | null>(null);
   const stretchBlock = (item: DragItem, target: Target | null, origin: DragOrigin | null, mode?: DragMode) => {
     const cur = stretch.current;
     if (!target || !mode || mode === 'move') {
-      // Cancelled (origin given): back as it was, unless the Calendar has
-      // drawn it since. Landed (no origin): the Calendar draws it now.
-      if (cur && origin) for (const s of cur.els) {
-        if (s.el.style.top === s.setTop) s.el.style.top = s.top;
-        if (s.el.style.height === s.setH) s.el.style.height = s.height;
+      if (cur) for (const el of cur.els) {
+        el.removeAttribute('data-stretch');
+        el.style.removeProperty('--stretch-top');
+        el.style.removeProperty('--stretch-h');
+        for (const t of Array.from(el.querySelectorAll('[data-live-times]'))) t.removeAttribute('data-live-times');
       }
       stretch.current = null;
       return;
@@ -639,18 +642,24 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     if (!els) {
       const col = rootRef.current?.querySelector(`[data-cal-day="${origin.day}"]`);
       const sel = item.kind === 'task' ? `[data-testid="task-block-${item.id}"]` : `[data-testid="calendar-routine-${item.id}"]`;
-      els = Array.from(col?.querySelectorAll<HTMLElement>(sel) ?? []).map((el) => ({ el, top: el.style.top, height: el.style.height, setTop: '', setH: '' }));
+      els = Array.from(col?.querySelectorAll<HTMLElement>(sel) ?? []);
       stretch.current = { key, els };
     }
     // The Calendar's own sizes (the same as the block gets when it lands: no jump).
     const css = (v: number | string) => (typeof v === 'number' ? `${v}px` : v);
     const top = css(rh(target.startMin / 60));
     const h = css(rhMax(item.kind === 'task' ? MIN_BLOCK_PX : 5, (target.endMin - target.startMin) / 60, -BLOCK_GAP));
-    for (const s of els) {
-      s.el.style.top = top;
-      s.el.style.height = h;
-      s.setTop = s.el.style.top;
-      s.setH = s.el.style.height;
+    // Its times follow the pull too, so letting go changes nothing (an
+    // attribute the style sheet shows; the block's own text is untouched).
+    const live = `${fmtMinOfDay(target.startMin)}–${fmtMinOfDay(target.endMin)}`;
+    for (const el of els) {
+      el.style.setProperty('--stretch-top', top);
+      el.style.setProperty('--stretch-h', h);
+      el.setAttribute('data-stretch', '');
+      for (const t of Array.from(el.querySelectorAll<HTMLElement>('[data-cal-times]'))) {
+        const rest = item.kind === 'task' ? '' : (t.querySelector('span')?.textContent ?? '');
+        t.setAttribute('data-live-times', live + rest);
+      }
     }
   };
   // Decision 63 (performance) — where the slots are, measured once per drag
@@ -1129,8 +1138,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   };
   // ── Decision 63 — what this view does as a drop surface ───────────────────
   const hmOfMin = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  // The board as it is now (the landed check runs after later renders: a
+  // render's own board would never show the change, and every event or
+  // habit drop waited for the 1.5 s fallback).
   const habitById = (id: string): Habit | undefined => {
-    for (const n of boardForCal?.nodes ?? []) {
+    for (const n of useBoardStore.getState().board?.nodes ?? []) {
       if (n.kind !== 'habit') continue;
       const h = ((n.state as { habits?: Habit[] } | null)?.habits ?? []).find((x) => x.id === id);
       if (h) return h;
@@ -2141,7 +2153,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
             // loses those pieces at its bottom edge, never half the time.
             // Decision 60 — the time small (10 px), wrapping at the dash in a narrow block.
             <span style={{ display: 'flex', flexWrap: 'wrap', columnGap: 8, fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: '13px', color: 'var(--ink-3)', overflow: 'hidden', minHeight: 13, maxHeight: Math.max(timeRowLines, widthPx < 110 ? 2 : 1) * 13, flexShrink: 0, pointerEvents: 'none', position: 'relative', zIndex: 1, marginTop: 1 }}>
-              <span>
+              <span data-cal-times="">
                 {task.timeOpen ? `${fmtMinOfDay(blockStartMin)} · no set time` : <>{fmtMinOfDay(blockStartMin)}–<wbr />{fmtMinOfDay(blockEndMin)}</>}
               </span>
               {startNote && <span data-testid={`task-start-delta-${task.id}`} style={{ whiteSpace: 'nowrap' }}>{startNote.replace(/^ · /, '')}</span>}
@@ -2501,7 +2513,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
               </div>
               {lines.showTime && (
                 // Decision 60 — the time and how often, small, wrapping in a narrow block.
-                <span data-testid={`calendar-routine-time-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-3)', whiteSpace: 'normal', overflow: 'hidden', maxHeight: lines.metaLines * EVENT_TEXT.metaLine, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
+                <span data-cal-times="" data-testid={`calendar-routine-time-${h.id}`} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-3)', whiteSpace: 'normal', overflow: 'hidden', maxHeight: lines.metaLines * EVENT_TEXT.metaLine, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
                   {occ.spill ? time : <>{fmtMinOfDay(occ.fullStart)}–<wbr />{fmtMinOfDay(occ.fullEnd)}</>}{!once && <span style={{ whiteSpace: 'nowrap' }}>{` · ${every}`}</span>}
                 </span>
               )}
