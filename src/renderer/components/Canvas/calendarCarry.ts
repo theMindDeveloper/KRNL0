@@ -37,6 +37,11 @@ export function canvasDragItem(node: KrnlNode | undefined): DragItem | null {
  * grabbed by), so it never covers the hours.
  */
 export function calendarCarryStart(id: string, x: number, y: number): void {
+  // A card left half-carried by a drag that never ended (the pointer let go
+  // outside the window) is whole again: no invisible card with live dots.
+  for (const stuck of Array.from(document.querySelectorAll<HTMLElement>('.react-flow__node[data-over-calendar], .react-flow__node[data-calendar-carry]'))) {
+    if (stuck.dataset['id'] !== id) { stuck.removeAttribute('data-over-calendar'); stuck.removeAttribute('data-calendar-carry'); }
+  }
   const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
   // Only this card animates into the package (a transition on every card cost the whole canvas).
   el?.setAttribute('data-calendar-carry', '1');

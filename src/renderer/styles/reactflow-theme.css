@@ -10,19 +10,53 @@
 /* ── Handles ─────────────────────────────────────────────────────────────── */
 /* easy-mode D24 — Easy has no wires: no connection dots to drag from. */
 [data-ui-mode="easy"] .react-flow__handle { display: none !important; }
+/* Decision 63 — connections are only drawn: a small, quiet dot (7 px) that
+   shows when the card is pointed at or selected, or while a line is drawn
+   to it. The 12 px box and its grab area stay, so it is as easy to drag from. */
 .react-flow__handle {
   width: 12px;
   height: 12px;
-  background: var(--paper);
-  border: 1.5px solid var(--ink-3);
-  opacity: 0.7;
-  transition: background 0.12s ease, transform 0.12s ease, opacity 0.12s ease;
+  background: transparent;
+  border: none;
 }
-
-.react-flow__handle:hover {
+.react-flow__handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1.25px solid var(--ink-3);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.14s ease, transform 0.14s ease, background 0.12s ease;
+  pointer-events: none;
+}
+.react-flow__node:hover .react-flow__handle::before,
+.react-flow__node.selected .react-flow__handle::before,
+.react-flow__handle.connectingfrom::before,
+.react-flow__handle.connectingto::before,
+.react-flow__handle:hover::before {
+  opacity: 0.85;
+  transform: none;
+}
+.react-flow__handle:hover::before,
+.react-flow__handle.connectingto::before,
+.react-flow__handle.connectingfrom::before {
   background: var(--acid);
+  border-color: var(--acid);
   opacity: 1;
 }
+/* A card carried to the Calendar shows no dots and its dots take no press
+   (they would trail it, and a line could start from where it shrank). */
+.react-flow__node[data-calendar-carry] .react-flow__handle::before { opacity: 0 !important; }
+.react-flow__node[data-calendar-carry] .react-flow__handle,
+.react-flow__node[data-over-calendar] .react-flow__handle { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .react-flow__handle::before { transition: none; } }
 
 /* Image + text + frame node connectors auto-hide. The default handle
  * opacity (0.7) reads as visual noise on top of these node bodies, and

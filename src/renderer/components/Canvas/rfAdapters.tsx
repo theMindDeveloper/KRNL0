@@ -166,12 +166,14 @@ export function toRfEdge(
 
 // ── createNodeAdapter ─────────────────────────────────────────────────────────
 
+// Decision 63 — connections are only drawn, so their dots are quiet: the
+// 12 px box (and its wider grab area, tokens.css) stays, the visible dot is a
+// small circle drawn inside it (reactflow-theme.css) that shows on hover.
 const handleStyle: React.CSSProperties = {
   width: 12,
   height: 12,
-  background: 'var(--paper)',
-  border: '1.5px solid var(--ink-3)',
-  opacity: 0.7,
+  background: 'transparent',
+  border: 'none',
   // RF positions Handles at the absolute left/right edge of the node. Without
   // an explicit z-index, nodes whose body has `position: relative` content
   // (e.g. ImageNode's image-frame) create a new stacking context and bury

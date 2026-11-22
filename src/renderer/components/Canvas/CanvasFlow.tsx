@@ -24,6 +24,7 @@ import {
   BaseEdge,
   getBezierPath,
   useReactFlow,
+  useUpdateNodeInternals,
   applyNodeChanges,
   type NodeChange,
   type EdgeChange,
@@ -515,6 +516,9 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   const setViewport = useBoardStore((s) => s.setViewport);
   const addNode = useBoardStore((s) => s.addNode);
   const { screenToFlowPosition, getNodes, fitView, getViewport, setViewport: setRfViewport, setCenter } = useReactFlow();
+  // A card that glided back from the Calendar has its connection dots measured
+  // again once it is whole (they were measured while it shrank into the box).
+  const updateNodeInternals = useUpdateNodeInternals();
 
   // Dock-frame variant (classic | synthesizer | telemetry | phosphor).
   // Hook applies `data-dock` to <html> and persists in localStorage.
@@ -1785,8 +1789,10 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
         // The card glides back to its place on the canvas (it is on the Calendar now).
         settleNodes([draggedId]);
         setNodes((prev) => prev.map((n) => (n.id === draggedId ? { ...n, position: { ...before } } : n)));
+        window.setTimeout(() => updateNodeInternals(draggedId), 360);
         return;
       }
+      window.setTimeout(() => updateNodeInternals(draggedId), 260);
     }
 
     // Align to grid: the drop settles on the nearest free grid spot (a frame
