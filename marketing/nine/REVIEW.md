@@ -1,4 +1,13 @@
-# Review: B "Nine become one" (render 1, 26.2 s, 1080×1920, 30 fps)
+# Review: B "Nine become one"
+
+## Render 2 (46.5 s, narrated): changes from the user's notes
+- **Slower:** the narration is the clock. Each scene holds as long as its line, the real footage plays at 0.8×, and the moves are longer (0.5–0.9 s).
+- **Narration:** ElevenLabs Eleven v4, voice "Jessa" (`yj30vwTGJxSHezdAGsv9`), with audio tags (`[exasperated]`, `[sighs]`, `[warm]`, `[confident]`, `[relaxed]`, `[cheerful]`). One line per scene (`scripts/voice.py`); each tool pings as the voice names it. Word-timed captions under the headline, for people watching muted.
+- **Ending redone:** no drop. The claim clears, the cube glides up and stays in the logo pose, and the K·R·N·L·0 tiles rise in under it on "Kernel Zero". The call to action lands on "Free".
+- **Effects quieter:** about 9 dB under the voice, the riser removed, one ping per tool. The final file is loudness-normalised to −15.1 LUFS, −1.4 dBTP.
+- Measured, not heard: the voice levels and the effect balance.
+
+## Render 1 (26.2 s, 1080×1920, 30 fps)
 
 **Creative calls**
 - The match cut carries the film: the "before" is a 3×3 grid of nine tools, the cube's front face is a 3×3 grid of nine tiles, and card *i* becomes tile *i*. Each feature then opens from its own tile and returns into it.

@@ -51,10 +51,10 @@
     .head { position: absolute; left: 120px; top: 300px; font-weight: 800; font-size: 150px; letter-spacing: -0.055em; line-height: 0.92; color: #0a0908; white-space: nowrap; }
     .head span { display: inline-block; margin-right: 0.22em; }
     .verb { position: absolute; left: 120px; top: 300px; font-weight: 800; font-size: 150px; letter-spacing: -0.055em; line-height: 0.92; color: #0a0908; white-space: nowrap; opacity: 0; }
-    #c-tiles { position: absolute; left: 0; right: 0; top: 820px; display: flex; justify-content: center; gap: 14px; }
-    .etile { width: 160px; height: 184px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 160px; color: #0a0908; letter-spacing: -0.04em; box-shadow: inset 0 0 0 5px #0a0908; }
+    #c-tiles { position: absolute; left: 0; right: 0; top: 950px; display: flex; justify-content: center; gap: 14px; }
+    .etile { opacity: 0; width: 160px; height: 184px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 160px; color: #0a0908; letter-spacing: -0.04em; box-shadow: inset 0 0 0 5px #0a0908; }
     .etile.zero { font-family: "KMono", monospace; font-size: 140px; }
-    #c-cta { position: absolute; left: 0; right: 0; top: 1060px; display: flex; flex-direction: column; align-items: center; gap: 24px; opacity: 0; }
+    #c-cta { position: absolute; left: 0; right: 0; top: 1168px; display: flex; flex-direction: column; align-items: center; gap: 24px; opacity: 0; }
     #c-btn { background: #0a0908; color: #c9f158; font-weight: 700; font-size: 42px; padding: 24px 44px; border-radius: 22px; }
     #c-os { font-family: "KMono", monospace; font-weight: 500; font-size: 32px; color: #0a0908; }
   </style>
@@ -86,28 +86,28 @@
     <div class="vground" id="c-vg0" style="background:#a98bf6"></div>
     <div class="vwrap" id="c-vw0" style="left:110.0px; top:620.0px; width:860px; height:860px">
       <video id="c-video0" class="clip" src="assets/windows/todo.mp4" muted playsinline
-        data-start="3.16" data-duration="2.6" data-track-index="2"
+        data-start="6.01" data-duration="5.18" data-playback-rate="0.8" data-track-index="2"
         style="position:absolute; left:-175.2px; top:-175.2px; width:1210.4px; height:1210.4px; display:block"></video>
     </div>
     <div class="verb" id="c-verb0">Plan it.</div>
     <div class="vground" id="c-vg1" style="background:#22d3ee"></div>
-    <div class="vwrap" id="c-vw1" style="left:110.0px; top:536.5px; width:860px; height:1147px">
+    <div class="vwrap" id="c-vw1" style="left:110.0px; top:566.5px; width:860px; height:1147px">
       <video id="c-video1" class="clip" src="assets/windows/cal.mp4" muted playsinline
-        data-start="6.32" data-duration="2.9" data-track-index="2"
+        data-start="11.92" data-duration="4.86" data-playback-rate="0.8" data-track-index="2"
         style="position:absolute; left:-175.2px; top:-175.2px; width:1210.4px; height:1497.0px; display:block"></video>
     </div>
     <div class="verb" id="c-verb1">See it.</div>
     <div class="vground" id="c-vg2" style="background:#c9f158"></div>
     <div class="vwrap" id="c-vw2" style="left:110.0px; top:620.0px; width:860px; height:860px">
       <video id="c-video2" class="clip" src="assets/windows/timer.mp4" muted playsinline
-        data-start="9.78" data-duration="3.933" data-track-index="2"
+        data-start="17.51" data-duration="5.067" data-playback-rate="0.8" data-track-index="2"
         style="position:absolute; left:-175.2px; top:-175.2px; width:1210.4px; height:1210.4px; display:block"></video>
     </div>
     <div class="verb" id="c-verb2">Run it.</div>
     <div class="vground" id="c-vg3" style="background:#ee8466"></div>
     <div class="vwrap" id="c-vw3" style="left:110.0px; top:620.0px; width:860px; height:860px">
       <video id="c-video3" class="clip" src="assets/windows/habit.mp4" muted playsinline
-        data-start="14.273" data-duration="3.0" data-track-index="2"
+        data-start="23.307" data-duration="4.38" data-playback-rate="0.8" data-track-index="2"
         style="position:absolute; left:-175.2px; top:-175.2px; width:1210.4px; height:1210.4px; display:block"></video>
     </div>
     <div class="verb" id="c-verb3">Keep it.</div>
@@ -117,49 +117,51 @@
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
-    const F = [{k:0,tile:1,zs:2.8,ze:3.1799999999999997,vs:3.16,vd:2.15,cb:5.31,tx:540,ty:706,vw:860,vh:860,vcy:1050},{k:1,tile:3,zs:5.96,ze:6.34,vs:6.32,vd:2.45,cb:8.77,tx:346,ty:900,vw:860,vh:1147,vcy:1110},{k:2,tile:0,zs:9.42,ze:9.8,vs:9.78,vd:3.483,cb:13.263,tx:346,ty:706,vw:860,vh:860,vcy:1050},{k:3,tile:2,zs:13.913,ze:14.293000000000001,vs:14.273,vd:2.55,cb:16.823,tx:734,ty:706,vw:860,vh:860,vcy:1050}];
+    const F = [{k:0,tile:1,zs:5.53,ze:6.03,vs:6.01,vd:4.63,cb:10.64,tx:540,ty:706,vw:860,vh:860,vcy:1050},{k:1,tile:3,zs:11.44,ze:11.94,vs:11.92,vd:4.31,cb:16.23,tx:346,ty:900,vw:860,vh:1147,vcy:1140},{k:2,tile:0,zs:17.03,ze:17.53,vs:17.51,vd:4.517,cb:22.027,tx:346,ty:706,vw:860,vh:860,vcy:1050},{k:3,tile:2,zs:22.827,ze:23.327,vs:23.307,vd:3.83,cb:27.137,tx:734,ty:706,vw:860,vh:860,vcy:1050}];
     const A = "expo.out";
     // "One app" lands word by word while the face sits exactly where the nine cards landed.
-    ["#c-one0", "#c-one1"].forEach((id, i) => tl.fromTo(id, { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, ease: "power2.out" }, 0.15 + i * 0.08));
+    ["#c-one0", "#c-one1"].forEach((id, i) => tl.fromTo(id, { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, ease: "power2.out" }, 1.35 + i * 0.08));
     // The side faces exist only once the cube starts to turn (no hairlines at the frontal cut).
-    tl.fromTo(".holder.top, .holder.right", { opacity: 0 }, { opacity: 1, duration: 0.12 }, 0.55);
+    tl.fromTo(".holder.top, .holder.right", { opacity: 0 }, { opacity: 1, duration: 0.12 }, 1.7);
     // The face becomes a cube: it turns into the logo pose.
-    tl.fromTo("#c-pos", { rotationX: 0, scale: 1, y: 0 }, { rotationX: -35.26, scale: 0.82, y: 150, duration: 1.4, ease: "power3.inOut" }, 0.55);
-    tl.fromTo("#c-cube", { rotationY: 0 }, { rotationY: -45, duration: 1.4, ease: "power3.inOut" }, 0.55);
+    tl.fromTo("#c-pos", { rotationX: 0, scale: 1, y: 0 }, { rotationX: -35.26, scale: 0.82, y: 150, duration: 1.9000000000000001, ease: "power3.inOut" }, 1.7);
+    tl.fromTo("#c-cube", { rotationY: 0 }, { rotationY: -45, duration: 1.9000000000000001, ease: "power3.inOut" }, 1.7);
     // Back to the front face for the first feature; "One app" leaves.
-    tl.fromTo("#c-one", { opacity: 1, y: 0 }, { opacity: 0, y: -200, duration: 0.3, ease: "power3.in" }, F[0].zs - 0.45);
-    tl.fromTo("#c-pos", { rotationX: -35.26, scale: 0.82, y: 150 }, { rotationX: 0, scale: 1, y: 0, duration: 0.45, ease: "power2.inOut", immediateRender: false }, F[0].zs - 0.5);
-    tl.fromTo("#c-cube", { rotationY: -45 }, { rotationY: 0, duration: 0.45, ease: "power2.inOut", immediateRender: false }, F[0].zs - 0.5);
+    tl.fromTo("#c-one", { opacity: 1, y: 0 }, { opacity: 0, y: -200, duration: 0.35, ease: "power3.in" }, F[0].zs - 0.6);
+    tl.fromTo("#c-pos", { rotationX: -35.26, scale: 0.82, y: 150 }, { rotationX: 0, scale: 1, y: 0, duration: 0.6, ease: "power2.inOut", immediateRender: false }, F[0].zs - 0.65);
+    tl.fromTo("#c-cube", { rotationY: -45 }, { rotationY: 0, duration: 0.6, ease: "power2.inOut", immediateRender: false }, F[0].zs - 0.65);
     F.forEach((f) => {
       // Zoom through the tile: it grows past the frame and its fill becomes the window's ground.
       tl.fromTo(`#c-zoom${f.k}`, { opacity: 0 }, { opacity: 1, duration: 0.01 }, f.zs);
       tl.fromTo(`#c-ft${f.tile}`, { opacity: 1 }, { opacity: 0, duration: 0.01 }, f.zs);
-      tl.fromTo(`#c-ft${f.tile}`, { opacity: 0 }, { opacity: 1, duration: 0.01, immediateRender: false }, f.cb + 0.41);
+      tl.fromTo(`#c-ft${f.tile}`, { opacity: 0 }, { opacity: 1, duration: 0.01, immediateRender: false }, f.cb + 0.51);
       tl.fromTo(`#c-zoom${f.k}`, { scale: 1 }, { scale: 18, duration: f.ze - f.zs, ease: "power3.in" }, f.zs);
-      tl.fromTo(`#c-zfill${f.k}`, { opacity: 0 }, { opacity: 1, duration: 0.24, ease: "power1.in" }, f.zs + 0.08);
+      tl.fromTo(`#c-zfill${f.k}`, { opacity: 0 }, { opacity: 1, duration: 0.32, ease: "power1.in" }, f.zs + 0.1);
       tl.fromTo(`#c-vg${f.k}`, { opacity: 0 }, { opacity: 1, duration: 0.01 }, f.ze - 0.02);
       // While the window is up, the grown tile underneath is hidden; it returns for the carry back.
       tl.fromTo(`#c-zoom${f.k}`, { visibility: "visible" }, { visibility: "hidden", duration: 0.01, immediateRender: false }, f.ze + 0.01);
 
       // The real window rises whole and settles; the verb lands and holds.
-      tl.fromTo(`#c-vw${f.k}`, { y: 90, scale: 1.06, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.45, ease: A }, f.vs);
+      tl.fromTo(`#c-vw${f.k}`, { y: 120, scale: 1.05, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.6, ease: A }, f.vs);
       tl.fromTo(`#c-verb${f.k}`, { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, ease: "power2.out" }, f.vs + 0.1);
       // Carry back: the window shrinks into its tile, the fill drains back into the tile.
-      tl.fromTo(`#c-verb${f.k}`, { opacity: 1, y: 0 }, { opacity: 0, y: -160, duration: 0.24, ease: "power3.in", immediateRender: false }, f.cb - 0.05);
-      tl.fromTo(`#c-vw${f.k}`, { scale: 1, x: 0, y: 0, opacity: 1, filter: "blur(0px)" }, { scale: 0.13, x: f.tx - 540, y: f.ty - f.vcy, opacity: 0, filter: "blur(6px)", duration: 0.4, ease: "power3.in", immediateRender: false }, f.cb);
+      tl.fromTo(`#c-verb${f.k}`, { opacity: 1, y: 0 }, { opacity: 0, y: -160, duration: 0.3, ease: "power3.in", immediateRender: false }, f.cb - 0.05);
+      tl.fromTo(`#c-vw${f.k}`, { scale: 1, x: 0, y: 0, opacity: 1, filter: "blur(0px)" }, { scale: 0.13, x: f.tx - 540, y: f.ty - f.vcy, opacity: 0, filter: "blur(6px)", duration: 0.5, ease: "power3.in", immediateRender: false }, f.cb);
       // The window's colour closes like an iris into its tile, over the cube.
-      tl.fromTo(`#c-vg${f.k}`, { clipPath: `circle(1500px at ${f.tx}px ${f.ty}px)` }, { clipPath: `circle(80px at ${f.tx}px ${f.ty}px)`, duration: 0.4, ease: "power3.in", immediateRender: false }, f.cb);
-      tl.fromTo(`#c-vg${f.k}`, { opacity: 1 }, { opacity: 0, duration: 0.08, immediateRender: false }, f.cb + 0.36);
+      tl.fromTo(`#c-vg${f.k}`, { clipPath: `circle(1500px at ${f.tx}px ${f.ty}px)` }, { clipPath: `circle(80px at ${f.tx}px ${f.ty}px)`, duration: 0.5, ease: "power3.in", immediateRender: false }, f.cb);
+      tl.fromTo(`#c-vg${f.k}`, { opacity: 1 }, { opacity: 0, duration: 0.08, immediateRender: false }, f.cb + 0.46);
     });
     // Claim: the cube settles back into the logo pose, lower; the line slams in word group by group.
-    tl.fromTo("#c-pos", { rotationX: 0, scale: 1, y: 0 }, { rotationX: -35.26, scale: 0.62, y: 470, duration: 0.7, ease: "power3.inOut", immediateRender: false }, 17.123);
-    tl.fromTo("#c-cube", { rotationY: 0 }, { rotationY: -45, duration: 0.7, ease: "power3.inOut", immediateRender: false }, 17.123);
-    ["#c-cl0", "#c-cl1", "#c-cl2"].forEach((id, i) => tl.fromTo(id, { scale: 1.6, opacity: 0, filter: "blur(14px)" }, { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.28, ease: A }, 17.373 + i * 0.16));
-    // End card: the cube drops away, the K·R·N·L·0 tiles fall into its place, the CTA lands and holds.
-    tl.fromTo("#c-claim", { y: 0 }, { y: -40, duration: 0.5, ease: "power3.inOut" }, 18.923);
-    tl.fromTo("#c-pos", { scale: 0.62, y: 470 }, { scale: 0, y: 560, duration: 0.4, ease: "power3.in", immediateRender: false }, 18.923);
-    for (let i = 0; i < 5; i++) tl.fromTo(`#c-et${i}`, { y: -1300, rotation: i % 2 ? 10 : -10 }, { y: 0, rotation: 0, duration: 0.7, ease: "back.out(1.4)" }, 18.923 + 0.12 + i * 0.07);
-    tl.fromTo("#c-cta", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.5, ease: A }, 18.923 + 0.75);
+    tl.fromTo("#c-pos", { rotationX: 0, scale: 1, y: 0 }, { rotationX: -35.26, scale: 0.62, y: 470, duration: 0.9, ease: "power3.inOut", immediateRender: false }, 27.537);
+    tl.fromTo("#c-cube", { rotationY: 0 }, { rotationY: -45, duration: 0.9, ease: "power3.inOut", immediateRender: false }, 27.537);
+    const CW = [28.077, 28.877, 29.237];
+    ["#c-cl0", "#c-cl1", "#c-cl2"].forEach((id, i) => tl.fromTo(id, { scale: 1.25, opacity: 0, filter: "blur(12px)" }, { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.35, ease: A }, CW[i] - 0.05));
+    // End card, calm: the claim clears, the cube glides up and stays in the logo pose,
+    // the K·R·N·L·0 tiles rise in under it on "Kernel Zero", the call to action lands on "Free".
+    ["#c-cl0", "#c-cl1", "#c-cl2"].forEach((id, i) => tl.fromTo(id, { opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(8px)", duration: 0.25, ease: "power2.in", immediateRender: false }, 29.887 - 0.3 + i * 0.05));
+    tl.fromTo("#c-pos", { scale: 0.62, y: 470 }, { scale: 0.56, y: -260, duration: 0.9, ease: "power3.inOut", immediateRender: false }, 29.887 - 0.2);
+    for (let i = 0; i < 5; i++) tl.fromTo(`#c-et${i}`, { y: 70, opacity: 0, filter: "blur(8px)" }, { y: 0, opacity: 1, filter: "blur(0px)", duration: 0.6, ease: A }, 29.887 + 0.25 + i * 0.06);
+    tl.fromTo("#c-cta", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: A }, 31.517 - 0.1);
     window.__timelines["core"] = tl;
   </script>
 </template>

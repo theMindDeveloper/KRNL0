@@ -58,7 +58,7 @@ for(const [name,shot] of Object.entries(SHOTS)){
     for(let k=0;k<66;k++){const j=[6,16,26,36,46].indexOf(k);if(j>=0&&t[j])await p.mouse.click(t[j].x,t[j].y);await snap();}}
   await p.close();
   fs.mkdirSync(path.join(ROOT,'assets/windows'),{recursive:true});
-  execFileSync('ffmpeg',['-v','error','-y','-framerate','30','-i',path.join(dir,'%04d.png'),'-vf','pad=ceil(iw/2)*2:ceil(ih/2)*2,tpad=stop_mode=clone:stop_duration=1.0','-c:v','libx264','-crf','14','-pix_fmt','yuv420p','-movflags','+faststart',path.join(ROOT,'assets/windows',name+'.mp4')]);
+  execFileSync('ffmpeg',['-v','error','-y','-framerate','30','-i',path.join(dir,'%04d.png'),'-vf','pad=ceil(iw/2)*2:ceil(ih/2)*2,tpad=stop_mode=clone:stop_duration=4.0','-c:v','libx264','-crf','14','-pix_fmt','yuv420p','-movflags','+faststart',path.join(ROOT,'assets/windows',name+'.mp4')]);
   console.log(name,i,'frames →',`assets/windows/${name}.mp4`,clip);
 }
 await b.close()})()
