@@ -1,0 +1,37 @@
+/* Shared look for the KRNL0 Instagram carousels (1080 x 1350, 4:5).
+   Link from a slide:  <link rel="stylesheet" href="../_shared/brand.css">  (adjust the relative path)
+   One colour per slide (the site's "one colour per hour"): --acid, --lav, --cyan, --coral, --paper, --ink. */
+@font-face { font-family: "Geist"; font-weight: 600; src: url("fonts/geist-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Geist"; font-weight: 700; src: url("fonts/geist-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Geist"; font-weight: 800; src: url("fonts/geist-latin-800-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; src: url("fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 700; src: url("fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 800; src: url("fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); }
+
+:root {
+  --acid: #c9f158; --lav: #a98bf6; --cyan: #22d3ee; --coral: #ee8466; --paper: #f4efe2; --ink: #0a0908; --app: #141414;
+  --sans: "Geist", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #000; }
+.slide { position: relative; width: 1080px; height: 1350px; overflow: hidden; font-family: var(--sans); color: var(--ink); }
+.slide.acid { background: var(--acid); } .slide.lav { background: var(--lav); } .slide.cyan { background: var(--cyan); }
+.slide.coral { background: var(--coral); } .slide.paper { background: var(--paper); } .slide.ink { background: var(--ink); color: var(--paper); }
+/* headline: huge, tight, 800 weight. Keep to 2-3 short lines; never smaller than ~84px. */
+.headline { font-weight: 800; font-size: 120px; line-height: .95; letter-spacing: -0.055em; }
+.sub { font-weight: 600; font-size: 44px; line-height: 1.2; letter-spacing: -0.02em; }
+/* mono chip, like the site's time chips */
+.chip { display: inline-block; font-family: var(--mono); font-weight: 800; font-size: 28px; letter-spacing: .02em; padding: 10px 20px; border-radius: 999px; background: var(--ink); color: var(--paper); }
+/* giant ghost digits behind content (tone-on-tone, decorative) */
+.ghost { position: absolute; font-family: var(--mono); font-weight: 800; font-size: 520px; letter-spacing: -0.06em; line-height: .8; color: currentColor; opacity: .09; pointer-events: none; }
+/* app window screenshot: show WHOLE windows, never a sliver; rounded + shadow added here, not baked into the PNG */
+.win { position: absolute; border-radius: 22px; overflow: hidden; box-shadow: 0 40px 80px rgba(0,0,0,.30), 0 10px 24px rgba(0,0,0,.22); }
+.win img { display: block; width: 100%; height: 100%; }
+/* K R N L 0 tiles (end slide) */
+.tiles { display: flex; gap: 14px; } .tiles b { width: 118px; height: 118px; border: 5px solid var(--ink); border-radius: 22px; display: grid; place-items: center; font-family: var(--sans); font-weight: 800; font-size: 82px; color: var(--ink); }
+.tiles b:nth-child(1) { background: var(--acid); } .tiles b:nth-child(2) { background: var(--cyan); } .tiles b:nth-child(3) { background: var(--coral); } .tiles b:nth-child(4) { background: var(--lav); } .tiles b:nth-child(5) { background: var(--paper); }
+/* top bar: logo + handle on the left, "1/6" on the right; swipe cue bottom-right */
+.bar { position: absolute; top: 56px; left: 64px; right: 64px; display: flex; align-items: center; justify-content: space-between; font-family: var(--mono); font-weight: 800; font-size: 26px; }
+.bar .brand { display: flex; align-items: center; gap: 14px; } .bar .brand img { width: 52px; height: 52px; border-radius: 13px; }
+.swipe { position: absolute; right: 64px; bottom: 56px; font-family: var(--mono); font-weight: 800; font-size: 26px; display: flex; align-items: center; gap: 10px; }
+.cta { display: inline-block; background: var(--ink); color: var(--paper); font-weight: 800; font-size: 46px; letter-spacing: -0.02em; padding: 24px 44px; border-radius: 999px; }

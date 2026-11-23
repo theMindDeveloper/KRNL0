@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- KRNL0 app icon, "Lit Core": a dark 3x3 voxel cube whose centre voxel
+       glows acid on every face. Full-bleed master; scripts/generate-icons.mjs
+       adds the per-platform margin and writes icon.png / icon.ico / icon.icns. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0C0C0C"/>
+      <stop offset="1" stop-color="#020202"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+    <pattern id="cellT" width="33.333" height="33.333" patternUnits="userSpaceOnUse">
+      <rect x="2.5" y="2.5" width="28.33" height="28.33" rx="4" fill="#4A4A4A"/>
+    </pattern>
+    <pattern id="cellL" width="33.333" height="33.333" patternUnits="userSpaceOnUse">
+      <rect x="2.5" y="2.5" width="28.33" height="28.33" rx="4" fill="#303030"/>
+    </pattern>
+    <pattern id="cellR" width="33.333" height="33.333" patternUnits="userSpaceOnUse">
+      <rect x="2.5" y="2.5" width="28.33" height="28.33" rx="4" fill="#1C1C1C"/>
+    </pattern>
+  </defs>
+  <rect width="200" height="200" rx="45" fill="url(#tile)"/>
+  <rect width="200" height="200" rx="45" fill="url(#sheen)"/>
+  <rect x="0.75" y="0.75" width="198.5" height="198.5" rx="44.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.07" stroke-width="1.5"/>
+  <g transform="translate(100,100) scale(0.66)">
+    <path d="M0,-100 L86.6,-50 L86.6,50 L0,100 L-86.6,50 L-86.6,-50Z" fill="#050505"/>
+    <g transform="matrix(0.866,-0.5,0.866,0.5,-86.6,-50)">
+      <rect width="100" height="100" fill="url(#cellT)"/>
+      <rect x="35.8" y="35.8" width="28.33" height="28.33" rx="4" fill="#B5E03E" filter="url(#glow)" opacity="0.6"/>
+      <rect x="35.8" y="35.8" width="28.33" height="28.33" rx="4" fill="#E6FF9C"/>
+    </g>
+    <g transform="matrix(0.866,0.5,0,1,-86.6,-50)">
+      <rect width="100" height="100" fill="url(#cellL)"/>
+      <rect x="35.8" y="35.8" width="28.33" height="28.33" rx="4" fill="#B5E03E"/>
+    </g>
+    <g transform="matrix(0.866,-0.5,0,1,0,0)">
+      <rect width="100" height="100" fill="url(#cellR)"/>
+      <rect x="35.8" y="35.8" width="28.33" height="28.33" rx="4" fill="#9BC232"/>
+    </g>
+  </g>
+</svg>
