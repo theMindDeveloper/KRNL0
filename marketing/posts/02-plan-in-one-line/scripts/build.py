@@ -9,7 +9,7 @@ CSS = """
 .h .headline { font-size: 112px; }
 .sub { position: absolute; left: 64px; right: 64px; top: 478px; max-width: 900px; opacity: .85; }
 .ghost { right: -30px; top: 520px; font-size: 440px; }
-.win { border-radius: 14px; }
+.win { border-radius: 14px; box-shadow: 0 0 0 3px var(--ink), 0 40px 80px rgba(0,0,0,.30), 0 10px 24px rgba(0,0,0,.22); }
 .slide.ink .bar .brand img { box-shadow: 0 0 0 2px rgba(244,239,226,.28); }
 .typed { position: absolute; left: 64px; top: 478px; display: inline-flex; align-items: center; gap: 14px; background: var(--ink); color: var(--paper); font-family: var(--mono); font-weight: 700; font-size: 31px; padding: 18px 28px; border-radius: 18px; }
 .typed i { display: inline-block; width: 14px; height: 36px; background: var(--acid); border-radius: 3px; }
@@ -36,16 +36,16 @@ S = {}
 S[1] = page(1, 'acid', bar(1) +
   '<div class="h" style="top:150px"><div class="headline">Plan your day<br>in one line.</div></div>'
   '<div class="typed">Review the proposal 11:00 1h<i></i></div>'
-  + win('cal-added.png', 210, 600, 660, 560/540))
+  + win('cal-added.png', 100, 590, 880, 1260/1620))
 # 2 type it
 S[2] = step(2, 'lav', '01 · TYPE', 'Write it like', 'you’d say it.', 'Day, time and length are read for you.',
-  win('todo-typed.png', 200, 590, 680, 1.0))
+  win('todo-typed.png', 175, 575, 730, 1.0))
 # 3 enter
-S[3] = step(3, 'cyan', '02 · ENTER', 'Press Enter.', 'It’s planned.', 'It’s on your calendar at 11:00, and in your list.', pair('todo-added.png', 'cal-added.png'))
+S[3] = step(3, 'cyan', '02 · ENTER', 'Press Enter.', 'It’s planned.', 'It’s on your calendar at 11:00, and in your list.', win('todo-added.png', 175, 575, 730, 1.0))
 # 4 drag
-S[4] = step(4, 'coral', '03 · DRAG', 'No time yet?', 'Drag it in.', 'Pick up any plan and drop it on the calendar.', pair('todo-drag.png', 'cal-drag.png'))
+S[4] = step(4, 'coral', '03 · DRAG', 'No time yet?', 'Drag it in.', 'Pick up any plan and drop it on the calendar.', win('cal-drag.png', 100, 620, 880, 1260/1620))
 # 5 drop
-S[5] = step(5, 'paper', '04 · DROP', 'Dropped.', 'It has a time.', 'Your list shows the time too.', pair('todo-dropped.png', 'cal-dropped.png'))
+S[5] = step(5, 'paper', '04 · DROP', 'Dropped.', 'It has a time.', 'Your list shows the time too.', win('todo-dropped.png', 175, 575, 730, 1.0))
 # 6 cheat sheet
 rows = [('Gym 18:00 1h30', 'today · <b>18:00</b> · <b>1h30</b>'),
         ('Call mom tomorrow at 5pm', '<b>tomorrow</b> · <b>17:00</b>'),

@@ -12,7 +12,7 @@
 
     // ── windows ── (the app draws them as one row, in x order; Clock/Analytics/Terminal go last and stay hidden in the film)
     const todo = byKind('todo'), cal = byKind('calendar'), habit = byKind('habit'), pomo = byKind('pomo');
-    place(todo, 0, 0, 540, 540); place(cal, 100, 0, 540, 540); place(habit, 200, 0, 540, 540); place(pomo, 300, 0, 540, 540);
+    place(todo, 0, 0, 600, 440); place(cal, 100, 0, 600, 440); place(habit, 200, 0, 600, 440); place(pomo, 300, 0, 600, 440);
     byKind('clock').position = { x: 400, y: 0 }; byKind('analytics').position = { x: 500, y: 0 }; byKind('term').position = { x: 600, y: 0 };
 
     // ── plans (the first three are on the calendar; "Send the invoice" has no time yet and is dragged on live) ──

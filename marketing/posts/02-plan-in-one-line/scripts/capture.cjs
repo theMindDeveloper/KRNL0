@@ -10,7 +10,7 @@ const union=async(p,ids,padX,padY=padX)=>{const bs=[];for(const id of ids)bs.pus
 const addPlanClick=(p)=>p.evaluate(()=>{const n=document.querySelector('[data-id="mother-todo"]');const t=[...n.querySelectorAll('*')].find(e=>e.children.length===0&&/^add a plan$/i.test((e.textContent||'').trim()));t&&t.click();});
 (async()=>{
  // ── A: type the line, press Enter ──
- {const {b,p,ground,fit}=await open({zoom:6});await ground('#141414');await fit(['mother-todo','mother-calendar']);
+ {const {b,p,ground,fit}=await open({zoom:9,th:540,ch:420,hr:[10,16],dsf:3});await ground('#ffffff');await fit(['mother-todo','mother-calendar']);
   const T=await p.evaluate(()=>document.querySelector('.react-flow__viewport').style.transform);
   const pin=async(ms)=>{await p.clock.runFor(ms);await p.evaluate(t=>{const v=document.querySelector('.react-flow__viewport');if(v&&v.style.transform!==t)v.style.transform=t;},T);};
   const el=(id,name)=>p.locator(`[data-id="${id}"] .mother-frame`).screenshot({path:path.join(OUT,name)});
@@ -23,7 +23,7 @@ const addPlanClick=(p)=>p.evaluate(()=>{const n=document.querySelector('[data-id
   await el('mother-todo','todo-added.png');await el('mother-calendar','cal-added.png');
   await b.close();}
  // ── B: drag "Send the invoice" onto 15:00 (element shots of both windows at each moment; the slide composes them) ──
- {const {b,p,ground,fit}=await open({zoom:6,review:true});await ground('#141414');await fit(['mother-todo','mother-calendar']);
+ {const {b,p,ground,fit}=await open({zoom:9,th:540,ch:420,hr:[10,16],dsf:3,review:true});await ground('#ffffff');await fit(['mother-todo','mother-calendar']);
   const T=await p.evaluate(()=>document.querySelector('.react-flow__viewport').style.transform);
   const pin=async(ms)=>{await p.clock.runFor(ms);await p.evaluate(t=>{const v=document.querySelector('.react-flow__viewport');if(v&&v.style.transform!==t)v.style.transform=t;},T);};
   const both=async(tag)=>{for(const [id,n] of [['mother-todo','todo'],['mother-calendar','cal']])await p.locator(`[data-id="${id}"] .mother-frame`).screenshot({path:path.join(OUT,`${n}-${tag}.png`)});};

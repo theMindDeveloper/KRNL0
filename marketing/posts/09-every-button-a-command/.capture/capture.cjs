@@ -23,7 +23,7 @@ const b=await chromium.launch();
 const p=await b.newPage({viewport:{width:1500,height:1000},deviceScaleFactor:Number(process.env.DPR||2)});
 p.on('pageerror',e=>console.log('PE',e.message.slice(0,200)));
 await p.clock.install({time:new Date('2026-11-24T10:30:00')});
-await p.addInitScript({content:'window.__PRE=1;'});
+await p.addInitScript({content:"try{localStorage.setItem('krnl0-theme','light')}catch(e){}"});
 await p.addInitScript({content:fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
 await p.addInitScript({content:`window.__OUT=${JSON.stringify(OUTMAP)};`});
 await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1200);await p.clock.runFor(4000);

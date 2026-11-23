@@ -20,7 +20,7 @@
       mk('h-read', 'Read 20 pages', 'book', 'cyan', readLog),
       mk('h-water', 'Drink water', 'water', 'rust', waterLog),
       ...(stretchLog ? [mk('h-stretch', 'Stretch', 'run', 'plum', stretchLog)] : []),
-      ...(journalLog ? [mk('h-journal', 'Evening journal', 'book', 'acid', journalLog)] : []),
+      ...(journalLog ? [mk('h-journal', 'Evening journal', 'book', 'ink', journalLog)] : []),
     ];
     if (V === 'empty') habit.state = { habits: [] };
     else if (V === 'repair') habit.state = { habits: rows(run(2, 9), run(1, 4), run(1, 2), run(1, 3), null) };

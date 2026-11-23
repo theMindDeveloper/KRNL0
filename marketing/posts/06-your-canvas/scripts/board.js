@@ -9,7 +9,7 @@
     const byKind = (k) => nodes.find((n) => n.kind === k);
     const place = (n, x, y, w, h) => { n.position = { x, y }; n.config = { ...n.config, canvasSize: { width: w, height: h } }; };
     const todo = byKind('todo'), cal = byKind('calendar'), habit = byKind('habit'), pomo = byKind('pomo');
-    place(todo, 0, 0, 520, 520); place(cal, 100, 0, 520, 520); place(habit, 200, 0, 520, 520); place(pomo, 300, 0, 520, 520);
+    place(todo, 0, 0, 440, 400); place(cal, 100, 0, 520, 520); place(habit, 200, 0, 520, 520); place(pomo, 300, 0, 520, 520);
     byKind('clock').position = { x: 400, y: 0 }; byKind('analytics').position = { x: 500, y: 0 }; byKind('term').position = { x: 600, y: 0 };
 
     for (const n of [cal, habit, pomo, byKind('clock'), byKind('analytics'), byKind('term')]) n.config = { ...n.config, stationHidden: window.__KEEP__ && window.__KEEP__.includes(n.kind) ? false : true };
@@ -41,7 +41,7 @@
     // ── things around the Todos window (free canvas). Row of windows starts at x = -1400 (Todos), each 520 + 20 gap ──
     const T = (id, text, look, x, y, w, h, fs = 22) => nodes.push({ id, kind: 'text', position: { x, y }, isMother: false, state: { text, look, width: w, height: h }, config: { fontSize: fs } });
     const S = (c) => ({ kind: 'sticky', color: c });
-    const X0 = -840;           // right of the Todos window
+    const X0 = -940;           // right of the Todos window (440 wide + 20 gap, row starts at -1400)
     T('c-s1', 'Ask Prof. Meyer about the deadline', S('#ffe28a'), X0, 10, 240, 200);
     T('c-s2', 'Pitch deck v2: add the numbers', S('#ffb3c7'), X0, 250, 240, 200);
     T('c-t1', 'call mum on Sunday', { kind: 'ellipse', color: '#b9f5a8' }, X0 + 270, 20, 250, 120, 24);

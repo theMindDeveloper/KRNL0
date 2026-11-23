@@ -42,20 +42,29 @@ def art_synth(c):  # smooth drifting chords: sine layers + orbits
     return o
 
 SLIDES = []
-def sound_slide(i, bg, fg, chip, title, mood, img, art, hs=500):
+def win(src, x, y, w, ink_outline=True, scale_px=300, extra=""):
+    """A whole real window with a thin ink outline + shadow so a light window separates from a light slide."""
+    from PIL import Image
+    iw, ih = Image.open(ROOT / "assets" / src).size
+    h = round(w * ih / iw); r = round(14 * w / scale_px)
+    ring = f"0 0 0 3px {INK}, " if ink_outline else ""
+    return h, f'''<div class="win" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px;border-radius:{r}px;overflow:visible;box-shadow:{ring}0 44px 70px rgba(0,0,0,.34), 0 10px 20px rgba(0,0,0,.22)"><img src="assets/{src}" style="width:100%;height:100%;display:block"></div>'''
+
+def sound_slide(i, bg, fg, chip, title, mood, img, art, H=790):
     from PIL import Image
     iw, ih = Image.open(ROOT / "assets" / img).size
-    h = round(hs * ih / iw)
-    x = (1080 - hs) // 2
+    w = round(H * iw / ih)
+    x = (1080 - w) // 2
+    h, w_html = win(img, x, 1262 - H, w)
     html = f'''<div class="slide" style="background:{bg};color:{fg}">
 {bar(i, fg)}
 <svg style="position:absolute;left:0;top:0" width="1080" height="1350" viewBox="0 0 1080 1350">{art}</svg>
-<div style="position:absolute;left:64px;top:168px;right:64px">
+<div style="position:absolute;left:64px;top:140px;right:64px">
   <span class="chip" style="background:{fg};color:{bg}">{chip}</span>
-  <div class="headline" style="margin-top:34px;font-size:150px">{title}</div>
-  <div class="sub" style="margin-top:30px;max-width:900px;font-size:46px">{mood}</div>
+  <div class="headline" style="margin-top:24px;font-size:128px">{title}</div>
+  <div class="sub" style="margin-top:20px;max-width:900px;font-size:40px">{mood}</div>
 </div>
-<img src="assets/{img}" style="position:absolute;left:{x}px;top:{1250 - h}px;width:{hs}px;filter:drop-shadow(0 34px 44px rgba(0,0,0,.38)) drop-shadow(0 8px 14px rgba(0,0,0,.28))">
+{w_html}
 {swipe(fg)}
 </div>'''
     SLIDES.append(html)
@@ -83,17 +92,17 @@ sound_slide(5, "#ee8466", INK, "fire · crackling fire", "Fire.", "A low roar wi
 sound_slide(6, "#c9f158", INK, "synth · ambient synth", "Synth.", "Slow chords that drift. Music without a beat to follow.", "radio-synth.png", art_synth(INK))
 # 7 mix + start (radio + timer, both real windows, shown whole)
 from PIL import Image
-rw, rh = Image.open(ROOT / "assets/radio-mix.png").size
-RW = 446; RH = round(RW * rh / rw)
-tw = 440
+RW = 460
+rh_, radio_html = win("radio-mix.png", 1080 - 64 - RW, 0, RW, ink_outline=False)
+th_, timer_html = win("timer.png", 64, 0, RW, ink_outline=False, scale_px=540)
+radio_html = radio_html.replace("top:0px", f"top:{1236 - rh_}px"); timer_html = timer_html.replace("top:0px", f"top:{1236 - th_}px")
 steps = "".join(f'<span class="chip" style="background:#1d1d1d;color:#f4efe2;border:2px solid rgba(244,239,226,.2)"><b style="color:#c9f158">{n}</b>&nbsp; {t}</span>' for n, t in (("1", "tap two sounds"), ("2", "press start")))
 SLIDES.append(f'''<div class="slide ink" style="background:{INK}">
 {bar(7, "#f4efe2")}
 <div class="headline" style="position:absolute;left:64px;top:170px;color:#c9f158;font-size:122px">Mix two.<br>Then press start.</div>
 <div class="sub" style="position:absolute;left:64px;top:446px;color:#f4efe2;max-width:900px;font-size:42px">Tap a second sound to layer it. Each one has its own volume.</div>
 <div style="position:absolute;left:64px;top:566px;display:flex;gap:14px">{steps}</div>
-<img src="assets/timer.png" style="position:absolute;left:64px;top:{1236 - tw}px;width:{tw}px;filter:drop-shadow(0 30px 40px rgba(0,0,0,.6))">
-<img src="assets/radio-mix.png" style="position:absolute;left:{1080 - 64 - RW}px;top:{1236 - RH}px;width:{RW}px;filter:drop-shadow(0 30px 40px rgba(0,0,0,.6))">
+{timer_html}{radio_html}
 {swipe("#f4efe2")}
 </div>''')
 # 8 end
