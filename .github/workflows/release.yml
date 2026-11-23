@@ -28,8 +28,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS is built by the maintainer on a Mac and its .dmg attached to
-          # the release by hand (docs/releases/RELEASING.md → "macOS build").
+          # macOS is built on the maintainer's Mac and its .dmg attached to the
+          # draft with `npm run release -- mac` (docs/releases/RELEASING.md →
+          # "macOS build"); krnl0.com's Mac button picks it up from the release.
           # GitHub's shared macOS runners queued for too long on v0.10.1. To
           # build it here again, add back:
           #   - os: macos-15

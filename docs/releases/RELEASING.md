@@ -145,25 +145,36 @@ updated by the Microsoft Store)".
 
 ---
 
-## macOS build (by hand, on a Mac)
+## macOS build (on a Mac) — every release, before Publish
 
-CI builds Windows only. GitHub's shared macOS runners queued for too long on v0.10.1.
-macOS installs are notify-only: they read GitHub's latest release and open its page, so the
-`.dmg` can be attached any time after publishing, with no metadata file to match.
+CI builds Windows only (GitHub's shared macOS runners queued for too long on v0.10.1). The
+`.dmg` is built on an Apple silicon Mac and attached to the draft. krnl0.com's download page
+reads the releases from GitHub and offers the newest `*arm64*.dmg` as the Mac download, so
+attaching it is all the website needs. macOS installs are notify-only (they open the release
+page), so there is no `latest-mac.yml` to match.
 
-On a Mac, from a checkout of the **same tag**:
+After `tag` has built the draft, on the Mac, from a checkout of **that tag**:
 
 ```bash
 git checkout vX.Y.Z
 npm ci
-npm run build
-npx electron-builder --mac --arm64 --publish never
-gh release upload vX.Y.Z release/KRNL0-X.Y.Z-arm64.dmg release/KRNL0-X.Y.Z-arm64.dmg.blockmap
+npm run release -- mac
 ```
 
-Until the `.dmg` is attached, Mac users who click **Download** land on a release page with
-Windows files only. Say so in the notes, or attach the `.dmg` before publishing. To build macOS
-in CI again, restore the commented `macos-15` entry in `release.yml`.
+`mac` checks that HEAD is the tag and the draft exists, fetches Electron and rebuilds node-pty
+(npm 11+ skips dependency install scripts it hasn't been told to allow, which leaves no
+Electron binary and no terminal), builds, ad-hoc signs (`build/afterPack.js`), verifies the
+signature and the image, and uploads `KRNL0-X.Y.Z-arm64.dmg` + `.blockmap` to the release.
+`check` says when the `.dmg` is still missing.
+
+- Google sign-in (Calendar) comes from `KRNL0_GOOGLE_CLIENT_ID` / `_SECRET` at build time.
+  CI has them as secrets; export them in the Mac's shell before `mac` or the Mac build says
+  Google sign-in is not set up (everything else works).
+- Smoke test before Publish: `release/mac-arm64/KRNL0.app` with
+  `KRNL0_USER_DATA=<tmp> KRNL0_BOARD_DIR=<tmp>` (keeps your real board out of it). Start the
+  Pomo, minimise: the floating timer must appear; restore: it hides. Run `krnl pomo start` in
+  its terminal.
+- To build macOS in CI again instead, restore the commented `macos-15` entry in `release.yml`.
 
 ## First release with the updater
 

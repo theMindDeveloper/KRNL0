@@ -7,6 +7,8 @@
 //   npm run release -- prepare patch|minor    release PR (version, CHANGELOG, history; checks)
 //   npm run release -- tag                    after the PR is merged: tag main, CI builds the draft
 //   npm run release -- check                  the draft has everything (installer, latest.yml, web app)
+//   npm run release -- mac                    on an Apple silicon Mac, from the tag: build the .dmg and
+//                                             attach it to the draft (the website's Mac download)
 //   npm run release -- publish --yes          ONLY after the owner said OK: publish, then start the
 //                                             server's follow workflow (its release PR)
 //
@@ -173,8 +175,38 @@ function check() {
     if (have !== hash) fail('the web app does not match its .sha256')
   } finally { rmSync(tmp, { recursive: true, force: true }) }
   say(`v${v} draft: ${d.draft ? 'draft' : 'PUBLISHED'} — installer, blockmap, latest.yml (${v}), web app with a matching checksum.`)
+  if (!names.includes(`KRNL0-${v}-arm64.dmg`)) say(`No Mac .dmg yet: on a Mac, git checkout v${v} && npm run release -- mac (before publishing).`)
   say(d.html_url)
   say('Ask the owner for an OK. Then: npm run release -- publish --yes')
+}
+
+/** macOS (Apple silicon) .dmg, built on this Mac from the tag and attached to the release.
+ *  CI builds Windows only; the website's Mac button finds the .dmg on the release by name. */
+function mac() {
+  if (process.platform !== 'darwin' || process.arch !== 'arm64') fail('the Mac build runs on an Apple silicon Mac.')
+  checkTree()
+  out('git', ['fetch', 'origin', 'main', '--tags'])
+  const v = JSON.parse(out('git', ['show', 'origin/main:package.json'])).version
+  if (!out('git', ['tag', '--list', `v${v}`])) fail(`v${v} is not tagged yet. Run: npm run release -- tag`)
+  if (out('git', ['rev-parse', 'HEAD']) !== out('git', ['rev-parse', `v${v}^{commit}`])) fail(`check out the tag first: git checkout v${v}`)
+  if (!draftOf(v)) fail(`no release for v${v} yet. Wait for its build: npm run release -- check`)
+  // npm 11+ skips dependency install scripts it has not been told to allow:
+  // no Electron binary and no node-pty for Electron means a broken app.
+  if (!existsSync(join(ROOT, 'node_modules', 'electron', 'dist'))) {
+    say('Fetching Electron (npm skipped its install script)...')
+    live('node', [join(ROOT, 'node_modules', 'electron', 'install.js')])
+  }
+  live('npx', ['electron-rebuild', '-f', '-w', 'node-pty'])
+  if (!process.env['KRNL0_GOOGLE_CLIENT_ID']) say('Note: KRNL0_GOOGLE_CLIENT_ID is not set here, so this build says Google sign-in is not set up. Export it (and _SECRET) first to include it.')
+  rmSync(join(ROOT, 'release'), { recursive: true, force: true })
+  live('npm', ['run', 'build'])
+  live('npx', ['electron-builder', '--mac', '--arm64', '--publish', 'never'])
+  const dmg = join(ROOT, 'release', `KRNL0-${v}-arm64.dmg`)
+  if (!existsSync(dmg)) fail(`electron-builder made no ${dmg}`)
+  live('codesign', ['--verify', '--deep', '--strict', join(ROOT, 'release', 'mac-arm64', 'KRNL0.app')])
+  live('hdiutil', ['verify', dmg])
+  live('gh', ['release', 'upload', `v${v}`, '-R', REPO, '--clobber', dmg, `${dmg}.blockmap`])
+  say(`Attached KRNL0-${v}-arm64.dmg to v${v}. krnl0.com's Mac button picks it up from the release.`)
 }
 
 function publish(yes) {
@@ -205,8 +237,9 @@ try {
   else if (cmd === 'prepare') prepare(arg)
   else if (cmd === 'tag') tag()
   else if (cmd === 'check') check()
+  else if (cmd === 'mac') mac()
   else if (cmd === 'publish') publish(process.argv.includes('--yes'))
-  else fail('status | prepare patch|minor | tag | check | publish --yes')
+  else fail('status | prepare patch|minor | tag | check | mac | publish --yes')
 } catch (err) {
   fail(err instanceof Error ? err.message : String(err))
 }
