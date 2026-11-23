@@ -3480,3 +3480,15 @@ Typecheck clean; all tests pass.
 **Files changed:** `CHANGELOG.md`, `docs/releases/v0.16.1.md`
 
 **Summary:** Notes for the small patch: the calm saved badge and the Microsoft Store channel. The owner asked for a small release; no What's new slides (patch, nothing new to learn).
+
+## [2026-11-23] — Release v0.16.1
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.16.1`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.16.0 → 0.16.1`. Notes: `docs/releases/v0.16.1.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
