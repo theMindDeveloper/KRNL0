@@ -7,7 +7,7 @@
 
 import { minorOf } from './appState';
 
-export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone' | 'update' | 'calendar' | 'events' | 'move';
+export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone' | 'update' | 'calendar' | 'events' | 'move' | 'calendars' | 'bothways' | 'phonetoday';
 /** What "Show me" does for a highlight. */
 export type WhatsNewAction = 'pomo' | 'feedback' | 'settings' | 'tour' | 'none';
 
@@ -40,6 +40,52 @@ export interface WhatsNewRelease {
 }
 
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    // Designed on the canvas "KRNL0 0.16 · What's new" (approved by the owner, 2026-11-23).
+    minor: '0.16',
+    date: 'Nov 2026',
+    summary: 'Your Google and iCloud calendars beside your plans, your plans on your phone',
+    items: [
+      {
+        label: 'Your Google and iPhone calendars',
+        kicker: 'New · Calendars',
+        caption: 'Google and iCloud, beside your plans.',
+        title: 'Your other calendars,\nright here.',
+        body: 'Sign in with Google or Apple (iCloud) once, in Calendar › Add your calendars. Their events sit on your Calendar next to your plans, outlined so you can tell them apart. KRNL0 never changes them.',
+        art: 'calendars',
+        action: 'tour',
+        tour: 'calendars',
+      },
+      {
+        label: 'Your plans on your phone',
+        kicker: 'New · Both ways',
+        caption: 'A KRNL0 calendar on your phone, kept in step.',
+        title: 'Your plans,\non your phone.',
+        body: 'Leave “Put KRNL0 on your Google too” on when you sign in: your events and planned tasks go to a calendar called KRNL0 there. Move or delete one on your phone and KRNL0 follows. Works with Google and iCloud.',
+        art: 'bothways',
+        action: 'tour',
+        tour: 'calendars',
+      },
+      {
+        label: 'Today on one phone screen',
+        kicker: 'New · Phone',
+        caption: 'The clock, your day and one timer.',
+        title: 'Today fits\none screen.',
+        body: 'On your phone, Today shows the date, your day on the clock and one timer, with no scrolling. Your todos have their own tab; Insights and Canvas are under More.',
+        art: 'phonetoday',
+        action: 'none',
+      },
+    ],
+    more: [
+      'Add a calendar link or bring in an .ics file; save your plans as one for any other calendar app.',
+      'A new tour, “Your other calendars”, in Help › Tutorials.',
+      'Commands: krnl cal link, links, sync, import, export, accounts, signout.',
+      'The top bar stays still on Saved and Synced, and folds neatly when the window is narrow.',
+      'What\'s new fits a phone screen, with Done always in reach.',
+      'After signing in with Google, the browser shows a KRNL0 page, not a blank one.',
+      'What KRNL0 does with your calendars, in plain words: krnl0.com/privacy.html',
+    ],
+  },
   {
     // Designed on the canvas "KRNL0 0.15 · What's new and tours", Direction A
     // (picked by the owner, 2026-11-22).

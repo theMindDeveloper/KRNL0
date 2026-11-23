@@ -5,6 +5,24 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] — 2026-11-23
+
+### Added
+- Your other calendars: sign in with Google or Apple (iCloud), or add a calendar link (.ics); their events sit on the Calendar beside your plans, outlined, and are never changed (Decision 64).
+- Your plans on your phone: "Put KRNL0 on your Google / iPhone too" keeps a calendar called KRNL0 there in step both ways; moves and deletes on the phone come back to KRNL0.
+- .ics files in and out; the calendars in the Calendar's menu and in Settings; `krnl cal link | links | sync | import | export | accounts | signout`.
+- A new "Your other calendars" tour in Help › Tutorials.
+- Phone: Today on one screen (date, the day on the clock, one timer); Todos has its own tab; Insights and Canvas under More.
+- A KRNL0 page in the browser after Google sign-in; a privacy page at krnl0.com/privacy.html.
+
+### Changed
+- Google is asked only for what KRNL0 needs: read your calendars and events, and write only the KRNL0 calendar it made.
+- The top bar stays still when the save status changes and folds by its measured width in a narrow window; its menus and dialogs always open whole.
+- The window has a minimum size.
+
+### Fixed
+- What's new fits a phone screen, with its buttons always in reach.
+
 ## [0.15.0] — 2026-11-22
 
 ### Added
