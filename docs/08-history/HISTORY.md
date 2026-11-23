@@ -3440,3 +3440,11 @@ Typecheck clean; all tests pass.
 - Version `0.15.0 → 0.16.0`. Notes: `docs/releases/v0.16.0.md`.
 - What's new 0.16 designed on the canvas "KRNL0 0.16 · What's new" and approved by the owner: "Your other calendars, right here.", "Your plans, on your phone.", "Today fits one screen.", plus the full-notes list. The three pictures are rendered from the canvas at 2x with a see-through background like the earlier plates. Show me on the first two starts the "Your other calendars" tour; the dialog no longer offers Show me for a desktop-only tour on the website.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+## [2026-11-23] — v0.16.0 published, with KRNL0 server 0.2.5
+
+**Type:** Release (published)
+**PRs/Commits:** #282 and #283 (the feature work), #284 (release PR), tag `v0.16.0`; server: theMindDeveloper/krnl0-server#23, #24; website: theMindDeveloper/krnl0-website#6
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:** Your Google and iCloud calendars beside your plans, your plans on your phone both ways, and Today on one phone screen (notes: `docs/releases/v0.16.0.md`, What's new designed on the canvas "KRNL0 0.16 · What's new" and approved by the owner). The owner said "Yes, release it". Full suite green in the release PR (313 files, 3050 tests); the draft checked by `npm run release -- check` (installer, blockmap, `latest.yml` 0.16.0, web app checksum). The draft's installer was also unpacked: its `app.asar` is 0.16.0, holds the Google client id and secret (counted, never printed) and the 0.16 What's new. Published at 05:33 UTC. The follow workflow opened server 0.2.5 (website = KRNL0 0.16.0), which was merged, built (release and CI runs green, signature checked in CI) and published at 05:39 UTC; `:latest` was checked against the digest in `release.json`. The KRNL0 website shows the 0.16 news and the fallback version 0.16.0.
