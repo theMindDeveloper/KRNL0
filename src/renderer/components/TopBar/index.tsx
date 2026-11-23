@@ -9,7 +9,7 @@
 import { useEasyMode } from '../../store/uiMode';
 import { CANVAS_FIT_PADDING } from '../Canvas/fitPadding';
 import { SettingsIcon } from '../ui/SettingsIcons';
-import { useState, useEffect, useLayoutEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutMenu } from '../ui/LayoutMenu';
@@ -145,10 +145,32 @@ export function TopBar() {
   };
 
 
+  // A narrow window: the bar folds down step by step instead of overlapping (data-fold, tokens.css).
+  // Measured here, not with CSS container queries: those would trap the menus and dialogs drawn
+  // inside the bar (board menu, layout menu, Connect server) in the bar's 44 px.
+  const barRef = useRef<HTMLDivElement>(null);
+  const [fold, setFold] = useState('');
+  useLayoutEffect(() => {
+    const el = barRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = (): void => {
+      const cs = getComputedStyle(el);
+      const w = el.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0');
+      const next = [w <= 1300 && 'labels', w <= 900 && 'words', w <= 700 && 'toggles'].filter(Boolean).join(' ');
+      setFold((prev) => (prev === next ? prev : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div
+      ref={barRef}
       data-testid="topbar"
       className="krnl-topbar"
+      data-fold={fold}
       style={{
         height: 44,
         width: '100%',
@@ -160,9 +182,6 @@ export function TopBar() {
         // narrows, the bar folds down instead (container queries in tokens.css).
         display: 'grid',
         gridTemplateColumns: 'minmax(max-content, 1fr) auto minmax(max-content, 1fr)',
-        containerType: 'inline-size',
-        containerName: 'topbar',
-        overflow: 'hidden',
         alignItems: 'center',
         // Left padding clears the macOS traffic-light cluster so the brand
         // mark and breadcrumb never sit underneath the red/yellow/green

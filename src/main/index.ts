@@ -207,7 +207,7 @@ function createWindow(): BrowserWindow {
     width: 1440,
     height: 900,
     // Below this the top bar's right-hand buttons (Help, Settings) no longer fit beside the board name.
-    minWidth: 640,
+    minWidth: 600,
     minHeight: 420,
     backgroundColor: '#0e0d0b',
     icon: resolveWindowIcon(),
