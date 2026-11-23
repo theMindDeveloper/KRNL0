@@ -16,8 +16,8 @@ await p.addStyleTag({content:`[data-testid="topbar"],[data-testid="statusbar"],[
   *{caret-color:#c9f158}`});
 await p.evaluate(()=>{for(const e of document.querySelectorAll('div,section')){const r=e.getBoundingClientRect();if(/^\s*Good morning/.test(e.textContent||'')&&r.height<80&&r.height>20)e.style.display='none';}});
 const tick=async(n,ms=100)=>{for(let i=0;i<n;i++){await p.clock.runFor(ms);}await p.waitForTimeout(60);};
-const radio=()=>p.locator('[data-testid="ambient-radio"] > div:last-child');
-const shot=async(loc,name)=>{await loc.screenshot({path:path.join(OUT,name+'.png'),omitBackground:true});console.log('shot',name);};
+const radio=()=>p.locator('[data-testid="ambient-radio"] > div').last();
+const shot=async(loc,name)=>{const bb=await loc.evaluate(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}});await p.screenshot({path:path.join(OUT,name+'.png'),omitBackground:true,clip:bb});console.log('shot',name,Math.round(bb.width),Math.round(bb.height));};
 await tick(6);
 await shot(radio(),'radio-off');
 // 1) rain

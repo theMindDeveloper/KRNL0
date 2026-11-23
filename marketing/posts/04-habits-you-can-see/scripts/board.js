@@ -11,29 +11,30 @@
     const V = window.__V || 'week';
     const habit = b.nodes.find((n) => n.kind === 'habit');
     habit.position = { x: 0, y: 0 };
-    habit.config = { ...habit.config, view: V === 'year' ? 'year' : V === 'month' ? 'month' : 'week', canvasSize: V === 'year' ? { width: 760, height: 322 } : V === 'month' ? { width: 540, height: 340 } : V === 'repair' ? { width: 540, height: 330 } : { width: 540, height: 262 } };
+    habit.config = { ...habit.config, view: V === 'year' ? 'year' : V === 'month' ? 'month' : 'week', canvasSize: { width: 540, height: 540 } };
     const created = '2026-01-04T08:00:00.000Z';
     const mk = (id, name, icon, color, log, extra = {}) => ({ id, name, icon, createdAt: created, log, archived: false, color, ...extra });
+    const sched = { schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 30 } };
+    const rows = (runLog, readLog, waterLog, stretchLog, journalLog) => [
+      mk('h-run', 'Morning run', 'run', 'acid', runLog, sched),
+      mk('h-read', 'Read 20 pages', 'book', 'cyan', readLog),
+      mk('h-water', 'Drink water', 'water', 'rust', waterLog),
+      ...(stretchLog ? [mk('h-stretch', 'Stretch', 'run', 'plum', stretchLog)] : []),
+      ...(journalLog ? [mk('h-journal', 'Evening journal', 'book', 'acid', journalLog)] : []),
+    ];
     if (V === 'empty') habit.state = { habits: [] };
-    else if (V === 'repair') habit.state = { habits: [
-      mk('h-run', 'Morning run', 'run', 'acid', run(2, 9), { schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 30 } }),
-      mk('h-read', 'Read 20 pages', 'book', 'cyan', run(1, 4)),
-      mk('h-water', 'Drink water', 'water', 'rust', run(1, 2)),
-    ] };
-    else if (V === 'month') habit.state = { habits: [
-      mk('h-run', 'Morning run', 'run', 'acid', [...run(1, 6), ds(8), ds(9), ds(10), ds(12), ds(13), ds(15), ds(16), ds(17), ds(18), ds(19), ds(20), ds(21), ds(22)], { schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 30 } }),
-      mk('h-read', 'Read 20 pages', 'book', 'cyan', [...run(1, 4), ds(6), ds(7), ds(9), ds(10), ds(11), ds(13), ds(14), ds(17), ds(18), ds(19), ds(21), ds(22), ds(23)]),
-      mk('h-water', 'Drink water', 'water', 'rust', [...run(1, 2), ds(4), ds(5), ds(7), ds(8), ds(9), ds(11), ds(12), ds(15), ds(16), ds(20), ds(21), ds(22)]),
-    ] };
+    else if (V === 'repair') habit.state = { habits: rows(run(2, 9), run(1, 4), run(1, 2), run(1, 3), null) };
+    else if (V === 'month') habit.state = { habits: rows(
+      [...run(1, 6), ds(8), ds(9), ds(10), ds(12), ds(13), ds(15), ds(16), ds(17), ds(18), ds(19), ds(20), ds(21), ds(22)],
+      [...run(1, 4), ds(6), ds(7), ds(9), ds(10), ds(11), ds(13), ds(14), ds(17), ds(18), ds(19), ds(21), ds(22), ds(23)],
+      [...run(1, 2), ds(4), ds(5), ds(7), ds(8), ds(9), ds(11), ds(12), ds(15), ds(16), ds(20), ds(21), ds(22)],
+      [ds(1), ds(3), ds(4), ds(6), ds(8), ds(10), ds(11), ds(14), ds(16), ds(17), ds(21), ds(22)], null) };
     else if (V === 'year') habit.state = { habits: [
       mk('h-run', 'Morning run', 'run', 'acid', [...hist(330, 14, 3).filter((d) => d < ds(39)), ...run(1, 38)]),
       mk('h-read', 'Read 20 pages', 'book', 'cyan', [...hist(240, 26, 11).filter((d) => d < ds(13)), ...run(1, 12)]),
+      mk('h-water', 'Drink water', 'water', 'rust', hist(290, 22, 29)),
     ] };
-    else habit.state = { habits: [
-      mk('h-run', 'Morning run', 'run', 'acid', run(1, 6), { schedule: { kind: 'daily', timeOfDay: '07:00', durationMin: 30 } }),
-      mk('h-read', 'Read 20 pages', 'book', 'cyan', run(1, 4)),
-      mk('h-water', 'Drink water', 'water', 'rust', run(1, 2)),
-    ] };
+    else habit.state = { habits: rows(run(1, 6), run(1, 4), run(1, 2), run(1, 3), run(1, 12)) };
     b.edges = [];
     b.layoutMode = 'free';
     return b;

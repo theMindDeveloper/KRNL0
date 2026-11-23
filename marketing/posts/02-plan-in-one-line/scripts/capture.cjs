@@ -4,8 +4,8 @@ const {open,ROOT}=require('./lib.cjs');const path=require('path');const fs=requi
 const OUT=path.join(ROOT,'assets');fs.mkdirSync(OUT,{recursive:true});
 const PLAN='Review the proposal 11:00 1h';
 const SHADOW=`.react-flow__node[data-id^="mother-"]{filter:drop-shadow(0 34px 44px rgba(0,0,0,.30)) drop-shadow(0 8px 14px rgba(0,0,0,.22))}`;
-const union=async(p,ids,pad)=>{const bs=[];for(const id of ids)bs.push(await p.locator(`[data-id="${id}"]`).boundingBox());
-  const x=Math.min(...bs.map(b=>b.x))-pad,y=Math.min(...bs.map(b=>b.y))-pad,x2=Math.max(...bs.map(b=>b.x+b.width))+pad,y2=Math.max(...bs.map(b=>b.y+b.height))+pad;
+const union=async(p,ids,padX,padY=padX)=>{const bs=[];for(const id of ids)bs.push(await p.locator(`[data-id="${id}"]`).boundingBox());
+  const x=Math.min(...bs.map(b=>b.x))-padX,y=Math.min(...bs.map(b=>b.y))-padY,x2=Math.max(...bs.map(b=>b.x+b.width))+padX,y2=Math.max(...bs.map(b=>b.y+b.height))+padY;
   return {x:Math.round(x),y:Math.round(y),width:Math.round(x2-x),height:Math.round(y2-y)};};
 const addPlanClick=(p)=>p.evaluate(()=>{const n=document.querySelector('[data-id="mother-todo"]');const t=[...n.querySelectorAll('*')].find(e=>e.children.length===0&&/^add a plan$/i.test((e.textContent||'').trim()));t&&t.click();});
 (async()=>{
@@ -22,13 +22,13 @@ const addPlanClick=(p)=>p.evaluate(()=>{const n=document.querySelector('[data-id
   await inp.press('Enter');for(let k=0;k<14;k++)await pin(100);
   await el('mother-todo','todo-added.png');await el('mother-calendar','cal-added.png');
   await ground('#22d3ee');await p.addStyleTag({content:SHADOW});await pin(300);
-  await p.screenshot({path:path.join(OUT,'pair-added.png'),clip:await union(p,['mother-todo','mother-calendar'],70)});
+  await p.screenshot({path:path.join(OUT,'pair-added.png'),clip:await union(p,['mother-todo','mother-calendar'],24,90)});
   await b.close();}
  // ── B: drag "Send the invoice" onto 15:00 ──
  {const {b,p,ground,fit}=await open({zoom:6,review:true});await ground('#ee8466');await fit(['mother-todo','mother-calendar']);await p.addStyleTag({content:SHADOW});
   const T=await p.evaluate(()=>document.querySelector('.react-flow__viewport').style.transform);
   const pin=async(ms)=>{await p.clock.runFor(ms);await p.evaluate(t=>{const v=document.querySelector('.react-flow__viewport');if(v&&v.style.transform!==t)v.style.transform=t;},T);};
-  await pin(300);const clip=await union(p,['mother-todo','mother-calendar'],70);
+  await pin(300);const clip=await union(p,['mother-todo','mother-calendar'],24,90);
   await p.screenshot({path:path.join(OUT,'pair-before-drag.png'),clip});
   const row=p.locator('[data-id="mother-todo"]').getByText('Send the invoice').first();const rb=await row.boundingBox();
   const cell=p.locator('[data-testid="week-cell-2026-11-24-15"]').first();const cb=await cell.boundingBox();console.log('row',rb,'cell',cb);

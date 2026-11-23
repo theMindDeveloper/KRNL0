@@ -20,8 +20,8 @@
     task('t-gym', 'Gym', 90, 18, 0, { tag: 'health' }, { x: 600, y: Y });
     task('t-mail', 'Answer emails', 30, null, 0, { tag: 'work' }, { x: 900, y: Y });
     const cal = nodes.find(n => n.kind === 'calendar');
-    cal.config = { ...cal.config, view: 'day', hourRange: { start: 9, end: 17 }, canvasSize: { width: 540, height: 600 } };
-    cal.state = { ...cal.state, zoom: 6 };
+    cal.config = { ...cal.config, view: 'day', hourRange: { start: 9, end: 15 }, canvasSize: { width: 540, height: 600 } };
+    cal.state = { ...cal.state, zoom: 9 };
     const size = { todo: [540, 540], habit: [540, 540], pomo: [540, 540] };
     for (const n of nodes) if (n.isMother && size[n.kind]) n.config = { ...n.config, canvasSize: { width: size[n.kind][0], height: size[n.kind][1] } };
     b.edges = []; b.layoutMode = 'free';

@@ -13,11 +13,11 @@ async function session(variant, size, fn) {
   await p.addStyleTag({ content: `[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-button"],.react-flow__minimap,.react-flow__controls,.react-flow__background,[data-testid="dock"],[data-testid="dock-layer"]{display:none!important}
     html,body,#root,.react-flow,.react-flow__renderer,.react-flow__pane,.react-flow__viewport{background:transparent!important}
     .react-flow__node:not([data-id="mother-habit"]){visibility:hidden!important}
-    [data-id="mother-habit"],[data-id="mother-habit"] *{filter:none!important}` });
+    [data-id="mother-habit"],[data-id="mother-habit"] *{filter:none!important} [data-id="mother-habit"] .mother-frame{box-shadow:none!important} .mother-frame__corners{display:none!important}` });
   await p.evaluate(() => { for (const e of document.querySelectorAll('div,section')) { const r = e.getBoundingClientRect(); if (/^\s*Good (morning|afternoon|evening)/.test(e.textContent || '') && r.height < 80 && r.height > 20) e.style.display = 'none'; } });
   const fit = async () => { await p.evaluate(() => window.dispatchEvent(new CustomEvent('krnl:fit-nodes', { detail: { nodeIds: ['mother-habit'] } }))); await p.clock.runFor(1500); await p.waitForTimeout(250); };
   await fit();
-  const shot = async (name) => { const n = p.locator('[data-id="mother-habit"]'); await n.screenshot({ path: path.join(OUT, name + '.png'), omitBackground: true }); console.log('shot', name, JSON.stringify(await n.boundingBox())); };
+  const shot = async (name) => { const n = p.locator('[data-id="mother-habit"] .mother-frame'); await n.screenshot({ path: path.join(OUT, name + '.png'), omitBackground: true }); console.log('shot', name, JSON.stringify(await n.boundingBox())); };
   await fn(p, shot, fit); await b.close();
 }
 const tick = async (p, name, wait = 500) => { await p.locator(`button[title^="${name} 2026-11-24"]`).first().click(); await p.clock.runFor(wait); };

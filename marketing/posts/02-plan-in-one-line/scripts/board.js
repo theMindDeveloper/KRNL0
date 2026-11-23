@@ -25,11 +25,11 @@
         parentTodoId: todo.id, parentTaskId: null, todoItemId: itemId, pomoSessionsCompleted: 0, plannedMin: min,
         secondsAccumulated: 0, currentSessionElapsedSec: 0, kind: 'event', ...(when ? { scheduledFor: when, scheduledDurationMin: min } : {}) }, config: { showDuration: true } });
     };
-    if (window.__REVIEW) plan('t-review', 'Review the proposal', 60, at(11, 0));
     plan('t-call', 'Client call', 60, at(14, 0));
     plan('t-gym', 'Gym', 90, at(18, 0));
     plan('t-invoice', 'Send the invoice', 30, null);
     plan('t-milk', 'Buy oat milk', 10, null);
+    if (window.__REVIEW) plan('t-review', 'Review the proposal', 60, at(11, 0));   // last, so it gets the colour a plan added live gets
     cal.config = { ...cal.config, view: 'day', hourRange: { start: 9, end: 17 } };
     cal.state = { ...cal.state, zoom: window.__ZOOM || 6 };
     b.edges = []; b.layoutMode = 'free';

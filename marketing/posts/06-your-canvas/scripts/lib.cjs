@@ -12,7 +12,7 @@ async function open({w,h,dpr=1.5,mode='free',hide=true,extraCss=''}){
   await p.addInitScript({content:`window.__MODE__=${JSON.stringify(mode)};`});
   await p.addInitScript({content:fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
   await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1200);await p.clock.runFor(4000);
-  await p.addStyleTag({content:(hide?HIDE:'')+extraCss});
+  if(hide||extraCss)await p.addStyleTag({content:(hide?HIDE:'')+extraCss});
   await p.evaluate(()=>{for(const e of document.querySelectorAll('div,section')){const r=e.getBoundingClientRect();if(/^\s*Good morning/.test(e.textContent||'')&&r.height<80&&r.height>20)e.style.display='none'}});
   const fit=async(ids,ms=1400)=>{await p.evaluate(ids=>window.dispatchEvent(new CustomEvent('krnl:fit-nodes',{detail:{nodeIds:ids}})),ids);await p.clock.runFor(ms);await p.waitForTimeout(250);};
   return {b,p,fit};
