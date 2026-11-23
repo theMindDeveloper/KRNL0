@@ -8,13 +8,13 @@ MODEL = "eleven_v4"
 LINES = {
  "p1": "[low, calm] Every morning starts the same. A list in one app. A calendar in another. A timer. A habit tracker. A dozen tabs open. [sighs] And none of them know about each other.",
  "p2": "[quietly] What if they did?",
- "r1": "[confident, deep] This is KRNL0. Kernel Zero. One canvas, for your whole day.",
+ "r1": "[confident, deep] This is Kernel Zero. One canvas, for your whole day.",
  "pl": "[calm] Start with the plan. Type it the way you'd say it. Review the proposal, eleven, one hour. [pause] Done. It's planned, it's timed, it's on your calendar. [warm] No time yet? Pick it up, and drop it where it belongs.",
  "fo": "[confident] Then, do the work. Press start, and every minute lands on the plan it belongs to. [soft] Put on a sound that keeps you in it. Rain. A low hum. A fire. Mix them. Make your own room.",
  "lb": "[warm] Build the habits that hold the day together. Tick them off. Watch the streak grow. [serious] And at the end of the day, the truth. Planned, against spent. Not what you meant to do. What you did.",
  "yo": "[confident] Everything lives on a canvas that's yours. Notes. Pictures. Frames to hold a week of thinking. Tidy when you want. Free when you don't. [calm] Prefer the keyboard? Every button is also a command. And when you'd rather just ask, ask. The assistant works on your real board.",
  "tu": "[warm] New here? The guided tours show you around, with real actions, in the real app. Two minutes, and you're in.",
- "en": "[low, confident] One canvas. Your whole day. [pause] KRNL0. [calm] Free. No account. Yours, on your computer. Download it today.",
+ "en": "[low, confident] One canvas. Your whole day. [pause] Kernel Zero. [calm] Free. No account. Yours, on your computer. Download it today.",
 }
 def tts(text):
     key = os.environ.get("ELEVENLABS_API_KEY", "proxy-injected")

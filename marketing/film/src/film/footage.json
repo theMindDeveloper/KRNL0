@@ -1,0 +1,238 @@
+{
+ "S22-terminal": {
+  "dur": 9.833,
+  "markers": {
+   "click": 0.933,
+   "enter-add": 3.867,
+   "enter-habit": 6.567,
+   "enter-pomo": 8.2
+  }
+ },
+ "S20-layout-flip": {
+  "dur": 8,
+  "markers": {
+   "menu": 1.1,
+   "my-layout": 2.8333333333333335,
+   "shortcut": 5.466666666666667
+  }
+ },
+ "S11-stopwatch": {
+  "dur": 7,
+  "markers": {
+   "stopwatchTab": 0.8,
+   "start": 1.57,
+   "runningEnds": 3.2,
+   "stop": 3.63,
+   "nameSpanInput": 4.4,
+   "save": 6.17
+  }
+ },
+ "S23-orb-ask": {
+  "dur": 8.467,
+  "markers": {
+   "click-orb": 0.933,
+   "click-input": 2.533,
+   "enter": 4.467,
+   "calendar-updates": 5.833
+  }
+ },
+ "S05-quickadd": {
+  "dur": 8.37,
+  "markers": {
+   "click": 0.967,
+   "typeStart": 1.533,
+   "parsed": 3.567,
+   "enter": 4.967,
+   "landed": 6.233
+  }
+ },
+ "S19-frame": {
+  "dur": 7,
+  "markers": {
+   "grab": 1.0333333333333334,
+   "dragged": 2.5,
+   "drop": 4.4
+  }
+ },
+ "S12b-card-closeup": {
+  "dur": 6,
+  "markers": {
+   "runStarts": 0
+  }
+ },
+ "S09-timer-record": {
+  "dur": 11,
+  "markers": {
+   "pickPlan": 1.7,
+   "start": 2.8,
+   "runningEnds": 9.9
+  }
+ },
+ "S14-habit-year": {
+  "dur": 7.07,
+  "markers": {
+   "tab_month": 1.2,
+   "tab_year": 3.67,
+   "settle": 5.17
+  }
+ },
+ "S02-glide": {
+  "dur": 8.7,
+  "markers": {
+   "stop-todos": 0.4,
+   "move-to-calendar": 1.7,
+   "stop-calendar": 2.533,
+   "move-to-habits": 4.033,
+   "stop-habits": 4.867,
+   "move-to-timer": 6.367,
+   "stop-timer": 7.2
+  }
+ },
+ "S04-tour-pomo": {
+  "dur": 8.6,
+  "markers": {
+   "orb-click": 0.767,
+   "assistant-open": 1.567,
+   "timer-tour-click": 2.167,
+   "step-1": 2.467,
+   "next-click-1": 4.133,
+   "step-which-task": 5.133,
+   "next-click-2": 5.6,
+   "step-press-start": 6.4,
+   "start-click": 6.9,
+   "running": 7,
+   "next-step": 8.6
+  }
+ },
+ "S12-card-fill": {
+  "dur": 6,
+  "markers": {
+   "runStarts": 0
+  }
+ },
+ "S16-day-complete": {
+  "dur": 5.9,
+  "markers": {
+   "card_in": 0.5,
+   "hover_cta": 4
+  }
+ },
+ "S07-tick": {
+  "dur": 5.57,
+  "markers": {
+   "click": 1.167,
+   "done": 2.267,
+   "openDone": 3.367
+  }
+ },
+ "S18-sticky": {
+  "dur": 12.4,
+  "markers": {
+   "rightclick1": 0.26666666666666666,
+   "created1": 2.5,
+   "typing1": 4.233333333333333,
+   "typed1": 5.4,
+   "rightclick2": 6.333333333333333,
+   "created2": 8.033333333333333,
+   "typed2": 10.566666666666666
+  }
+ },
+ "S21-theme-flip": {
+  "dur": 6.2,
+  "markers": {
+   "gear": 1.3,
+   "light": 3.066666666666667,
+   "closed": 4.7
+  }
+ },
+ "S01-boot": {
+  "dur": 9.867,
+  "markers": {
+   "app-on-todos": 1.8,
+   "pull-to-pair": 1.8,
+   "pull-to-all": 4.733,
+   "hold-row": 6.767
+  }
+ },
+ "S13-habit-tick": {
+  "dur": 7,
+  "markers": {
+   "tick_run": 1.17,
+   "tick_read": 2.83,
+   "tick_water": 4.2,
+   "settle": 5.5
+  }
+ },
+ "S17-week-recap": {
+  "dur": 5.9,
+  "markers": {
+   "card_in": 0.5,
+   "hover_cta": 4
+  }
+ },
+ "S03-tour-first-day": {
+  "dur": 10.433,
+  "markers": {
+   "orb-click": 1,
+   "assistant-open": 2,
+   "start-tour-click": 2.767,
+   "step-1": 3.067,
+   "next-click": 5.067,
+   "step-2-type-a-plan": 6.067,
+   "typing": 6.833,
+   "enter": 8.467,
+   "step-3": 8.733
+  }
+ },
+ "S15-analytics": {
+  "dur": 8.7,
+  "markers": {
+   "click_tab": 1.2,
+   "hover_accuracy": 3.1,
+   "hover_task": 4.8,
+   "hover_day": 6.5,
+   "settle": 8.1
+  }
+ },
+ "S08-calendar-day": {
+  "dur": 8.9,
+  "markers": {
+   "cursorIn": 1.633,
+   "hover": 5.9
+  }
+ },
+ "S24-orb-tours": {
+  "dur": 5.2,
+  "markers": {
+   "click-orb": 0.8,
+   "hover-first-day": 2.333,
+   "hover-tour": 3.767
+  }
+ },
+ "S25-chrome-zoomout": {
+  "dur": 10.1,
+  "markers": {
+   "start": 0,
+   "pull-back-begins": 1.233,
+   "whole-board": 7.267
+  }
+ },
+ "S10-radio-mix": {
+  "dur": 10,
+  "markers": {
+   "rain": 1,
+   "fire": 1.8,
+   "synth": 2.5,
+   "volume": 5
+  }
+ },
+ "S06-drag": {
+  "dur": 6.47,
+  "markers": {
+   "grab": 1.2,
+   "hover": 2.233,
+   "drop": 2.967,
+   "landed": 4.433
+  }
+ }
+}

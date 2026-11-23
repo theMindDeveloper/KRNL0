@@ -1,0 +1,90 @@
+{
+ "text": "[low, confident] One canvas. Your whole day. [pause] Kernel Zero. [calm] Free. No account. Yours, on your computer. Download it today.",
+ "words": [
+  {
+   "w": "One",
+   "s": 0.24,
+   "e": 0.4
+  },
+  {
+   "w": "canvas.",
+   "s": 0.48,
+   "e": 1.36
+  },
+  {
+   "w": "Your",
+   "s": 1.6,
+   "e": 1.76
+  },
+  {
+   "w": "whole",
+   "s": 1.84,
+   "e": 2.08
+  },
+  {
+   "w": "day.",
+   "s": 2.16,
+   "e": 2.76
+  },
+  {
+   "w": "Kernel",
+   "s": 3.12,
+   "e": 3.36
+  },
+  {
+   "w": "Zero.",
+   "s": 3.52,
+   "e": 4.16
+  },
+  {
+   "w": "Free.",
+   "s": 4.48,
+   "e": 5.04
+  },
+  {
+   "w": "No",
+   "s": 5.28,
+   "e": 5.36
+  },
+  {
+   "w": "account.",
+   "s": 5.44,
+   "e": 6.12
+  },
+  {
+   "w": "Yours,",
+   "s": 6.32,
+   "e": 6.92
+  },
+  {
+   "w": "on",
+   "s": 7.04,
+   "e": 7.12
+  },
+  {
+   "w": "your",
+   "s": 7.2,
+   "e": 7.36
+  },
+  {
+   "w": "computer.",
+   "s": 7.44,
+   "e": 8.12
+  },
+  {
+   "w": "Download",
+   "s": 8.32,
+   "e": 8.64
+  },
+  {
+   "w": "it",
+   "s": 8.68,
+   "e": 8.72
+  },
+  {
+   "w": "today.",
+   "s": 8.8,
+   "e": 9.36
+  }
+ ]
+}
