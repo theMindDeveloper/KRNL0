@@ -1,7 +1,7 @@
 // Films the real app doing one focus session and saves transparent window shots (no baked shadow) into assets/.
 // Needs the renderer preview running: (repo root) npx vite --config vite.preview.config.ts  (port 5201)
 const {chromium}=require('playwright');const {open,fit,ROOT}=require('./lib.cjs');const path=require('path');const fs=require('fs');
-const OUT=path.join(ROOT,'assets');fs.mkdirSync(OUT,{recursive:true});
+const OUT=path.join(ROOT,'.capture/raw');fs.mkdirSync(OUT,{recursive:true});
 const click=(p,re)=>p.evaluate(re=>{const n=document.querySelector('[data-id="mother-pomo"]');const e=[...n.querySelectorAll('button')].find(e=>new RegExp(re).test((e.textContent||'')+'|'+(e.getAttribute('title')||'')));if(e)e.click();return !!e;},re);
 (async()=>{const b=await chromium.launch();const p=await open(b,{dsf:3,w:760,h:720});
 await fit(p,['mother-pomo','mother-calendar']);

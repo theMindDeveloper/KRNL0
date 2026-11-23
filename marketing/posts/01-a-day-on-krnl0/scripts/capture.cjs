@@ -36,10 +36,18 @@ for(const [name,s] of Object.entries(SHOTS)){
     for(let k=0;k<40;k++)await p.clock.runFor(15000);   // ten minutes of focus
     await p.clock.runFor(500);}
   if(s.click){
-    await p.clock.runFor(800);
+    await p.clock.runFor(1500);
+    await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Good night/.test(x.textContent||''));b&&b.click();});
+    await p.clock.runFor(1200);
     await p.evaluate(()=>{const b=[...document.querySelectorAll('[data-id="mother-analytics"] button')].find(x=>x.getAttribute('aria-label')==='Planned vs spent');b&&b.click();});
     await p.clock.runFor(1500);await p.waitForTimeout(600);await p.clock.runFor(1000);}
-  if(name==='recap'){await p.clock.runFor(3000);await p.waitForTimeout(500);await p.clock.runFor(1500);}
+  if(name==='recap'){await p.clock.runFor(3000);await p.waitForTimeout(500);await p.clock.runFor(1500);
+    // film just the evening-recap card (a whole card, not a slice of the window behind it)
+    const box=await p.evaluate(()=>{const b=[...document.querySelectorAll('button')].find(x=>/Good night/.test(x.textContent||''));if(!b)return null;
+      let e=b;while(e&&e.parentElement){const r=e.getBoundingClientRect();if(r.width>400&&r.height>300&&getComputedStyle(e).borderRadius!=='0px')break;e=e.parentElement;}
+      const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};});
+    console.log('recap card',box);
+    if(box){await p.screenshot({path:path.join(OUT,name+'.png'),clip:box,omitBackground:true});await p.close();continue;}}
   const bb=await p.locator(`.react-flow__node[data-id="${s.id}"]`).boundingBox();
   console.log(name,bb);
   await p.screenshot({path:path.join(OUT,name+'.png'),clip:{x:bb.x,y:bb.y,width:bb.width,height:bb.height},omitBackground:true});

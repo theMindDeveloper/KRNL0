@@ -50,7 +50,7 @@
     }
     const an = nodes.find(n => n.kind === 'analytics');
     if (an) an.state = { ...an.state, view: 'summary', rangeDays: 7 };
-    const size = { todo: [540, 330], habit: [540, 420], pomo: [540, 540] };
+    const size = { todo: [540, 280], habit: [540, 360], pomo: [540, 540] };
     for (const n of nodes) if (n.isMother && size[n.kind]) n.config = { ...n.config, canvasSize: { width: size[n.kind][0], height: size[n.kind][1] } };
     b.edges = []; b.layoutMode = 'free';
     return b;

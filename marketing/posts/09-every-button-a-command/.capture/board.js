@@ -11,7 +11,7 @@
     const place = (n, x, y, w, h) => { n.position = { x, y }; n.config = { ...n.config, canvasSize: { width: w, height: h } }; };
     const todo = byKind('todo'), cal = byKind('calendar'), habit = byKind('habit'), pomo = byKind('pomo'), term = byKind('term');
     place(todo, 0, 0, 540, 540); place(cal, 100, 0, 540, 540); place(habit, 200, 0, 540, 540); place(pomo, 300, 0, 540, 540);
-    place(term, 400, 0, 980, 480);
+    place(term, 400, 0, 980, 480); term.config = { ...term.config, stationHidden: false };
     byKind('clock').position = { x: 500, y: 0 }; byKind('analytics').position = { x: 600, y: 0 };
 
     const items = todo.state.items = [];

@@ -4,6 +4,6 @@
  "krnl habit streak \"Morning run\"": "streak for \"Morning run\": 7 days",
  "krnl cal show": "2026-11-24  11:00-12:00  [A]  task-f1e  Review the proposal",
  "krnl todo list": "[ ] fc62424e  Review the proposal [Meetings?]",
- "krnl pomo start --label \"Write the pitch\" --minutes 25": "Pomodoro started",
- "krnl pomo status": "pomo running — Write the pitch — 12m worked, 13m remain"
+ "krnl pomo start": "Pomodoro started",
+ "krnl pomo status": "pomo running — 13m worked, 12m remain"
 }

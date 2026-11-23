@@ -1,6 +1,6 @@
 // Stopwatch mode of the same Timer window (open-ended work).
 const {chromium}=require('playwright');const {open,fit,ROOT}=require('./lib.cjs');const path=require('path');
-const OUT=path.join(ROOT,'assets');
+const OUT=path.join(ROOT,'.capture/raw');
 const click=(p,re)=>p.evaluate(re=>{const n=document.querySelector('[data-id="mother-pomo"]');const e=[...n.querySelectorAll('button')].find(e=>new RegExp(re).test((e.textContent||'').trim()));if(e)e.click();return !!e;},re);
 (async()=>{const b=await chromium.launch();const p=await open(b,{dsf:3,w:760,h:720});
 await fit(p,['mother-pomo']);

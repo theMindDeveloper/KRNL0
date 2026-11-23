@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>KRNL0 · Press start (carousel)</title>
+<link rel="stylesheet" href="../_shared/brand.css">
+<style>
+  body { display: flex; flex-direction: column; gap: 40px; align-items: center; padding: 40px 0; }
+  .slide .headline { position: absolute; left: 64px; top: 168px; white-space: nowrap; }
+  .slide .sub { position: absolute; left: 64px; top: 168px; max-width: 900px; opacity: .82; }
+  .slide .tag { position: absolute; left: 64px; top: 120px; font-size: 24px; padding: 8px 18px; }
+  .slide.ink .tag { background: var(--acid); color: var(--ink); }
+  .slide.ink .bar { color: var(--paper); }
+  .slide.ink .headline em { color: var(--acid); font-style: normal; }
+  .win { left: 64px; }
+  .win img { height: auto; }
+  .call { position: absolute; font-family: var(--mono); font-weight: 800; font-size: 26px; padding: 12px 22px; border-radius: 999px; background: var(--ink); color: var(--paper); white-space: nowrap; }
+  .call.acid { background: var(--acid); color: var(--ink); }
+  .line { position: absolute; background: var(--ink); height: 4px; border-radius: 2px; }
+  .vline { position: absolute; background: var(--ink); width: 4px; border-radius: 2px; }
+  .dot { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); }
+  .num { position: absolute; width: 46px; height: 46px; border-radius: 50%; background: var(--acid); color: var(--ink); border: 4px solid var(--ink); display: grid; place-items: center; font-family: var(--mono); font-weight: 800; font-size: 26px; }
+  .legend { position: absolute; left: 64px; width: 330px; display: flex; gap: 16px; align-items: flex-start; }
+  .legend .num { flex: none; }
+  .legend b { display: block; font-weight: 800; font-size: 30px; white-space: nowrap; letter-spacing: -0.03em; line-height: 1.05; }
+  .legend span { display: block; font-family: var(--mono); font-weight: 700; font-size: 22px; margin-top: 8px; opacity: .75; }
+  .swipe .arr { font-size: 34px; line-height: 1; }
+</style></head>
+<body>
+
+<!-- 1 · HOOK -->
+<section class="slide acid" id="s1">
+  <div class="ghost" style="right:-70px; bottom:-40px;">25</div>
+  <div class="bar"><div class="brand"><img src="../_shared/icon.svg" alt="">KRNL0</div><div>1/7</div></div>
+  <div class="chip tag">FOCUS TIMER</div>
+  <div class="headline" style="top:184px; font-size:132px;">Press start.<br>It keeps score.</div>
+  <div class="win" style="top:520px; width:760px;"><img src="assets/timer-run.png" alt="Timer window recording a session on Review the proposal"></div>
+  <div class="swipe">swipe <span class="arr">→</span></div>
+</section>
+
+<!-- 2 · it knows what is on -->
+<section class="slide lav" id="s2">
+  <div class="ghost" style="right:-60px; bottom:-40px;">11</div>
+  <div class="bar"><div class="brand"><img src="../_shared/icon.svg" alt="">KRNL0</div><div>2/7</div></div>
+  <div class="chip tag">11:02 · TUESDAY</div>
+  <div class="headline" style="top:184px; font-size:112px;">It already knows<br>what's on.</div>
+  <div class="sub" style="top:416px; font-size:40px; max-width:820px;">Your 11:00 plan is waiting in the timer. One tap and you're on it.</div>
+  <div class="win" style="top:560px; width:700px;"><img src="assets/timer-idle.png" alt="Timer window offering Review the proposal, planned now"></div>
+  <div class="call" style="left:790px; top:904px;">← one tap</div>
+  <div class="swipe">swipe <span class="arr">→</span></div>
+</section>
+
+<!-- 3 · press start -->
+<section class="slide cyan" id="s3">
+  <div class="ghost" style="right:-60px; bottom:-40px;">1</div>
+  <div class="bar"><div class="brand"><img src="../_shared/icon.svg" alt="">KRNL0</div><div>3/7</div></div>
+  <div class="chip tag">STEP 1</div>
+  <div class="headline" style="top:184px; font-size:132px;">Press start.<br>That's it.</div>
+  <div class="sub" style="top:462px; font-size:40px; max-width:880px;">Every minute lands on the plan you chose.</div>
+  <div class="win" style="top:560px; width:700px;"><img src="assets/timer-late.png" alt="Timer window recording"></div>
+  <div class="call" style="left:790px; top:904px;">← on the plan</div>
+  <div class="swipe">swipe <span class="arr">→</span></div>
+</section>
+
+<!-- 4 · cards fill -->
+<section class="slide coral" id="s4">
+  <div class="ghost" style="right:-60px; bottom:-40px;">1h</div>
+  <div class="bar"><div class="brand"><img src="../_shared/icon.svg" alt="">KRNL0</div><div>4/7</div></div>
+  <div class="chip tag">THE TASK CARD</div>
+  <div class="headline" style="top:184px; font-size:124px;">Watch the plan<br>fill up.</div>
+  <div class="sub" style="top:452px; font-size:40px; max-width:880px;">Time spent against time planned, live.</div>
+  <div class="win" style="top:560px; width:580px;"><img src="assets/card-run.png" alt="Task card: 9m of 1h"></div>
+  <div class="call" style="left:690px; top:690px;">9 min in</div>
+  <div class="vline" style="left:352px; top:880px; height:64px;"></div>
+  <div class="call" style="left:392px; top:884px;">+ 13 min later</div>
+  <div class="win" style="top:947px; width:580px;"><img src="assets/card-late.png" alt="Task card: 22m of 1h"></div>
+  <div class="call" style="left:690px; top:1077px;">22 min in</div>
+  <div class="swipe">swipe <span class="arr">→</span></div>
+</section>
+
+<!-- 5 · calendar -->
+<section class="slide paper" id="s5">
+  <div class="ghost" style="right:-60px; bottom:-40px;">11</div>
+  <div class="bar"><div class="brand"><img src="../_shared/icon.svg" alt="">KRNL0</div><div>5/7</div></div>
+  <div class="chip tag">THE CALENDAR</div>
+  <div class="headline" style="top:184px; font-size:118px;">See it on<br>your calendar.</div>
+  <div class="sub" style="top:452px; font-size:40px; max-width:900px;">What you planned vs. what you really did.</div>
+  <div class="win" id="cal" style="left:400px; top:560px; width:600px;"><img src="assets/cal-tracked.png" alt="Calendar day with the plan block and the recorded time bar"></div>
+  <!-- numbered markers sit on the real elements (bar: x~460,y~806; block right end), legend on the left -->
+  <div class="num" style="left:438px; top:752px;">1</div>
+  <div class="num" style="left:940px; top:766px;">2</div>
+  <div class="legend" style="top:720px;"><div class="num" style="position:static;">1</div><div><b>What you did</b><span>22 min, live</span></div></div>
+  <div class="legend" style="top:870px;"><div class="num" style="position:static;">2</div><div><b>What you planned</b><span>11:00–12:00</span></div></div>
+  <div class="swipe">swipe <span class="arr">→</span></div>
+</section>
+
+<!-- 6 · stopwatch -->
+<section class="slide ink" id="s6">
+  <div class="ghost" style="right:-60px; bottom:-40px; color:var(--acid);">36</div>
+  <div class="bar"><div class="brand"><img src="../_shared/icon.svg" alt="">KRNL0</div><div>6/7</div></div>
+  <div class="chip tag">STOPWATCH MODE</div>
+  <div class="headline" style="top:184px; font-size:112px;">Not a 25-minute<br><em>kind of person?</em></div>
+  <div class="sub" style="top:416px; font-size:40px; max-width:880px;">Count up instead. Start, break, stop, then say what it was.</div>
+  <div class="win" style="top:560px; width:700px;"><img src="assets/sw-run.png" alt="Timer in stopwatch mode at 36:21"></div>
+  <div class="swipe">swipe <span class="arr">→</span></div>
+</section>
+
+<!-- 7 · CTA -->
+<section class="slide acid" id="s7">
+  <div class="bar"><div class="brand"><img src="../_shared/icon.svg" alt="">KRNL0</div><div>7/7</div></div>
+  <img src="../_shared/icon.svg" alt="" style="position:absolute; left:64px; top:190px; width:220px; height:220px; border-radius:50px; box-shadow:0 24px 50px rgba(0,0,0,.25);">
+  <div class="headline" style="top:470px; font-size:124px;">Your focus,<br>on the record.</div>
+  <div class="sub" style="top:742px; font-size:42px; max-width:900px;">Plan it. Press start. See it on the calendar.</div>
+  <div class="tiles" style="position:absolute; left:64px; top:870px;"><b>K</b><b>R</b><b>N</b><b>L</b><b>0</b></div>
+  <div class="cta" style="position:absolute; left:64px; top:1080px;">Free download · link in bio</div>
+  <div style="position:absolute; left:64px; top:1218px; font-family:var(--mono); font-weight:700; font-size:28px;">Windows · macOS · Linux</div>
+</section>
+
+</body></html>

@@ -14,8 +14,8 @@ const OUTMAP={
   'krnl cal show': real('cal show'),
   'krnl todo list': real('todo list'),
   // pomo cannot run headlessly (it needs the app's main process); these are the exact strings the command code returns
-  'krnl pomo start --label "Write the pitch" --minutes 25': 'Pomodoro started',
-  'krnl pomo status': 'pomo running — Write the pitch — 12m worked, 13m remain',
+  'krnl pomo start': 'Pomodoro started',
+  'krnl pomo status': 'pomo running — 13m worked, 12m remain',
 };
 fs.writeFileSync(path.join(__dirname,'outmap.json'),JSON.stringify(OUTMAP,null,1));
 (async()=>{
@@ -54,7 +54,7 @@ await shot('mother-pomo','win-timer');
 
 // ── terminal ──
 await fit('mother-term');
-await p.click('.react-flow__node[data-id="mother-term"] .xterm, .react-flow__node[data-id="mother-term"]',{position:{x:300,y:300}});
+{const bb=await p.locator('.react-flow__node[data-id="mother-term"]').boundingBox();await p.mouse.click(bb.x+bb.width/2,bb.y+bb.height-60);}
 await p.clock.runFor(600);
 await type('clear');
 await type('krnl todo add "Review the proposal 11:00 1h"');
@@ -64,7 +64,7 @@ await type('krnl habit done "Morning run"');
 await type('krnl habit streak "Morning run"');
 await shot('mother-term','term-habit');
 await type('clear');
-await type('krnl pomo start --label "Write the pitch" --minutes 25');
+await type('krnl pomo start');
 await type('krnl pomo status');
 await shot('mother-term','term-timer');
 await type('clear');

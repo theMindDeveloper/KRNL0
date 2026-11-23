@@ -61,9 +61,9 @@
     // Today's four tasks (planned → really took) and earlier days, each tied to a finished plan.
     pomo.state.history = [
       rec('r2', 24, 9, 30, 125, 't-review', 'Review the proposal'),
-      rec('r1', 24, 11, 40, 100, 't-deep', 'Deep work: thesis'),
-      rec('r3', 24, 14, 0, 70, 't-call', 'Client call'),
-      rec('r4', 24, 18, 0, 95, 't-gym', 'Gym'),
+      rec('r1', 24, 11, 40, 130, 't-deep', 'Deep work: thesis'),
+      rec('r3', 24, 14, 0, 80, 't-call', 'Client call'),
+      rec('r4', 24, 18, 0, 100, 't-gym', 'Gym'),
       rec('r5', 23, 9, 0, 110, 'gone-a', 'Write the report'), rec('r6', 23, 14, 0, 80, 'gone-b', 'Prepare the slides'),
       rec('r7', 22, 10, 0, 100, 'gone-c', 'Plan the sprint'), rec('r8', 21, 9, 30, 115, 'gone-d', 'Study chapter 4'), rec('r9', 21, 15, 0, 40, 'gone-e', 'Emails'),
       rec('r10', 20, 10, 0, 105, 'gone-f', 'Design review'), rec('r11', 19, 11, 0, 75, 'gone-g', 'Weekly review'),
@@ -76,7 +76,7 @@
       rec('q7', 20, 9, 0, 90, 'gone-n', 'Plan next week'), rec('q8', 21, 11, 0, 45, 'gone-o', 'Tidy the notes'),
     ];
     pomo.state.history.push(...more);
-    const done = { 't-review': 125, 't-deep': 100, 't-call': 70, 't-gym': 95 };
+    const done = { 't-review': 125, 't-deep': 130, 't-call': 80, 't-gym': 100 };
     const t = { 't-review': '10:20', 't-deep': '13:35', 't-call': '15:15', 't-gym': '19:40' };
     for (const n of nodes) if (done[n.id]) { n.state.done = true; n.state.completedAt = `2026-11-24T${t[n.id]}:00.000Z`; n.state.secondsAccumulated = done[n.id] * 60; }
     for (const it of items) if (done[it.taskNodeId]) { it.done = true; it.completedAt = `2026-11-24T${t[it.taskNodeId.replace('item-', '')] || '12:00'}:00.000Z`; }

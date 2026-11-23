@@ -37,7 +37,8 @@ await p.addInitScript({content:fs.readFileSync(path.join(__dirname,'board.js'),'
 await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1200);await p.clock.runFor(4000);
 await p.addStyleTag({content:CSS+`[data-testid="ambient-radio"]{display:none!important}`});
 const tick=async(n,ms=100)=>{for(let i=0;i<n;i++)await p.clock.runFor(ms);await p.waitForTimeout(60);};
-await p.evaluate(()=>window.dispatchEvent(new CustomEvent('krnl:fit-nodes',{detail:{nodeIds:['mother-pomo']}})));await tick(20);
+for(let k=0;k<12;k++){await p.evaluate(()=>window.dispatchEvent(new CustomEvent('krnl:fit-nodes',{detail:{nodeIds:['mother-pomo']}})));await tick(10);
+  const w=await p.evaluate(()=>document.querySelector('[data-id="mother-pomo"]').getBoundingClientRect().width);if(w>480)break;}
 await p.evaluate(()=>{const n=document.querySelector('[data-id="mother-pomo"]');const t=[...n.querySelectorAll('button,[role=combobox],[aria-haspopup]')].find(e=>/No task/.test(e.textContent||''));t&&t.click();});await tick(5);
 await p.evaluate(()=>{const o=[...document.querySelectorAll('[role=option]')].find(e=>/Review the proposal/.test(e.textContent||''));o&&o.click();});await tick(8);
 await p.evaluate(()=>{const n=document.querySelector('[data-id="mother-pomo"]');const t=[...n.querySelectorAll('button')].find(e=>/Start session/.test(e.textContent||''));t&&t.click();});await tick(12);
