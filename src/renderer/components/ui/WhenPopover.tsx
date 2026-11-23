@@ -119,6 +119,14 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
     touched.current = true;
     if (onChange) { const pt = t.trim() ? parseTime(t) : null; onChange({ ...v, day: v.day ?? (pt ? today : null), time: pt ?? null }); }
   };
+  // "Now": today, from this minute (a plan that starts from the point you are in).
+  const setNow = () => {
+    const d = new Date();
+    const t = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    setTimeText(t);
+    setTimeTouched(true);
+    setV((p) => ({ ...p, day: today, time: t }));
+  };
   const [weekOffset, setWeekOffset] = useState(0);
   // The month is one tap away ("Date"); the three day chips cover most plans.
   const [gridOpen, setGridOpen] = useState(false);
@@ -294,6 +302,7 @@ export function WhenPopover({ x, y, today, value, tab: tab0 = 'when', onApply, o
               <span style={cardLabel}>Time</span>
               <div style={cardCtls}>
                 <button type="button" data-testid="when-any-time" onClick={() => setTime('')} style={cardPill(!shownTime.trim())}>Any time</button>
+                <button type="button" data-testid="when-now" title="Start now: today, from this minute" onClick={setNow} style={{ ...cardPill(false), padding: '0 8px' }}>Now</button>
                 <TimeField value={shownTime} onChange={setTime} testId="when-time" placeholder="--:--" onEnter={() => apply()} onEscape={onClose} style={cardTime} />
               </div>
             </div>

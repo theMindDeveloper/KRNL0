@@ -3492,3 +3492,19 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-23] — Plan from now: snap to the time now, and a Now button
+
+**Type:** Feature (small)
+**PRs/Commits:** branch `feat/plan-from-now`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/calendarDrag.ts`, `src/renderer/components/ui/WhenPopover.tsx`, `tests/unit/renderer/planFromNow.test.tsx`
+
+**Summary:** The owner asked to start a plan from the point they are in. While a plan is dragged onto (or moved on) today's column, a start within 4 minutes of the time now lands exactly on it (also when pulling the top edge; never the bottom edge, other days or habits). The add card has a small **Now** button in the Time row (today, this minute); it fits the row, so the card does not grow. Tests map each rule.
+
+## [2026-11-23] — License: PolyForm Shield 1.0.0 from v0.16.1
+
+**Type:** Chore / Docs
+**PRs/Commits:** branch `chore/license-polyform-shield`
+**Files changed:** `LICENSE.md`, `LICENSES/FSL-1.1-ALv2.md`, `package.json`, `README.md`, `CHANGELOG.md`, `docs/releases/v0.16.1.md`
+
+**Summary:** The owner wanted a license that lets people use the code but not build a competing product, with no automatic change of license after two years (the FSL turns each version into Apache 2.0 after two years). `LICENSE.md` is now the PolyForm Shield License 1.0.0 (official text) with the Required Notice, a `Licensor Line of Business` line (so the Discontinued Products clause does not open the door if KRNL0 pauses) and a note that versions up to 0.16.0 stay under FSL, whose text moved to `LICENSES/FSL-1.1-ALv2.md`. `package.json` said MIT by mistake; it now says `PolyForm-Shield-1.0.0`. Old copies cannot be recalled: whoever has a version up to 0.16.0 keeps its FSL rights. The only other committer (two lockfile commits, one reverted) has no code left in the project, so no relicense consent is needed. The v0.16.1 notes and CHANGELOG now cover the plan-from-now features, the Store and the license.
