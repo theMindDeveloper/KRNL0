@@ -36,7 +36,7 @@ dev("S10-radio-mix", 52.91, 60.05, 0.0, [[0, 0.12, 0.09, 0.91, 0.93], [2.0, 0.56
 dev("S07-tick", 60.05, 62.91, 0.3, [[0, 0.19, 0.09, 0.71, 0.95], [2.8, 0.2, 0.1, 0.7, 0.93]], tilt=(9, 10, 1))
 CLK = json.loads((R / "scripts/clock.json").read_text()) if (R / "scripts/clock.json").exists() else None
 if CLK:   # the clock beat (voice line "cl"): framing from scripts/clock.json, written after the footage lands
-    for c in CLK: dev(c["src"], c["t0"], c["t1"], c["m0"], c["views"], tilt=tuple(c["tilt"]))
+    for c in CLK: dev(c["src"], c["t0"], c["t1"], c["m0"], c["views"], tilt=tuple(c["tilt"]), rate=c.get("rate", 1.0))
 else:
     dev("S11-stopwatch", 62.91, 65.77, 0.5, [[0, 0.03, 0.09, 0.5, 0.93], [2.8, 0.04, 0.1, 0.49, 0.91]], tilt=(7, -12, -1))
     dev("S02-glide", 65.77, tt["see"][0], 0.0, [[0, *WIDE], [5.6, 0.06, 0.08, 0.94, 0.92]], tilt=(6, 8, 0))

@@ -234,5 +234,24 @@
    "drop": 2.967,
    "landed": 4.433
   }
+ },
+ "S26-clock-drag": {
+  "dur": 6.567,
+  "markers": {
+   "grab": 1.1,
+   "carry": 2.167,
+   "drop": 3.267,
+   "landed": 4.867
+  }
+ },
+ "S27-clock-live": {
+  "dur": 9.133,
+  "markers": {
+   "pill": 0.733,
+   "pickPlan": 1.533,
+   "start": 2.533,
+   "ffwdStart": 3.133,
+   "ffwdEnd": 8.133
+  }
  }
 }
