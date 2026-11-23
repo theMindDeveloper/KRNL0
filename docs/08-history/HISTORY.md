@@ -3429,3 +3429,14 @@ Typecheck clean; all tests pass.
 
 **Second check (same day):** an independent review found that the first version of the narrow-window fix (`overflow: hidden` + a CSS container on the top bar) cut off the board menu and the layout menu and would have squeezed the Connect-server and server-update dialogs into the 44 px bar. Replaced by a width watcher on the bar; both menus checked open and whole at 1400 and 700 px. Also confirmed: 0.15.0 edits events with `{ ...h }`, so an older phone website keeps an event's `icsUid` and `place`; the release build step gets the Google client (a local build with the keys set has it in `out/main`); no tour points at a removed phone element. The window's minimum width is 600 px. The private test server was stopped and its data deleted.
 
+
+## [2026-11-23] — Release v0.16.0
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.16.0`; feature work #282, #283
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/releases/v0.16.0.md`, `src/shared/whatsnew.ts`, `src/renderer/components/Launch/WhatsNewDialog.tsx`, `src/renderer/assets/launch/plate-calendars.webp`, `plate-bothways.webp`, `plate-phonetoday.webp`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.15.0 → 0.16.0`. Notes: `docs/releases/v0.16.0.md`.
+- What's new 0.16 designed on the canvas "KRNL0 0.16 · What's new" and approved by the owner: "Your other calendars, right here.", "Your plans, on your phone.", "Today fits one screen.", plus the full-notes list. The three pictures are rendered from the canvas at 2x with a see-through background like the earlier plates. Show me on the first two starts the "Your other calendars" tour; the dialog no longer offers Show me for a desktop-only tour on the website.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.

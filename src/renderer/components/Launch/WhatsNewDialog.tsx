@@ -27,14 +27,19 @@ import artUpdate from '../../assets/launch/plate-update.webp';
 import artCalendar from '../../assets/launch/plate-calendar.webp';
 import artEvents from '../../assets/launch/plate-events.webp';
 import artMove from '../../assets/launch/plate-move.webp';
+import artCalendars from '../../assets/launch/plate-calendars.webp';
+import artBothways from '../../assets/launch/plate-bothways.webp';
+import artPhoneToday from '../../assets/launch/plate-phonetoday.webp';
 import { startTour } from '../Tour/TourHost';
 import { tourById } from '../Tour/tours';
+import { IS_WEB } from '../../platform';
 import { useEasyMode } from '../../store/uiMode';
 
 const ART: Record<WhatsNewArt, string> = {
   mini: artMini, menubar: artMenubar, feedback: artFeedback, streak: artStreak, sessions: artSessions, guide: artGuide, board: artBoard,
   boards: artBoards, windows: artWindows, cards: artCards, sync: artSync, phone: artPhone, update: artUpdate,
   calendar: artCalendar, events: artEvents, move: artMove,
+  calendars: artCalendars, bothways: artBothways, phonetoday: artPhoneToday,
 };
 
 function runAction(item: WhatsNewItem): void {
@@ -106,8 +111,8 @@ export function WhatsNewDialog() {
             <button type="button" className="ln-link" onClick={() => { void window.krnl?.appOpenExternal?.(RELEASES_URL); }}>full release notes</button>
             <span style={{ flex: 1 }} />
             <button type="button" className="ln-btn" onClick={() => closeWhatsNew()} data-testid="whatsnew-later">Later</button>
-            {/* A tour that only exists in Advanced is not offered in Easy. */}
-            {item.action !== 'none' && !(item.action === 'tour' && easy && tourById(item.tour ?? 'first-day')?.onlyIn === 'advanced') && (
+            {/* A tour that only exists in Advanced is not offered in Easy, nor a desktop-only tour on the website. */}
+            {item.action !== 'none' && !(item.action === 'tour' && ((easy && tourById(item.tour ?? 'first-day')?.onlyIn === 'advanced') || (IS_WEB && tourById(item.tour ?? 'first-day')?.desktopOnly))) && (
               <button type="button" className="ln-btn ln-btn--line" onClick={() => runAction(item)} data-testid="whatsnew-show">Show me</button>
             )}
             <button
