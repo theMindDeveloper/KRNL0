@@ -37,4 +37,11 @@ describe('Google sign-in: what it asks for', () => {
     const r = run(['openid', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.events.readonly'].join(' '));
     await expect(r.result).rejects.toThrow(/all three calendar boxes/);
   });
+
+  it('the page after sign-in is KRNL0\'s own and loads nothing from the internet', async () => {
+    const { SIGNED_IN_PAGE, SIGN_IN_FAILED_PAGE } = await import('../../../src/main/calendars/signinPage');
+    expect(SIGNED_IN_PAGE).toContain('Your Google events now sit next to your plans.');
+    expect(SIGN_IN_FAILED_PAGE).toContain("Sign-in didn't finish.");
+    for (const page of [SIGNED_IN_PAGE, SIGN_IN_FAILED_PAGE]) expect(page).not.toMatch(/https?:\/\/|<script|<link/);
+  });
 });

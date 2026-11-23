@@ -14,6 +14,7 @@ import type { ExportEvent } from '../../shared/calsync/krnlIcs';
 import type { MirrorItem, RemoteItem } from '../../shared/calsync/mirror';
 import type { LinkedEvent } from '../../shared/calsync/types';
 import { SignInError, type RemoteAdapter, type RemoteCal } from './remote';
+import { SIGNED_IN_PAGE, SIGN_IN_FAILED_PAGE } from './signinPage';
 
 declare const __KRNL0_GOOGLE_CLIENT__: { id: string; secret: string } | undefined;
 
@@ -49,10 +50,6 @@ export interface GoogleTokens {
 
 const b64url = (buf: Buffer) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-const DONE_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>KRNL0</title></head>
-<body style="margin:0;height:100vh;display:grid;place-items:center;background:#ebe1c2;color:#1a1612;font-family:system-ui,sans-serif">
-<div style="text-align:center"><h1 style="font-size:22px;margin:0 0 8px">You're signed in</h1><p style="margin:0;color:#554b38">Go back to KRNL0. You can close this tab.</p></div></body></html>`;
-const FAIL_PAGE = DONE_PAGE.replace("You're signed in", 'Sign-in did not finish').replace('Go back to KRNL0. You can close this tab.', 'Go back to KRNL0 and try again.');
 
 /**
  * F8 — opens Google's sign-in in the browser and waits (5 minutes at most) for
@@ -73,7 +70,7 @@ export async function signInGoogle(openBrowser: (url: string) => Promise<unknown
         const url = new URL(req.url ?? '/', 'http://127.0.0.1');
         if (url.pathname !== '/callback') { res.writeHead(404).end(); return; }
         const ok = url.searchParams.get('state') === state && url.searchParams.get('code');
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(ok ? DONE_PAGE : FAIL_PAGE);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(ok ? SIGNED_IN_PAGE : SIGN_IN_FAILED_PAGE);
         clearTimeout(timer);
         if (!ok) { reject(new Error(url.searchParams.get('error') === 'access_denied' ? 'Google sign-in was cancelled.' : 'Google sign-in did not finish.')); return; }
         const port = (server!.address() as AddressInfo).port;

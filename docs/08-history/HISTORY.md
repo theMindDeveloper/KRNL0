@@ -3411,3 +3411,11 @@ Typecheck clean; all tests pass.
 
 **Summary:** The owner found the phone's Today ugly: a second Start timer at the top, a big "Nothing on the clock" box, and the Timer, Plans, Habits and Clock stacked so everything needed scrolling. Three directions were drafted on the design canvas "KRNL0 phone Today"; the owner picked **A · Your day on the clock**. Today now fits one screen with no scrolling (checked at 390×844 and 375×667 in headless Chrome against a local test server): the date and one line (the day so far and what is next), the Clock (it already draws the day's plans as arcs), the day's timed items as small chips in one sideways row, and one compact Timer card with one button (Start, Pause or Resume; its reading opens Focus). The phone's tabs are now Today, Todos, Calendar, Habits, More; More holds Insights and Canvas. The iPad keeps its rail and two-column Today.
 
+## [2026-11-23] — The page after "Sign in with Google"
+
+**Type:** Feature polish
+**PRs/Commits:** branch `fix/google-scope-and-polish`
+**Files changed:** `src/main/calendars/signinPage.ts` (new), `src/main/calendars/google.ts`, `tests/unit/main/googleScopes.test.ts`
+
+**Summary:** The owner found the browser page after Google sign-in empty and ugly ("You're signed in · close this tab" on cream). Three directions were drafted on the design canvas (page "Google sign-in page"); the owner picked **C**: "Your Google events now sit next to your plans", with an example week where KRNL0 plans are filled and Google events outlined, as on the Calendar. A failed or cancelled sign-in gets the same look ("Sign-in didn't finish. Nothing was changed."). Both pages are served by KRNL0 on 127.0.0.1 and load nothing from the internet (a test checks it); they fit a phone-width window. Typecheck clean; the Google tests pass.
+
