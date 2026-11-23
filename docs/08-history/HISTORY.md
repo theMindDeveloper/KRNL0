@@ -3472,3 +3472,11 @@ Typecheck clean; all tests pass.
 **Files changed:** `src/renderer/store/syncStore.ts`, `tests/unit/renderer/SyncChip.test.tsx`
 
 **Summary:** The top bar's badge flipped between "syncing" (blue) and "saved · synced" on every sync round, which looked restless. While a server that has synced before is syncing or connecting, the badge now stays "saved · synced"; the details window still says "Syncing…". A server that has never synced stays plain "saved". The Store work (Store-aware updater and app id, `package:store`, docs) is merged on top of v0.16.0 and ships in the same patch.
+
+## [2026-11-23] — Release notes for v0.16.1
+
+**Type:** Docs
+**PRs/Commits:** branch `docs/release-notes-v0.16.1`
+**Files changed:** `CHANGELOG.md`, `docs/releases/v0.16.1.md`
+
+**Summary:** Notes for the small patch: the calm saved badge and the Microsoft Store channel. The owner asked for a small release; no What's new slides (patch, nothing new to learn).
