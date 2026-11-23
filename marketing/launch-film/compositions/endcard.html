@@ -1,0 +1,50 @@
+<template>
+  <style>
+    
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "KGeist"; src: url("assets/fonts/geist-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+  @font-face { font-family: "KMono"; src: url("assets/fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "KGeist", sans-serif; }
+    
+      #flood { position: absolute; left: 50%; top: 50%; width: 4400px; height: 4400px; margin: -2200px 0 0 -2200px; border-radius: 50%; background: #c9f158; transform: scale(0); }
+      #cubebox { position: absolute; left: 300px; top: 300px; width: 430px; height: 430px; opacity: 0; transform-origin: 50% 50%; }
+      #tiles { position: absolute; left: 790px; top: 335px; display: flex; gap: 12px; }
+      .t { width: 190px; height: 190px; border: 6px solid #0a0908; border-radius: 34px; display: grid; place-items: center; font: 800 128px KGeist, sans-serif; color: #0a0908; opacity: 0; }
+      .t0 { background: #c9f158; } .t1 { background: #22d3ee; } .t2 { background: #ee8466; } .t3 { background: #a98bf6; } .t4 { background: #f4efe2; }
+      #chips { position: absolute; left: 790px; top: 585px; display: flex; gap: 14px; }
+      .chip { font: 800 34px KMono, monospace; padding: 12px 26px; border-radius: 999px; border: 4px solid #0a0908; color: #0a0908; opacity: 0; }
+      #cta { position: absolute; left: 790px; top: 690px; font: 800 52px KGeist, sans-serif; letter-spacing: -0.02em; background: #0a0908; color: #f4efe2; padding: 22px 44px; border-radius: 999px; opacity: 0; }
+    
+  </style>
+  <div id="root" data-composition-id="endcard" data-width="1920" data-height="1080">
+    <div id="flood"></div>
+      <div id="cubebox"><svg id="cubesvg" width="430" height="430" viewBox="-100 -100 200 200" overflow="visible" style="overflow:visible"><defs><filter id="cglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter></defs><path d="M0,-98 L85,-49 L85,49 L0,98 L-85,49 L-85,-49Z" fill="#050505" stroke="#050505" stroke-width="12" stroke-linejoin="round"/><g transform="matrix(0.866,-0.5,0.866,0.5,-86.6,-50)"><rect x="2.5" y="2.5" width="28.33" height="28.33" rx="10" fill="#4a4a4a"/><rect x="2.5" y="35.833" width="28.33" height="28.33" rx="10" fill="#4a4a4a"/><rect x="2.5" y="69.166" width="28.33" height="28.33" rx="10" fill="#4a4a4a"/><rect x="35.833" y="2.5" width="28.33" height="28.33" rx="10" fill="#4a4a4a"/><rect id="glow0" x="32.833" y="32.833" width="34.33" height="34.33" rx="10" fill="#e6ff9c" filter="url(#cglow)" opacity="0.7"/><rect id="core0" x="35.833" y="35.833" width="28.33" height="28.33" rx="10" fill="#e6ff9c"/><rect x="35.833" y="69.166" width="28.33" height="28.33" rx="10" fill="#4a4a4a"/><rect x="69.166" y="2.5" width="28.33" height="28.33" rx="10" fill="#4a4a4a"/><rect x="69.166" y="35.833" width="28.33" height="28.33" rx="10" fill="#4a4a4a"/><rect x="69.166" y="69.166" width="28.33" height="28.33" rx="10" fill="#4a4a4a"/></g><g transform="matrix(0.866,0.5,0,1,-86.6,-50)"><rect x="2.5" y="2.5" width="28.33" height="28.33" rx="10" fill="#303030"/><rect x="2.5" y="35.833" width="28.33" height="28.33" rx="10" fill="#303030"/><rect x="2.5" y="69.166" width="28.33" height="28.33" rx="10" fill="#303030"/><rect x="35.833" y="2.5" width="28.33" height="28.33" rx="10" fill="#303030"/><rect id="glow1" x="32.833" y="32.833" width="34.33" height="34.33" rx="10" fill="#b5e03a" filter="url(#cglow)" opacity="0.7"/><rect id="core1" x="35.833" y="35.833" width="28.33" height="28.33" rx="10" fill="#b5e03a"/><rect x="35.833" y="69.166" width="28.33" height="28.33" rx="10" fill="#303030"/><rect x="69.166" y="2.5" width="28.33" height="28.33" rx="10" fill="#303030"/><rect x="69.166" y="35.833" width="28.33" height="28.33" rx="10" fill="#303030"/><rect x="69.166" y="69.166" width="28.33" height="28.33" rx="10" fill="#303030"/></g><g transform="matrix(0.866,-0.5,0,1,0,0)"><rect x="2.5" y="2.5" width="28.33" height="28.33" rx="10" fill="#1c1c1c"/><rect x="2.5" y="35.833" width="28.33" height="28.33" rx="10" fill="#1c1c1c"/><rect x="2.5" y="69.166" width="28.33" height="28.33" rx="10" fill="#1c1c1c"/><rect x="35.833" y="2.5" width="28.33" height="28.33" rx="10" fill="#1c1c1c"/><rect id="glow2" x="32.833" y="32.833" width="34.33" height="34.33" rx="10" fill="#9bc232" filter="url(#cglow)" opacity="0.7"/><rect id="core2" x="35.833" y="35.833" width="28.33" height="28.33" rx="10" fill="#9bc232"/><rect x="35.833" y="69.166" width="28.33" height="28.33" rx="10" fill="#1c1c1c"/><rect x="69.166" y="2.5" width="28.33" height="28.33" rx="10" fill="#1c1c1c"/><rect x="69.166" y="35.833" width="28.33" height="28.33" rx="10" fill="#1c1c1c"/><rect x="69.166" y="69.166" width="28.33" height="28.33" rx="10" fill="#1c1c1c"/></g></svg></div>
+      <div id="tiles"><b class="t t0">K</b><b class="t t1">R</b><b class="t t2">N</b><b class="t t3">L</b><b class="t t4">0</b></div>
+      <div id="chips"><span class="chip" id="c1">Free</span><span class="chip" id="c2">No account</span><span class="chip" id="c3">Windows · macOS · Linux</span></div>
+      <div id="cta">Download it today · link below</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    
+      const E = (n, x) => gsap.parseEase(n)(Math.min(1, Math.max(0, x)));
+      const el = id => document.getElementById(id);
+      const flood = el("flood"), cube = el("cubebox"), tiles = [...document.querySelectorAll(".t")], chips = [el("c1"), el("c2"), el("c3")], cta = el("cta");
+      const HIT = 153.04500000000002, T = [155.341, 155.885, 157.685];
+      function render(t) {
+        flood.style.transform = `scale(${E("power3.inOut", (t - 152.9) / 0.45)})`;
+        // the mark is carried in on the hit: it lands from large with a short settle, then everything else follows
+        const k = E("expo.out", (t - (HIT - 0.12)) / 0.5);
+        cube.style.opacity = t >= HIT - 0.12 ? Math.min(1, k * 3) : 0; cube.style.transform = `scale(${1 + (1 - k) * 2.2})`;
+        tiles.forEach((n, i) => { const p = E("expo.out", (t - (HIT + 0.08 + i * 0.07)) / 0.4); n.style.opacity = Math.min(1, p * 2); n.style.transform = `translateX(${(1 - p) * 60}px)`; });
+        chips.forEach((n, i) => { const p = E("expo.out", (t - T[i]) / 0.3); n.style.opacity = p; n.style.transform = `translateY(${(1 - p) * 24}px)`; });
+        const p = E("expo.out", (t - 158.765) / 0.35); cta.style.opacity = p; cta.style.transform = `scale(${0.9 + 0.1 * p})`;
+      }
+      const S = { t: 0 }; render(0);
+      tl.to(S, { t: 165.094, duration: 165.094, ease: "none", onUpdate: () => render(S.t) }, 0);
+    
+    window.__timelines["endcard"] = tl;
+  </script>
+</template>

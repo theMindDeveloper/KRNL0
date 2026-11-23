@@ -1,0 +1,40 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/hyperframes.json",
+  "registry": "https://raw.githubusercontent.com/heygen-com/hyperframes/main/registry",
+  "paths": {
+    "blocks": "compositions",
+    "components": "compositions/components",
+    "assets": "assets"
+  },
+  "media": {
+    "autoProxy": true
+  },
+  "authoringSkill": "hyperframes",
+  "registryItems": [
+    {
+      "name": "notification-pileup",
+      "type": "hyperframes:component",
+      "target": "compositions/components/notification-pileup.html"
+    },
+    {
+      "name": "headline-slam",
+      "type": "hyperframes:component",
+      "target": "compositions/components/headline-slam.html"
+    },
+    {
+      "name": "char-slam-explode",
+      "type": "hyperframes:component",
+      "target": "compositions/components/char-slam-explode.html"
+    },
+    {
+      "name": "whip-pan",
+      "type": "hyperframes:block",
+      "target": "compositions/whip-pan.html"
+    },
+    {
+      "name": "agent-cursor",
+      "type": "hyperframes:component",
+      "target": "compositions/components/agent-cursor.html"
+    }
+  ]
+}

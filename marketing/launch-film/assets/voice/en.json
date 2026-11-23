@@ -1,0 +1,85 @@
+{
+ "text": "[low, confident] One canvas. Your whole day. [pause] KRNL0. [calm] Free. No account. Yours, on your computer. Download it today.",
+ "words": [
+  {
+   "w": "One",
+   "s": 0.24,
+   "e": 0.4
+  },
+  {
+   "w": "canvas.",
+   "s": 0.48,
+   "e": 1.36
+  },
+  {
+   "w": "Your",
+   "s": 1.6,
+   "e": 1.76
+  },
+  {
+   "w": "whole",
+   "s": 1.84,
+   "e": 2.08
+  },
+  {
+   "w": "day.",
+   "s": 2.16,
+   "e": 2.52
+  },
+  {
+   "w": "KRNL0.",
+   "s": 3.48,
+   "e": 5.16
+  },
+  {
+   "w": "Free.",
+   "s": 5.776,
+   "e": 6.08
+  },
+  {
+   "w": "No",
+   "s": 6.32,
+   "e": 6.4
+  },
+  {
+   "w": "account.",
+   "s": 6.48,
+   "e": 7.16
+  },
+  {
+   "w": "Yours,",
+   "s": 7.36,
+   "e": 7.88
+  },
+  {
+   "w": "on",
+   "s": 8.0,
+   "e": 8.08
+  },
+  {
+   "w": "your",
+   "s": 8.16,
+   "e": 8.24
+  },
+  {
+   "w": "computer.",
+   "s": 8.32,
+   "e": 9.0
+  },
+  {
+   "w": "Download",
+   "s": 9.2,
+   "e": 9.52
+  },
+  {
+   "w": "it",
+   "s": 9.56,
+   "e": 9.6
+  },
+  {
+   "w": "today.",
+   "s": 9.68,
+   "e": 10.32
+  }
+ ]
+}

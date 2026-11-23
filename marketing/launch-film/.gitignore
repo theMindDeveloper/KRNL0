@@ -1,0 +1,7 @@
+.hyperframes/
+out/
+footage/
+assets/footage/
+.capture*/
+node_modules/
+thumb/app.png

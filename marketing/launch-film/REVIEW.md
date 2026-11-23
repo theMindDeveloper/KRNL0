@@ -1,0 +1,6 @@
+# Review — KRNL0 launch film (v2)
+
+**What was checked:** `lint` 0/0; `check` (runtime, motion, contrast, craft, audio true; layout errors fixed: intended overlaps allowed on the old-way cards); `snapshot` at every chapter, cut and the end card; contact sheets of the full render (every 3.5 s); loudness of the render.
+**Fixed after the first render:** end card never showed (its clock was offset by its start time → mounted at 0); Todos/Frame punch-ins cropped windows → 1.1–1.15× only; music was as loud as the voice when ducked (−23 LUFS each) → music ducks to 0.17 and the voice chain adds +5 dB with a limiter; cube too small before the dive → 1.28–1.42×.
+**Measured, not heard:** whole film −15.0 LUFS integrated, −1.2 dBFS peak (first render); the balance of voice, score and effects, and the ElevenLabs voice's pronunciation of "KRNL0", must be heard by a person.
+**Honest limits:** UI text in two-window shots is ~20–24 px at 1920 (the app keeps windows at 540 px); every shot is a real recording of the browser preview of the renderer (fake clock, composed demo board), not the packaged desktop app; the assistant reply and the terminal shell are scripted stand-ins (the real app needs Claude Code / a real shell); S25's first seconds show clipped neighbours while the camera pulls back.

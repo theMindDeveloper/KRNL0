@@ -1,0 +1,12 @@
+# SPEC — "KRNL0 — your whole day, one canvas" (YouTube launch film)
+
+GOAL:   after 2:45 a stranger can say what KRNL0 is ("one canvas for planning, doing and reviewing my day"), has seen the real app do it, and wants to download it.
+OUTPUT: HyperFrames, 1920×1080, 30 fps, 165.094 s = 4953 frames. Letterbox 2.39:1 (bars 138 px) from 0 to 39.45 s and again from 152.5 s; open between (the drop opens the frame).
+TIME:   the score is the clock: ElevenLabs Music, 146.7 BPM (0.409 s = 12.3 frames/beat; bar = 1.64 s = 49.1 frames), downbeats in `assets/music/score.grid.json`. Sections: build 4–36 · dip 36–39 · DROP 39.325 · groove 39–93 · breakdown 93–117 · climax 117–153 · hit 153.05 · outro to 165.
+        The voice (ElevenLabs Eleven v4, male voice pn8ABB5WQQBNyhFA5uEG) is placed on downbeats by `scripts/plan.py`; anchors: "One canvas" = drop (39.325), "KRNL0." = final hit (153.045).
+LOOK:   two worlds. World 1 — colour fields: GREY #cdc9be (the dull old way) then one brand colour per chapter (acid #c9f158, lavender #a98bf6, cyan #22d3ee, coral #ee8466, paper #f4efe2), Geist 800 at 330 px / -5.5% tracking for chapter words, JetBrains Mono 800 for ghost digits (640 px, 10% ink). World 2 — the real app: dark theme, chrome visible, footage 2880×1620 punched to ≤1.5×, never a window under 50% frame height. The cube is the mark and the device (original Lit Core colours). Shadow 0 22 46 / .22 on cards; grain none; vignette none.
+OBJECTS: the cube = iso 3×3×3 faces, rounded cells r10, body #050505 round-joined (no sharp hex), lit cores acid. "Old way" cards = generic white cards with a coloured header and a label; never a real brand.
+MOTION: arrive expo.out 0.2–0.3 s, camera power2.inOut, drop power4.in 0.5 s; word-by-word blur-in (9 px → 0, 0.09 s stagger); chapter cards wipe in from the bottom on the downbeat; cuts on beats, layout changes on the bar.
+SHOTS:  see build.py EDL. Hero move per shot; the real action starts within 0.4 s; every cursor click causes the next thing on the same frame.
+BANNED: a dark void with floating small things (the opening macro is the cube surface, never a void); glow rings/particles; purple-blue gradients; a docked logo; three-cards rows; titles that keep drifting after landing; numbered "01/02" labels; the same whoosh on every cut.
+QA:     0.5 s (macro core) · 3.97 (first pulse) · 9.7 (cube pull-back) · 14 (first cards) · 25 (chaos) · 30 (dip) · 33 (cube) · 39.4 (flash) · each chapter card · every shot's click frame · 153.1 (end card hit) · 164 (hold).
