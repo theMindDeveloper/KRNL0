@@ -102,20 +102,37 @@ export function dragTarget(a: {
   lenMin: number;
   gran: number;
   dayChange: boolean;
+  /** The real time now: a start close to it on today's column snaps to exactly it. */
+  nowMark?: { day: string; min: number };
 }): Target {
   const g = Math.max(1, a.gran);
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  // A start within SNAP_NOW_MIN of the time now (today only) lands exactly on it,
+  // so a plan can start from the point you are in. The grid is used everywhere else.
+  const snapNow = (day: string, raw: number, onGrid: number): number =>
+    a.nowMark && a.nowMark.day === day && Math.abs(raw - a.nowMark.min) <= SNAP_NOW_MIN ? clamp(a.nowMark.min, 0, 1440 - g) : onGrid;
   if (!a.origin || a.startMin === null) {
-    const s = clamp(Math.floor(a.now.min / g) * g, 0, 1440 - g);
+    const s = snapNow(a.now.day, a.now.min, clamp(Math.floor(a.now.min / g) * g, 0, 1440 - g));
     return { day: a.now.day, startMin: s, endMin: Math.min(1440, s + Math.max(g, a.lenMin)) };
   }
   const o = a.origin;
+  const raw = o.startMin + (a.now.min - a.startMin);
   const d = Math.round((a.now.min - a.startMin) / g) * g;
-  if (a.mode === 'top') return { day: o.day, startMin: clamp(o.startMin + d, 0, o.endMin - g), endMin: o.endMin };
+  if (a.mode === 'top') return { day: o.day, startMin: Math.min(snapNow(o.day, raw, clamp(o.startMin + d, 0, o.endMin - g)), o.endMin - g), endMin: o.endMin };
   if (a.mode === 'bottom') return { day: o.day, startMin: o.startMin, endMin: clamp(o.endMin + d, o.startMin + g, o.startMin + 1440) };
   const len = o.endMin - o.startMin;
-  const s = clamp(o.startMin + d, 0, 1440 - g);
-  return { day: a.dayChange ? a.now.day : o.day, startMin: s, endMin: s + len };
+  const day = a.dayChange ? a.now.day : o.day;
+  const s = snapNow(day, raw, clamp(o.startMin + d, 0, 1440 - g));
+  return { day, startMin: s, endMin: s + len };
+}
+
+/** How close (minutes) a start must be to the time now to snap onto it. */
+export const SNAP_NOW_MIN = 4;
+
+/** The real time now as a day and a minute (local). */
+export function nowMark(date: Date = new Date()): { day: string; min: number } {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return { day: `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`, min: date.getHours() * 60 + date.getMinutes() };
 }
 
 const hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -269,6 +286,8 @@ function targetAt(a: Active, s: CalendarSurface, slot: { day: string; min: numbe
     // instead of jumping an hour at a time.
     gran: Math.min(15, s.gran()),
     dayChange: canChangeDay(a.item),
+    // Not for a habit (a rule for every day, not a start on one day).
+    ...(a.item.kind !== 'habit' ? { nowMark: nowMark() } : {}),
   });
 }
 

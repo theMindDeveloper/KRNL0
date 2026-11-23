@@ -3492,3 +3492,11 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-23] — Plan from now: snap to the time now, and a Now button
+
+**Type:** Feature (small)
+**PRs/Commits:** branch `feat/plan-from-now`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/calendarDrag.ts`, `src/renderer/components/ui/WhenPopover.tsx`, `tests/unit/renderer/planFromNow.test.tsx`
+
+**Summary:** The owner asked to start a plan from the point they are in. While a plan is dragged onto (or moved on) today's column, a start within 4 minutes of the time now lands exactly on it (also when pulling the top edge; never the bottom edge, other days or habits). The add card has a small **Now** button in the Time row (today, this minute); it fits the row, so the card does not grow. Tests map each rule.
