@@ -93,6 +93,7 @@ page(7, "lav", '''
 # 8 — end -------------------------------------------------------------------------------------------
 page(8, "acid", '''
 <div class="h" style="top:230px;font-size:190px;line-height:.88">Plan it.<br>Time it.<br>See it.</div>
+<img src="../../_shared/icon.svg" style="position:absolute;right:72px;top:250px;width:280px;height:280px;border-radius:64px;filter:drop-shadow(0 30px 40px rgba(0,0,0,.28))">
 <div style="position:absolute;left:72px;top:880px"><div class="tiles"><b>K</b><b>R</b><b>N</b><b>L</b><b>0</b></div></div>
 <div style="position:absolute;left:72px;top:1060px"><span class="cta">Free download &middot; link in bio</span></div>
 <div class="mono" style="position:absolute;left:72px;top:1190px;font-size:28px;letter-spacing:.04em">Windows &middot; macOS &middot; Linux</div>
