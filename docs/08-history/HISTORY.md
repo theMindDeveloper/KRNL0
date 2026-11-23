@@ -3419,3 +3419,11 @@ Typecheck clean; all tests pass.
 
 **Summary:** The owner found the browser page after Google sign-in empty and ugly ("You're signed in · close this tab" on cream). Three directions were drafted on the design canvas (page "Google sign-in page"); the owner picked **C**: "Your Google events now sit next to your plans", with an example week where KRNL0 plans are filled and Google events outlined, as on the Calendar. A failed or cancelled sign-in gets the same look ("Sign-in didn't finish. Nothing was changed."). Both pages are served by KRNL0 on 127.0.0.1 and load nothing from the internet (a test checks it); they fit a phone-width window. Typecheck clean; the Google tests pass.
 
+## [2026-11-23] — Pre-release check of the calendar release
+
+**Type:** Bug fixes / Docs
+**PRs/Commits:** branch `fix/google-scope-and-polish`
+**Files changed:** `src/main/index.ts`, `src/renderer/components/Mobile/mobile.css`, `docs/06-requirements/calendar-sync.md`
+
+**Summary:** Before the release the owner asked to make sure nothing loses data, conflicts or fails a check. Mixed versions: 0.15.0 (an old desktop, or the phone website until the server updates) merges boards key by key (`boardMerge`), so it keeps `calendarLinks` and an event's `place` and `icsUid` it does not know; nothing parses the board through a schema that would strip them. Every change since the deep audit was read again (narrower Google permissions, top bar, What's new on phones, phone Today, the sign-in page). Two fixes: the window now has a minimum size (640 × 420), below which the top bar's Help and Settings were cut off, and the phone's saved badge no longer reserves the desktop's width. Typecheck 0 errors; 313 test files pass; desktop and web production builds pass; the web bundle holds no desktop-only calendar code. The server calendar sync (P3) is written up as a future update in `calendar-sync.md`.
+

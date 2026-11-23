@@ -198,3 +198,24 @@ Feature: CLI (F21)
     When I run krnl cal links
     Then it prints both with their runner, last check and state
 ```
+
+## Later: the KRNL0 server runs calendars (P3, a future update)
+
+*Decided with the owner on 2026-11-23: calendar sync ships desktop-only; this is the plan for when it is built.*
+
+**Why.** Someone who only uses the website (no desktop app) cannot connect a calendar today, and with the laptop closed nothing syncs.
+
+**The one rule.** Every calendar connection is run by exactly one place at a time. Two runners would both send and delete the same items and undo each other.
+
+| Who | What happens |
+|---|---|
+| Desktop only | As now: the desktop runs it. |
+| Website only | Opt-in switch on the website, "Let my server sync my calendars": the server signs in and runs it around the clock. |
+| Both | The server runs it (it is always on); desktops show "kept in step by your server" and stop. Switched off on the server: the desktop that holds the sign-in takes it back. |
+
+**Order of work.** (1) A desktop update that understands "the server runs this calendar" and steps back, so no older desktop keeps running it. (2) The server feature with **Apple / iCloud first** (a form: email + app password, works on the website). (3) **Google** last: Google returns the browser only to a public address, never to a home server's private one (192.168.…), so a small hand-off page on krnl0.com passes the sign-in on to the user's own server (PKCE); may need Google's review again, so after the current review is approved.
+
+**What changes on the server (krnl0-server).** Its rules say it never reads board content and never calls outside services; this feature needs both, so it is **off by default** and switched on by the owner. Sign-ins are stored encrypted in the server's data folder, never in the board. The engine (`src/shared/calsync/`) ships with the KRNL0 release and the server pins it (Decision 52), so app and server run the same code. Needs a server decision (S-series) and a threat-model entry first.
+
+**Effort.** About 1–2 weeks.
+

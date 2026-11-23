@@ -295,3 +295,6 @@ body:has(.m-shell--phone) .dm-morning { bottom: calc(84px + env(safe-area-inset-
 .m-more__text strong { font-size: 16px; font-weight: 600; }
 .m-more__text span { font-size: 13px; color: var(--ink-3); }
 @media (prefers-reduced-motion: reduce) { .m-timercard__go:active { transform: none; } }
+
+/* The saved badge keeps one width in the desktop top bar; on a phone the board name needs that room. */
+.m-head .krnl-sync-badge { min-width: 0 !important; }
