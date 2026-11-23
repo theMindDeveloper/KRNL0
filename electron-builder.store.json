@@ -1,0 +1,21 @@
+{
+  "extends": "./electron-builder.json",
+  "directories": {
+    "output": "release-store"
+  },
+  "publish": null,
+  "win": {
+    "target": "appx",
+    "icon": "build/icon.ico"
+  },
+  "appx": {
+    "applicationId": "KRNL0",
+    "displayName": "KRNL0",
+    "identityName": "TheMindDev.KRNL0",
+    "publisher": "CN=CEF6E937-7B17-4D65-AAB5-42CA8A00AFD9",
+    "publisherDisplayName": "TheMindDev",
+    "backgroundColor": "#0b0b0c",
+    "languages": ["en-US"],
+    "artifactName": "${productName}-Store-${version}.${ext}"
+  }
+}

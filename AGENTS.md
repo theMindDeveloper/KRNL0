@@ -134,6 +134,8 @@ KRNL0 ships updates through **GitHub Releases** (free, public repo). Windows ins
 4. Check the draft (assets include `latest.yml`), then **Publish**. That click is what ships the update to every install.
 5. **Designed release notes, every release.** Each release's "What's new" (`src/shared/whatsnew.ts` slides + the in-app dialog, and `docs/releases/vX.Y.Z.md`) is designed on the Claude Design canvas like any UI — one slide per headline feature with its art, plus the "more" list — and the user approves it before the release PR merges. Every feature that goes into a release must appear in its notes.
 
+6. **Microsoft Store (second channel).** After a release is published on GitHub, build the Store package from its tag (`npm run package:store`) and submit it in Partner Center — only with the owner's OK. Store installs are updated by the Store, not by our updater. Steps and gotchas: [docs/releases/RELEASING.md](docs/releases/RELEASING.md) → "Microsoft Store build".
+
 Never: reuse a version number, move a tag after publishing, hand-upload an `.exe` without its `latest.yml` + `.blockmap`, or merge a board-schema change without a migration (an update must open every older `board.json`).
 
 ---

@@ -24,6 +24,8 @@ export interface UpdaterEnv {
   isPackaged: boolean;
   platform: NodeJS.Platform;
   env: Record<string, string | undefined>;
+  /** True when running as a Microsoft Store (MSIX) package — Electron's `process.windowsStore`. */
+  windowsStore?: boolean;
 }
 
 export type BackendChoice =
@@ -32,8 +34,10 @@ export type BackendChoice =
   | { kind: 'github' };
 
 /** Which backend this build uses, or why updates are off (F8). Pure — tested. */
-export function chooseBackend({ isPackaged, platform, env }: UpdaterEnv): BackendChoice {
+export function chooseBackend({ isPackaged, platform, env, windowsStore }: UpdaterEnv): BackendChoice {
   if (env['KRNL0_DISABLE_UPDATES'] === '1') return { kind: 'disabled', reason: 'turned off by KRNL0_DISABLE_UPDATES' };
+  // Microsoft Store builds are updated by the Store; a package cannot replace itself.
+  if (windowsStore) return { kind: 'disabled', reason: 'this copy is updated by the Microsoft Store' };
   // Explicit opt-in to try the flow against the real releases, any build.
   if (env['KRNL0_UPDATES'] === 'notify') return { kind: 'github' };
   if (!isPackaged) return { kind: 'disabled', reason: 'development build' };
@@ -64,7 +68,7 @@ async function flushWindow(getDispatch: () => CliDispatchFn | null): Promise<voi
 export function initUpdater(getDispatch: () => CliDispatchFn | null): UpdateService {
   if (service) return service;
 
-  const choice = chooseBackend({ isPackaged: app.isPackaged, platform: process.platform, env: process.env });
+  const choice = chooseBackend({ isPackaged: app.isPackaged, platform: process.platform, env: process.env, windowsStore: process.windowsStore === true });
   let backend: UpdateBackend | null = null;
   if (choice.kind === 'nsis') backend = createNsisBackend(log);
   if (choice.kind === 'github') backend = createGithubNotifyBackend(globalThis.fetch as unknown as FetchLike);

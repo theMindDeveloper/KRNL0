@@ -30,6 +30,7 @@ Nothing here needs a paid GitHub feature or a personal token.
 | 9 | Server: check the draft (bundles, `release.json`, signature verified in CI), owner's OK, **Publish** → `published.yml` moves `:latest`; updaters and the app's server-update notice see it. Then check `:latest` is the signed image: `docker buildx imagetools inspect ghcr.io/theminddeveloper/krnl0-server:latest` shows the digest in the release's `release.json` | `gh release edit vX.Y.Z -R theMindDeveloper/krnl0-server --draft=false --latest` | only after the owner says yes |
 | 10 | Website: fallback version in `theminddev-site/krnl0/index.html` (`data-krnl-v`, `softwareVersion`); news section for feature releases | PR on the site repo | agent |
 | 11 | History: a "vX.Y.Z published" entry in both repos | PR | agent |
+| 12 | Microsoft Store: build the `.appx` from the tag and submit it in Partner Center (see "Microsoft Store build" below) | `npm run package:store`, then Partner Center | agent builds, **owner clicks Submit** |
 
 `npm run release -- status` shows where everything stands in both repos. A server-only fix (no
 new app) is a normal server PR with a patch bump in `package.json`; merging it lets `tag.yml` do the rest.
@@ -106,6 +107,44 @@ the fix as the next patch quickly. Never "fix" it under the same version.
 
 ---
 
+## Microsoft Store build (by hand, on Windows) — after every published release
+
+The Store is a **second channel** next to GitHub. Store installs are updated by the Store, never
+by our updater (`chooseBackend` turns it off when `process.windowsStore` is true), so a release
+only reaches Store users once it is **submitted to Partner Center and passes Microsoft's review**
+(hours to a couple of days). Requirements: [microsoft-store.md](../06-requirements/microsoft-store.md).
+
+Account facts: individual Partner Center account, product **KRNL0**, Store ID `9NP2NNSWW7QQ`,
+identity values already in `electron-builder.store.json`. Microsoft signs Store packages, so no
+certificate is needed.
+
+Do this only for a version that is already published on GitHub, from a checkout of **that tag**:
+
+1. `npm ci` then `npm run package:store` -> `release-store/KRNL0-Store-X.Y.Z.appx`.
+   The version in the package is `X.Y.Z.0` (the Store requires the last part to be 0; never
+   hand-edit it). A Store version must be higher than the one in the Store, same rule as GitHub.
+2. Partner Center -> Apps and games -> KRNL0 -> **Start update** (the first time: **Start submission**)
+   -> Packages: upload the `.appx` -> Store listing: paste the release notes (`docs/releases/vX.Y.Z.md`,
+   shortened) -> **Submit**. Never submit before the owner says yes.
+3. Wait for certification. If it fails, read the report, fix on a branch, and ship the fix as the
+   **next patch** on GitHub too (versions are shared; never reuse one).
+4. The Store keeps its own copy of every version. Do not unpublish a Store version to "fix" it;
+   submit a higher one.
+
+**Known gotcha on this dev PC:** electron-builder's cached `makeappx.exe` (in
+`%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\winCodeSign-2.6.0\windows-10d`) fails with
+"side-by-side configuration is incorrect" when that folder holds stale files. Fix: make a *clean* copy
+of the cache with the Windows SDK's `x64` tools (`C:\Program Files (x86)\Windows Kitsin\<ver>d`)
+in `windows-10d`, and run `ELECTRON_BUILDER_CACHE=<that folder> npm run package:store`. A fresh
+machine or CI runner does not have this problem.
+
+**Testing a Store build on this PC:** an `.appx` only installs when it is signed with a certificate
+Windows trusts (and Developer Mode on). That is a Windows setting: ask the owner first. The Store
+build never shows the update dialog; `krnl update check` answers "Updates are off (this copy is
+updated by the Microsoft Store)".
+
+---
+
 ## macOS build (by hand, on a Mac)
 
 CI builds Windows only. GitHub's shared macOS runners queued for too long on v0.10.1.
@@ -143,6 +182,7 @@ updater-enabled version is published.
   (`MAC_CSC_LINK`, `APPLE_ID`, … secrets), a `zip` target next to the `dmg` (Squirrel.Mac
   installs from the zip; electron-builder then writes `latest-mac.yml`), and switching the
   macOS backend in `src/main/updater/index.ts` to electron-updater.
+- **Microsoft Store:** see "Microsoft Store build" above. Store installs update through the Store.
 - **Dev builds and worktrees never update** (`app.isPackaged`, `KRNL0_USER_DATA`).
   `KRNL0_UPDATES=notify npm run dev` runs the notify-only check against the real releases,
   to see the flow; `KRNL0_DISABLE_UPDATES=1` turns it off in an installed build.

@@ -28,6 +28,10 @@ describe('chooseBackend (F8)', () => {
     expect(chooseBackend({ ...packagedWin, platform: 'linux' })).toEqual({ kind: 'github' });
   });
 
+  it('is off in a Microsoft Store package (the Store updates it)', () => {
+    expect(chooseBackend({ ...packagedWin, windowsStore: true })).toEqual({ kind: 'disabled', reason: 'this copy is updated by the Microsoft Store' });
+  });
+
   it('is off in a development build', () => {
     expect(chooseBackend({ ...packagedWin, isPackaged: false })).toEqual({ kind: 'disabled', reason: 'development build' });
   });

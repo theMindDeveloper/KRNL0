@@ -53,7 +53,10 @@ describe('chip words (F6)', () => {
     expect(chipLook(null).label).toBe('saved');
     expect(chipLook(info({ configured: false, state: 'off' })).label).toBe('saved');
     expect(chipLook(info()).label).toBe('saved · synced');
-    expect(chipLook(info({ state: 'syncing' })).tone).toBe('cyan');
+    // Syncing never changes the badge: no flicker (a server that never synced stays "saved").
+    expect(chipLook(info({ state: 'syncing', lastSyncedAt: Date.now() }))).toEqual({ label: 'saved · synced', tone: 'acid' });
+    expect(chipLook(info({ state: 'connecting', lastSyncedAt: Date.now() }))).toEqual({ label: 'saved · synced', tone: 'acid' });
+    expect(chipLook(info({ state: 'syncing', lastSyncedAt: null }))).toEqual({ label: 'saved', tone: 'acid' });
     expect(chipLook(info({ state: 'offline' })).label).toBe('saved · offline');
     expect(chipLook(info({ state: 'paused' })).label).toBe('sync paused');
     expect(chipLook(info({ state: 'update' })).label).toBe('update KRNL0');
