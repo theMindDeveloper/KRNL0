@@ -9,6 +9,7 @@ CSS = """
 .h .headline { font-size: 112px; }
 .sub { position: absolute; left: 64px; right: 64px; top: 478px; max-width: 900px; opacity: .85; }
 .ghost { right: -30px; top: 520px; font-size: 440px; }
+.swipe { bottom: auto; top: 58px; right: 128px; }
 .win { border-radius: 14px; box-shadow: 0 0 0 3px var(--ink), 0 40px 80px rgba(0,0,0,.30), 0 10px 24px rgba(0,0,0,.22); }
 .slide.ink .bar .brand img { box-shadow: 0 0 0 2px rgba(244,239,226,.28); }
 .typed { position: absolute; left: 64px; top: 478px; display: inline-flex; align-items: center; gap: 14px; background: var(--ink); color: var(--paper); font-family: var(--mono); font-weight: 700; font-size: 31px; padding: 18px 28px; border-radius: 18px; }
@@ -36,7 +37,7 @@ S = {}
 S[1] = page(1, 'acid', bar(1) +
   '<div class="h" style="top:150px"><div class="headline">Plan your day<br>in one line.</div></div>'
   '<div class="typed">Review the proposal 11:00 1h<i></i></div>'
-  + win('cal-added.png', 100, 590, 880, 1260/1620))
+  + win('cal-added.png', 110, 595, 860, 1260/1620))
 # 2 type it
 S[2] = step(2, 'lav', '01 · TYPE', 'Write it like', 'you’d say it.', 'Day, time and length are read for you.',
   win('todo-typed.png', 175, 575, 730, 1.0))

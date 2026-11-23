@@ -19,7 +19,7 @@ const NOTES=['c-s1','c-s2','c-t1','c-r1','c-s3'];
   const m=await p.evaluate(()=>{const d=document.querySelector('[data-testid="dock"]').getBoundingClientRect();const o={w:d.width,h:d.height};for(const k of ['select','text','sticky','shape','image','pen','frame']){const e=document.querySelector(`[data-testid="dock-btn-${k}"]`);if(e){const r=e.getBoundingClientRect();o[k]=r.y-d.y+r.height/2;}}return o;});
   require('fs').writeFileSync(OUT+'/dock.json',JSON.stringify(m));await b.close();}
  // frame: a frame with its notes
- if(want('frame')){const {b,p,fit}=await open({w:760,h:760,dpr:1.5,extraCss:DOCKHIDE});
+ if(want('frame')){const {b,p,fit}=await open({w:760,h:760,dpr:2,extraCss:DOCKHIDE});
   await fit(['frame-notes']);await p.screenshot({path:OUT+'/frame.png',omitBackground:true});await b.close();}
  // layout menu (real)
  if(want('menu')){const {b,p}=await open({w:1400,h:900,dpr:3,hide:false});

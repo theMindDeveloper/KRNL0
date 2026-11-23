@@ -15,39 +15,40 @@ BASE_CSS = """
 """
 def bar(n, ink=False):
     col = "var(--paper)" if ink else "var(--ink)"
-    return f'<div class="bar" style="color:{col}"><div class="brand"><img src="../../_shared/icon.svg"><span>KRNL0</span></div><span>{n}/{N}</span></div>'
+    cue = f'<span>{n}/{N}{"  ·  swipe →" if n < N else ""}</span>'
+    return f'<div class="bar" style="color:{col}"><div class="brand"><img src="../../_shared/icon.svg"><span>KRNL0</span></div>{cue}</div>'
 def swipe(ink=False):
-    col = "var(--paper)" if ink else "var(--ink)"
-    return f'<div class="swipe" style="color:{col}">swipe <span style="font-size:34px;line-height:1">→</span></div>'
+    return ""
 def slide(n, cls, body, css="", ghost=True, ink=False):
+    ghost = ghost and n in (5, 6)
     g = f'<div class="ghostn" style="color:{"var(--paper)" if ink else "var(--ink)"}">{n:02d}</div>' if ghost else ""
     return HEAD.format(css=BASE_CSS + css) + f'<div class="slide {cls}">{g}{bar(n, ink)}{body}{swipe(ink) if n < N else ""}</div></body></html>'
 def hl(l1, l2, sub=None, size=120):
     s = f'<div class="sub">{sub}</div>' if sub else ""
     return f'<div class="hl"><div class="headline" style="font-size:{size}px">{l1}<br>{l2}</div>{s}</div>'
-def win(src, x, y, w, extra=""):
-    return f'<div class="win" style="left:{x}px;top:{y}px;width:{w}px;height:{w}px;{extra}"><img src="../assets/{src}"></div>'
+def win(src, x, y, w, light=False):
+    ring = "0 0 0 5px var(--ink)," if light else ""
+    return f'<div class="win" style="left:{x}px;top:{y}px;width:{w}px;height:{w}px;border-radius:26px;box-shadow:{ring}0 40px 80px rgba(0,0,0,.30),0 10px 24px rgba(0,0,0,.22)"><img src="../assets/{src}"></div>'
 def card(x, y, w, inner, bg="#0c0a08", fg="var(--paper)", pad=40):
     return f'<div style="position:absolute;left:{x}px;top:{y}px;width:{w}px;background:{bg};color:{fg};border-radius:26px;padding:{pad}px;box-shadow:0 30px 60px rgba(0,0,0,.28);z-index:2">{inner}</div>'
 e = html.escape
 slides = {}
 
 # 1 hook
-slides[1] = slide(1, "acid", hl("Every button", "is a command.", "Type it instead of clicking it.") + win("term-add.png", 170, 500, 740))
+slides[1] = slide(1, "acid", hl("Every button", "is a command.") + win("term-add.png", 110, 420, 860))
 
 # 2 plan in one line
-cmd = 'krnl todo add "Review the proposal 11:00 1h"'
-slides[2] = slide(2, "cyan", hl("Plan it in", "one line.") +
-    card(64, 392, 952, f'<div class="code" style="font-size:36px;line-height:1.35"><span style="color:var(--acid)">❯</span> krnl todo add<br><span style="padding-left:34px">"Review the proposal 11:00 1h"</span></div>', pad=34) +
-    '<div class="pill" style="left:64px;top:600px">↓ lands on your Calendar</div>' + win("win-calendar.png", 270, 668, 600))
+slides[2] = slide(2, "cyan", hl("Plan it in", "one line.", None, 108) +
+    card(64, 372, 952, '<div class="code" style="font-size:31px;line-height:1.3;white-space:nowrap"><span style="color:var(--acid)">❯</span> krnl todo add "Review the proposal 11:00 1h"</div>', pad=26) +
+    win("win-calendar.png", 130, 490, 820, light=True))
 
 # 3 habit
-slides[3] = slide(3, "lav", hl("Tick it off.", "Keep the streak.", "Same Habits window, no mouse.", 112) + win("term-habit.png", 170, 500, 740))
+slides[3] = slide(3, "lav", hl("Tick it off.", "Keep the streak.", None, 112) + win("term-habit.png", 110, 420, 860))
 
 # 4 timer
-slides[4] = slide(4, "coral", hl("Start the timer.", "Stay in flow.", None, 112) +
-    card(64, 392, 952, '<div class="code" style="font-size:36px;line-height:1.5"><span style="color:var(--acid)">❯</span> krnl pomo start<br><span style="color:var(--acid)">❯</span> krnl pomo status</div>', pad=34) +
-    '<div class="pill" style="left:64px;top:600px">↓ the Timer is recording</div>' + win("win-timer.png", 270, 668, 600))
+slides[4] = slide(4, "coral", hl("Start the timer.", "Stay in flow.", None, 108) +
+    card(64, 372, 952, '<div class="code" style="font-size:33px;line-height:1.3"><span style="color:var(--acid)">❯</span> krnl pomo start</div>', pad=26) +
+    win("win-timer.png", 130, 490, 820, light=True))
 
 # 5 groups
 groups = ["todo","task","habit","routine","pomo","cal","clock","analytics","time","recap","text","image","frame","board","radio","sound","theme","window","settings","edge","tour","help"]
@@ -62,9 +63,9 @@ script = ['# morning.sh', 'krnl todo add "Review the proposal 11:00 1h"', 'krnl 
 sc = "".join(f'<div style="{"opacity:.5" if i==0 else ""}">{e(l)}</div>' if i else f'<div style="opacity:.5">{e(l)}</div>' for i, l in enumerate(script))
 res = ['Added todo: "Review the proposal" · on the Calendar 2026-11-24 11:00 · 60 min (task: task-f1e0b4a9…)', real['habit done Morning run'], 'Pomodoro started', real['cal show']]
 slides[6] = slide(6, "paper", hl("Script your", "morning.", None, 120) +
-    card(64, 392, 952, f'<div class="code" style="font-size:31px;line-height:1.55">{sc}</div>', pad=36) +
-    '<div class="pill" style="left:64px;top:800px">↓ runs in the Terminal window</div>' +
-    card(64, 876, 952, '<div class="code" style="font-size:27px;line-height:1.5;color:#cfcabb;font-weight:500">' + "".join(f'<div style="margin-bottom:8px">{e(r)}</div>' for r in res) + '</div>', pad=30))
+    card(64, 392, 952, f'<div class="code" style="font-size:32px;line-height:1.5">{sc}</div>', pad=36) +
+    '<div class="pill" style="left:64px;top:780px">↓ runs in the Terminal window</div>' +
+    card(64, 850, 952, '<div class="code" style="font-size:30px;line-height:1.4;color:#e6e1d2;font-weight:500">' + "".join(f'<div style="margin-bottom:8px">{e(r)}</div>' for r in res) + '</div>', pad=30))
 
 # 7 cta
 slides[7] = slide(7, "acid", '<img src="../../_shared/icon.svg" style="position:absolute;left:64px;top:170px;width:230px;height:230px;border-radius:52px;box-shadow:0 30px 60px rgba(0,0,0,.25)">' +

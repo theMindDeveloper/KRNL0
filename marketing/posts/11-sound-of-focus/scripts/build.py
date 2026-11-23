@@ -50,7 +50,7 @@ def win(src, x, y, w, ink_outline=True, scale_px=300, extra=""):
     ring = f"0 0 0 3px {INK}, " if ink_outline else ""
     return h, f'''<div class="win" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px;border-radius:{r}px;overflow:visible;box-shadow:{ring}0 44px 70px rgba(0,0,0,.34), 0 10px 20px rgba(0,0,0,.22)"><img src="assets/{src}" style="width:100%;height:100%;display:block"></div>'''
 
-def sound_slide(i, bg, fg, chip, title, mood, img, art, H=790):
+def sound_slide(i, bg, fg, chip, title, mood, img, art, H=752):
     from PIL import Image
     iw, ih = Image.open(ROOT / "assets" / img).size
     w = round(H * iw / ih)
@@ -62,7 +62,7 @@ def sound_slide(i, bg, fg, chip, title, mood, img, art, H=790):
 <div style="position:absolute;left:64px;top:140px;right:64px">
   <span class="chip" style="background:{fg};color:{bg}">{chip}</span>
   <div class="headline" style="margin-top:24px;font-size:128px">{title}</div>
-  <div class="sub" style="margin-top:20px;max-width:900px;font-size:40px">{mood}</div>
+  <div class="sub" style="margin-top:20px;max-width:900px;font-size:40px;text-wrap:balance">{mood}</div>
 </div>
 {w_html}
 {swipe(fg)}
