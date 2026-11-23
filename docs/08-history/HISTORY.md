@@ -3525,3 +3525,14 @@ Typecheck clean; all tests pass.
 
 **Summary:** The owner asked for a Mac build, on their Mac, offered on the website. No release had ever had a `.dmg`, so krnl0.com's Mac button said "Coming soon". Building the `.dmg` and running it with isolated data showed that every main-side `krnl pomo` command failed in a packaged app: `pomo.ts` loaded `../../main/boardIo` with a runtime `require`, which keeps its source path after electron-vite bundles main into one file (Windows was affected too). The terminal banner read `../../../package.json`, which is outside app.asar, so it said v0.0.0. Fixes: static imports (`boardIo` tolerates a missing Electron `app` in tests), `app.getVersion()` for the banner, and a test that fails on any source-relative `require` in `src/main`/`src/sys`. The packaged Mac app was checked: the floating timer (dial, capsule, box) shows when the main window is minimised and hides on restore, its Stop button stops the board's timer, the menu-bar timer runs, node-pty spawns a shell, the `.dmg` verifies and the app's ad-hoc signature is valid. `npm run release -- mac` now builds the `.dmg` from the tag on an Apple silicon Mac (fetching Electron and rebuilding node-pty, which npm 11 skips) and attaches it to the release; `check` reminds when it is missing.
 
+## [2026-11-23] — Release v0.16.2
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.16.2`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.16.1 → 0.16.2`. Notes: `docs/releases/v0.16.2.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
