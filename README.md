@@ -17,7 +17,7 @@ Pomodoro, Todos, Tasks, Habits, Calendar, Clock, and a real Terminal anchored as
 
 <br />
 
-[![License: FSL-1.1](https://img.shields.io/badge/License-FSL--1.1-c9f158?style=flat-square&labelColor=0e0d0b)](LICENSE.md)
+[![License: PolyForm Shield](https://img.shields.io/badge/License-PolyForm%20Shield-c9f158?style=flat-square&labelColor=0e0d0b)](LICENSE.md)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-c9f158?style=flat-square&labelColor=0e0d0b)](#quickstart)
 [![Website](https://img.shields.io/badge/Website-theminddev.com%2Fkrnl0-c9f158?style=flat-square&labelColor=0e0d0b)](https://theminddev.com/krnl0/)
 [![Latest](https://img.shields.io/badge/v0.11.3-latest-c9f158?style=flat-square&labelColor=0e0d0b)](https://github.com/theMindDeveloper/KRNL0/releases/latest)
@@ -352,14 +352,14 @@ npm run typecheck   # strict TypeScript, zero `any`
 
 ## License
 
-[**Functional Source License v1.1**](LICENSE.md), with an Apache 2.0 future grant.
+[**PolyForm Shield License 1.0.0**](LICENSE.md): the code is open to read, use and change, but not to build a competing product. It does not expire and never changes to another license.
 
 | | |
 |:---:|---|
 | ✅ | Use, fork, modify, self-host, contribute |
 | ✅ | Build plugins and themes |
-| ❌ | Sell as a competing commercial product |
-| 🕒 | Each release becomes Apache 2.0 two years after publication |
+| ❌ | Sell as a competing commercial product, or offer KRNL0 as a competing service |
+| ℹ️ | Versions up to 0.16.0 were published under the Functional Source License 1.1 and stay under it ([text](LICENSES/FSL-1.1-ALv2.md)) |
 
 ---
 
