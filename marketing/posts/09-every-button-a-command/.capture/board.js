@@ -11,7 +11,7 @@
     const place = (n, x, y, w, h) => { n.position = { x, y }; n.config = { ...n.config, canvasSize: { width: w, height: h } }; };
     const todo = byKind('todo'), cal = byKind('calendar'), habit = byKind('habit'), pomo = byKind('pomo'), term = byKind('term');
     place(todo, 0, 0, 540, 540); place(cal, 100, 0, 540, 540); place(habit, 200, 0, 540, 540); place(pomo, 300, 0, 540, 540);
-    place(term, 400, 0, 980, 480); term.config = { ...term.config, stationHidden: false };
+    place(term, 400, 0, 540, 540); term.config = { ...term.config, stationHidden: false, fontSize: 12 };
     byKind('clock').position = { x: 500, y: 0 }; byKind('analytics').position = { x: 600, y: 0 };
 
     const items = todo.state.items = [];
@@ -38,7 +38,7 @@
   };
 
   // ── the stand-in shell ──
-  const PROMPT = '\x1b[38;2;201;241;88m~/krnl0\x1b[0m \x1b[2m❯\x1b[0m ';
+  const PROMPT = '\x1b[38;2;201;241;88m❯\x1b[0m ';
   const state = { cb: null, buf: '' };
   window.__OUT = {};
   const run = (cmd) => {

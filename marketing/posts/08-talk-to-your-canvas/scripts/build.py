@@ -33,8 +33,8 @@ def hl(h, sub=None, top=150):
 # 1 hook
 page(1, "acid", '<div class="ghost" style="left:-30px; top:760px; font-size:620px">17:00</div>'
   + hl("Ask your<br>canvas.", "Type it. It happens on the board.")
-  + f'<div class="card" style="left:64px; top:700px; width:760px"><img src="{A}panel-move.png"></div>'
-  + f'<div class="orbbadge" style="left:790px; top:1010px; width:190px; height:190px"><img src="{A}orb.png"></div>')
+  + f'<div class="card" style="left:64px; top:560px; width:900px"><img src="{A}panel-move.png"></div>'
+  + f'<div class="orbbadge" style="left:780px; top:900px; width:200px; height:200px"><img src="{A}orb.png"></div>')
 # 2 plan by asking
 page(2, "lav", '<div class="ghost" style="right:-40px; top:700px; font-size:620px">16:00</div>'
   + hl("Plan it<br>by asking.", "Say what and when. It sets it up.")
@@ -63,7 +63,7 @@ page(6, "lav", '<div class="ghost" style="right:-40px; top:600px; font-size:560p
   + '<div class="chip" style="position:absolute; left:680px; top:930px">voiced tours</div>')
 # 7 control
 rows = [("1", "Your own Claude Code", "Sign in once. It runs on your account."),
-        ("2", "Only krnl commands", "It can do what the app can do. Nothing else on your computer."),
+        ("2", "Only krnl commands", "The same ones the app uses. Nothing else."),
         ("3", "Only when you ask", "Nothing is sent to Claude on its own.")]
 b7 = hl("You stay<br>in charge.", None)
 y = 520

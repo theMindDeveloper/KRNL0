@@ -34,7 +34,7 @@ await p.addStyleTag({content:`[data-testid="ambient-radio"],[data-testid="topbar
   [data-id^="mother-"]{filter:none!important;box-shadow:none!important}`});
 await p.evaluate(()=>{for(const e of document.querySelectorAll('div,section')){const r=e.getBoundingClientRect();if(/^\s*Good morning/.test(e.textContent||'')&&r.height<80&&r.height>20)e.style.display='none'}});
 const fit=async(id,ms=1200)=>{await p.evaluate(i=>window.dispatchEvent(new CustomEvent('krnl:fit-nodes',{detail:{nodeIds:[i]}})),id);await p.clock.runFor(ms);await p.waitForTimeout(300);};
-const shot=async(id,name)=>{await fit(id);const loc=p.locator(`.react-flow__node[data-id="${id}"]`);const bb=await loc.boundingBox();console.log(name,JSON.stringify(bb));await p.screenshot({path:path.join(OUT,name+'.png'),omitBackground:true,clip:bb});};
+const shot=async(id,name)=>{await fit(id);const loc=p.locator(`.react-flow__node[data-id="${id}"] > *`).first();const bb=await loc.boundingBox();console.log(name,JSON.stringify(bb));await p.screenshot({path:path.join(OUT,name+'.png'),omitBackground:true,clip:bb});};
 const type=async(cmd)=>{await p.keyboard.type(cmd,{delay:0});await p.clock.runFor(200);await p.keyboard.press('Enter');await p.clock.runFor(400);await p.waitForTimeout(200);};
 
 // ── windows ──
