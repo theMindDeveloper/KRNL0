@@ -3536,3 +3536,11 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+## [2026-11-23] — v0.16.2 published: KRNL0 for Mac, with KRNL0 server 0.2.7
+
+**Type:** Release (published)
+**PRs/Commits:** #292 (fix + Mac step), #293 (release PR), tag `v0.16.2`; server: theMindDeveloper/krnl0-server#27 (v0.2.7); website: theMindDeveloper/krnl0-website#10
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:** The owner asked for a Mac build made on their Mac, offered on the website, and the whole release run without them. CI built the Windows draft; `npm run release -- check` passed (installer, blockmap, `latest.yml` 0.16.2, web app checksum). On the Mac, `npm run release -- mac` built `KRNL0-0.16.2-arm64.dmg` from the tag, verified the image and the ad-hoc signature, and attached it with its blockmap. The packaged 0.16.2 app was smoke-tested with isolated data: the banner says v0.16.2, `krnl pomo start` works, and minimising shows the always-on-top floating timer. Then the release was published. The follow workflow opened server 0.2.7 (web 0.16.2, signed image digest in `release.json`); it was merged, built, published, and `:latest` moved. krnl0.com: fallback version 0.16.2, the homepage says Windows and Mac, and the download page's licence line says PolyForm Shield. The live download page offers the `.dmg` as "Download for Mac". Not done: the Mac build has no Google sign-in client (CI-only secrets), so Google Calendar sign-in says "not set up" on Mac; and the Microsoft Store submission needs Windows and the owner.
