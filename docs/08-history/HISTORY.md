@@ -3464,3 +3464,11 @@ Typecheck clean; all tests pass.
 **Files changed:** `docs/08-history/HISTORY.md`
 
 **Summary:** Your Google and iCloud calendars beside your plans, your plans on your phone both ways, and Today on one phone screen (notes: `docs/releases/v0.16.0.md`, What's new designed on the canvas "KRNL0 0.16 · What's new" and approved by the owner). The owner said "Yes, release it". Full suite green in the release PR (313 files, 3050 tests); the draft checked by `npm run release -- check` (installer, blockmap, `latest.yml` 0.16.0, web app checksum). The draft's installer was also unpacked: its `app.asar` is 0.16.0, holds the Google client id and secret (counted, never printed) and the 0.16 What's new. Published at 05:33 UTC. The follow workflow opened server 0.2.5 (website = KRNL0 0.16.0), which was merged, built (release and CI runs green, signature checked in CI) and published at 05:39 UTC; `:latest` was checked against the digest in `release.json`. The KRNL0 website shows the 0.16 news and the fallback version 0.16.0.
+
+## [2026-11-23] — Calm "saved · synced" badge; Store branch merged with v0.16.0
+
+**Type:** Bug Fix / Feature
+**PRs/Commits:** branch `feat/microsoft-store`
+**Files changed:** `src/renderer/store/syncStore.ts`, `tests/unit/renderer/SyncChip.test.tsx`
+
+**Summary:** The top bar's badge flipped between "syncing" (blue) and "saved · synced" on every sync round, which looked restless. While a server that has synced before is syncing or connecting, the badge now stays "saved · synced"; the details window still says "Syncing…". A server that has never synced stays plain "saved". The Store work (Store-aware updater and app id, `package:store`, docs) is merged on top of v0.16.0 and ships in the same patch.
