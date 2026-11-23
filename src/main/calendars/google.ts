@@ -14,10 +14,21 @@ import type { ExportEvent } from '../../shared/calsync/krnlIcs';
 import type { MirrorItem, RemoteItem } from '../../shared/calsync/mirror';
 import type { LinkedEvent } from '../../shared/calsync/types';
 import { SignInError, type RemoteAdapter, type RemoteCal } from './remote';
+import { SIGNED_IN_PAGE, SIGN_IN_FAILED_PAGE } from './signinPage';
 
 declare const __KRNL0_GOOGLE_CLIENT__: { id: string; secret: string } | undefined;
 
-const SCOPE = 'openid email https://www.googleapis.com/auth/calendar';
+/**
+ * The narrowest access that works (Decision 64, point 1): the list of the owner's calendars and
+ * their events, read-only, and full access only to the calendars KRNL0 makes ("KRNL0 · Board").
+ * KRNL0 never needs to change the owner's other calendars.
+ */
+export const CALENDAR_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+  'https://www.googleapis.com/auth/calendar.events.readonly',
+  'https://www.googleapis.com/auth/calendar.app.created',
+] as const;
+const SCOPE = ['openid', 'email', ...CALENDAR_SCOPES].join(' ');
 const API = 'https://www.googleapis.com/calendar/v3';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
@@ -39,10 +50,6 @@ export interface GoogleTokens {
 
 const b64url = (buf: Buffer) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-const DONE_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>KRNL0</title></head>
-<body style="margin:0;height:100vh;display:grid;place-items:center;background:#ebe1c2;color:#1a1612;font-family:system-ui,sans-serif">
-<div style="text-align:center"><h1 style="font-size:22px;margin:0 0 8px">You're signed in</h1><p style="margin:0;color:#554b38">Go back to KRNL0. You can close this tab.</p></div></body></html>`;
-const FAIL_PAGE = DONE_PAGE.replace("You're signed in", 'Sign-in did not finish').replace('Go back to KRNL0. You can close this tab.', 'Go back to KRNL0 and try again.');
 
 /**
  * F8 — opens Google's sign-in in the browser and waits (5 minutes at most) for
@@ -63,7 +70,7 @@ export async function signInGoogle(openBrowser: (url: string) => Promise<unknown
         const url = new URL(req.url ?? '/', 'http://127.0.0.1');
         if (url.pathname !== '/callback') { res.writeHead(404).end(); return; }
         const ok = url.searchParams.get('state') === state && url.searchParams.get('code');
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(ok ? DONE_PAGE : FAIL_PAGE);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(ok ? SIGNED_IN_PAGE : SIGN_IN_FAILED_PAGE);
         clearTimeout(timer);
         if (!ok) { reject(new Error(url.searchParams.get('error') === 'access_denied' ? 'Google sign-in was cancelled.' : 'Google sign-in did not finish.')); return; }
         const port = (server!.address() as AddressInfo).port;
@@ -74,6 +81,8 @@ export async function signInGoogle(openBrowser: (url: string) => Promise<unknown
         const q = new URLSearchParams({
           client_id: client.id, redirect_uri: `http://127.0.0.1:${port}/callback`, response_type: 'code', scope: SCOPE,
           code_challenge: challenge, code_challenge_method: 'S256', state, access_type: 'offline', prompt: 'consent',
+          // Development only: the language of Google's screens (the review video must be in English).
+          ...(process.env['KRNL0_GOOGLE_HL'] ? { hl: process.env['KRNL0_GOOGLE_HL'] } : {}),
         });
         openBrowser(`https://accounts.google.com/o/oauth2/v2/auth?${q.toString()}`).catch((err) => { clearTimeout(timer); reject(err); });
       });
@@ -84,8 +93,11 @@ export async function signInGoogle(openBrowser: (url: string) => Promise<unknown
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ code, client_id: client.id, client_secret: client.secret, redirect_uri: redirect, grant_type: 'authorization_code', code_verifier: verifier }).toString(),
     });
-    const j = await res.json() as { access_token?: string; refresh_token?: string; expires_in?: number; id_token?: string; error_description?: string };
+    const j = await res.json() as { access_token?: string; refresh_token?: string; expires_in?: number; id_token?: string; scope?: string; error_description?: string };
     if (!res.ok || !j.refresh_token) throw new Error(j.error_description ?? 'Google did not give KRNL0 access.');
+    // Google lets people untick single permissions. Without all three the calendar cannot work.
+    const granted = new Set((j.scope ?? SCOPE).split(/\s+/));
+    if (CALENDAR_SCOPES.some((sc) => !granted.has(sc))) throw new Error('Google sign-in needs all three calendar boxes ticked. Sign in again and leave them on.');
     let email = 'Google account';
     try {
       const payload = JSON.parse(Buffer.from((j.id_token ?? '').split('.')[1] ?? '', 'base64').toString('utf8')) as { email?: string };

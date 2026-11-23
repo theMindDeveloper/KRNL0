@@ -86,6 +86,7 @@
 .m-body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .m-shell--phone .m-body { padding: 12px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left)); }
 .m-shell--phone .m-body:has(> .m-scroll) { padding: 0; }
+.m-shell--phone .m-body:has(> .m-today-a) { padding: 0; }
 /* The Calendar and the canvas get the whole screen on a phone. */
 .m-shell--phone .m-body:has(> .m-cal) { padding: 8px max(6px, env(safe-area-inset-right)) 8px max(6px, env(safe-area-inset-left)); }
 .m-shell--phone .m-body:has(> .m-canvas) { padding: 0; }
@@ -236,3 +237,64 @@ body:has(.m-shell--phone) .dm-morning { bottom: calc(84px + env(safe-area-inset-
   .m-head, .m-tabbar { border-color: var(--ink-3); }
   .m-day__meta, .m-day__time { color: var(--ink-2); }
 }
+
+
+/* ── Today on a phone, design A (2026-11-22): one screen, no scrolling ───── */
+.m-today-a {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+  overflow-y: auto; overscroll-behavior: contain; /* only a very short screen ever scrolls */
+}
+.m-headline__line { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ink-3); font-family: var(--font-mono); }
+.m-today-a__clock { flex: 1 1 auto; min-height: 250px; display: flex; flex-direction: column; }
+.m-daychips {
+  flex-shrink: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  margin: 0 calc(-1 * max(12px, env(safe-area-inset-left))); padding: 0 max(12px, env(safe-area-inset-left));
+}
+.m-daychips::-webkit-scrollbar { display: none; }
+.m-daychip {
+  height: 34px; padding: 0 12px; flex-shrink: 0; border: 0; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  background: var(--paper-2); color: var(--ink-2); font-size: 13px; font-weight: 500;
+}
+.m-daychip .m-num { font-family: var(--font-mono); color: var(--ink-3); }
+.m-daychip--done { color: var(--ink-4); text-decoration: line-through; }
+.m-daychip--quiet { color: var(--ink-3); }
+.m-timercard {
+  flex-shrink: 0; display: flex; align-items: center; gap: 14px;
+  padding: 12px 12px 12px 16px; border-radius: 14px;
+  background: var(--node-bg); border: 1px solid var(--paper-3);
+}
+.m-timercard__read { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.m-timercard__label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+.m-timercard__digits {
+  border: 0; background: transparent; padding: 0; cursor: pointer; color: var(--ink);
+  font-family: var(--font-mono); font-size: 44px; line-height: 1.08; font-weight: 300; font-variant-numeric: tabular-nums;
+}
+.m-timercard__what {
+  max-width: 100%; height: 32px; margin-left: -8px; padding: 0 8px; border: 0; border-radius: 8px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; background: transparent; color: var(--ink-3); font-size: 13px;
+}
+.m-timercard__what span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-timercard__go {
+  flex-shrink: 0; height: 60px; padding: 0 20px; border: 0; border-radius: 16px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--btn-primary-bg); color: var(--btn-primary-fg); font-size: 16px; font-weight: 700;
+}
+.m-timercard__go:active { background: var(--btn-primary-bg-hover); transform: scale(0.97); }
+/* More (phone): Insights and Canvas. */
+.m-more { gap: 10px; padding-top: 4px; }
+.m-more__row {
+  min-height: 72px; padding: 0 16px; border: 1px solid var(--paper-3); border-radius: 14px; cursor: pointer;
+  display: flex; align-items: center; gap: 14px; text-align: left;
+  background: var(--node-bg); color: var(--ink);
+}
+.m-more__row:active { background: var(--paper-2); }
+.m-more__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.m-more__text strong { font-size: 16px; font-weight: 600; }
+.m-more__text span { font-size: 13px; color: var(--ink-3); }
+@media (prefers-reduced-motion: reduce) { .m-timercard__go:active { transform: none; } }
+
+/* The saved badge keeps one width in the desktop top bar; on a phone the board name needs that room. */
+.m-head .krnl-sync-badge { min-width: 0 !important; }

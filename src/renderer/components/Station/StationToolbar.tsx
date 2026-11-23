@@ -157,7 +157,7 @@ function ToolbarBtn({
       }}
     >
       {children}
-      <span>{label}</span>
+      <span className="krnl-panel-toggle__label">{label}</span>
     </button>
   );
 }

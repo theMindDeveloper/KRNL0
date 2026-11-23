@@ -799,17 +799,17 @@ input[type="number"]::-webkit-outer-spin-button {
   .krnl-topbar-btn:active, .krnl-panel-toggle:active { transform: none; }
 }
 
-/* "◆ live" breathes slowly; the floor stays readable (never under 0.75). */
-.krnl-live-badge {
-  animation: krnl-live-breathe 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-@keyframes krnl-live-breathe {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.75; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .krnl-live-badge { animation: none; }
-}
+/* The saved / synced badge stays still: no breathing, no width change (owner, 2026-11-22). */
+
+/* A narrow window: the top bar folds down step by step, never overlapping (owner, 2026-11-22).
+   Every hidden word stays in its button's tooltip. data-fold is set by the bar from its inner width. */
+.krnl-topbar[data-fold~="labels"] .krnl-panel-toggle__label { display: none; }
+.krnl-topbar[data-fold~="labels"] .krnl-panel-toggle { padding: 4px 6px !important; }
+.krnl-topbar[data-fold~="words"] .krnl-topbar-word,
+.krnl-topbar[data-fold~="words"] .krnl-layout-label,
+.krnl-topbar[data-fold~="words"] .krnl-badge-label { display: none; }
+.krnl-topbar[data-fold~="words"] .krnl-sync-badge { min-width: 0 !important; }
+.krnl-topbar[data-fold~="toggles"] [data-testid="topbar-panel-toggles"] { display: none !important; }
 
 /* Native <select> lists inherit the OS colours (white on white in dark themes). */
 select option { background: var(--paper); color: var(--ink); }

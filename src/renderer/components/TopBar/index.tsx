@@ -9,7 +9,7 @@
 import { useEasyMode } from '../../store/uiMode';
 import { CANVAS_FIT_PADDING } from '../Canvas/fitPadding';
 import { SettingsIcon } from '../ui/SettingsIcons';
-import { useState, useEffect, useLayoutEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
 import { LayoutMenu } from '../ui/LayoutMenu';
@@ -145,17 +145,44 @@ export function TopBar() {
   };
 
 
+  // A narrow window: the bar folds down step by step instead of overlapping (data-fold, tokens.css).
+  // Measured here, not with CSS container queries: those would trap the menus and dialogs drawn
+  // inside the bar (board menu, layout menu, Connect server) in the bar's 44 px.
+  const barRef = useRef<HTMLDivElement>(null);
+  const [fold, setFold] = useState('');
+  useLayoutEffect(() => {
+    const el = barRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = (): void => {
+      const cs = getComputedStyle(el);
+      const w = el.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0');
+      const next = [w <= 1300 && 'labels', w <= 900 && 'words', w <= 700 && 'toggles'].filter(Boolean).join(' ');
+      setFold((prev) => (prev === next ? prev : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div
+      ref={barRef}
       data-testid="topbar"
+      className="krnl-topbar"
+      data-fold={fold}
       style={{
         height: 44,
         width: '100%',
         background: 'var(--paper-2)',
         borderBottom: '1px solid var(--paper-3)',
-        display: 'flex',
+        // Three fixed columns: the centre toggles stay in place whatever the
+        // left side says ("saved", "syncing", "saved · synced"…).
+        // Never narrower than what they hold, so nothing overlaps; as the window
+        // narrows, the bar folds down instead (container queries in tokens.css).
+        display: 'grid',
+        gridTemplateColumns: 'minmax(max-content, 1fr) auto minmax(max-content, 1fr)',
         alignItems: 'center',
-        justifyContent: 'space-between',
         // Left padding clears the macOS traffic-light cluster so the brand
         // mark and breadcrumb never sit underneath the red/yellow/green
         // controls. Windows/Linux render controls on the right, so the
@@ -171,7 +198,7 @@ export function TopBar() {
       } as React.CSSProperties}
     >
       {/* Left: brand + breadcrumb + live badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ gridColumn: 1, display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
         {/* Brand mark — the "Lit Core" app icon (build/icon.svg): a dark 3×3
             voxel cube on a near-black tile, centre voxel lit acid on each
             face. The tile is dark in every theme so the mark matches the
@@ -187,6 +214,7 @@ export function TopBar() {
         >
           <BrandMark />
           <span
+            className="krnl-topbar-word"
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: 13,
@@ -213,13 +241,13 @@ export function TopBar() {
       {/* Centre: panel toggles (ADR 0009 F9) — in Station AND Canvas mode; a
           hidden mother disappears and the rest close the gap. */}
       {MANIFESTS[dockStyle].slots.panelToggles === 'topbar' && (
-        <div data-testid="topbar-panel-toggles" style={{ display: 'flex', alignItems: 'center' }}>
+        <div data-testid="topbar-panel-toggles" style={{ gridColumn: 2, display: 'flex', alignItems: 'center' }}>
           <StationToolbar variant="inline" />
         </div>
       )}
 
       {/* Right: action buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ gridColumn: 3, justifySelf: 'end', display: 'flex', alignItems: 'center', gap: 6 }}>
         {/* window-frame.md, top bar — Fit only where it does something (the Free
             layout; Station's small canvas has its own fit control). It sits
             before the switch, so the switch never moves when it appears. The
