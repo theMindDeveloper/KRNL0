@@ -7,7 +7,9 @@ const {chromium}=require('playwright');const fs=require('fs');const path=require
 const ROOT=path.resolve(__dirname,'..'),OUT=path.join(ROOT,'assets');fs.mkdirSync(OUT,{recursive:true});
 const CSS=`[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-button"],.react-flow__minimap,.react-flow__controls,.react-flow__background,[data-testid="dock"],[data-testid="dock-layer"],.react-flow__edges{display:none!important}
   html,body,#root,.react-flow,.react-flow__renderer,.react-flow__pane{background:transparent!important}
-  [data-testid="ambient-radio"]>div:last-child{box-shadow:none!important}`;
+  [data-testid="ambient-radio"]>div:last-child{box-shadow:none!important}
+  /* light theme: the speaker grille dots take the paper colour and wash the dark particle screen out to grey; thin them so the screen reads dark as designed (Decision 60) */
+  [data-testid="ambient-radio-grille"]{opacity:.22!important}`;
 (async()=>{
 const b=await chromium.launch();
 // ── the radio, real time ──

@@ -21,7 +21,7 @@ def page(i, cls, body, extra_css="", last=False):
     swipe = "" if last else '<div class="swipe">swipe <svg width="40" height="20" viewBox="0 0 40 20"><path d="M2 10h32M26 3l8 7-8 7" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
     html = f'''<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../_shared/brand.css"><style>
 body{{margin:0}} .slide .h{{position:absolute;left:64px;right:64px}}
-.shot{{position:absolute;filter:drop-shadow(0 34px 44px rgba(0,0,0,.28)) drop-shadow(0 8px 14px rgba(0,0,0,.18))}}
+.shot{{position:absolute;filter:drop-shadow(2px 0 0 #0a0908) drop-shadow(-2px 0 0 #0a0908) drop-shadow(0 2px 0 #0a0908) drop-shadow(0 -2px 0 #0a0908) drop-shadow(0 30px 40px rgba(0,0,0,.30))}}
 .shot img{{display:block;width:100%}}
 {extra_css}</style></head><body><div class="slide {cls}">{body}{bar}{swipe}</div></body></html>'''
     (HT / f"slide-{i}.html").write_text(html)
@@ -29,20 +29,20 @@ body{{margin:0}} .slide .h{{position:absolute;left:64px;right:64px}}
 def fit(name, w): return w, round(w * S[name][1] / S[name][0])
 
 # 1 — hook (lavender)
-w, h = fit("hero", 960)
+w, h = fit("hero", 980)
 page(1, "lav", f'''
 <div class="ghost" style="right:-60px;bottom:-40px;font-size:900px;color:var(--ink)">0</div>
 <div class="h headline" style="top:150px;font-size:158px">Not another<br>list.</div>
 <div class="h sub" style="top:470px;font-size:52px;max-width:860px">A canvas that looks<br>like your head.</div>
-<div class="shot" style="left:60px;top:620px;width:{w}px"><img src="../shots/trim/hero.png"></div>
-<div class="chip" style="position:absolute;left:64px;top:{620+h+90}px">Free canvas · put anything anywhere</div>''')
+<div class="shot" style="left:50px;top:640px;width:{w}px"><img src="../shots/trim/hero.png"></div>
+<div class="chip" style="position:absolute;left:64px;top:{640+h+80}px">Free canvas · put anything anywhere</div>''')
 
 # 2 — next to your plan (coral)
-w, h = fit("beside", 940)
+w, h = fit("beside", 960)
 page(2, "cyan", f'''
 <div class="h headline" style="top:150px;font-size:116px">Put anything<br>next to your plan.</div>
 <div class="h sub" style="top:430px;max-width:820px">Ideas, reminders and details sit right beside the task they belong to.</div>
-<div class="shot" style="left:70px;top:640px;width:{w}px"><img src="../shots/trim/beside.png"></div>''')
+<div class="shot" style="left:60px;top:600px;width:{w}px"><img src="../shots/trim/beside.png"></div>''')
 
 # 3 — tools (cyan): the real dock, labelled row by row
 DH = 720; k = DH / dock["h"]; DW = dock["w"] * k
@@ -52,38 +52,37 @@ rows = "".join(f'<div class="row" style="top:{top0 + dock[key]*k - 46}px"><span 
 page(3, "acid", f'''
 <div class="h headline" style="top:150px;font-size:150px">Think<br>out loud.</div>
 <div class="h sub" style="top:450px">Seven tools. One key each.</div>
-<div class="shot" style="left:200px;top:{top0}px;width:{DW}px;filter:drop-shadow(0 30px 40px rgba(0,0,0,.35))"><img src="../shots/dock.png"></div>
+<div class="shot" style="left:200px;top:{top0}px;width:{DW}px"><img src="../shots/dock.png"></div>
 {rows}''', extra_css=f'''
 .row{{position:absolute;left:{200+DW+56}px;display:flex;align-items:center;gap:28px;height:92px}}
 .row .nm{{font-weight:800;font-size:56px;letter-spacing:-0.035em}}
 .row .chip{{font-size:30px;padding:8px 18px}}''')
 
 # 4 — frames (acid)
-w, h = fit("frame", 640)
+w, h = fit("frame", 700)
 page(4, "ink", f'''
 <div class="h headline" style="top:150px;font-size:128px">Group it<br>in a frame.</div>
 <div class="h sub" style="top:430px;max-width:860px">Drag the frame and everything inside moves with it.</div>
-<div class="shot" style="left:{(1080-w)//2}px;top:600px;width:{w}px"><img src="../shots/trim/frame.png"></div>
-<div class="chip" style="position:absolute;left:64px;top:{600+h+50}px;background:var(--acid);color:var(--ink)">Frame · F</div>''')
+<div class="shot" style="left:{(1080-w)//2}px;top:560px;width:{w}px"><img src="../shots/trim/frame.png"></div>
+<div class="chip" style="position:absolute;left:64px;top:{560+h+40}px;background:var(--acid);color:var(--ink)">Frame · F</div>''')
 
 # 5 — two layouts (paper)
 mw = 880; mh = round(mw * 501 / 960)
 page(5, "paper", f'''
 <div class="h headline" style="top:150px;font-size:112px">Tidy when<br>you want.<br><span style="color:var(--coral)">Free when<br>you don't.</span></div>
-<div class="shot" style="left:100px;top:{730}px;width:{mw}px;filter:drop-shadow(0 30px 40px rgba(0,0,0,.30))"><img src="../shots/menu.png" style="border-radius:40px"></div>
+<div class="shot" style="left:100px;top:{730}px;width:{mw}px"><img src="../shots/menu.png" style="border-radius:40px"></div>
 <div class="chip" style="position:absolute;left:100px;top:{730+mh+56}px">Layout menu · top bar</div>''')
 
-# 6 — flip (ink)
-sw = 484
-sh_ = round(sw * S["station"][1] / S["station"][0]); fh = round(sw * S["free"][1] / S["free"][0])
+# 6 — flip (lavender): the two layouts stacked, big enough to read
+cw = 840; sh_ = round(cw * S["station"][1] / S["station"][0]); fh = round(cw * S["free"][1] / S["free"][0])
+y1 = 500; y2 = y1 + sh_ + 56
 page(6, "lav", f'''
-<div class="h headline" style="top:150px;font-size:116px">One shortcut<br>flips them.</div>
-<div class="h" style="top:430px"><span class="chip" style="font-size:40px;padding:14px 30px">Ctrl + Shift + L</span></div>
-<div class="lab" style="left:48px;top:610px"><span class="chip" style="background:var(--paper);color:var(--ink)">My layout</span></div>
-<div class="lab" style="left:{48+sw+24}px;top:610px"><span class="chip">Free canvas</span></div>
-<div class="shot" style="left:48px;top:690px;width:{sw}px"><img src="../shots/trim/station.png"></div>
-<div class="shot" style="left:{48+sw+24}px;top:690px;width:{sw}px"><img src="../shots/trim/free.png"></div>
-<div style="position:absolute;left:64px;right:64px;top:{690+max(sh_,fh)+60}px;font-weight:600;font-size:36px;line-height:1.25;opacity:.9">Same windows, same notes. Your arrangement stays as you left it.</div>''', extra_css=".lab{position:absolute}")
+<div class="h headline" style="top:140px;font-size:104px">One shortcut<br>flips them.</div>
+<div class="h" style="top:372px"><span class="chip" style="font-size:34px;padding:12px 26px">Ctrl + Shift + L</span> <span style="font-family:var(--mono);font-weight:800;font-size:26px;margin-left:14px">⌘ + Shift + L on Mac</span></div>
+<div class="shot" style="left:120px;top:{y1}px;width:{cw}px"><img src="../shots/trim/station.png"></div>
+<div class="lab" style="left:64px;top:{y1-18}px"><span class="chip" style="background:var(--paper);color:var(--ink)">My layout</span></div>
+<div class="shot" style="left:120px;top:{y2}px;width:{cw}px"><img src="../shots/trim/free.png"></div>
+<div class="lab" style="left:64px;top:{y2-18}px"><span class="chip">Free canvas</span></div>''', extra_css=".lab{position:absolute;z-index:2}")
 
 # 7 — CTA (acid)
 page(7, "acid", '''
