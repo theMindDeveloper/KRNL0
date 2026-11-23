@@ -19,7 +19,7 @@ WIDE = [0.04, 0.06, 0.96, 0.94]
 PAIR = [0.04, 0.07, 0.97, 0.97]; TODO5 = [0.04, 0.07, 0.5, 0.97]; CAL5 = [0.49, 0.07, 0.97, 0.97]
 CAL = CAL5
 
-shots.append(dict(kind="intro", t0=0, t1=round(DROP + 0.45, 3)))
+shots.append(dict(kind="intro", t0=0, t1=round(DROP + 0.034, 3)))
 world(DROP, tt["plan"][0], "reveal")
 title(*tt["plan"], ["Plan", "it."], LAV, "#c9f158")
 # Plan: Start with the plan. Type it... Review the proposal, eleven, one hour. Done. It's planned... on your calendar.
@@ -34,8 +34,12 @@ dev("S12b-card-closeup", 50.06, 52.91, 1.0, [[0, 0.2, 0.2, 0.8, 0.82], [2.8, 0.2
 dev("S10-radio-mix", 52.91, 60.05, 0.0, [[0, 0.12, 0.09, 0.91, 0.93], [2.0, 0.56, 0.09, 0.91, 0.93], [6.5, 0.5, 0.09, 0.91, 0.93]], tilt=(7, -12, 0), rate=0.75, studio=CYAN)
 # groove, music only
 dev("S07-tick", 60.05, 62.91, 0.3, [[0, 0.19, 0.09, 0.71, 0.95], [2.8, 0.2, 0.1, 0.7, 0.93]], tilt=(9, 10, 1))
-dev("S11-stopwatch", 62.91, 65.77, 0.5, [[0, 0.03, 0.09, 0.5, 0.93], [2.8, 0.04, 0.1, 0.49, 0.91]], tilt=(7, -12, -1))
-dev("S02-glide", 65.77, tt["see"][0], 0.0, [[0, *WIDE], [5.6, 0.06, 0.08, 0.94, 0.92]], tilt=(6, 8, 0))
+CLK = json.loads((R / "scripts/clock.json").read_text()) if (R / "scripts/clock.json").exists() else None
+if CLK:   # the clock beat (voice line "cl"): framing from scripts/clock.json, written after the footage lands
+    for c in CLK: dev(c["src"], c["t0"], c["t1"], c["m0"], c["views"], tilt=tuple(c["tilt"]))
+else:
+    dev("S11-stopwatch", 62.91, 65.77, 0.5, [[0, 0.03, 0.09, 0.5, 0.93], [2.8, 0.04, 0.1, 0.49, 0.91]], tilt=(7, -12, -1))
+    dev("S02-glide", 65.77, tt["see"][0], 0.0, [[0, *WIDE], [5.6, 0.06, 0.08, 0.94, 0.92]], tilt=(6, 8, 0))
 title(*tt["see"], ["See", "it."], CORAL, "#c9f158")
 dev("S14-habit-year", tt["see"][1], 74.31, 4.5, [[0, 0.26, 0.08, 0.74, 0.94], [1.4, 0.27, 0.1, 0.73, 0.92]], tilt=(9, -10, 0), studio=CORAL)
 tick = W("lb", "tick"); dev("S13-habit-tick", 74.31, 78.61, max(0, 1.17 - (tick - 74.31)), [[0, 0.26, 0.08, 0.74, 0.94], [4.2, 0.27, 0.1, 0.73, 0.92]], tilt=(8, 11, 1), studio=CORAL)

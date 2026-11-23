@@ -7,7 +7,8 @@ VOICE = "pn8ABB5WQQBNyhFA5uEG"
 MODEL = "eleven_v4"
 LINES = {
  "p1": "[low, calm] Every morning starts the same. A list in one app. A calendar in another. A timer. A habit tracker. A dozen tabs open. [sighs] And none of them know about each other.",
- "p2": "[quietly] What if they did?",
+ "p2": "[confident, warm] What if they did?",
+ "cl": "[warm] And it all comes together on the clock. Your plans around the dial. The time you spend, filling in as you go.",
  "r1": "[confident, deep] This is Kernel Zero. One canvas, for your whole day.",
  "pl": "[calm] Start with the plan. Type it the way you'd say it. Review the proposal, eleven, one hour. [pause] Done. It's planned, it's timed, it's on your calendar. [warm] No time yet? Pick it up, and drop it where it belongs.",
  "fo": "[confident] Then, do the work. Press start, and every minute lands on the plan it belongs to. [soft] Put on a sound that keeps you in it. Rain. A low hum. A fire. Mix them. Make your own room.",
