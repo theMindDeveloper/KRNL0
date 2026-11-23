@@ -35,17 +35,17 @@ slides[1] = page(1, "acid", f'''<div class="t" style="top:150px"><span class="ch
 <div class="t headline" style="top:225px; font-size:150px">Your whole<br>day, one<br>canvas.</div>
 <div class="t" style="top:735px">{rows}</div>''', ghost="right:-60px; top:700px; font-size:640px; opacity:.08;")
 # 2 plan
-slides[2] = page(2, "lav", text("01 · MORNING", "Start with<br>the list.", "Type it in one line. Time included.") + win("todo", 90, 600, 900, 383), ghost=GH)
+slides[2] = page(2, "lav", text("01 · MORNING", "Start with<br>the list.", "Type it in one line. Time included.") + win("todo", 90, 640, 900, 342), ghost=GH)
 # 3 schedule
-slides[3] = page(3, "cyan", text("02 · SCHEDULE", "Give every<br>plan a time.", "Drop it on the calendar. One glance.") + win("cal", 90, 510, 900, 780), ghost=GH)
+slides[3] = page(3, "cyan", text("02 · SCHEDULE", "Give every<br>plan a time.", "Drop it on the calendar. One glance.") + win("cal", 112, 555, 855, 741), ghost=GH)
 # 4 focus
-slides[4] = page(4, "coral", text("03 · FOCUS", "Press start.<br>It records.", "Pick the plan. Hit start.") + win("timer", 90, 530, 900, 733), ghost=GH)
+slides[4] = page(4, "coral", text("03 · FOCUS", "Press start.<br>It records.", "Pick the plan. Hit start.") + win("timer", 90, 555, 900, 733), ghost=GH)
 # 5 habits
-slides[5] = page(5, "acid", text("04 · HABITS", "Habits you can<br>see building.", "Tick them off. Streaks do the rest.") + win("habits", 90, 580, 900, 600), ghost=GH)
+slides[5] = page(5, "acid", text("04 · HABITS", "Habits you can<br>see building.", "Tick them off. Streaks do the rest.") + win("habits", 90, 620, 900, 533), ghost=GH)
 # 6 recap
-slides[6] = page(6, "ink", text("05 · EVENING", "Close the<br>day.", "What got done, and for how long.") + win("recap", 90, 540, 900, 690), ghost=GH)
+slides[6] = page(6, "ink", text("05 · EVENING", "Close the<br>day.", "What got done, and for how long.") + win("recap", 90, 560, 900, 690), ghost=GH)
 # 7 planned vs spent
-slides[7] = page(7, "lav", text("06 · REVIEW", "See where<br>the time went.", "Planned against spent, task by task.") + win("planned", 150, 500, 780, 780), ghost=GH)
+slides[7] = page(7, "lav", text("06 · REVIEW", "See where<br>the time went.", "Planned against spent, task by task.") + win("planned", 180, 560, 720, 720), ghost=GH)
 # 8 end
 slides[8] = page(8, "acid", '''<img src="../../_shared/icon.svg" style="position:absolute; left:64px; top:120px; width:220px; height:220px; border-radius:50px; box-shadow:0 30px 60px rgba(0,0,0,.28)">
 <div class="t headline" style="top:400px; font-size:128px">One canvas.<br>Your whole<br>day.</div>
