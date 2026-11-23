@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.16.1] — 2026-11-23
 
+### Added
+- Plan from now: drag a plan to today and its start snaps to the time now (within a few minutes), so it starts from the point you are in. The add card has a small **Now** button (today, this minute).
+- KRNL0 can now be installed from the Microsoft Store. Store copies are updated by the Store.
+
 ### Fixed
 - The "saved · synced" badge in the top bar no longer flickers to a blue "syncing" and back. It stays "saved · synced"; the details window still says when it is syncing.
 
 ### Changed
-- KRNL0 can now be installed from the Microsoft Store. Store copies are updated by the Store.
+- License: from this version on KRNL0 is under the PolyForm Shield License 1.0.0 (use and change it freely, but not to build a competing product; it never changes to another license). Versions up to 0.16.0 stay under the Functional Source License.
 
 ## [0.16.0] — 2026-11-23
 
