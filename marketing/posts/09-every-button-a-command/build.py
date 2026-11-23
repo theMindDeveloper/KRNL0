@@ -2,7 +2,7 @@
 import json, html
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
-OUT = json.loads((ROOT / ".capture/outputs.json").read_text())
+OUT = json.loads((ROOT / "capture/outputs.json").read_text())
 real = {o["cmd"]: o["message"] for o in OUT}
 N = 7
 HEAD = '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../_shared/brand.css"><style>{css}</style></head><body>'
@@ -63,9 +63,9 @@ script = ['# morning.sh', 'krnl todo add "Review the proposal 11:00 1h"', 'krnl 
 sc = "".join(f'<div style="{"opacity:.5" if i==0 else ""}">{e(l)}</div>' if i else f'<div style="opacity:.5">{e(l)}</div>' for i, l in enumerate(script))
 res = ['Added todo: "Review the proposal" · on the Calendar 2026-11-24 11:00 · 60 min (task: task-f1e0b4a9…)', real['habit done Morning run'], 'Pomodoro started', real['cal show']]
 slides[6] = slide(6, "paper", hl("Script your", "morning.", None, 120) +
-    card(64, 392, 952, f'<div class="code" style="font-size:32px;line-height:1.5">{sc}</div>', pad=36) +
-    '<div class="pill" style="left:64px;top:780px">↓ runs in the Terminal window</div>' +
-    card(64, 850, 952, '<div class="code" style="font-size:30px;line-height:1.4;color:#e6e1d2;font-weight:500">' + "".join(f'<div style="margin-bottom:8px">{e(r)}</div>' for r in res) + '</div>', pad=30))
+    card(64, 416, 952, f'<div class="code" style="font-size:32px;line-height:1.5">{sc}</div>', pad=36) +
+    '<div class="pill" style="left:64px;top:792px">↓ runs in the Terminal window</div>' +
+    card(64, 862, 952, '<div class="code" style="font-size:30px;line-height:1.4;color:#e6e1d2;font-weight:500">' + "".join(f'<div style="margin-bottom:8px">{e(r)}</div>' for r in res) + '</div>', pad=30))
 
 # 7 cta
 slides[7] = slide(7, "acid", '<img src="../../_shared/icon.svg" style="position:absolute;left:64px;top:170px;width:230px;height:230px;border-radius:52px;box-shadow:0 30px 60px rgba(0,0,0,.25)">' +

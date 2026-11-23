@@ -9,5 +9,5 @@ export default defineConfig({
     '@xterm/xterm/css/xterm.css': resolve(R, 'tests/__mocks__/@xterm/xterm.css.ts'),
     '@xyflow/react': resolve(R, 'tests/__mocks__/@xyflow/react.tsx'), '@xyflow/react/dist/style.css': resolve(R, 'tests/__mocks__/@xterm/xterm.css.ts'),
   } },
-  test: { include: ['marketing/posts/09-every-button-a-command/.capture/run.test.ts'], environment: 'node', testTimeout: 60000 },
+  test: { include: ['marketing/posts/09-every-button-a-command/capture/run.test.ts'], environment: 'node', testTimeout: 60000 },
 });

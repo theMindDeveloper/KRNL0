@@ -8,9 +8,9 @@ CSS = """
 .hl .headline { font-size:118px; }
 .hl .sub { margin-top:26px; font-size:42px; max-width:880px; }
 .ph { position:absolute; display:block; }
-.card { position:absolute; border-radius:22px; overflow:hidden; background:#0b0b0b; box-shadow:0 40px 80px rgba(0,0,0,.30), 0 10px 24px rgba(0,0,0,.22); }
+.card { position:absolute; border-radius:22px; overflow:hidden; background:#f3f1ea; box-shadow:0 0 0 3px var(--ink), 0 40px 80px rgba(0,0,0,.32), 0 10px 24px rgba(0,0,0,.22); }
 .card img { display:block; width:100%; }
-.orbbadge { position:absolute; border-radius:50%; overflow:hidden; background:#0b0b0b; box-shadow:0 24px 50px rgba(0,0,0,.30); }
+.orbbadge { position:absolute; border-radius:50%; overflow:hidden; background:#f3f1ea; box-shadow:0 0 0 3px var(--ink), 0 24px 50px rgba(0,0,0,.30); }
 .orbbadge img { width:100%; display:block; transform:scale(1.18); }
 .slide.ink .chip { background:var(--acid); color:var(--ink); }
 .row { position:absolute; left:64px; right:64px; display:flex; gap:32px; align-items:flex-start; }
@@ -38,29 +38,29 @@ page(1, "acid", '<div class="ghost" style="left:-30px; top:760px; font-size:620p
 # 2 plan by asking
 page(2, "lav", '<div class="ghost" style="right:-40px; top:700px; font-size:620px">16:00</div>'
   + hl("Plan it<br>by asking.", "Say what and when. It sets it up.")
-  + f'<div class="card" style="left:64px; top:660px; width:800px"><img src="{A}panel-plan.png"></div>'
-  + '<div class="chip" style="position:absolute; left:64px; top:1230px">2 commands · 1 sentence</div>')
+  + f'<div class="card" style="left:64px; top:540px; width:900px"><img src="{A}panel-plan.png"></div>'
+  + '<div class="chip" style="position:absolute; left:64px; top:1190px">2 commands · 1 sentence</div>')
 # 3 lands
 page(3, "cyan", '<div class="ghost" style="left:-30px; top:720px; font-size:620px">16:00</div>'
   + hl("Already on<br>your calendar.", None)
-  + f'<div class="card" style="left:200px; top:470px; width:680px"><img src="{A}win-calendar.png"></div>'
-  + '<div class="chip" style="position:absolute; left:64px; top:1190px; font-size:32px">Call Mia · 16:00 · 1h</div>')
+  + f'<div class="card" style="left:160px; top:450px; width:760px"><img src="{A}win-calendar.png"></div>'
+  + '<div class="chip" style="position:absolute; left:64px; top:1235px; font-size:32px">Call Mia · 16:00 · 1h</div>')
 # 4 ask about the day
 page(4, "coral", '<div class="ghost" style="right:-40px; top:760px; font-size:560px">?</div>'
   + hl("Ask about<br>your day.", "Every answer shows the command it ran.")
-  + f'<div class="card" style="left:64px; top:600px; width:680px"><img src="{A}panel-plate.png"></div>')
+  + f'<div class="card" style="left:64px; top:500px; width:820px"><img src="{A}panel-plate.png"></div>')
 # 5 focus session
 page(5, "paper", '<div class="ghost" style="right:-20px; top:560px; font-size:560px">25</div>'
   + hl("Say “focus<br>session.”", "The orb answers out loud and starts your timer.")
-  + f'<div class="card" style="left:64px; top:660px; width:450px"><img src="{A}win-timer.png"></div>'
-  + f'<div class="card" style="left:540px; top:660px; width:476px"><img src="{A}orb-say.png"></div>'
-  + '<div class="chip" style="position:absolute; left:540px; top:960px">no Claude needed</div>')
+  + f'<div class="card" style="left:64px; top:640px; width:500px"><img src="{A}win-timer.png"></div>'
+  + f'<div class="card" style="left:584px; top:640px; width:432px"><img src="{A}orb-say.png"></div>'
+  + '<div class="chip" style="position:absolute; left:584px; top:900px">no Claude needed</div>')
 # 6 guide
 page(6, "lav", '<div class="ghost" style="right:-40px; top:600px; font-size:560px">?!</div>'
   + hl("It shows<br>you around.", "Click the orb. A voiced guide walks you through the app.")
-  + f'<div class="card" style="left:64px; top:560px; width:520px"><img src="{A}panel-start.png"></div>'
-  + f'<div class="orbbadge" style="left:680px; top:620px; width:270px; height:270px"><img src="{A}orb.png"></div>'
-  + '<div class="chip" style="position:absolute; left:680px; top:930px">voiced tours</div>')
+  + f'<div class="card" style="left:64px; top:520px; width:600px"><img src="{A}panel-start.png"></div>'
+  + f'<div class="orbbadge" style="left:716px; top:560px; width:260px; height:260px"><img src="{A}orb.png"></div>'
+  + '<div class="chip" style="position:absolute; left:716px; top:860px">voiced tours</div>')
 # 7 control
 rows = [("1", "Your own Claude Code", "Sign in once. It runs on your account."),
         ("2", "Only krnl commands", "The same ones the app uses. Nothing else."),

@@ -6,3 +6,5 @@ Real: the orb, the assistant panel, the Calendar, the Timer, the focus-session f
 Scripted: Claude Code does not run in a browser, so `scripts/board.js` plays the three answers (and their `krnl` lines) through the
 same bridge calls the desktop app uses. In the desktop app the answers come from Claude Code; the commands shown are real `krnl` commands.
 The Timer was started with its own button (the preview cannot run the `pomo start` command the focus flow sends).
+
+Theme: windows are filmed in the app's bright theme (localStorage krnl0-theme=light). The assistant panel and the orb's speech bubble use fixed dark inline styles in the app, so they stay dark.
