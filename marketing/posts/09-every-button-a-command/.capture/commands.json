@@ -1,0 +1,21 @@
+[
+ ["todo","add","Review the proposal 11:00 1h"],
+ ["todo","add","Dentist tomorrow 14:00 30 min"],
+ ["todo","add","Pay rent friday"],
+ ["todo","list"],
+ ["habit","add","Morning run"],
+ ["habit","add","Read 20 pages"],
+ ["habit","done","Morning run"],
+ ["habit","streak","Morning run"],
+ ["habit","list"],
+ ["pomo","start","--label","Write the pitch","--minutes","25"],
+ ["pomo","status"],
+ ["pomo","stop"],
+ ["cal","show"],
+ ["recap","today"],
+ ["analytics","totals","--range","7"],
+ ["board","summary"],
+ ["radio","list"],
+ ["window","list"],
+ ["help"]
+]
