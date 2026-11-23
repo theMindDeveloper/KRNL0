@@ -14,7 +14,7 @@ const PLAN='Review the proposal 11:00 1h';
  const inp=p.locator('[data-id="mother-todo"] input').first();
  await R.moveTo(field.x+field.w*0.72,field.y+field.h*0.92,0.35);   // out of the way of the text
  R.mark('typeStart');
- let i=0;for(const ch of PLAN){await inp.press(ch===' '?'Space':ch);await R.frame(i%5===4?3:2);i++;}   // ≈ 12.5 characters a second
+ await inp.fill(PLAN);await R.frame(20);   // the whole line at once: the card opens already parsed (no layout jump)
  R.mark('parsed');await R.frame(42);                            // the card with day / time / length is read
  R.mark('enter');await inp.press('Enter');await R.frame(38);    // lands in the list and on the calendar
  R.mark('landed');

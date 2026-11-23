@@ -21,7 +21,7 @@ async function session(cfg, fn) {
   await p.addStyleTag({ content: CHROME_HIDE + (cfg.css || '') });
   await p.evaluate(() => {
     for (const e of document.querySelectorAll('div,section')) { const r = e.getBoundingClientRect(); if (/^\s*Good (morning|afternoon|evening)/.test(e.textContent || '') && r.height < 80 && r.height > 20) e.style.display = 'none'; }
-    const c = document.createElement('div'); c.id = 'cur';
+    const c = document.createElement('div'); c.id = 'cur';document.head.insertAdjacentHTML('beforeend','<style>#cur{visibility:hidden!important}</style>');
     c.style.cssText = 'position:fixed;left:0;top:0;width:72px;height:72px;z-index:2147483647;pointer-events:none;opacity:0;transform-origin:8px 6px';
     c.innerHTML = '<svg width="72" height="72" viewBox="0 0 24 24"><path d="M4 2.5 L4 18.5 L8.4 14.6 L11.2 21 L14 19.8 L11.3 13.5 L17.2 13.3 Z" fill="#0a0908" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
     document.body.appendChild(c);

@@ -28,7 +28,7 @@ async function film({id,dur,theme='dark',flags='',css='',setup,script,hold=1.0})
   const DPR=Number(process.env.DPR||1.5), dry=DPR<1.5;
   const OUTD=path.join(ROOT,'.capture-e-'+id);fs.rmSync(OUTD,{recursive:true,force:true});fs.mkdirSync(OUTD,{recursive:true});
   const {b,p}=await open({dpr:DPR,theme,flags,css});
-  await p.evaluate(()=>{const c=document.createElement('div');c.id='cur';c.style.cssText='position:fixed;left:0;top:0;width:72px;height:72px;z-index:2147483647;pointer-events:none;opacity:0;transform-origin:8px 6px';c.innerHTML='<svg width="72" height="72" viewBox="0 0 24 24"><path d="M4 2.5 L4 18.5 L8.4 14.6 L11.2 21 L14 19.8 L11.3 13.5 L17.2 13.3 Z" fill="#0a0908" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';document.body.appendChild(c);});
+  await p.evaluate(()=>{const c=document.createElement('div');c.id='cur';document.head.insertAdjacentHTML('beforeend','<style>#cur{visibility:hidden!important}</style>');c.style.cssText='position:fixed;left:0;top:0;width:72px;height:72px;z-index:2147483647;pointer-events:none;opacity:0;transform-origin:8px 6px';c.innerHTML='<svg width="72" height="72" viewBox="0 0 24 24"><path d="M4 2.5 L4 18.5 L8.4 14.6 L11.2 21 L14 19.8 L11.3 13.5 L17.2 13.3 Z" fill="#0a0908" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';document.body.appendChild(c);});
   const state={ptr:{x:W+80,y:H*0.82},Q:{},holding:false,curOn:false,marks:{}};
   if(setup)await setup(p,state);
   const A=api(state);
