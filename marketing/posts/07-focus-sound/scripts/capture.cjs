@@ -1,5 +1,6 @@
 // Films the real Ambient Radio (and the Timer it sits beside) in the browser preview of the app.
 // Needs the preview running:  (repo root) npx vite --config vite.preview.config.ts   -> http://localhost:5201
+// Theme: the app's bright (light) theme (localStorage krnl0-theme).
 // Usage: node scripts/capture.cjs   -> assets/*.png (transparent corners, no baked shadow; the slides add the shadow in CSS)
 // The radio is filmed in real time (its settings panel does not like the fake clock); the Timer uses the fake clock.
 const {chromium}=require('playwright');const fs=require('fs');const path=require('path');
@@ -10,9 +11,9 @@ const CSS=`[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-bu
 (async()=>{
 const b=await chromium.launch();
 // ── the radio, real time ──
-{const p=await b.newPage({viewport:{width:1200,height:900},deviceScaleFactor:3});
+{const p=await b.newPage({viewport:{width:1200,height:900},deviceScaleFactor:3.5});
 p.on('pageerror',e=>console.log('PE',e.message.slice(0,120)));
-await p.addInitScript(()=>{localStorage.setItem('krnl0-ambient-radio-edge','none');localStorage.setItem('krnl0-ambient-radio-pos',JSON.stringify({x:820,y:40}));});
+await p.addInitScript(()=>{localStorage.setItem('krnl0-theme','light');localStorage.setItem('krnl0-ambient-radio-edge','none');localStorage.setItem('krnl0-ambient-radio-pos',JSON.stringify({x:820,y:40}));});
 await p.goto('http://localhost:5201/?fixture=fresh');await p.waitForTimeout(3500);await p.addStyleTag({content:CSS});
 const radio=()=>p.locator('[data-testid="ambient-radio"] > div').last();
 const shot=async(name)=>{await p.mouse.move(5,5);const bb=await radio().evaluate(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}});await p.screenshot({path:path.join(OUT,name+'.png'),omitBackground:true,clip:bb});console.log('shot',name,Math.round(bb.width),Math.round(bb.height));};
@@ -30,9 +31,10 @@ await click('ambient-radio-gear');
 await click('ambient-radio-preset-yt');await p.waitForTimeout(800);await shot('radio-yt');
 await p.close();}
 // ── the timer, fake clock ──
-{const p=await b.newPage({viewport:{width:1200,height:900},deviceScaleFactor:3});
+{const p=await b.newPage({viewport:{width:1200,height:900},deviceScaleFactor:3.5});
 p.on('pageerror',e=>console.log('PE',e.message.slice(0,120)));
 await p.clock.install({time:new Date('2026-11-24T10:30:00')});
+await p.addInitScript(()=>localStorage.setItem('krnl0-theme','light'));
 await p.addInitScript({content:fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
 await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1200);await p.clock.runFor(4000);
 await p.addStyleTag({content:CSS+`[data-testid="ambient-radio"]{display:none!important}`});

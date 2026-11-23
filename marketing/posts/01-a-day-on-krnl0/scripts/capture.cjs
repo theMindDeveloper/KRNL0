@@ -14,8 +14,9 @@ const SHOTS={
 (async()=>{const b=await chromium.launch();
 for(const [name,s] of Object.entries(SHOTS)){
   if(ONLY&&!ONLY.split(',').includes(name))continue;
-  const p=await b.newPage({viewport:{width:1440,height:1100},deviceScaleFactor:2});
+  const p=await b.newPage({viewport:{width:1440,height:1100},deviceScaleFactor:3});
   p.on('pageerror',e=>console.log('PE',e.message.slice(0,160)));
+  await p.addInitScript(()=>{try{localStorage.setItem('krnl0-theme','light');}catch(e){}});
   await p.clock.install({time:new Date(s.at)});
   const flags=Object.entries(s.flags).map(([k,v])=>`window.__${k}=${JSON.stringify(v)};`).join('');
   await p.addInitScript({content:flags+fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
@@ -49,7 +50,7 @@ for(const [name,s] of Object.entries(SHOTS)){
     console.log('recap card',box);
     if(box){await p.screenshot({path:path.join(OUT,name+'.png'),clip:box,omitBackground:true});await p.close();continue;}}
   const bb=await p.locator(`.react-flow__node[data-id="${s.id}"]`).boundingBox();
-  console.log(name,bb);
+  console.log(name,bb,'theme=',await p.evaluate(()=>document.documentElement.getAttribute('data-theme')));
   await p.screenshot({path:path.join(OUT,name+'.png'),clip:{x:bb.x,y:bb.y,width:bb.width,height:bb.height},omitBackground:true});
   await p.close();}
 await b.close()})()

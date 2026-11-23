@@ -1,0 +1,12 @@
+
+@import url("../../_shared/brand.css");
+.slide { font-family: var(--sans); }
+.pad { position: absolute; left: 72px; right: 72px; }
+.kicker { position: absolute; left: 72px; top: 168px; }
+.h { position: absolute; left: 72px; right: 72px; font-weight: 800; letter-spacing: -0.055em; line-height: .94; }
+.sub { position: absolute; left: 72px; right: 72px; font-weight: 600; font-size: 44px; line-height: 1.22; letter-spacing: -0.02em; }
+.shot { position: absolute; filter: drop-shadow(0 38px 46px rgba(0,0,0,.30)) drop-shadow(0 8px 14px rgba(0,0,0,.22)); }
+.shot img { display: block; width: 100%; height: auto; }
+.hi { display: inline-block; background: var(--ink); color: var(--acid); border-radius: 26px; padding: 0 .16em .06em; margin-left: -.04em; }
+.mono { font-family: var(--mono); font-weight: 800; }
+.cap { position: absolute; font-family: var(--mono); font-weight: 800; font-size: 26px; letter-spacing: .04em; text-transform: uppercase; }

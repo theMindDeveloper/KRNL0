@@ -39,21 +39,32 @@
 
   // ── the stand-in shell ──
   const PROMPT = '\x1b[38;2;201;241;88m❯\x1b[0m ';
-  const state = { cb: null, buf: '' };
+  const WRAP = 37;   // columns that fit the window at the filmed size; long output is wrapped on spaces (xterm in this preview wraps wider)
+  const state = { cb: null, buf: '', col: 2 };
   window.__OUT = {};
+  const wrap = (text) => text.split('\n').map((line) => {
+    const out = []; let cur = '';
+    for (const tok of line.match(/\S+|\s+/g) || ['']) {
+      if (cur.length + tok.length > WRAP && cur.trim()) { out.push(cur.replace(/\s+$/, '')); cur = /^\s+$/.test(tok) ? '' : tok; } else cur += tok;
+    }
+    out.push(cur); return out.join('\r\n');
+  }).join('\r\n');
   const run = (cmd) => {
     if (cmd === 'clear') return '\x1b[2J\x1b[H' + PROMPT;
     const out = window.__OUT[cmd];
-    return '\r\n' + (out === undefined ? `krnl: no recorded output for: ${cmd}` : out.replace(/\n/g, '\r\n')) + '\r\n' + PROMPT;
+    return '\r\n' + (out === undefined ? `krnl: no recorded output for: ${cmd}` : wrap(out)) + '\r\n' + PROMPT;
   };
   const patch = (v) => {
     v.ptyCreate = async () => ({ sessionId: 'film', motd: '' });
     v.onPtyData = (_id, cb) => { state.cb = cb; setTimeout(() => cb(PROMPT), 50); return () => {}; };
     v.ptyWrite = (_id, data) => {
       for (const ch of data) {
-        if (ch === '\r') { const c = state.buf.trim(); state.buf = ''; state.cb && state.cb(c === 'clear' ? run(c) : run(c)); }
-        else if (ch === '\x7f') { if (state.buf) { state.buf = state.buf.slice(0, -1); state.cb && state.cb('\b \b'); } }
-        else if (ch >= ' ') { state.buf += ch; state.cb && state.cb(ch); }
+        if (ch === '\r') { const c = state.buf.trim(); state.buf = ''; state.col = 2; state.cb && state.cb(run(c)); }
+        else if (ch >= ' ') {
+          state.buf += ch;
+          if (state.col >= WRAP) { state.cb && state.cb('\r\n'); state.col = 0; }
+          state.cb && state.cb(ch); state.col++;
+        }
       }
     };
   };

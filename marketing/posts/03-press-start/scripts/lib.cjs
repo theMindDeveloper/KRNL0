@@ -5,6 +5,7 @@ exports.open=async function(b,{at='2026-11-24T11:02:00',dsf=2,w=1500,h=1000}={})
   const p=await b.newPage({viewport:{width:w,height:h},deviceScaleFactor:dsf});
   p.on('pageerror',e=>console.log('PE',e.message.slice(0,160)));
   await p.clock.install({time:new Date(at)});
+  await p.addInitScript({content:"try{localStorage.setItem('krnl0-theme','light')}catch(e){}"});
   await p.addInitScript({content:fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
   await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1500);await p.clock.runFor(4000);
   await p.addStyleTag({content:`[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-button"],[data-testid="dock"],[data-testid="dock-layer"],.react-flow__minimap,.react-flow__controls,.react-flow__background{display:none!important}

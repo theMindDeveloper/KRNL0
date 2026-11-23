@@ -20,7 +20,7 @@
     task('t-gym', 'Gym', 60, 15, 0, 65);
     task('t-milk', 'Buy oat milk', 10, null, 0);
     const cal = nodes.find(n => n.kind === 'calendar');
-    cal.config = { ...cal.config, view: 'day', hourRange: { start: 9, end: 19 }, canvasSize: { width: 540, height: 760 } };
+    cal.config = { ...cal.config, view: 'day', hourRange: { start: 9, end: 19 }, canvasSize: { width: 540, height: 468 } };
     cal.state = { ...cal.state, zoom: window.__CALZOOM || 5 };
     const day = back => { const d = new Date('2026-11-24T12:00:00'); d.setDate(d.getDate() - back); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
     const run = (a, z) => Array.from({ length: z - a + 1 }, (_, i) => day(a + i));
@@ -50,7 +50,7 @@
     }
     const an = nodes.find(n => n.kind === 'analytics');
     if (an) an.state = { ...an.state, view: 'summary', rangeDays: 7 };
-    const size = { todo: [540, 280], habit: [540, 360], pomo: [540, 540] };
+    const size = { todo: [540, 280], habit: [540, 360], pomo: [540, 440], analytics: [540, 468] };
     for (const n of nodes) if (n.isMother && size[n.kind]) n.config = { ...n.config, canvasSize: { width: size[n.kind][0], height: size[n.kind][1] } };
     b.edges = []; b.layoutMode = 'free';
     return b;

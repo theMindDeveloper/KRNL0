@@ -5,10 +5,11 @@ const HIDE=`[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="s
  .react-flow__node[data-id="mother-clock"],.react-flow__node[data-id="mother-analytics"],.react-flow__node[data-id="mother-term"],.react-flow__node[data-id="mother-pomo"],.react-flow__node[data-id="mother-habit"]{visibility:hidden!important}
  html,body,#root,.react-flow,.react-flow__renderer,.react-flow__pane{background:transparent!important}
  .react-flow__edges,.react-flow__edge{display:none!important} *{caret-color:#c9f158}`;
-async function open({w,h,dpr=1.5,mode='free',hide=true,extraCss='',keep=[]}){
+async function open({w,h,dpr=1.5,mode='free',hide=true,extraCss='',keep=[],theme='light'}){
   const b=await chromium.launch();const p=await b.newPage({viewport:{width:w,height:h},deviceScaleFactor:dpr});
   p.on('pageerror',e=>console.log('PE',e.message.slice(0,200)));
   await p.clock.install({time:new Date('2026-11-24T10:30:00')});
+  await p.addInitScript({content:`try{localStorage.setItem('krnl0-theme',${JSON.stringify(theme)})}catch(e){}`});
   await p.addInitScript({content:`window.__MODE__=${JSON.stringify(mode)};window.__KEEP__=${JSON.stringify(keep)};`});
   await p.addInitScript({content:fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
   await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1200);await p.clock.runFor(4000);

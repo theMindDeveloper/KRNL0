@@ -9,7 +9,7 @@
     const byKind = (k) => nodes.find((n) => n.kind === k);
     const place = (n, x, y, w, h) => { n.position = { x, y }; n.config = { ...n.config, canvasSize: { width: w, height: h } }; };
     const todo = byKind('todo'), cal = byKind('calendar');
-    place(todo, 0, 0, 540, 560); place(cal, 100, 0, 540, 560);
+    place(todo, 0, 0, 540, window.__TH || 260); place(cal, 100, 0, 540, window.__CH || 340);
     // everything else is parked far away (and hidden by CSS in the capture)
     byKind('habit').position = { x: 4000, y: 0 }; byKind('pomo').position = { x: 4100, y: 0 };
     byKind('clock').position = { x: 4200, y: 0 }; byKind('analytics').position = { x: 4300, y: 0 }; byKind('term').position = { x: 4400, y: 0 };
@@ -30,7 +30,7 @@
     plan('t-invoice', 'Send the invoice', 30, null);
     plan('t-milk', 'Buy oat milk', 10, null);
     if (window.__REVIEW) plan('t-review', 'Review the proposal', 60, at(11, 0));   // last, so it gets the colour a plan added live gets
-    cal.config = { ...cal.config, view: 'day', hourRange: { start: 9, end: 17 } };
+    cal.config = { ...cal.config, view: 'day', hourRange: { start: (window.hourRange || [10, 16])[0], end: (window.hourRange || [10, 16])[1] } };
     cal.state = { ...cal.state, zoom: window.__ZOOM || 6 };
     b.edges = []; b.layoutMode = 'free';
     return b;

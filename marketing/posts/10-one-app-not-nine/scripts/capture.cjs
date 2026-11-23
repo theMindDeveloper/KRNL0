@@ -2,8 +2,9 @@
 const {chromium}=require('playwright');const fs=require('fs');const path=require('path');
 const OUT=path.resolve(__dirname,'../assets');
 (async()=>{
-const b=await chromium.launch();const p=await b.newPage({viewport:{width:1000,height:900},deviceScaleFactor:2});
+const b=await chromium.launch();const p=await b.newPage({viewport:{width:1000,height:900},deviceScaleFactor:3});
 p.on('pageerror',e=>console.log('PE',e.message.slice(0,200)));
+await p.addInitScript(()=>{try{localStorage.setItem('krnl0-theme','light')}catch(e){}});
 await p.clock.install({time:new Date('2026-11-24T10:30:00')});
 await p.addInitScript({content:fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
 await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1500);await p.clock.runFor(4000);

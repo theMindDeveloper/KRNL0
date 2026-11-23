@@ -4,11 +4,11 @@
 const {chromium}=require('playwright');const fs=require('fs');const path=require('path');
 const ROOT=path.resolve(__dirname,'..'), OUT=path.join(ROOT,'assets'), ONLY=process.argv[2];
 const LOGO='data:image/png;base64,'+fs.readFileSync(path.resolve(ROOT,'../../../docs/assets/krnl0-instagram-logo.png')).toString('base64');
-const DSF=2;
+const DSF=3, THEME=process.env.THEME||'light';
 const SHOTS={
   // id = mother window, at = fake "now", view = analytics view, page = which analytics page, size = window size
-  todo:     {id:'mother-todo', at:'2026-11-24T08:30:00', noseed:true, size:{todo:[560,560]}},
-  timer:    {id:'mother-pomo', at:'2026-11-24T11:00:00', noseed:true, size:{pomo:[560,560]}, act:'timer'},
+  todo:     {id:'mother-todo', at:'2026-11-24T08:30:00', noseed:true, size:{todo:[540,330]}},
+  timer:    {id:'mother-pomo', at:'2026-11-24T11:00:00', noseed:true, size:{pomo:[540,420]}, act:'timer'},
   plan_vs:  {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'summary', size:{analytics:[560,640]}, click:'Planned vs spent'},
   summary:  {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'summary', size:{analytics:[560,640]}},
   tall:     {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'estimates', size:{analytics:[560,900]}},
@@ -22,6 +22,7 @@ async function open(b,shot){
   p.on('pageerror',e=>console.log('PE',e.message.slice(0,160)));
   await p.clock.install({time:new Date(shot.at)});
   const flags=`window.__LOGO=${JSON.stringify(LOGO)};window.__NOSEED=${!!shot.noseed};window.__VIEW=${JSON.stringify(shot.view||'')};window.__SIZE=${JSON.stringify(shot.size||{})};window.__SKIP='';`;
+  await p.addInitScript({content:`try{localStorage.setItem('krnl0-theme','${THEME}')}catch(e){}`});
   await p.addInitScript({content:flags+fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
   await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1500);await p.clock.runFor(4000);
   return p;

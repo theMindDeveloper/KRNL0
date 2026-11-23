@@ -5,7 +5,7 @@ const {chromium}=require('playwright');const fs=require('fs');const path=require
 const OUT=path.resolve(__dirname,'../assets');fs.mkdirSync(OUT,{recursive:true});
 const DPR=Number(process.env.DPR||3);
 const CSS=`[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="statusbar"],.react-flow__minimap,.react-flow__controls,.react-flow__background,[data-testid="dock"],[data-testid="dock-layer"],[data-testid="day-moment"]{display:none!important}
-  html,body,#root,.react-flow,.react-flow__renderer,.react-flow__pane{background:#0b0b0b!important}
+  html,body,#root,.react-flow,.react-flow__renderer,.react-flow__pane{background:#f3f1ea!important}
   .react-flow__node[data-id="mother-clock"],.react-flow__node[data-id="mother-analytics"],.react-flow__node[data-id="mother-term"],.react-flow__node[data-id="mother-habit"]{visibility:hidden!important}`;
 const SCRIPTS={
  'Move Gym to 17:00':[{wait:500,ev:{type:'tool',label:'krnl todo when Gym today 17:00'}},{wait:300,ev:{type:'text',text:'Done. '}},{wait:200,ev:{type:'text',text:'Gym is now at 17:00.'}},{wait:200,ev:{type:'done',text:''}}],
@@ -16,6 +16,7 @@ async function open(b,{boardPatch,viewport}={}){
   const p=await b.newPage({viewport:viewport||{width:1000,height:1000},deviceScaleFactor:DPR});
   p.on('pageerror',e=>console.log('PE',e.message.slice(0,160)));
   await p.clock.install({time:new Date('2026-11-24T10:30:00')});
+  await p.addInitScript(()=>{try{localStorage.setItem('krnl0-theme','light')}catch(e){}});   // the app's bright theme
   await p.addInitScript({content:fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
   await p.addInitScript((s)=>{window.__orbScript=s},SCRIPTS);
   if(boardPatch)await p.addInitScript({content:boardPatch});

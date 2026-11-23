@@ -4,10 +4,10 @@ const OUT = path.resolve(__dirname, '../assets'); fs.mkdirSync(OUT, { recursive:
 const BOARD = fs.readFileSync(path.join(__dirname, 'board.js'), 'utf8');
 const only = process.argv[2];
 async function session(variant, size, fn) {
-  const b = await chromium.launch(); const p = await b.newPage({ viewport: size, deviceScaleFactor: 2 });
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: size, deviceScaleFactor: 3 });
   p.on('pageerror', (e) => console.log('PE', e.message.slice(0, 160)));
   await p.clock.install({ time: new Date('2026-11-24T10:30:00') });
-  await p.addInitScript({ content: `window.__V=${JSON.stringify(variant)};` });
+  await p.addInitScript({ content: `window.__V=${JSON.stringify(variant)}; try { localStorage.setItem('krnl0-theme','light'); } catch (e) {}` });
   await p.addInitScript({ content: BOARD });
   await p.goto('http://localhost:5201/?fixture=fresh'); await p.clock.runFor(5000); await p.waitForTimeout(1200); await p.clock.runFor(4000);
   await p.addStyleTag({ content: `[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-button"],.react-flow__minimap,.react-flow__controls,.react-flow__background,[data-testid="dock"],[data-testid="dock-layer"]{display:none!important}
@@ -17,6 +17,7 @@ async function session(variant, size, fn) {
   await p.evaluate(() => { for (const e of document.querySelectorAll('div,section')) { const r = e.getBoundingClientRect(); if (/^\s*Good (morning|afternoon|evening)/.test(e.textContent || '') && r.height < 80 && r.height > 20) e.style.display = 'none'; } });
   const fit = async () => { await p.evaluate(() => window.dispatchEvent(new CustomEvent('krnl:fit-nodes', { detail: { nodeIds: ['mother-habit'] } }))); await p.clock.runFor(1500); await p.waitForTimeout(250); };
   await fit();
+  console.log('theme', await p.evaluate(() => document.documentElement.getAttribute('data-theme')), 'radius', await p.evaluate(() => getComputedStyle(document.querySelector('[data-id="mother-habit"] .mother-frame')).borderRadius));
   const shot = async (name) => { const n = p.locator('[data-id="mother-habit"] .mother-frame'); await n.screenshot({ path: path.join(OUT, name + '.png'), omitBackground: true }); console.log('shot', name, JSON.stringify(await n.boundingBox())); };
   await fn(p, shot, fit); await b.close();
 }

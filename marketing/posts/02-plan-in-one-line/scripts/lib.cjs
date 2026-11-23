@@ -5,8 +5,9 @@ exports.open=async function(opts={}){
   const b=await chromium.launch();
   const p=await b.newPage({viewport:{width:1700,height:1000},deviceScaleFactor:opts.dsf||2});
   p.on('pageerror',e=>console.log('PE',e.message.slice(0,200)));
+  await p.addInitScript(()=>{try{localStorage.setItem('krnl0-theme','light')}catch(e){}});
   await p.clock.install({time:new Date('2026-11-24T10:30:00')});
-  await p.addInitScript({content:`window.__ZOOM=${opts.zoom||6};window.__REVIEW=${!!opts.review};`+fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
+  await p.addInitScript({content:`window.__ZOOM=${opts.zoom||6};window.__REVIEW=${!!opts.review};window.__TH=${opts.th||260};window.__CH=${opts.ch||340};hourRange=${JSON.stringify(opts.hr||[10,16])};`+fs.readFileSync(path.join(__dirname,'board.js'),'utf8')});
   await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1500);await p.clock.runFor(4000);
   await p.addStyleTag({content:`[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-button"],[data-testid="dock"],[data-testid="dock-layer"],.react-flow__minimap,.react-flow__controls,.react-flow__background,.react-flow__edges{display:none!important}
    .react-flow__node[data-id="mother-habit"],.react-flow__node[data-id="mother-pomo"],.react-flow__node[data-id="mother-clock"],.react-flow__node[data-id="mother-analytics"],.react-flow__node[data-id="mother-term"],.react-flow__node[data-type="todo.task"]{visibility:hidden!important}`});

@@ -1,7 +1,7 @@
 // Films the real app for post 09: the Terminal (typing real krnl commands), plus the Todos/Calendar/Habits/Timer windows
 // that those commands change. Usage: node capture.cjs   (preview must be running on :5201)
 const {chromium}=require('playwright');const fs=require('fs');const path=require('path');
-const OUT=path.join(__dirname,'shots');fs.mkdirSync(OUT,{recursive:true});
+const OUT=path.join(__dirname,process.env.OUTDIR||'shots');fs.mkdirSync(OUT,{recursive:true});
 const outputs=JSON.parse(fs.readFileSync(path.join(__dirname,'outputs.json'),'utf8'));
 const map={};
 for(const o of outputs) map['krnl '+o.cmd.replace(/^(\S+ \S+) (.*)$/,(m,a,b)=>a+' '+b)]=o.message;
@@ -20,7 +20,7 @@ const OUTMAP={
 fs.writeFileSync(path.join(__dirname,'outmap.json'),JSON.stringify(OUTMAP,null,1));
 (async()=>{
 const b=await chromium.launch();
-const p=await b.newPage({viewport:{width:1500,height:1000},deviceScaleFactor:2});
+const p=await b.newPage({viewport:{width:1500,height:1000},deviceScaleFactor:Number(process.env.DPR||2)});
 p.on('pageerror',e=>console.log('PE',e.message.slice(0,200)));
 await p.clock.install({time:new Date('2026-11-24T10:30:00')});
 await p.addInitScript({content:'window.__PRE=1;'});
