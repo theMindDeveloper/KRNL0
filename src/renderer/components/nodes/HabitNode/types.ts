@@ -92,6 +92,13 @@ export interface Habit {
   /** Routine only (Decision 62): first day it happens (YYYY-MM-DD). With
    *  `endsOn` on the same day it is a one-time event: it happens once. */
   startsOn?: string;
+  /** Routine only (Decision 64, F5): the UID of the .ics event it was
+   *  imported from, so importing the same file again adds nothing. */
+  icsUid?: string;
+  /** Routine only (Decision 64): where it happens, as a calendar's LOCATION.
+   *  '' = no place on purpose (the note's first line is not used as one).
+   *  Absent = the old rule: from the name or the note's first line. */
+  place?: string;
   /** Routine only: stretches it was ended and later restarted (inclusive
    *  YYYY-MM-DD). Nothing happened then, so nothing is drawn there. */
   pauses?: Array<{ from: string; to: string }>;

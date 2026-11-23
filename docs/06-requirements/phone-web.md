@@ -10,12 +10,13 @@ The owner asked (2026-11-21) for big changes to the phone website: a better layo
 |---|---|
 | F1 | **Today answers "what now?"** The date as the title, one line under it (plans done today, the day's events), then **Your day**: every plan with a Calendar time, repeating event and habit set for a time today, in time order, with a red line where now is. The item going on now (or the next one) opens out as a card: its name large, its time and place, "Now · 25 min left" with a progress bar, or "Next · in 2 h". Every item is shown; nothing hides behind a count. A row opens the Calendar on today. |
 | F2 | The open-out card of a plan offers **Focus on it** (Pomo) or **Track it now** (Observe), the same action as the Calendar's; not in Easy mode. |
-| F3 | Under Your day: the Timer, Plans, Habits and the Clock. While the timer is idle the headline offers **Start timer**; while it runs, the live reading that opens Focus. |
+| F3 | **Today on a phone fits one screen, no scrolling** (owner, 2026-11-22; design "KRNL0 phone Today", direction A): the date, one line (the day so far and what is on now or next), the **Clock** with the day's plans as arcs (your day on the clock), the day's timed items as small chips in one row (the row scrolls sideways, nothing hidden; a chip opens the Calendar on today), and **one compact Timer card**: what it reads, what it is for, and one button (Start, Pause or Resume). The card's reading or "What are you doing?" opens Focus (the full Timer). There is no second Start. An iPad keeps its two-column Today. |
 | F4 | The Calendar tab gives the Calendar the whole screen (a phone shows a day by default, its choice kept on this phone). An iPad shows the Calendar beside the Clock. |
 | F5 | The canvas tab runs edge to edge. One finger pans, two pinch to zoom, a card drags with one finger, and the map of the board is hidden on a phone. |
 | F6 | **A long-press is the right-click menu and nothing else**: one menu at the finger (the phone's own long-press menu is dropped), no text selected (UI text is not selectable on touch screens: dial numbers, headers, buttons, chips, rows), and the lift is not a tap (it never picks the menu row that opened under the finger). Fields, text being edited and anything marked `data-selectable` keep the system's long-press. A move or a second finger cancels it. |
 | F7 | Menus opened by touch have rows at least 44 px tall. |
 | F8 | The tab bar marks the open view with a filled pill behind its icon; every control answers on press. Notices (the morning line) sit above the tab bar. |
+| F9 | **Phone tabs: Today, Todos, Calendar, Habits, More.** Todos is the Plans window on its own page. More holds Insights and Canvas (a row each); while one of them is open, the More tab stays marked. The iPad's rail keeps Today, Week, Habits, Insights and Canvas. |
 
 ## Non-Functional Requirements
 

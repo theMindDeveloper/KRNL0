@@ -64,8 +64,10 @@ import { useDismissOutside } from '../../ui/useDismissOutside';
 import { TaskInfoPopup } from '../../ui/TaskInfoPopup';
 import { showPlanGuide } from '../../PlanGuide';
 import { hourWindow, stepHourWindow } from './hourWindow';
+import { allDayOn, linksOf, partOnDay, type CalendarLink, type LinkedEvent } from '../../../../shared/calsync/types';
+import { LinkedEmptyHint, LinkedInfoCard, linkedLook } from './OtherCalendars';
 import { useLayoutEffect, type PointerEvent as ReactPointerEvent } from 'react';
-import { EVENT_TEXT, eventLines, eventTitleAndPlace } from './eventText';
+import { EVENT_TEXT, eventLines, eventTitleAndPlace, eventTitleAndPlaceOf } from './eventText';
 import { parseQuickAdd } from '../../../../shared/quickAdd';
 import { Z } from '../../ui/layers';
 import { MenuIcon } from '../../ui/menuIcons';
@@ -237,6 +239,8 @@ interface WeekViewProps {
    *  window's header (the header is drawn by the Calendar window itself). */
   /** The Calendar's header menu button opens this view's menu through it. */
   menuRef?: { current: ((x: number, y: number) => void) | null };
+  /** Decision 64 — the menu's "Other calendars…" opens the Calendar's card there. */
+  onOtherCalendars?: (x: number, y: number) => void;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -317,7 +321,7 @@ type HabitScheduleKind = 'weekly' | 'daily';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function WeekView({ state, config, onCommand, singleDay = false, menuRef }: WeekViewProps) {
+export function WeekView({ state, config, onCommand, singleDay = false, menuRef, onOtherCalendars }: WeekViewProps) {
   // Width of the per-day reality rail (left edge of each column), as a CSS
   // length so it scales with the column: wide in the day view (carries a
   // minutes label), at most 12% of a narrow week column (station panels can
@@ -898,6 +902,35 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     return hits;
   };
   const routineKey = (r: { h: Habit; occ: RoutineSpan }) => `rt:${r.h.id}${r.occ.spill ? ':spill' : ''}`;
+  // -- Decision 64: events from other calendars (Look A), read-only --
+  const calendarLinksRaw = (boardForCal as { calendarLinks?: unknown } | null)?.calendarLinks;
+  const shownLinks = useMemo((): CalendarLink[] => (layers.linked ? linksOf({ calendarLinks: calendarLinksRaw }).filter((l) => l.on) : []), [calendarLinksRaw, layers.linked]);
+  /** Each shown day's timed and all-day events of other calendars. */
+  const linkedByDay = useMemo(() => {
+    const timed = new Map<string, Array<{ link: CalendarLink; ev: LinkedEvent; startMin: number; endMin: number }>>();
+    const allDay = new Map<string, Array<{ link: CalendarLink; ev: LinkedEvent }>>();
+    if (!shownLinks.length || !weekDays.length) return { timed, allDay };
+    const first = weekDays[0]!;
+    const last = weekDays[weekDays.length - 1]!;
+    for (const link of shownLinks) {
+      for (const ev of link.events) {
+        // The events are sorted by start: nothing after the last day shown.
+        if (ev.start.slice(0, 10) > last) break;
+        if (ev.allDay) {
+          for (const d of weekDays) if (allDayOn(ev, d)) (allDay.get(d) ?? allDay.set(d, []).get(d)!).push({ link, ev });
+          continue;
+        }
+        if (ev.end.slice(0, 10) < first) continue;
+        for (const d of weekDays) {
+          const part = partOnDay(ev, d);
+          if (part) (timed.get(d) ?? timed.set(d, []).get(d)!).push({ link, ev, startMin: part.startMin, endMin: part.endMin });
+        }
+      }
+    }
+    return { timed, allDay };
+  }, [shownLinks, weekDays]);
+  const linkedKey = (x: { link: CalendarLink; ev: LinkedEvent }) => `ln:${x.link.id}:${x.ev.id}`;
+  const [linkedInfo, setLinkedInfo] = useState<{ link: CalendarLink; ev: LinkedEvent; x: number; y: number } | null>(null);
   /**
    * Decision 60 — ONE lane plan per day for plans and repeating events
    * (routineLanes.sharedLanes): a plan and an event at the same time sit side
@@ -908,8 +941,23 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     const items: KindSpan[] = [
       ...routineHitsOn(dayYMD).map((r) => ({ id: routineKey(r), startMin: r.occ.startMin, endMin: Math.max(r.occ.endMin, r.occ.startMin + minSpan), kind: 'event' as const })),
       ...(slicesByDay.get(dayYMD) ?? []).map((sl) => ({ id: sl.task.id, startMin: sl.sliceStartMin, endMin: Math.max(sl.sliceEndMin, sl.sliceStartMin + minSpan), kind: 'task' as const })),
+      // Decision 64: events from other calendars share the day's lanes too.
+      ...(linkedByDay.timed.get(dayYMD) ?? []).map((x) => ({ id: linkedKey(x), startMin: x.startMin, endMin: Math.max(x.endMin, x.startMin + minSpan), kind: 'event' as const })),
     ];
     return sharedLanes(items);
+  };
+  const linkedOnDay = (dayYMD: string) => {
+    const hits = linkedByDay.timed.get(dayYMD) ?? [];
+    if (!hits.length) return [];
+    const lanes = dayLanes(dayYMD);
+    return hits.map((x) => { const l = lanes.get(linkedKey(x)); return { ...x, lane: l?.lane ?? 0, lanes: l?.lanes ?? 1 }; });
+  };
+  /** The event of another calendar under a click (exact: only in its own lane). */
+  const linkedAt = (dayYMD: string, minute: number, xFrac: number, exact: boolean) => {
+    const minSpan = (MIN_BLOCK_PX / rowHeight) * 60;
+    const under = linkedOnDay(dayYMD).filter((r) => minute >= r.startMin && minute < Math.max(r.endMin, r.startMin + minSpan));
+    const hit = under.find((r) => xFrac >= r.lane / r.lanes && xFrac < (r.lane + 1) / r.lanes);
+    return hit ?? (exact ? null : under[0] ?? null);
   };
   const routinesOnDay = (dayYMD: string): Array<{ h: Habit; occ: RoutineSpan; lane: number; lanes: number }> => {
     const hits = routineHitsOn(dayYMD);
@@ -1625,6 +1673,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     if (items.length === 0) {
       const rect = e.currentTarget.getBoundingClientRect();
       const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
+      // Decision 64: an event from another calendar has nothing to edit here, so its card.
+      const lk = linkedAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width), true);
+      if (lk) { setLinkedInfo({ link: lk.link, ev: lk.ev, x: e.clientX, y: e.clientY }); return; }
       const [yy, mm, dd] = dayYMD.split('-').map(Number) as [number, number, number];
       const clickMs = new Date(yy, mm - 1, dd, 0, Math.floor(minute)).getTime();
       const x = e.clientX;
@@ -1674,6 +1725,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       // Decision 39 — a click on a routine band: skip, move or end it.
       const rect = e.currentTarget.getBoundingClientRect();
       const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
+      // Decision 64: an event from another calendar opens its card (read-only).
+      const lk = linkedAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width), true);
+      if (lk) { setLinkedInfo({ link: lk.link, ev: lk.ev, x: e.clientX, y: e.clientY }); return; }
       const r = routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width));
       if (r) {
         const [yy, mo, dd] = r.occ.date.split('-').map(Number) as [number, number, number];
@@ -1705,6 +1759,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
     const rect = e.currentTarget.getBoundingClientRect();
     const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
     if (routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width))) return;
+    if (linkedAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width), true)) return;
     openNewAt(dayYMD, minute, e.clientX, e.clientY);
   }
 
@@ -2200,6 +2255,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       plannedMin: number; trackedMin: number; habit: boolean; task?: ScheduledTask;
       /** Real end (minutes from this day's midnight; may exceed 1440). */
       endLabelMin: number;
+      /** Decision 64: an event from another calendar (read-only). */
+      linked?: { link: CalendarLink; ev: LinkedEvent };
     };
     const items: Item[] = [];
     for (const sl of slicesByDay.get(dayYMD) ?? []) {
@@ -2223,6 +2280,14 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
         key: `habit-${h.id}`, taskId: null, title: h.name, tone: `var(--${h.color})`,
         startMin: start, endMin: start + dur, done: false, missed: false,
         plannedMin: dur, trackedMin: 0, habit: true, endLabelMin: start + dur,
+      });
+    }
+    // Decision 64: events from other calendars, in time order with the rest.
+    for (const x of linkedByDay.timed.get(dayYMD) ?? []) {
+      items.push({
+        key: `ln-${x.link.id}-${x.ev.id}`, taskId: null, title: x.ev.title, tone: `var(--${x.link.color})`,
+        startMin: x.startMin, endMin: x.endMin, done: false, missed: false,
+        plannedMin: x.endMin - x.startMin, trackedMin: 0, habit: true, endLabelMin: x.endMin, linked: { link: x.link, ev: x.ev },
       });
     }
     items.sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
@@ -2281,10 +2346,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
               home: surface,
             });
           } : undefined}
-          onClick={(e) => { if (it.task) openTaskInfo(it.task, e.clientX, e.clientY); }}
+          onClick={(e) => { if (it.task) openTaskInfo(it.task, e.clientX, e.clientY); else if (it.linked) setLinkedInfo({ ...it.linked, x: e.clientX, y: e.clientY }); }}
           style={{
             display: 'grid', gridTemplateColumns: '42px 1fr', gap: 8, alignItems: 'start',
-            padding: '7px 8px 7px 0', borderRadius: 6, cursor: it.task ? 'pointer' : 'default',
+            padding: '7px 8px 7px 0', borderRadius: 6, cursor: it.task || it.linked ? 'pointer' : 'default',
             background: active ? `color-mix(in srgb, ${it.tone} 14%, transparent)` : 'transparent',
             opacity: it.done ? 0.5 : 1,
           }}
@@ -2299,7 +2364,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
               {it.done && <span style={{ color: 'var(--acid-ink, var(--acid))', marginRight: 4, display: 'inline-block', verticalAlign: '-1px' }}><CalIcon name="check" size={10} /></span>}{it.title}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 3, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-              <span>{it.habit ? `habit · ${fmtDur(it.plannedMin)}` : `${fmtDur(it.plannedMin)} planned`}</span>
+              <span>{it.linked ? `from ${it.linked.link.name}` : it.habit ? `habit · ${fmtDur(it.plannedMin)}` : `${fmtDur(it.plannedMin)} planned`}</span>
               {it.trackedMin > 0 && <span>· {fmtDur(it.trackedMin)} tracked</span>}
               {over > 0 && <span style={{ color: 'var(--rust)', fontWeight: 700 }}>+{fmtDur(over)} over</span>}
               {it.missed && <span style={{ color: 'var(--ink-4)' }}>· missed</span>}
@@ -2410,6 +2475,66 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
   // Decision 55 (owner, 2026-11-21) — readable: a calm tinted card (no
   // hatching), the whole name over as many lines as it has, then the time and
   // the place (eventText.ts). Only a lane too thin for words writes sideways.
+  // Decision 64 (design: Look A): an event from another calendar is a paler
+  // card with an outline in its calendar's colour, its time and calendar's
+  // name, and the link mark. Read-only: no pointer events (the column
+  // hit-tests a click and opens its card), never dragged.
+  function renderLinkedBlocks(dayYMD: string) {
+    const hits = linkedOnDay(dayYMD);
+    if (!hits.length) return null;
+    const colPxB = gridW > 0 ? (gridW - GUTTER_WIDTH) / dayCount : 220;
+    const railPx = railPxFor(dayYMD);
+    return hits.map(({ link, ev, startMin, endMin, lane, lanes }) => {
+      const look = linkedLook(link.color);
+      const height = Math.max(6, ((endMin - startMin) / 60) * rowHeight);
+      const blockH = Math.max(5, height - 2);
+      const laneW = (colPxB - railPx) / lanes;
+      const textW = laneW - 4 - 6 - 6;
+      const showIcon = textW >= 110;
+      const time = `${ev.start.slice(11, 16)}–${ev.end.slice(11, 16)}`;
+      const lines = eventLines(blockH, textW - (showIcon ? 15 : 0), ev.title, !!ev.place, `${time} · ${link.name}`);
+      return (
+        <div
+          key={`linked-${link.id}-${ev.id}`}
+          data-testid={`calendar-linked-${ev.id}`}
+          data-lane={`${lane}/${lanes}`}
+          className="cal-event cal-linked"
+          aria-label={`${ev.title}, from ${link.name}, ${time}`}
+          title={`${ev.title} · ${time} · from ${link.name} · click for details`}
+          style={{
+            position: 'absolute', left: `calc(${railPx}px + (100% - ${railPx}px) * ${lane / lanes} + 2px)`, width: `calc((100% - ${railPx}px) / ${lanes} - 4px)`,
+            top: rh(startMin / 60), height: rhMax(5, (endMin - startMin) / 60, -BLOCK_GAP),
+            zIndex: 0, pointerEvents: 'none', boxSizing: 'border-box', borderRadius: 6, overflow: 'hidden',
+            border: `1px solid ${look.border}`, background: look.bg,
+          }}
+        >
+          {lines.titleLines === 0 ? (blockH >= 9 && textW >= 10 && (
+            <span style={{ position: 'absolute', left: 4, right: 3, top: 0, bottom: 0, display: 'flex', alignItems: 'center', minWidth: 0, fontFamily: 'var(--font-read, var(--font-sans))', fontSize: blockH >= 13 ? 10.5 : 9, fontWeight: 600, lineHeight: 1, color: look.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.title}</span>
+            </span>
+          )) : (
+            <div style={{ position: 'absolute', inset: 0, padding: `${EVENT_TEXT.padY}px 6px ${EVENT_TEXT.padY}px 6px`, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, minWidth: 0 }}>
+                <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 13, fontWeight: 600, lineHeight: `${EVENT_TEXT.titleLine}px`, color: look.text, overflowWrap: 'break-word', display: '-webkit-box', WebkitLineClamp: lines.titleLines, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {ev.title}
+                </span>
+                {showIcon && <span aria-hidden data-kind="linked" title={KIND_LABEL.linked} style={{ flexShrink: 0, display: 'inline-flex', marginTop: 2, color: look.mark }}><KindIcon kind="linked" size={11} strokeWidth={2.4} /></span>}
+              </div>
+              {lines.showTime && (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: `${EVENT_TEXT.metaLine}px`, color: look.meta, whiteSpace: 'normal', overflow: 'hidden', maxHeight: lines.metaLines * EVENT_TEXT.metaLine, fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
+                  {ev.start.slice(11, 16)}–<wbr />{ev.end.slice(11, 16)}<span style={{ whiteSpace: 'nowrap' }}>{` · ${link.name}`}</span>
+                </span>
+              )}
+              {lines.showPlace && ev.place && (
+                <span style={{ fontFamily: 'var(--font-read, var(--font-sans))', fontSize: 11.5, lineHeight: `${EVENT_TEXT.metaLine}px`, color: 'var(--ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.place}</span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    });
+  }
+
   function renderRoutineBands(dayYMD: string) {
     if (!layers.routines) return null;
     const out: ReactNode[] = [];
@@ -2422,7 +2547,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
       const laneW = (colPxB - railPx) / lanes;
       const lead = 6;
       const blockH = Math.max(5, height - 2);
-      const { title, place } = eventTitleAndPlace(h.name, h.note);
+      const { title, place } = eventTitleAndPlaceOf(h);
       const textW = laneW - 4 - lead - 6;
       const sideways = textW < 22 && blockH > 40;
       // Decision 62 — a one-time event: no repeat mark, just its time.
@@ -2964,11 +3089,40 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
                   {d.text}
                 </div>
               ))}
+              {/* Decision 64: all-day events of other calendars (Look A), read-only. */}
+              {(linkedByDay.allDay.get(dayYMD) ?? []).map(({ link, ev }) => {
+                const look = linkedLook(link.color);
+                return (
+                  <button
+                    key={`ln-${link.id}-${ev.id}`}
+                    type="button"
+                    data-testid={`calendar-linked-allday-${ev.id}`}
+                    className="nodrag"
+                    lang="en"
+                    title={`${ev.title} · all day · from ${link.name}`}
+                    onClick={(e) => { e.stopPropagation(); setLinkedInfo({ link, ev, x: e.clientX, y: e.clientY }); }}
+                    style={{
+                      minHeight: 18, lineHeight: '14px', padding: '1px 5px', borderRadius: 4, boxSizing: 'border-box', cursor: 'pointer', textAlign: 'left',
+                      display: 'flex', alignItems: 'flex-start', gap: 4,
+                      fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 600, whiteSpace: 'normal', overflowWrap: 'anywhere', hyphens: 'auto',
+                      border: `1px solid ${look.border}`, background: look.bg, color: look.text,
+                    }}
+                  >
+                    <span style={{ flex: 1, minWidth: 0 }}>{ev.title}</span>
+                    <span aria-hidden style={{ flexShrink: 0, display: 'inline-flex', marginTop: 2, color: look.mark }}><KindIcon kind="linked" size={10} strokeWidth={2.4} /></span>
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>
       )}
 
+
+      {/* Decision 64 — nothing from the other calendars in the days shown: say where the next is. */}
+      {layers.linked && weekDays.length > 0 && (
+        <LinkedEmptyHint links={shownLinks} fromYMD={weekDays[0]!} toYMD={weekDays[weekDays.length - 1]!} period={singleDay ? 'this day' : 'this week'} onJump={(d) => onCommand('calendar.setAnchor', { date: d })} />
+      )}
       {useAgenda && renderAgenda(weekDays[0]!)}
       {!useAgenda && singleDay && narrowDay && (
         <button
@@ -3187,6 +3341,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
                 {/* Issue #166 — tracked reality as background highlights
                     (zIndex 0, no pointer events — behind habits and tasks) */}
                 {renderRoutineBands(dayYMD)}
+                {renderLinkedBlocks(dayYMD)}
                 {renderRealityBlocks(dayYMD)}
 
                 {/* App open / close markers (thin dashed lines). */}
@@ -3227,6 +3382,14 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
           y={calMenu.y}
           onDismiss={() => setCalMenu(null)}
           items={[
+            // Decision 64 (owner, 2026-11-22: "highlighted so people actually use it"): first, tinted.
+            ...(onOtherCalendars ? [{
+              label: shownLinks.length ? 'Your other calendars' : 'Add your calendars',
+              icon: <MenuIcon name={shownLinks.length ? 'link' : 'plus'} />,
+              hint: shownLinks.length ? `${shownLinks.length} shown` : 'Google · iPhone',
+              accent: true, testId: 'calendar-menu-othercals',
+              onSelect: () => onOtherCalendars(calMenu.x, calMenu.y),
+            } as ContextMenuItem] : []),
             // easy-mode D22 — the layer switches and zoom are Advanced.
             ...(easy ? [] : ([
               ['recorded', 'Recorded time'],
@@ -3365,6 +3528,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef 
           />
         );
       })()}
+      {linkedInfo && (
+        <LinkedInfoCard link={linkedInfo.link} ev={linkedInfo.ev} x={linkedInfo.x} y={linkedInfo.y} onClose={() => setLinkedInfo(null)} />
+      )}
       {infoPopup && (
         <TaskInfoPopup
           taskId={infoPopup.taskId}

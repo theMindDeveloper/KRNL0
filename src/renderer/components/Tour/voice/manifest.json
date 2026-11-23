@@ -946,5 +946,41 @@
     "tours": [
       "terminal"
     ]
+  },
+  "c73851bc": {
+    "text": "Your iPhone, Google, work or school calendar can sit on this Calendar too, beside your plans. And your plans can go to your phone.",
+    "tours": [
+      "calendars"
+    ]
+  },
+  "b524f574": {
+    "text": "The Calendar's menu has Other calendars. Here is its card: each calendar with a switch to show or hide it.",
+    "tours": [
+      "calendars"
+    ]
+  },
+  "f36997dc": {
+    "text": "Press Add a calendar.",
+    "tours": [
+      "calendars"
+    ]
+  },
+  "6e1fece0": {
+    "text": "Pick where your calendar is. For your iPhone, choose Apple and sign in with your Apple ID and an app password: the card shows how to make one in a minute. Google opens its own sign-in. Then tick the calendars to show, and your plans go to your phone too.",
+    "tours": [
+      "calendars"
+    ]
+  },
+  "f29f5bd7": {
+    "text": "Once a calendar is added, its events sit on your week as outlined cards with a little link mark, next to your own. Click one to see where it comes from, or copy it in to make it yours.",
+    "tours": [
+      "calendars"
+    ]
+  },
+  "891d3873": {
+    "text": "Export saves your events and planned tasks as one file, for any calendar app. Import brings a file's events in as your own events, never as tasks.",
+    "tours": [
+      "calendars"
+    ]
   }
 }

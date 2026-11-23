@@ -44,8 +44,11 @@ export function chipLook(info: SyncInfo | null): ChipLook {
   if (!info || !info.configured) return { label: 'saved', tone: 'acid' };
   switch (info.state) {
     case 'synced': return { label: 'saved · synced', tone: 'acid' };
+    // Syncing is quick and constant; showing it made the badge flicker between
+    // words and colours. It stays "saved · synced" (the details say "Syncing…").
+    // Only a server that has never synced yet stays plain "saved".
     case 'syncing':
-    case 'connecting': return { label: 'syncing', tone: 'cyan' };
+    case 'connecting': return info.lastSyncedAt !== null ? { label: 'saved · synced', tone: 'acid' } : { label: 'saved', tone: 'acid' };
     case 'offline': return { label: 'saved · offline', tone: 'amber' };
     case 'paused': return { label: 'sync paused', tone: 'rust' };
     case 'update': return { label: IS_WEB ? 'update needed' : 'update KRNL0', tone: 'rust' };

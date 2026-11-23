@@ -24,13 +24,15 @@ export interface CalendarLayers {
   habits: boolean;
   /** Decision 39 — routine bands behind the plans. */
   routines: boolean;
+  /** Decision 64 — events from other calendars (Google, iCloud, links). */
+  linked: boolean;
 }
 
-export const DEFAULT_CAL_LAYERS: CalendarLayers = { recorded: true, habits: true, routines: true };
+export const DEFAULT_CAL_LAYERS: CalendarLayers = { recorded: true, habits: true, routines: true, linked: true };
 
 export function calendarLayersOf(state: { layers?: Partial<CalendarLayers> | undefined } | null | undefined): CalendarLayers {
   const l = state?.layers;
-  return { recorded: l?.recorded !== false, habits: l?.habits !== false, routines: l?.routines !== false };
+  return { recorded: l?.recorded !== false, habits: l?.habits !== false, routines: l?.routines !== false, linked: l?.linked !== false };
 }
 
 export const CAL_ZOOM_MIN = 1;

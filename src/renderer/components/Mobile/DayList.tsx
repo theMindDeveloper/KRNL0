@@ -29,7 +29,7 @@ export function useDayAgenda(): { agenda: DayAgenda; nowMin: number } {
   return { agenda, nowMin };
 }
 
-const toneOf = (it: AgendaItem): string => (it.taskId ? toneVarForTask(it.taskId) : it.color ? `var(--${it.color})` : 'var(--ink-3)');
+export const toneOf = (it: AgendaItem): string => (it.taskId ? toneVarForTask(it.taskId) : it.color ? `var(--${it.color})` : 'var(--ink-3)');
 
 const KIND_WORD: Record<AgendaItem['kind'], string> = { plan: 'Plan', event: 'Repeats', habit: 'Habit' };
 

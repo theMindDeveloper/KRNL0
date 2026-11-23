@@ -28,6 +28,9 @@ export interface ContextMenuItem {
   children?: ContextMenuItem[];
   /** Stay open after choosing (a step you may press a few times, like zoom). */
   keepOpen?: boolean;
+  /** A row the menu wants you to find (Decision 64: Add your calendars): an acid-tinted pill. */
+  accent?: boolean;
+  testId?: string;
 }
 
 export interface ContextMenuProps {
@@ -138,6 +141,8 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
           <button
             type="button"
             disabled={item.disabled}
+            data-testid={item.testId}
+            data-accent={item.accent ? 'true' : undefined}
             onClick={() => {
               if (item.disabled) return;
               if (item.children) { setSub({ label: item.label, items: item.children }); return; }
@@ -148,10 +153,13 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
               display: 'flex',
               alignItems: 'center',
               gap: 10,
-              width: '100%',
+              width: item.accent ? 'calc(100% - 12px)' : '100%',
               textAlign: 'left',
-              background: 'transparent',
+              background: item.accent ? 'color-mix(in srgb, var(--acid) 22%, var(--paper))' : 'transparent',
               border: 'none',
+              borderRadius: item.accent ? 6 : 0,
+              margin: item.accent ? '2px 6px 4px' : 0,
+              fontWeight: item.accent ? 600 : undefined,
               padding: hasIcons ? '6px 14px 6px 10px' : '6px 14px',
               cursor: item.disabled ? 'default' : 'pointer',
               color: item.disabled
@@ -166,20 +174,20 @@ export function ContextMenu({ x, y, items, onDismiss }: ContextMenuProps) {
             }}
             onMouseEnter={(e) => {
               if (!item.disabled) {
-                (e.currentTarget as HTMLButtonElement).style.background = 'var(--paper-2)';
+                (e.currentTarget as HTMLButtonElement).style.background = item.accent ? 'color-mix(in srgb, var(--acid) 38%, var(--paper))' : 'var(--paper-2)';
               }
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+              (e.currentTarget as HTMLButtonElement).style.background = item.accent ? 'color-mix(in srgb, var(--acid) 22%, var(--paper))' : 'transparent';
             }}
           >
             {hasIcons && (
-              <span aria-hidden style={{ width: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: item.danger ? 'var(--rust)' : 'var(--ink-3)' }}>
+              <span aria-hidden style={{ width: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: item.danger ? 'var(--rust)' : item.accent ? 'var(--acid-ink, var(--ink))' : 'var(--ink-3)' }}>
                 {item.icon}
               </span>
             )}
             <span style={{ flex: 1 }}>{item.label}</span>
-            {item.hint && <span style={{ marginLeft: 16, fontSize: 11, color: 'var(--ink-3)' }}>{item.hint}</span>}
+            {item.hint && <span style={{ marginLeft: 16, fontSize: 11, fontWeight: 400, color: item.accent ? 'var(--ink-2)' : 'var(--ink-3)' }}>{item.hint}</span>}
             {item.children && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ marginLeft: 12, color: 'var(--ink-3)' }}><path d="M9 6l6 6-6 6" /></svg>}
           </button>
         </Fragment>

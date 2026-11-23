@@ -367,6 +367,8 @@ export function TourHost(): JSX.Element | null {
     cardPos.current = null;
     rectRef.current = null;
     stopVoice();
+    // What a tour opened by an event closes again (the Other calendars card).
+    window.dispatchEvent(new CustomEvent('krnl:tour-ended'));
     setTour(null); setI(0); setRect(null); setRect2(null); setNudge(null); setReadyKey('');
     // The examples always go (before the question about the user's own practice).
     removeExamples();

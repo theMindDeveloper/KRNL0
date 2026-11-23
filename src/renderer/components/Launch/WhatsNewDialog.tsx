@@ -27,14 +27,19 @@ import artUpdate from '../../assets/launch/plate-update.webp';
 import artCalendar from '../../assets/launch/plate-calendar.webp';
 import artEvents from '../../assets/launch/plate-events.webp';
 import artMove from '../../assets/launch/plate-move.webp';
+import artCalendars from '../../assets/launch/plate-calendars.webp';
+import artBothways from '../../assets/launch/plate-bothways.webp';
+import artPhoneToday from '../../assets/launch/plate-phonetoday.webp';
 import { startTour } from '../Tour/TourHost';
 import { tourById } from '../Tour/tours';
+import { IS_WEB } from '../../platform';
 import { useEasyMode } from '../../store/uiMode';
 
 const ART: Record<WhatsNewArt, string> = {
   mini: artMini, menubar: artMenubar, feedback: artFeedback, streak: artStreak, sessions: artSessions, guide: artGuide, board: artBoard,
   boards: artBoards, windows: artWindows, cards: artCards, sync: artSync, phone: artPhone, update: artUpdate,
   calendar: artCalendar, events: artEvents, move: artMove,
+  calendars: artCalendars, bothways: artBothways, phonetoday: artPhoneToday,
 };
 
 function runAction(item: WhatsNewItem): void {
@@ -86,11 +91,12 @@ export function WhatsNewDialog() {
           </div>
         </div>
         <div className="ln-wn__main">
+          <div className="ln-wn__scroll" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="ln-row">
             <span className="ln-chip" data-testid="whatsnew-chip">{from}</span>
             <span className="ln-meta" style={{ marginLeft: 'auto' }}>{step + 1} of {release.items.length}</span>
           </div>
-          <h2 id="ln-wn-title" className="ln-display" style={{ marginTop: 24, fontSize: 46 }}>{item.title}</h2>
+          <h2 id="ln-wn-title" className="ln-display" style={{ marginTop: 24, fontSize: 'clamp(32px, 9vw, 46px)' }}>{item.title}</h2>
           <p className="ln-body" style={{ marginTop: 16, maxWidth: 400 }}>{item.body}</p>
           <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 4 }}>
             {release.items.map((it, i) => (
@@ -100,12 +106,13 @@ export function WhatsNewDialog() {
               </button>
             ))}
           </div>
-          <div className="ln-row" style={{ marginTop: 'auto', gap: 8 }}>
+          </div>
+          <div className="ln-row ln-wn__foot" style={{ marginTop: 'auto', gap: 8 }}>
             <button type="button" className="ln-link" onClick={() => { void window.krnl?.appOpenExternal?.(RELEASES_URL); }}>full release notes</button>
             <span style={{ flex: 1 }} />
             <button type="button" className="ln-btn" onClick={() => closeWhatsNew()} data-testid="whatsnew-later">Later</button>
-            {/* A tour that only exists in Advanced is not offered in Easy. */}
-            {item.action !== 'none' && !(item.action === 'tour' && easy && tourById(item.tour ?? 'first-day')?.onlyIn === 'advanced') && (
+            {/* A tour that only exists in Advanced is not offered in Easy, nor a desktop-only tour on the website. */}
+            {item.action !== 'none' && !(item.action === 'tour' && ((easy && tourById(item.tour ?? 'first-day')?.onlyIn === 'advanced') || (IS_WEB && tourById(item.tour ?? 'first-day')?.desktopOnly))) && (
               <button type="button" className="ln-btn ln-btn--line" onClick={() => runAction(item)} data-testid="whatsnew-show">Show me</button>
             )}
             <button

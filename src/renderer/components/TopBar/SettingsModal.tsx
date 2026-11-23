@@ -20,14 +20,17 @@ import { FinishedSection } from './FinishedSection';
 import { Switch } from '../ui/Switch';
 import { gridScopeOf } from '../Canvas/alignGrid';
 import { SettingsIcon, type SettingsIconName } from '../ui/SettingsIcons';
+import { CalendarsEmbedded, OtherCalendarsCard } from '../nodes/CalendarNode/OtherCalendars';
 
 import { useDockStyle, VISIBLE_DOCK_STYLES } from '../ChassisLayer/useDockStyle';
 import { DOCK_REGISTRY } from '../ChassisLayer/dockRegistry';
 export type Theme = 'light' | 'dark';
-export type SettingsSection = 'general' | 'timer' | 'sounds' | 'finished' | 'celebrations' | 'updates' | 'reset';
+export type SettingsSection = 'general' | 'calendars' | 'timer' | 'sounds' | 'finished' | 'celebrations' | 'updates' | 'reset';
 
 const SECTIONS: ReadonlyArray<{ id: SettingsSection; icon: SettingsIconName; label: string; title: string; blurb: string }> = [
   { id: 'general', icon: 'general', label: 'General', title: 'General', blurb: 'How KRNL0 looks, and how much of it you see.' },
+  // Decision 64 — the Calendar's Other calendars card, also here (owner, 2026-11-22: "so we have both").
+  { id: 'calendars', icon: 'calendar', label: 'Calendars', title: 'Calendars', blurb: 'Your iPhone, Google and other calendars on this board, and your plans on your phone.' },
   { id: 'timer', icon: 'timer', label: 'Floating timer', title: 'Floating timer', blurb: 'Keep the Timer in sight while you work in other apps.' },
   { id: 'sounds', icon: 'sound', label: 'Sounds', title: 'Sounds', blurb: 'Small sounds that confirm what you just did.' },
   { id: 'finished', icon: 'finished', label: 'Finished cards', title: 'Finished cards', blurb: 'Done tasks clear off the board so today stays in focus.' },
@@ -112,6 +115,7 @@ export function SettingsModal({ onClose, theme, onTheme, initial = 'general' }: 
           </header>
           <div className="st-body">
             {section === 'general' && <General theme={theme} onTheme={onTheme} />}
+            {section === 'calendars' && <Card><CalendarsEmbedded.Provider value><OtherCalendarsCard x={0} y={0} onClose={onClose} /></CalendarsEmbedded.Provider></Card>}
             {section === 'timer' && <Card><PocketSection /></Card>}
             {section === 'sounds' && <SoundSection />}
             {section === 'finished' && <FinishedSection />}

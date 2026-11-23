@@ -15,7 +15,8 @@ import { createRpcServer } from './rpc/server';
 import type { RpcServer } from './rpc/server';
 import { initUpdater } from './updater';
 import { initSync } from './sync';
-import { notifyBoardChanged } from './boardIo';
+import { notifyBoardChanged, BOARD_PATH } from './boardIo';
+import { initCalendars } from './calendars';
 import { getMainWindow, revealMainWindow, setMainWindow } from './mainWindow';
 import { attachMainWindow, initPocket, registerPocketSettings, setPocketPort } from './pocket';
 import { startReminders } from './reminders';
@@ -205,6 +206,9 @@ function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
+    // Below this the top bar's right-hand buttons (Help, Settings) no longer fit beside the board name.
+    minWidth: 600,
+    minHeight: 420,
     backgroundColor: '#0e0d0b',
     icon: resolveWindowIcon(),
     titleBarStyle: 'hidden',
@@ -322,6 +326,8 @@ app.whenReady().then(async () => {
   initUpdater(getCliDispatch);
   // Decision 51: sync with the owner's KRNL0 server (stays off until connected).
   initSync({ boardDir: getBoardDir(), notifyBoardChanged, switchToBoard: (id) => switchBoardAndReload(id).ok });
+  // Decision 64: calendar links of the open board, checked every 15 minutes.
+  initCalendars({ boardPath: () => BOARD_PATH, boardDir: getBoardDir, notifyBoardChanged });
 
   // Only the packaged path needs the local renderer server; dev uses Vite.
   if (process.env['NODE_ENV'] !== 'development') {

@@ -2915,3 +2915,73 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
 10. **The Clock follows a carried item with one small arc** (owner, same day: the task being moved on the Clock was "too slow and too stuttery"). The Clock window used to be drawn again on every step of the ghost (dial, lanes, the list and its measuring), at low priority (point 5), so under a steady drag it fell behind (57 ms, up to 0.3 s at 4x CPU) and jumped from step to step. Now the window is drawn again only when a drag starts and ends (which item is carried: its arc and list row step back, as on the Calendar), and `ClockCarriedArc` draws the carried item at the ghost's time in the lane it would take, gliding from step to step like the ghost (90 ms, from where it is drawn now, still for reduced motion). On a drop the carried arc hands over to the real one in the same frame.
 
 Measured at 4x CPU in the development build, before → after: a plan moved on the Calendar lands in 0.47 s → 0.19 s; a canvas card dropped on the Calendar 0.73 s → 0.36 s; blocking work in a canvas card drag ~0.8 s → 0.19 s; slow frames while dragging a note 19% → 4%. What is left on a drop is the redraw of every window after a board change (development-build cost; a release build is several times faster).
+
+## Decision 64 — Calendar sync with Google and Apple: one engine, run by the server or the app, never both (2026-11-22)
+
+**Status:** Proposed. The owner asked on 2026-11-22 for free, open-source sync with Google Calendar and Apple Calendar, then asked: "is it better to do it in the app itself or on the server or on both? … not all people will have the server, and a lot of them will have the server and want to use it". The owner answered "Yes, write them" to the shape below. Requirements: [calendar-sync.md](../06-requirements/calendar-sync.md). Design drafts for the link screens come before any UI code.
+
+**Context.** People keep appointments in Google Calendar or Apple's iCloud Calendar. They want them in KRNL0, and they want KRNL0's events and timed tasks on their phone's calendar. It must cost nothing. A paid middleman (Nylas, Cronofy, OneCal and the like) is out: it costs money and sees every event, against the privacy-first rule. Many owners run no KRNL0 server. Many do, and expect sync to keep working while the laptop is closed. Two copies of a sync running at once would send every event twice.
+
+**Decision.**
+1. **Three ways in, all free.**
+   - **Calendar links (read-only).** An ICS address: Google's "secret address in iCal format", an iCloud public calendar, any `.ics` URL. No account and no sign-in. Plus Export and Import of a `.ics` file.
+   - **Apple and any CalDAV calendar (two-way).** iCloud (`caldav.icloud.com`) with an app-specific password the owner makes at appleid.apple.com. The same code works for Nextcloud, Fastmail and others. Library: `tsdav` (MIT).
+   - **Google (two-way).** The Google Calendar API (free, with high quotas), signed in through OAuth for installed apps (loopback redirect and PKCE).
+     - Scope: the narrowest that works. To check before building: `calendar.app.created`, which gives access only to calendars KRNL0 made itself.
+     - The Google Cloud project is the owner's. Until Google reviews the app, sign-in shows "unverified app" and at most 100 accounts can link.
+     - The project is kept "In production": in "Testing", Google's tokens expire after 7 days.
+   - ICS parsing and repeat expansion: `ical.js`. Writing ICS: `ical-generator`. Both are open source.
+2. **No KRNL0 feed for Google or Apple to subscribe to.** Google fetches a subscribed feed from its own servers, so the home server would have to be on the public internet with a real certificate. Google also refreshes a feed only every 8–24 hours. KRNL0 writes through the API or CalDAV instead.
+3. **One engine** in `src/shared/calsync/`, with no Node or Electron imports (like `src/shared/sync/`, server-sync NF2).
+   - It turns KRNL0 events and timed tasks into calendar events and back.
+   - It keeps the matching list, finds what changed on each side, and applies Decision 53's clash rules.
+   - Each host gives it network access, a secret store, the clock and the board. On the desktop, changes take the `krnl` commands' own path: load the board file, change it, save it and tell the window (`notifyBoardChanged`), which merges it with its own unsaved edits (Decision 34). Nothing else writes `board.json` (hard rule 5).
+4. **Two hosts.**
+   - **The desktop app** runs it in the main process, next to the board's one write path, while the app is open. Changes made while the app was closed are caught up on the next start.
+   - **The KRNL0 server** runs it as a built-in background device. This is a headless sync client: it reads and writes boards through the normal sync protocol like any other device, so the server gets no merge of its own (Decision 51 keeps merging in `boardMerge`).
+   - The engine ships in the KRNL0 release beside the website bundle, and the server release pins it (Decision 52). App and server run the same code.
+5. **One runner per link, chosen by a rule, never by who is online.**
+   - The server runs a link when a server is connected and reports `calendarSync` in `GET /api/v1/server`. Otherwise the desktop that made the link runs it.
+   - When the server is offline, the desktop does **not** take over: two runners would duplicate events. Changes wait on both sides and catch up.
+   - A server too old to report the capability leaves the job to the desktop.
+   - Without a server, two desktops have separate boards, so each runs its own links.
+6. **Links and the matching list travel with the board; secrets never do.**
+   - A board gets an optional `calendarLinks` list. Each link holds the provider, the remote calendar, which runner it has, and the owner's time zone. For each item it holds the remote event id, its version tag and a hash of what was last sent.
+   - The list syncs like the rest of the board. A handover from desktop to server (or back) therefore knows what was already sent and sends nothing twice.
+   - Passwords and tokens stay in the OS keychain (`safeStorage`) on the desktop and encrypted in the server's data folder. They are never in `board.json` and never logged. They go only to the provider and, once, from the app to its own pinned server.
+7. **Handover is silent.** Connecting a server hands each link's secret to the server over the pinned connection and makes the server its runner. The desktop keeps its keychain copy. Disconnecting makes this desktop the runner again, from that copy; if it never had a copy, it asks to link again. No notice is shown (owner's rule: no technical notices).
+8. **KRNL0 writes only into its own calendar.** Linking Google or Apple creates a calendar named "KRNL0" ("KRNL0 · <board>" when there are several boards), and KRNL0 writes only there. The owner's other calendars can be added as read-only. Unlinking leaves that calendar for the owner to keep or delete.
+9. **What goes where.**
+   - **Out:** events (once and repeating, with their skipped and moved days) and tasks that have a time (`scheduledFor` and their length). Never habits, the timer, the time log, or notes beyond an event's name and place.
+   - **In:** changes to those. New events made in the KRNL0 calendar become events, never tasks (Decision 62). Editing a task's copy changes the task's time or name. Deleting a task's copy takes the task off the Calendar but never deletes it from Todo.
+   - A repeat KRNL0 cannot express (monthly, every second week, a set count) is shown read-only and edited where it was made.
+   - Read-only calendars are drawn as events on their own layer.
+10. **Time zones.** KRNL0 keeps local dates and times. A link stores the IANA time zone of the device that made it, because a server in Docker usually runs in UTC. Every event is sent with that zone, so a server never shifts the owner's times.
+11. **When it checks.**
+    - After a KRNL0 change, it is sent within a few seconds.
+    - From the provider: Google's sync token, and CalDAV's sync token or ctag, every 2 minutes while the runner is up.
+    - Calendar links every 15 minutes, with `ETag` / `If-Modified-Since`.
+    - No push from Google: its notifications need a public address.
+12. **Google sign-in starts on a desktop.** Google sends an installed app's sign-in back to the user's own computer, not to a home server's private address. A server-run Google link is therefore made once from a desktop app and handed over. Apple's password is just a form and can be typed on the website. Linking Google from the website alone is left open.
+13. **CLI** (hard rule 8): `krnl cal link ics <url>`, `krnl cal link apple`, `krnl cal link caldav <url>`, `krnl cal link google`, `krnl cal links`, `krnl cal sync [<link>]`, `krnl cal unlink <link>`, `krnl cal export [--out <file>]`, `krnl cal import <file>`.
+14. **Order of work.**
+    1. The engine with the desktop host: calendar links and `.ics` export/import.
+    2. Apple and CalDAV, two-way.
+    3. The server host (krnl0-server).
+    4. Google, two-way.
+
+**Built (2026-11-22, P1, P2, P4 on the desktop).** The two-way engine is `shared/calsync/mirror.ts`: a pure reconcile of the board's items (events, planned tasks), the KRNL0 calendar's entries and the matching list (UID, where it lives, ETag, a hash of each side at the last sync). It works on one neutral item (`ExportEvent` with its UID), so each account only needs an adapter (`main/calendars/remote.ts`): **iCloud and CalDAV** through `tsdav` 2.5.0 (entries as one VCALENDAR each), **Google** through its Calendar API in JSON (`events.import` keeps KRNL0's UID; repeats as RRULE/EXDATE lines; a moved day patches that instance). Google CalDAV was not used: it cannot make a calendar, and the API is better documented. A clash on the same item within one check goes to the calendar's version. Sign-in secrets (app password, Google refresh token) are sealed per account in `calendar-links.json` in the app's data folder; the window's card sends the password over its own IPC call, never as `krnl` argv. Google needs the owner's OAuth client (scope `calendar`, sensitive: Google's review), passed to the build.
+
+**Rejected.**
+- *Desktop only:* changes made on the phone website would wait until a laptop is opened, and website-only owners would get nothing.
+- *Server only:* most owners have no server.
+- *"Whoever is online runs it":* after a brief outage, two runners would each send the same events.
+- *A paid sync service:* costs money and sees every event.
+- *Native EventKit:* macOS only. iCloud CalDAV already reaches Apple Calendar on every Apple device.
+
+**Consequences.**
+- New work in krnl0-server: the headless device, its secret store, the capability flag, and pinning the engine.
+- The board gets an optional field, with no schema bump. An older KRNL0 must keep `calendarLinks` it does not know (Decision 52, point 2).
+- The Calendar's layers gain one for read-only calendars (`linked`). All-day events of other calendars are chips in the existing ANY TIME strip, not a new row.
+- The owner creates and keeps the Google Cloud project.
+- The feature ends with a tutorial ("Your other calendars") and designed release notes.

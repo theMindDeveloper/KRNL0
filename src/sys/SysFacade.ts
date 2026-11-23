@@ -22,6 +22,8 @@ import * as nodeCmd from './commands/node';
 import * as edgeCmd from './commands/edge';
 import * as infoCmd from './commands/info';
 import * as calCmd from './commands/cal';
+import * as calLinks from './commands/calLinks';
+import type { CalendarLinksPort } from '../shared/calsync/port';
 import * as clockCmd from './commands/clock';
 import * as updateCmd from './commands/update';
 import type { UpdaterPort } from '../shared/update';
@@ -95,6 +97,8 @@ export interface SysFacadeDeps {
   updater?: UpdaterPort;
   /** Decision 51: sync with the owner's server (main only). */
   sync?: SyncPort;
+  /** Decision 64: calendar links (main only). */
+  calendars?: CalendarLinksPort;
   /** Decision 37: the floating pocket timer (main only; absent in tests / headless). */
   pocket?: PocketPort;
   /** Decision 38: launch info and app prefs (main only; absent in tests / headless). */
@@ -146,6 +150,7 @@ export class SysFacade {
       ...(deps?.viewSize ? { viewSize: deps.viewSize } : {}),
       ...(deps?.updater ? { updater: deps.updater } : {}),
       ...(deps?.sync ? { sync: deps.sync } : {}),
+      ...(deps?.calendars ? { calendars: deps.calendars } : {}),
       ...(deps?.pocket ? { pocket: deps.pocket } : {}),
       ...(deps?.appState ? { appState: deps.appState } : {}),
     };
@@ -945,6 +950,29 @@ export class SysFacade {
           command.on,
           command.json,
         );
+      }
+      // Decision 64 — other calendars.
+      if (command.sub === 'link' || command.sub === 'links' || command.sub === 'unlink' || command.sub === 'sync' || command.sub === 'export' || command.sub === 'import' || command.sub === 'account' || command.sub === 'signout' || command.sub === 'accounts') {
+        const lctx: calLinks.CalLinkCtx = {
+          boardPath: this.deps.boardPath,
+          ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+          ...(this.deps.calendars ? { calendars: this.deps.calendars } : {}),
+        };
+        switch (command.sub) {
+          case 'link':
+            if (command.mode === 'ics') return calLinks.calLinkAdd(lctx, command.target, command.name, command.color, command.json);
+            if (command.mode === 'check') return calLinks.calLinkCheck(lctx, command.target, command.json);
+            if (command.mode === 'set') return calLinks.calLinkSet(lctx, command.target, command.name, command.color, command.on);
+            return { ok: false, message: 'cal link ics <address> | cal link check <address> | cal link set <calendar> …' };
+          case 'account': return calLinks.calLinkAccount(lctx, command.mode, command.server, command.user, command.password, command.calendars, command.send, command.json);
+          case 'signout': return calLinks.calSignOut(lctx, command.ref);
+          case 'accounts': return calLinks.calAccounts(lctx, command.json);
+          case 'links': return calLinks.calLinksList(lctx, command.json);
+          case 'unlink': return calLinks.calUnlink(lctx, command.ref);
+          case 'sync': return calLinks.calSync(lctx, command.ref);
+          case 'export': return calLinks.calExport(lctx, command.out);
+          case 'import': return calLinks.calImport(lctx, command.file, command.dryRun, command.json);
+        }
       }
       if (command.sub === 'view') {
         return calCmd.calView(

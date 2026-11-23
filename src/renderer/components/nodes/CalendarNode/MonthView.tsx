@@ -22,6 +22,8 @@ import { selectPomoReality } from '../../../store/pomoReality';
 import { fmtMinutes } from '../ClockNode/dayModel';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { LineGlyph } from '../../ui/LineGlyph';
+import { allDayOn, linksOf, partOnDay, type CalendarLink, type LinkedEvent } from '../../../../shared/calsync/types';
+import { LinkedEmptyHint, LinkedInfoCard, linkedLook } from './OtherCalendars';
 
 interface ScheduledTask {
   id: string;
@@ -243,6 +245,28 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
     () => dayOnlyPlans(boardNodes ?? [], cells, new Map(scheduledTasks.map((t) => [t.id, t.startISO.slice(0, 10)])), todayYMD),
     [boardNodes, cells, scheduledTasks, todayYMD],
   );
+
+  // Decision 64: events from other calendars (Look A), each on its days.
+  const calendarLinksRaw = useBoardStore((st) => (st.board as { calendarLinks?: unknown } | null)?.calendarLinks);
+  const linkedLayerOn = calendarLayersOf(state).linked;
+  const linkedByDay = useMemo(() => {
+    const map = new Map<string, Array<{ link: CalendarLink; ev: LinkedEvent }>>();
+    if (!linkedLayerOn || !cells.length) return map;
+    const first = cells[0]!;
+    const last = cells[cells.length - 1]!;
+    for (const link of linksOf({ calendarLinks: calendarLinksRaw }).filter((l) => l.on)) {
+      for (const ev of link.events) {
+        if (ev.start.slice(0, 10) > last) break;
+        if (ev.end.slice(0, 10) < first) continue;
+        for (const d of cells) {
+          if (ev.allDay ? allDayOn(ev, d) : partOnDay(ev, d)) (map.get(d) ?? map.set(d, []).get(d)!).push({ link, ev });
+        }
+      }
+    }
+    for (const list of map.values()) list.sort((a, b) => (a.ev.allDay ? -1 : 0) - (b.ev.allDay ? -1 : 0) || a.ev.start.localeCompare(b.ev.start));
+    return map;
+  }, [calendarLinksRaw, linkedLayerOn, cells]);
+  const [linkedInfo, setLinkedInfo] = useState<{ link: CalendarLink; ev: LinkedEvent; x: number; y: number } | null>(null);
 
   const tasksByDay = useMemo(() => {
     const map = new Map<string, ScheduledTask[]>();
@@ -466,6 +490,13 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
         ))}
       </div>
 
+      {/* Decision 64 — the month has nothing from the other calendars: say where the next is. */}
+      {linkedLayerOn && (() => {
+        const mFirst = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-01`;
+        const mLast = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-${String(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+        return <LinkedEmptyHint links={linksOf({ calendarLinks: calendarLinksRaw })} fromYMD={mFirst} toYMD={mLast} period="this month" onJump={(d) => onCommand('calendar.setAnchor', { date: d })} />;
+      })()}
+
       {/* Day cell grid — 6 rows × 7 cols = 42 cells */}
       <div
         ref={gridRef}
@@ -683,6 +714,27 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
                       {d.kind === 'deadline' && <DueFlag />}{truncateLabel(d.text)}
                     </div>
                   ))}
+                  {(linkedByDay.get(ymd) ?? []).map(({ link, ev }) => {
+                    const look = linkedLook(link.color);
+                    const at = !ev.allDay && ev.start.slice(0, 10) === ymd ? `${ev.start.slice(11, 16)} ` : '';
+                    return (
+                      <button
+                        key={`ln-${link.id}-${ev.id}`}
+                        type="button"
+                        data-testid="month-linked-chip"
+                        title={`${ev.title} · from ${link.name}`}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); setLinkedInfo({ link, ev, x: e.clientX, y: e.clientY }); }}
+                        style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 11, flexShrink: 0, borderRadius: 2, padding: '0 3px', lineHeight: '1.3', textAlign: 'left',
+                          overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'pointer',
+                          border: `1px solid ${look.border}`, background: look.bg, color: look.text,
+                        }}
+                      >
+                        {at}{truncateLabel(ev.title)}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -724,6 +776,7 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
         })}
       </div>
       {taskPopup && <TaskInfoPopup {...taskPopup} onClose={() => setTaskPopup(null)} />}
+      {linkedInfo && <LinkedInfoCard link={linkedInfo.link} ev={linkedInfo.ev} x={linkedInfo.x} y={linkedInfo.y} onClose={() => setLinkedInfo(null)} />}
     </div>
   );
 }

@@ -124,7 +124,7 @@ export function LayoutMenu() {
         }}
       >
         <span style={{ color: 'var(--ink-2)', display: 'inline-flex' }}><LayoutGlyph rects={current.glyph} size={18} /></span>
-        <span>{current.label}</span>
+        <span className="krnl-layout-label">{current.label}</span>
         <span aria-hidden style={{ color: 'var(--ink-3)', display: 'inline-flex' }}><LineGlyph name="caretDown" size={11} /></span>
       </button>
 

@@ -364,6 +364,21 @@ export const TOURS: readonly Tour[] = [
       { say: "Semester over? Right-click it, and choose End after this day. The days before it stay, and Restart is in the events list.", node: 'mother-calendar', target: CAL, event: 'krnl:calendar-show-routines', badge: 'END, DON’T DELETE', text: 'Semester over? **Right-click** it and choose **End after this day**: the days before stay. **Restart** is in the events list.', waitFor: { board: routineEnded }, hint: 'Waiting for an ended event… (or Skip)' },
     ],
   },
+  // Decision 64 (calendar-sync F22) — other calendars on your Calendar.
+  {
+    id: 'calendars',
+    desktopOnly: true,
+    title: 'Your other calendars',
+    summary: 'Your Google, iCloud or school calendar beside your plans; .ics files in and out',
+    steps: [
+      { say: "Your iPhone, Google, work or school calendar can sit on this Calendar too, beside your plans. And your plans can go to your phone.", node: 'mother-calendar', target: CAL, badge: 'OTHER CALENDARS', text: 'Your **iPhone, Google, work or school calendar** can sit on this Calendar too, beside your plans. And your plans can go to your **phone**.' },
+      { say: "The Calendar's menu has Other calendars. Here is its card: each calendar with a switch to show or hide it.", node: 'mother-calendar', event: 'krnl:open-other-calendars', target: '[data-testid="othercal-card"]', badge: 'ITS CARD', text: 'The Calendar\'s **menu** has **Other calendars…**. Here is its card: each calendar with a **switch** to show or hide it.' },
+      { say: "Press Add a calendar.", event: 'krnl:open-other-calendars', target: '[data-testid="othercal-add"]', badge: 'PRESS', text: 'Press **Add a calendar**.', waitFor: { click: '[data-testid="othercal-add"]' }, hint: 'Waiting for Add a calendar…' },
+      { say: "Pick where your calendar is. For your iPhone, choose Apple and sign in with your Apple ID and an app password: the card shows how to make one in a minute. Google opens its own sign-in. Then tick the calendars to show, and your plans go to your phone too.", target: '[data-testid="othercal-add-card"]', badge: 'SIGN IN', text: 'Pick where your calendar is. For your iPhone, choose **Apple** and sign in with your Apple ID and an **app password** (the card shows how to make one, in a minute). **Google** opens its own sign-in. Then tick the calendars to show, and your plans go to your phone too.' },
+      { say: "Once a calendar is added, its events sit on your week as outlined cards with a little link mark, next to your own. Click one to see where it comes from, or copy it in to make it yours.", event: 'krnl:close-other-calendars', node: 'mother-calendar', target: CAL, badge: 'ON YOUR WEEK', text: 'Once a calendar is added, its events sit on your week as **outlined cards** with a **link mark**, next to your own. **Click** one to see where it comes from, or **Copy to KRNL0** to make it yours.' },
+      { say: "Export saves your events and planned tasks as one file, for any calendar app. Import brings a file's events in as your own events, never as tasks.", event: 'krnl:open-other-calendars', target: '[data-testid="othercal-export"]', badge: 'FILES', text: '**Export .ics** saves your events and planned tasks as one file, for any calendar app. **Import .ics** brings a file\'s events in as **your own events**, never as tasks.' },
+    ],
+  },
   // Decisions 54-60 — the layout menu: My layout and the Free canvas. The tour
   // shows My layout where it needs it, and puts the user's own layout back.
   {
