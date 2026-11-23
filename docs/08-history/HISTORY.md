@@ -3362,3 +3362,19 @@ Typecheck clean; all tests pass.
 **Files changed:** `docs/08-history/HISTORY.md`
 
 **Summary:** A Calendar you can read, events that happen once, one drag engine for everything that goes onto the Calendar, the phone website and the layout menu (notes: `docs/releases/v0.15.0.md`, What's new Direction A). The owner asked for the release without per-step questions. Full suite green in the release PR (2984), draft checked by `npm run release -- check` (installer, blockmap, `latest.yml` 0.15.0, web app checksum) and published at 09:44 UTC. The follow workflow opened server 0.2.4 (website = KRNL0 0.15.0), which was merged, built, verified (`krnl0 updater verify`: signature from release.yml@v0.2.4, 9 files; the Linux bundle is 0.2.4 with the 0.15.0 website) and published at 09:52 UTC. `:latest` was checked against `release.json`. The website shows "New in v0.15" and the fallback version 0.15.0.
+
+## [2026-11-22] — Microsoft Store package (groundwork)
+
+**Type:** Feature (in progress, not merged)
+**PRs/Commits:** branch `feat/microsoft-store`
+**Files changed:** `electron-builder.store.json`, `package.json`, `.gitignore`, `src/main/updater/index.ts`, `tests/unit/main/updater.backends.test.ts`, `docs/06-requirements/microsoft-store.md`
+
+**Summary:** The owner asked to publish KRNL0 on the Microsoft Store as well. Added a separate `electron-builder.store.json` (extends the normal config, no publish target) and `npm run package:store`. A Store package is updated by the Store, so `chooseBackend` now turns the GitHub updater off when Electron reports `process.windowsStore`; direct installs are unchanged. The `.appx` is not built yet: the `makeappx.exe` that electron-builder downloads does not start on this PC (side-by-side error); the Store identity values and the Partner Center account are still open. See `docs/06-requirements/microsoft-store.md`.
+
+## [2026-11-22] — Microsoft Store: account, name, package builds
+
+**Type:** Feature (in progress, not merged)
+**PRs/Commits:** branch `feat/microsoft-store`
+**Files changed:** `electron-builder.store.json`, `src/main/index.ts`, `src/main/updater/index.ts`, `tests/unit/main/updater.backends.test.ts`, `docs/releases/RELEASING.md`, `AGENTS.md`, `docs/06-requirements/microsoft-store.md`
+
+**Summary:** The owner registered a free individual Partner Center account; the name KRNL0 is reserved (Store ID 9NP2NNSWW7QQ, submit before 2027-02-22) and the real identity values are in `electron-builder.store.json`. `npm run package:store` now builds a valid `.appx` (the stale cached `makeappx` on the dev PC was the blocker). Store packages skip the forced Windows app id so the package identity wins. RELEASING.md has a "Microsoft Store build" section and a train step 12; AGENTS.md rule 11 points to it. Nothing is submitted; the owner is finishing a big update first, and the Store version must be that one.

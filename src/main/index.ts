@@ -293,7 +293,9 @@ app.whenReady().then(async () => {
   // Electron icon to the taskbar even when BrowserWindow({ icon }) is set.
   // Setting an explicit ID (matches electron-builder.json `appId`) tells
   // Windows this is its own application and the BrowserWindow icon wins.
-  if (process.platform === 'win32') {
+  // A Microsoft Store (MSIX) package already has its own identity from the
+  // package; overriding it would split the taskbar icon and notifications.
+  if (process.platform === 'win32' && !process.windowsStore) {
     app.setAppUserModelId('com.theminddevlab.krnl0');
   }
 
