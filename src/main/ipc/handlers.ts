@@ -28,13 +28,11 @@ import type { RpcServer } from '../rpc/server';
 import { askClaude, claudeStatus } from '../assistant/askClaude';
 import type { AskEvent } from '../../shared/assistant/claudeStream';
 
-// Read version once at module load (package.json is bundled into resources).
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// The app's own version. Not package.json by path: main is bundled, and that
+// path is outside app.asar in a packaged app (#291).
 const APP_VERSION: string = (() => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pkg = require('../../../package.json') as { version?: string };
-    return pkg.version ?? '0.0.0';
+    return app?.getVersion?.() ?? '0.0.0';
   } catch {
     return '0.0.0';
   }
