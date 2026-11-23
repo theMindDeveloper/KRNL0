@@ -3,7 +3,7 @@ import { AbsoluteFill } from "remotion";
 import { Space, Plane, Finish, Cam } from "../lib/space";
 import { Cube } from "../lib/cube";
 import { ToolCard, Kind } from "../lib/cards";
-import { Crop } from "../lib/media";
+import { Img, staticFile } from "remotion";
 import { SANS, MONO, C } from "../lib/fonts";
 import { keys, sine, inOut, prog, outExpo, outPow, inPow, lerp, rand, clamp } from "../lib/ease";
 import { Bay, useT, RECT } from "./common";
@@ -16,7 +16,7 @@ const Win: React.FC<{ cam: Cam; id: string; x: number; y: number; z: number; w: 
   const r = RECT[id]; const h = Math.round((w * (r.rect[3] - r.rect[1])) / (r.rect[2] - r.rect[0]));
   return (
     <Plane cam={cam} x={x} y={y} z={z} w={w} h={h} ry={ry} rx={rx} radius={20} shadow sheen={0.06} opacity={opacity}>
-      <Crop src={r.src} rect={r.rect} w={w} h={h} startFrom={r.at} />
+      <Img src={staticFile(`stills/${id}.png`)} style={{ width: w, height: h, display: "block" }} />
     </Plane>
   );
 };
