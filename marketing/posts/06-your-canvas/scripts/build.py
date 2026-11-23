@@ -39,7 +39,7 @@ page(1, "lav", f'''
 
 # 2 — next to your plan (coral)
 w, h = fit("beside", 960)
-page(2, "cyan", f'''
+page(2, "coral", f'''
 <div class="h headline" style="top:150px;font-size:116px">Put anything<br>next to your plan.</div>
 <div class="h sub" style="top:430px;max-width:820px">Ideas, reminders and details sit right beside the task they belong to.</div>
 <div class="shot" style="left:60px;top:600px;width:{w}px"><img src="../shots/trim/beside.png"></div>''')
@@ -59,12 +59,12 @@ page(3, "acid", f'''
 .row .chip{{font-size:30px;padding:8px 18px}}''')
 
 # 4 — frames (acid)
-w, h = fit("frame", 700)
-page(4, "ink", f'''
+w, h = fit("frame", 660)
+page(4, "cyan", f'''
 <div class="h headline" style="top:150px;font-size:128px">Group it<br>in a frame.</div>
 <div class="h sub" style="top:430px;max-width:860px">Drag the frame and everything inside moves with it.</div>
 <div class="shot" style="left:{(1080-w)//2}px;top:560px;width:{w}px"><img src="../shots/trim/frame.png"></div>
-<div class="chip" style="position:absolute;left:64px;top:{560+h+40}px;background:var(--acid);color:var(--ink)">Frame · F</div>''')
+<div class="chip" style="position:absolute;left:64px;top:{560+h+36}px;background:var(--acid);color:var(--ink)">Frame · F</div>''')
 
 # 5 — two layouts (paper)
 mw = 880; mh = round(mw * 501 / 960)
@@ -74,15 +74,15 @@ page(5, "paper", f'''
 <div class="chip" style="position:absolute;left:100px;top:{730+mh+56}px">Layout menu · top bar</div>''')
 
 # 6 — flip (lavender): the two layouts stacked, big enough to read
-cw = 840; sh_ = round(cw * S["station"][1] / S["station"][0]); fh = round(cw * S["free"][1] / S["free"][0])
-y1 = 500; y2 = y1 + sh_ + 56
+cw = 700; sh_ = round(cw * S["station"][1] / S["station"][0]); fh = round(cw * S["free"][1] / S["free"][0])
+y1 = 536; y2 = y1 + sh_ + 76
 page(6, "lav", f'''
 <div class="h headline" style="top:140px;font-size:104px">One shortcut<br>flips them.</div>
 <div class="h" style="top:372px"><span class="chip" style="font-size:34px;padding:12px 26px">Ctrl + Shift + L</span> <span style="font-family:var(--mono);font-weight:800;font-size:26px;margin-left:14px">⌘ + Shift + L on Mac</span></div>
-<div class="shot" style="left:120px;top:{y1}px;width:{cw}px"><img src="../shots/trim/station.png"></div>
-<div class="lab" style="left:64px;top:{y1-18}px"><span class="chip" style="background:var(--paper);color:var(--ink)">My layout</span></div>
-<div class="shot" style="left:120px;top:{y2}px;width:{cw}px"><img src="../shots/trim/free.png"></div>
-<div class="lab" style="left:64px;top:{y2-18}px"><span class="chip">Free canvas</span></div>''', extra_css=".lab{position:absolute;z-index:2}")
+<div class="shot" style="left:64px;top:{y1}px;width:{cw}px"><img src="../shots/trim/station.png"></div>
+<div class="lab" style="left:64px;top:{y1-58}px"><span class="chip" style="background:var(--paper);color:var(--ink)">My layout</span></div>
+<div class="shot" style="left:64px;top:{y2}px;width:{cw}px"><img src="../shots/trim/free.png"></div>
+<div class="lab" style="left:64px;top:{y2-58}px"><span class="chip">Free canvas</span></div>''', extra_css=".lab{position:absolute;z-index:2}")
 
 # 7 — CTA (acid)
 page(7, "acid", '''

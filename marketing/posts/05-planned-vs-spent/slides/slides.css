@@ -5,7 +5,7 @@
 .kicker { position: absolute; left: 72px; top: 168px; }
 .h { position: absolute; left: 72px; right: 72px; font-weight: 800; letter-spacing: -0.055em; line-height: .94; }
 .sub { position: absolute; left: 72px; right: 72px; font-weight: 600; font-size: 44px; line-height: 1.22; letter-spacing: -0.02em; }
-.shot { position: absolute; filter: drop-shadow(0 38px 46px rgba(0,0,0,.30)) drop-shadow(0 8px 14px rgba(0,0,0,.22)); }
+.shot { position: absolute; filter: drop-shadow(3px 0 0 var(--ink)) drop-shadow(-3px 0 0 var(--ink)) drop-shadow(0 3px 0 var(--ink)) drop-shadow(0 -3px 0 var(--ink)) drop-shadow(0 40px 48px rgba(0,0,0,.28)); }
 .shot img { display: block; width: 100%; height: auto; }
 .hi { display: inline-block; background: var(--ink); color: var(--acid); border-radius: 26px; padding: 0 .16em .06em; margin-left: -.04em; }
 .mono { font-family: var(--mono); font-weight: 800; }

@@ -7,7 +7,7 @@ const LOGO='data:image/png;base64,'+fs.readFileSync(path.resolve(ROOT,'../../../
 const DSF=3, THEME=process.env.THEME||'light';
 const SHOTS={
   // id = mother window, at = fake "now", view = analytics view, page = which analytics page, size = window size
-  todo:     {id:'mother-todo', at:'2026-11-24T08:30:00', noseed:true, size:{todo:[540,330]}},
+  todo:     {id:'mother-todo', at:'2026-11-24T08:30:00', noseed:true, size:{todo:[540,270]}},
   timer:    {id:'mother-pomo', at:'2026-11-24T11:00:00', noseed:true, size:{pomo:[540,420]}, act:'timer'},
   plan_vs:  {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'summary', size:{analytics:[560,640]}, click:'Planned vs spent'},
   summary:  {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'summary', size:{analytics:[560,640]}},
@@ -29,6 +29,7 @@ async function open(b,shot){
 }
 const HIDE=`[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-button"],[data-testid="dock"],[data-testid="dock-layer"],.react-flow__minimap,.react-flow__controls,.react-flow__background,.react-flow__edges{display:none!important}
  .react-flow__node,.react-flow__node *{filter:none!important;box-shadow:none!important}
+ .ln-scrim{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
  html,body,#root,.react-flow,.react-flow__renderer,.react-flow__pane{background:transparent!important}`;
 (async()=>{const b=await chromium.launch();fs.mkdirSync(OUT,{recursive:true});
 for(const [name,shot] of Object.entries(SHOTS)){

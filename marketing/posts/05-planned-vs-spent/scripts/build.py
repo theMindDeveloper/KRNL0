@@ -11,7 +11,7 @@ CSS = """
 .kicker { position: absolute; left: 72px; top: 168px; }
 .h { position: absolute; left: 72px; right: 72px; font-weight: 800; letter-spacing: -0.055em; line-height: .94; }
 .sub { position: absolute; left: 72px; right: 72px; font-weight: 600; font-size: 44px; line-height: 1.22; letter-spacing: -0.02em; }
-.shot { position: absolute; filter: drop-shadow(0 38px 46px rgba(0,0,0,.30)) drop-shadow(0 8px 14px rgba(0,0,0,.22)); }
+.shot { position: absolute; filter: drop-shadow(3px 0 0 var(--ink)) drop-shadow(-3px 0 0 var(--ink)) drop-shadow(0 3px 0 var(--ink)) drop-shadow(0 -3px 0 var(--ink)) drop-shadow(0 40px 48px rgba(0,0,0,.28)); }
 .shot img { display: block; width: 100%; height: auto; }
 .hi { display: inline-block; background: var(--ink); color: var(--acid); border-radius: 26px; padding: 0 .16em .06em; margin-left: -.04em; }
 .mono { font-family: var(--mono); font-weight: 800; }
@@ -44,25 +44,24 @@ page(1, "acid", '''
 
 # 2 — the list says what, not how long ---------------------------------------
 page(2, "lav", '''
-<div class="h" style="top:170px;font-size:122px">A list tells<br>you what.<br>Not how long.</div>
-<div class="sub" style="top:540px;font-size:44px">You write the plan. Then you guess the time.</div>
-<div class="shot" style="left:140px;top:690px;width:800px"><img src="../assets/todo.png"></div>
-<div class="cap" style="right:72px;top:1215px;display:none"></div>
-<span class="chip" style="position:absolute;right:140px;top:1222px;background:var(--ink)">&uarr; just a guess</span>
+<div class="h" style="top:170px;font-size:116px">Lists know what.<br>Not how long.</div>
+<div class="sub" style="top:430px;font-size:46px">You write the plan. Then you guess the time.</div>
+<span class="chip" style="position:absolute;right:76px;top:570px;background:var(--ink)">&darr; just a guess</span>
+<div class="shot" style="left:72px;top:650px;width:936px"><img src="../assets/todo.png"></div>
 ''')
 
 # 3 — press start, it records -------------------------------------------------
 page(3, "cyan", '''
 <div class="h" style="top:170px;font-size:140px">Press start.<br>It records.</div>
 <div class="sub" style="top:470px">Pick the plan. The time lands on the task.</div>
-<div class="shot" style="left:190px;top:660px;width:700px"><img src="../assets/timer.png"></div>
+<div class="shot" style="left:120px;top:590px;width:840px"><img src="../assets/timer.png"></div>
 ''')
 
 # 4 — analytics window -----------------------------------------------------------
 page(4, "coral", '''
-<div class="h" style="top:170px;font-size:128px">Then, the<br>real numbers.</div>
-<div class="sub" style="top:462px">Planned vs spent, task by task and day by day.</div>
-<div class="shot" style="left:90px;top:560px;width:720px"><img src="../assets/plan_vs.png"></div>
+<div class="h" style="top:170px;font-size:116px">Then, the<br>real numbers.</div>
+<div class="sub" style="top:424px;font-size:42px">Planned vs spent: per task, per day.</div>
+<div class="shot" style="left:90px;top:500px;width:770px"><img src="../assets/plan_vs.png"></div>
 ''')
 
 # 5 — the number ------------------------------------------------------------------------
@@ -78,17 +77,17 @@ page(5, "ink", '''
 ''')
 
 # 6 — evening recap ---------------------------------------------------------------------------
-page(6, "paper", '''
-<div class="h" style="top:170px;font-size:128px">Every evening,<br>a recap.</div>
-<div class="sub" style="top:462px;max-width:900px">What got done, what was recorded, and how it went against the plan.</div>
-<div class="shot" style="left:140px;top:640px;width:800px"><img src="../assets/recap.png"></div>
+page(6, "cyan", '''
+<div class="h" style="top:170px;font-size:124px">Every evening,<br>a recap.</div>
+<div class="sub" style="top:440px;max-width:900px;font-size:42px">What got done, what was recorded, and how it went against the plan.</div>
+<div class="shot" style="left:100px;top:570px;width:840px"><img src="../assets/recap.png"></div>
 ''')
 
 # 7 — Monday look-back ---------------------------------------------------------------------------
 page(7, "lav", '''
-<div class="h" style="top:170px;font-size:128px">Every Monday,<br>a look back.</div>
-<div class="sub" style="top:462px;max-width:900px">Last week, day by day. Nothing carries over as debt.</div>
-<div class="shot" style="left:140px;top:600px;width:800px"><img src="../assets/week.png"></div>
+<div class="h" style="top:170px;font-size:124px">Every Monday,<br>a look back.</div>
+<div class="sub" style="top:440px;max-width:900px;font-size:42px">Last week day by day,<br>with your best day picked out.</div>
+<div class="shot" style="left:90px;top:590px;width:780px"><img src="../assets/week.png"></div>
 ''')
 
 # 8 — end -------------------------------------------------------------------------------------------

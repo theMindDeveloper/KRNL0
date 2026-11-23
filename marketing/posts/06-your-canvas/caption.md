@@ -6,7 +6,7 @@ Most planners give you a column of tasks and nothing else. KRNL0 gives you a can
 
 Seven tools, one key each: Select (V), Text (N), Sticky note (S), Shape (R), Image (I), Pen (P), Frame (F).
 
-Want it tidy? My layout keeps your windows in a row. Want it loose? Free canvas lets you put anything anywhere. Ctrl + Shift + L flips between them, and each one stays as you left it.
+Want it tidy? My layout keeps your windows in a row. Want it loose? Free canvas lets you put anything anywhere. Ctrl + Shift + L (⌘ + Shift + L on Mac) flips between them, and each one stays as you left it.
 
 Make room for how you think.
 
@@ -21,5 +21,5 @@ Slides
 3. Think out loud. — the real dock, labelled with its seven tools and keys
 4. Group it in a frame. — a frame holding a title and three notes
 5. Tidy when you want. Free when you don't. — the real layout menu (My layout / Free canvas)
-6. One shortcut flips them. — Ctrl + Shift + L, My layout vs Free canvas side by side
+6. One shortcut flips them. — Ctrl + Shift + L (⌘ on Mac), My layout and Free canvas stacked
 7. Make room for how you think. — logo, K·R·N·L·0 tiles, Free download · link in bio
