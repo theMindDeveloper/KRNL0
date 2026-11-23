@@ -54,6 +54,7 @@ await shot('mother-pomo','win-timer');
 
 // ── terminal ──
 await fit('mother-term');
+await p.evaluate(()=>document.fonts.ready);await p.evaluate(()=>window.dispatchEvent(new Event('resize')));await p.clock.runFor(800);await p.waitForTimeout(500);
 {const bb=await p.locator('.react-flow__node[data-id="mother-term"]').boundingBox();await p.mouse.click(bb.x+bb.width/2,bb.y+bb.height-60);}
 await p.clock.runFor(600);
 await type('clear');
