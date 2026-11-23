@@ -18,6 +18,7 @@ it('records command outputs', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'krnl-post09-'));
   const boardPath = join(dir, 'board.json');
   writeFileSync(boardPath, JSON.stringify(seedBoard()), 'utf-8');
+  process.env['KRNL0_BOARD_PATH'] = boardPath;
   const f = new SysFacade({ boardPath, hasOpenRenderer: () => false, onBoardChanged: () => {} });
   const script: string[][] = JSON.parse(readFileSync(join(__dirname, 'commands.json'), 'utf-8'));
   const out: Array<{ cmd: string; ok: boolean; message: string }> = [];

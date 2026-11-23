@@ -5,10 +5,11 @@ const ROOT=path.resolve(__dirname,'..'),OUT=path.join(ROOT,'assets');fs.mkdirSyn
 const ONLY=process.argv[2];
 const SHOTS={
   todo:     {id:'mother-todo',      at:'2026-11-24T08:00:00', flags:{}},
-  cal:      {id:'mother-calendar',  at:'2026-11-24T08:30:00', flags:{SCHED:1,CALZOOM:Number(process.env.CALZOOM||5)}},
+  cal:      {id:'mother-calendar',  at:'2026-11-24T10:30:00', flags:{SCHED:1,CALZOOM:Number(process.env.CALZOOM||6)}},
   timer:    {id:'mother-pomo',      at:'2026-11-24T10:30:00', flags:{SCHED:1}},
   habits:   {id:'mother-habit',     at:'2026-11-24T20:00:00', flags:{}},
-  analytics:{id:'mother-analytics', at:'2026-11-24T21:30:00', flags:{SCHED:1,DONE:1}},
+  planned:  {id:'mother-analytics', at:'2026-11-24T19:40:00', flags:{SCHED:1,DONE:1}, click:1},
+  recap:    {id:'mother-analytics', at:'2026-11-24T21:30:00', flags:{SCHED:1,DONE:1}},
 };
 (async()=>{const b=await chromium.launch();
 for(const [name,s] of Object.entries(SHOTS)){
@@ -34,10 +35,11 @@ for(const [name,s] of Object.entries(SHOTS)){
     await p.evaluate(()=>{const n=document.querySelector('[data-id="mother-pomo"]');const t=[...n.querySelectorAll('button')].find(e=>/Start session/.test(e.textContent||''));t&&t.click();});
     for(let k=0;k<40;k++)await p.clock.runFor(15000);   // ten minutes of focus
     await p.clock.runFor(500);}
-  if(name==='analytics'){
+  if(s.click){
     await p.clock.runFor(800);
-    await p.locator('[data-id="mother-analytics"] button[aria-label="Planned vs spent"]').first().click({force:true});
-    await p.clock.runFor(1500);await p.waitForTimeout(400);}
+    await p.evaluate(()=>{const b=[...document.querySelectorAll('[data-id="mother-analytics"] button')].find(x=>x.getAttribute('aria-label')==='Planned vs spent');b&&b.click();});
+    await p.clock.runFor(1500);await p.waitForTimeout(600);await p.clock.runFor(1000);}
+  if(name==='recap'){await p.clock.runFor(3000);await p.waitForTimeout(500);await p.clock.runFor(1500);}
   const bb=await p.locator(`.react-flow__node[data-id="${s.id}"]`).boundingBox();
   console.log(name,bb);
   await p.screenshot({path:path.join(OUT,name+'.png'),clip:{x:bb.x,y:bb.y,width:bb.width,height:bb.height},omitBackground:true});

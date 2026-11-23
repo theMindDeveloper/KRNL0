@@ -1,0 +1,62 @@
+[
+ {
+  "cmd": "todo add Review the proposal 11:00 1h",
+  "ok": true,
+  "message": "Added todo: \"Review the proposal\" · on the Calendar 2026-11-24 11:00 · 60 min (task: task-f1e0b4a9…)"
+ },
+ {
+  "cmd": "habit add Morning run",
+  "ok": true,
+  "message": "habit added: Morning run (c30f3981-db19-40c8-bc4c-11b24bf72e9e)"
+ },
+ {
+  "cmd": "habit done Morning run --date 2026-11-18",
+  "ok": true,
+  "message": "habit done: \"Morning run\" marked 2026-11-18"
+ },
+ {
+  "cmd": "habit done Morning run --date 2026-11-19",
+  "ok": true,
+  "message": "habit done: \"Morning run\" marked 2026-11-19"
+ },
+ {
+  "cmd": "habit done Morning run --date 2026-11-20",
+  "ok": true,
+  "message": "habit done: \"Morning run\" marked 2026-11-20"
+ },
+ {
+  "cmd": "habit done Morning run --date 2026-11-21",
+  "ok": true,
+  "message": "habit done: \"Morning run\" marked 2026-11-21"
+ },
+ {
+  "cmd": "habit done Morning run --date 2026-11-22",
+  "ok": true,
+  "message": "habit done: \"Morning run\" marked 2026-11-22"
+ },
+ {
+  "cmd": "habit done Morning run --date 2026-11-23",
+  "ok": true,
+  "message": "habit done: \"Morning run\" marked 2026-11-23"
+ },
+ {
+  "cmd": "habit done Morning run",
+  "ok": true,
+  "message": "habit done: \"Morning run\" marked 2026-11-24"
+ },
+ {
+  "cmd": "habit streak Morning run",
+  "ok": true,
+  "message": "streak for \"Morning run\": 7 days"
+ },
+ {
+  "cmd": "cal show",
+  "ok": true,
+  "message": "2026-11-24  11:00-12:00  [A]  task-f1e  Review the proposal"
+ },
+ {
+  "cmd": "todo list",
+  "ok": true,
+  "message": "[ ] fc62424e  Review the proposal [Meetings?]"
+ }
+]

@@ -3,7 +3,7 @@
 const {chromium}=require('playwright');const {open,fit,ROOT}=require('./lib.cjs');const path=require('path');const fs=require('fs');
 const OUT=path.join(ROOT,'assets');fs.mkdirSync(OUT,{recursive:true});
 const click=(p,re)=>p.evaluate(re=>{const n=document.querySelector('[data-id="mother-pomo"]');const e=[...n.querySelectorAll('button')].find(e=>new RegExp(re).test((e.textContent||'')+'|'+(e.getAttribute('title')||'')));if(e)e.click();return !!e;},re);
-(async()=>{const b=await chromium.launch();const p=await open(b,{dsf:2,w:1500,h:900});
+(async()=>{const b=await chromium.launch();const p=await open(b,{dsf:3,w:760,h:720});
 await fit(p,['mother-pomo','mother-calendar']);
 const shot=async(id,name)=>{await fit(p,[id]);await p.clock.runFor(600);await p.locator(`[data-id="${id}"]`).screenshot({path:path.join(OUT,name+'.png'),omitBackground:true});console.log('saved',name);};
 // the pill that offers the plan that is on right now

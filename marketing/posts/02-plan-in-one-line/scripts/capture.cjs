@@ -13,7 +13,7 @@ const addPlanClick=(p)=>p.evaluate(()=>{const n=document.querySelector('[data-id
  {const {b,p,ground,fit}=await open({zoom:6});await ground('#141414');await fit(['mother-todo','mother-calendar']);
   const T=await p.evaluate(()=>document.querySelector('.react-flow__viewport').style.transform);
   const pin=async(ms)=>{await p.clock.runFor(ms);await p.evaluate(t=>{const v=document.querySelector('.react-flow__viewport');if(v&&v.style.transform!==t)v.style.transform=t;},T);};
-  const el=(id,name)=>p.locator(`[data-id="${id}"]`).screenshot({path:path.join(OUT,name)});
+  const el=(id,name)=>p.locator(`[data-id="${id}"] .mother-frame`).screenshot({path:path.join(OUT,name)});
   await el('mother-calendar','cal-before.png');await el('mother-todo','todo-before.png');
   await addPlanClick(p);await pin(400);
   const inp=p.locator('[data-id="mother-todo"] input').first();
@@ -26,7 +26,7 @@ const addPlanClick=(p)=>p.evaluate(()=>{const n=document.querySelector('[data-id
  {const {b,p,ground,fit}=await open({zoom:6,review:true});await ground('#141414');await fit(['mother-todo','mother-calendar']);
   const T=await p.evaluate(()=>document.querySelector('.react-flow__viewport').style.transform);
   const pin=async(ms)=>{await p.clock.runFor(ms);await p.evaluate(t=>{const v=document.querySelector('.react-flow__viewport');if(v&&v.style.transform!==t)v.style.transform=t;},T);};
-  const both=async(tag)=>{for(const [id,n] of [['mother-todo','todo'],['mother-calendar','cal']])await p.locator(`[data-id="${id}"]`).screenshot({path:path.join(OUT,`${n}-${tag}.png`)});};
+  const both=async(tag)=>{for(const [id,n] of [['mother-todo','todo'],['mother-calendar','cal']])await p.locator(`[data-id="${id}"] .mother-frame`).screenshot({path:path.join(OUT,`${n}-${tag}.png`)});};
   await pin(300);await both('before-drag');
   const row=p.locator('[data-id="mother-todo"]').getByText('Send the invoice').first();const rb=await row.boundingBox();
   const cell=p.locator('[data-testid="week-cell-2026-11-24-15"]').first();const cb=await cell.boundingBox();

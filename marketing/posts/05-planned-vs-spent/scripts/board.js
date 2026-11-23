@@ -80,7 +80,8 @@
     const t = { 't-review': '10:20', 't-deep': '13:35', 't-call': '15:15', 't-gym': '19:40' };
     for (const n of nodes) if (done[n.id]) { n.state.done = true; n.state.completedAt = `2026-11-24T${t[n.id]}:00.000Z`; n.state.secondsAccumulated = done[n.id] * 60; }
     for (const it of items) if (done[it.taskNodeId]) { it.done = true; it.completedAt = `2026-11-24T${t[it.taskNodeId.replace('item-', '')] || '12:00'}:00.000Z`; }
-    const plannedOf = { 'gone-h': 90, 'gone-i': 60, 'gone-j': 90, 'gone-k': 60, 'gone-l': 120, 'gone-m': 45, 'gone-n': 90, 'gone-o': 45, 'gone-a': 120, 'gone-b': 90, 'gone-c': 90, 'gone-d': 120, 'gone-e': 30, 'gone-f': 90, 'gone-g': 60 };
+    // earlier tasks: planned about two thirds of what they really took (the usual story)
+    const plannedOf = Object.fromEntries(pomo.state.history.filter(h => String(h.taskId).startsWith('gone-')).map(h => [h.taskId, Math.max(15, Math.round(h.durationMin / 1.5 / 15) * 15)]));
     b.completions = [
       ...Object.keys(done).map((id) => { const n = nodes.find(x => x.id === id); return { taskId: id, text: n.state.text, plannedMin: n.state.plannedMin, completedAt: n.state.completedAt }; }),
       ...Object.entries(plannedOf).map(([id, m]) => ({ taskId: id, text: pomo.state.history.find(h => h.taskId === id).label, plannedMin: m, completedAt: pomo.state.history.find(h => h.taskId === id).endedAt })),

@@ -1,0 +1,9 @@
+{
+ "krnl todo add \"Review the proposal 11:00 1h\"": "Added todo: \"Review the proposal\" · on the Calendar 2026-11-24 11:00 · 60 min (task: task-f1e0b4a9…)",
+ "krnl habit done \"Morning run\"": "habit done: \"Morning run\" marked 2026-11-24",
+ "krnl habit streak \"Morning run\"": "streak for \"Morning run\": 7 days",
+ "krnl cal show": "2026-11-24  11:00-12:00  [A]  task-f1e  Review the proposal",
+ "krnl todo list": "[ ] fc62424e  Review the proposal [Meetings?]",
+ "krnl pomo start --label \"Write the pitch\" --minutes 25": "Pomodoro started",
+ "krnl pomo status": "pomo running — Write the pitch — 12m worked, 13m remain"
+}

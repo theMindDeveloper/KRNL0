@@ -14,7 +14,15 @@ async function open({w,h,dpr=1.5,mode='free',hide=true,extraCss='',keep=[]}){
   await p.goto('http://localhost:5201/?fixture=fresh');await p.clock.runFor(5000);await p.waitForTimeout(1200);await p.clock.runFor(4000);
   if(hide||extraCss)await p.addStyleTag({content:(hide?HIDE:'')+extraCss});
   await p.evaluate(()=>{for(const e of document.querySelectorAll('div,section')){const r=e.getBoundingClientRect();if(/^\s*Good morning/.test(e.textContent||'')&&r.height<80&&r.height>20)e.style.display='none'}});
-  const fit=async(ids,ms=1400)=>{await p.evaluate(ids=>window.dispatchEvent(new CustomEvent('krnl:fit-nodes',{detail:{nodeIds:ids}})),ids);await p.clock.runFor(ms);await p.waitForTimeout(250);};
+  // fit-view, then verify every wanted node is inside the viewport (retry: a loaded machine can miss the first event)
+  const fit=async(ids,ms=1400)=>{
+    for(let k=0;k<6;k++){
+      await p.evaluate(ids=>window.dispatchEvent(new CustomEvent('krnl:fit-nodes',{detail:{nodeIds:ids}})),ids);await p.clock.runFor(ms);await p.waitForTimeout(300);
+      const ok=await p.evaluate(ids=>{const vw=innerWidth,vh=innerHeight;return ids.every(id=>{const n=document.querySelector(`.react-flow__node[data-id="${id}"]`);if(!n)return false;const r=n.getBoundingClientRect();return r.x>=-2&&r.y>=-2&&r.right<=vw+2&&r.bottom<=vh+2&&r.width>20;});},ids);
+      if(ok)return;
+    }
+    console.log('fit not confirmed for',ids.join(','));
+  };
   return {b,p,fit};
 }
 module.exports={open,HIDE};

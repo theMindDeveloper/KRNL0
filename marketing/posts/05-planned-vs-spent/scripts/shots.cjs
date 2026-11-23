@@ -9,8 +9,11 @@ const SHOTS={
   // id = mother window, at = fake "now", view = analytics view, page = which analytics page, size = window size
   todo:     {id:'mother-todo', at:'2026-11-24T08:30:00', noseed:true, size:{todo:[560,560]}},
   timer:    {id:'mother-pomo', at:'2026-11-24T11:00:00', noseed:true, size:{pomo:[560,560]}, act:'timer'},
-  plan_vs:  {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'estimates', size:{analytics:[820,760]}},
-  summary:  {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'summary', size:{analytics:[820,760]}},
+  plan_vs:  {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'summary', size:{analytics:[560,640]}, click:'Planned vs spent'},
+  summary:  {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'summary', size:{analytics:[560,640]}},
+  tall:     {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'estimates', size:{analytics:[560,900]}},
+  wide:     {id:'mother-analytics', at:'2026-11-24T19:40:00', view:'estimates', size:{analytics:[900,700]}},
+  estimates:{id:'mother-analytics', at:'2026-11-24T19:40:00', view:'estimates', size:{analytics:[560,640]}},
   recap:    {id:null, at:'2026-11-24T21:05:00', modal:'recap'},
   week:     {id:null, at:'2026-11-23T09:10:00', modal:'week'},
 };
@@ -24,7 +27,7 @@ async function open(b,shot){
   return p;
 }
 const HIDE=`[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-button"],[data-testid="dock"],[data-testid="dock-layer"],.react-flow__minimap,.react-flow__controls,.react-flow__background,.react-flow__edges{display:none!important}
- .react-flow__node,.react-flow__node *{filter:none!important}
+ .react-flow__node,.react-flow__node *{filter:none!important;box-shadow:none!important}
  html,body,#root,.react-flow,.react-flow__renderer,.react-flow__pane{background:transparent!important}`;
 (async()=>{const b=await chromium.launch();fs.mkdirSync(OUT,{recursive:true});
 for(const [name,shot] of Object.entries(SHOTS)){
@@ -43,6 +46,7 @@ for(const [name,shot] of Object.entries(SHOTS)){
       await p.clock.runFor(700);
       await p.evaluate(()=>{const n=document.querySelector('[data-id="mother-pomo"]');const t=[...n.querySelectorAll('button')].find(e=>/Start session/.test(e.textContent||''));t&&t.click();});
       await p.clock.runFor(1500);await p.clock.runFor(60*1000*3);await p.waitForTimeout(300);}
+    if(shot.click){await p.locator(`[data-id="${shot.id}"] button[aria-label="${shot.click}"]`).first().click({force:true});await p.clock.runFor(1200);await p.waitForTimeout(400);}
     const bb=await p.locator(`.react-flow__node[data-id="${shot.id}"]`).boundingBox();
     console.log(name,bb);
     await p.screenshot({path:path.join(OUT,name+'.png'),omitBackground:true,clip:{x:Math.floor(bb.x),y:Math.floor(bb.y),width:Math.ceil(bb.width),height:Math.ceil(bb.height)}});

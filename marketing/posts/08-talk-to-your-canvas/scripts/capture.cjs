@@ -52,8 +52,8 @@ if(what==='windows'||what==='all'){
   p=await open(b,{viewport:{width:1300,height:900}});
   await p.locator('[data-testid="orb-button"]').click();await p.clock.runFor(900);
   let inp=p.locator('[data-testid="orb-chat-input"]');await inp.click();await inp.fill('focus session');
-  await panelShot(p,'panel-focus-typed');
-  await inp.press('Enter');await p.clock.runFor(1500);await p.waitForTimeout(250);
+  await inp.press('Enter');await p.clock.runFor(380);await panelShot(p,'panel-focus');
+  await p.clock.runFor(1200);await p.waitForTimeout(250);
   await p.screenshot({path:`${OUT}/orb-say.png`,clip:{x:70,y:700,width:430,height:200}});
   await p.close();
   // A running Timer, whole (started with its own button, 2 minutes in)
