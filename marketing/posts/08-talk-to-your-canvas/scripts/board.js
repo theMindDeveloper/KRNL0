@@ -32,6 +32,7 @@
     plan('t-gym', 'Gym', 90, at(18, 0));
     plan('t-invoice', 'Send the invoice', 30, null);
     plan('t-milk', 'Buy oat milk', 10, null);
+    if (window.__mia) plan('t-mia', 'Call Mia', 60, at(16, 0));   // the plan the assistant "adds" in post slide 2
     cal.config = { ...cal.config, view: 'day', hourRange: { start: 0, end: 23 } };
     cal.state = { ...cal.state, zoom: 5 };
 

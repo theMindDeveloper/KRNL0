@@ -24,6 +24,7 @@ async function open(b,shot){
   return p;
 }
 const HIDE=`[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="statusbar"],[data-testid="orb-button"],[data-testid="dock"],[data-testid="dock-layer"],.react-flow__minimap,.react-flow__controls,.react-flow__background,.react-flow__edges{display:none!important}
+ .react-flow__node,.react-flow__node *{filter:none!important}
  html,body,#root,.react-flow,.react-flow__renderer,.react-flow__pane{background:transparent!important}`;
 (async()=>{const b=await chromium.launch();fs.mkdirSync(OUT,{recursive:true});
 for(const [name,shot] of Object.entries(SHOTS)){

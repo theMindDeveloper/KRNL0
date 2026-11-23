@@ -12,7 +12,7 @@
     place(todo, 0, 0, 520, 520); place(cal, 100, 0, 520, 520); place(habit, 200, 0, 520, 520); place(pomo, 300, 0, 520, 520);
     byKind('clock').position = { x: 400, y: 0 }; byKind('analytics').position = { x: 500, y: 0 }; byKind('term').position = { x: 600, y: 0 };
 
-    for (const n of [habit, pomo, byKind('clock'), byKind('analytics'), byKind('term')]) n.config = { ...n.config, stationHidden: window.__KEEP__ && window.__KEEP__.includes(n.kind) ? false : true };
+    for (const n of [cal, habit, pomo, byKind('clock'), byKind('analytics'), byKind('term')]) n.config = { ...n.config, stationHidden: window.__KEEP__ && window.__KEEP__.includes(n.kind) ? false : true };
     const items = todo.state.items = [];
     let seq = 0;
     const plan = (id, text, min, when) => {
@@ -38,17 +38,17 @@
       { id: 'h-read', name: 'Read 20 pages', icon: 'book', createdAt: created, log: run(1, 4), archived: false, color: 'cyan' },
     ] };
 
-    // ── things around the Todos window (free canvas). Coordinates are in canvas px, right of / below the window row ──
+    // ── things around the Todos window (free canvas). Row of windows starts at x = -1400 (Todos), each 520 + 20 gap ──
     const T = (id, text, look, x, y, w, h, fs = 22) => nodes.push({ id, kind: 'text', position: { x, y }, isMother: false, state: { text, look, width: w, height: h }, config: { fontSize: fs } });
     const S = (c) => ({ kind: 'sticky', color: c });
-    // cluster "head": a few notes of different kinds
-    T('c-s1', 'Ask Prof. Meyer about the deadline', S('#ffe28a'), 640, 40, 240, 200);
-    T('c-s2', 'Pitch deck v2: add the numbers', S('#ffb3c7'), 640, 270, 240, 200);
-    T('c-t1', 'call mum Sunday', { kind: 'note' }, 920, 60, 240, 110, 26);
-    T('c-r1', 'Pitch week', { kind: 'rect', color: '#c9f158' }, 920, 210, 260, 80, 26);
-    T('c-e1', 'idea!', { kind: 'ellipse', color: '#b9f5a8' }, 940, 330, 180, 120, 26);
-    // framed group
-    const FX = 6000, FY = 3000, kids = ['f-title', 'f1', 'f2', 'f3'];
+    const X0 = -840;           // right of the Todos window
+    T('c-s1', 'Ask Prof. Meyer about the deadline', S('#ffe28a'), X0, 10, 240, 200);
+    T('c-s2', 'Pitch deck v2: add the numbers', S('#ffb3c7'), X0, 250, 240, 200);
+    T('c-t1', 'call mum on Sunday', { kind: 'ellipse', color: '#b9f5a8' }, X0 + 270, 20, 250, 120, 24);
+    T('c-r1', 'Pitch week', { kind: 'rect', color: '#c9f158' }, X0 + 270, 170, 260, 80, 26);
+    T('c-s3', 'Gift idea for Mom', S('#a8e6ff'), X0 + 270, 290, 240, 190);
+    // a framed group (far below, shot on its own)
+    const FX = -1400, FY = 1400, kids = ['f-title', 'f1', 'f2', 'f3'];
     nodes.push({ id: 'frame-notes', kind: 'frame', position: { x: FX, y: FY }, isMother: false, state: { label: 'Pitch week', width: 640, height: 640, childIds: kids }, config: { tint: 'neutral' } });
     T('f-title', 'Friday: pitch to the jury', { kind: 'rect', color: '#c9f158' }, FX + 40, FY + 60, 560, 76, 26);
     T('f1', 'Ask Prof. Meyer about the deadline', S('#ffe28a'), FX + 40, FY + 170, 250, 210);

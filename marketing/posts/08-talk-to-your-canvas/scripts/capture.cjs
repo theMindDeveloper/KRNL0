@@ -9,7 +9,7 @@ const CSS=`[data-testid="ambient-radio"],[data-testid="topbar"],[data-testid="st
   .react-flow__node[data-id="mother-clock"],.react-flow__node[data-id="mother-analytics"],.react-flow__node[data-id="mother-term"],.react-flow__node[data-id="mother-habit"]{visibility:hidden!important}`;
 const SCRIPTS={
  'Move Gym to 17:00':[{wait:500,ev:{type:'tool',label:'krnl todo when Gym today 17:00'}},{wait:300,ev:{type:'text',text:'Done. '}},{wait:200,ev:{type:'text',text:'Gym is now at 17:00.'}},{wait:200,ev:{type:'done',text:''}}],
- 'Add Send the invoice at 15:00':[{wait:500,ev:{type:'tool',label:'krnl todo when "Send the invoice" today 15:00'}},{wait:300,ev:{type:'text',text:'Done. '}},{wait:200,ev:{type:'text',text:'Send the invoice is on your Calendar at 15:00.'}},{wait:200,ev:{type:'done',text:''}}],
+ 'Add Call Mia at 16:00':[{wait:500,ev:{type:'tool',label:'krnl todo add "Call Mia"'}},{wait:350,ev:{type:'tool',label:'krnl todo when "Call Mia" today 16:00'}},{wait:300,ev:{type:'text',text:'Done. '}},{wait:200,ev:{type:'text',text:'Call Mia is on your Calendar at 16:00.'}},{wait:200,ev:{type:'done',text:''}}],
  "What's on my plate today?":[{wait:500,ev:{type:'tool',label:'krnl todo list'}},{wait:300,ev:{type:'text',text:'Five plans today.\n\n11:00  Review the proposal\n14:00  Client call\n18:00  Gym\n\nSend the invoice and Buy oat milk have no time yet.'}},{wait:200,ev:{type:'done',text:''}}],
 };
 async function open(b,{boardPatch,viewport}={}){
@@ -35,10 +35,33 @@ if(what==='panels'||what==='all'){
   await p.locator('[data-testid="orb-button"]').click();await p.clock.runFor(900);
   await panelShot(p,'panel-start');          // default state: quick actions + tutorials
   await p.locator('[data-testid="orb-button"]').screenshot({path:`${OUT}/orb.png`});
-  for(const [q,n] of [['Move Gym to 17:00','panel-move'],['Add Send the invoice at 15:00','panel-plan'],["What's on my plate today?",'panel-plate']]){
+  for(const [q,n] of [['Move Gym to 17:00','panel-move'],['Add Call Mia at 16:00','panel-plan'],["What's on my plate today?",'panel-plate']]){
     await ask(p,q);await panelShot(p,n);
     await p.locator('[data-testid="orb-chat-new"]').click();await p.clock.runFor(400);
   }
+  await p.close();
+}
+if(what==='windows'||what==='all'){
+  // Calendar with the plan the assistant "added", framed whole
+  let p=await open(b,{boardPatch:'window.__mia=true;'});
+  await p.addStyleTag({content:'[data-testid="orb-button"]{display:none!important}'});
+  await p.evaluate(()=>window.dispatchEvent(new CustomEvent('krnl:fit-nodes',{detail:{nodeIds:['mother-calendar']}})));await p.clock.runFor(1400);await p.waitForTimeout(250);
+  await p.locator('[data-id="mother-calendar"]').screenshot({path:`${OUT}/win-calendar.png`});
+  await p.close();
+  // The focus session: typed in the orb, answered by the app's own built-in flow (no Claude needed). The orb speaks the caption.
+  p=await open(b,{viewport:{width:1300,height:900}});
+  await p.locator('[data-testid="orb-button"]').click();await p.clock.runFor(900);
+  let inp=p.locator('[data-testid="orb-chat-input"]');await inp.click();await inp.fill('focus session');
+  await panelShot(p,'panel-focus-typed');
+  await inp.press('Enter');await p.clock.runFor(1500);await p.waitForTimeout(250);
+  await p.screenshot({path:`${OUT}/orb-say.png`,clip:{x:70,y:700,width:430,height:200}});
+  await p.close();
+  // A running Timer, whole (started with its own button, 2 minutes in)
+  p=await open(b,{viewport:{width:1000,height:1000}});
+  await p.addStyleTag({content:'[data-testid="orb-button"]{display:none!important}'});
+  await p.evaluate(()=>window.dispatchEvent(new CustomEvent('krnl:fit-nodes',{detail:{nodeIds:['mother-pomo']}})));await p.clock.runFor(1400);
+  await p.getByText('Start session').first().click();await p.clock.runFor(125000);await p.waitForTimeout(300);
+  await p.locator('[data-id="mother-pomo"]').screenshot({path:`${OUT}/win-timer.png`});
   await p.close();
 }
 await b.close();console.log('ok')})()

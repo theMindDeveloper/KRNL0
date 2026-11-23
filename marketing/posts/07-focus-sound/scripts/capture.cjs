@@ -19,6 +19,7 @@ const tick=async(n,ms=100)=>{for(let i=0;i<n;i++){await p.clock.runFor(ms);}awai
 const radio=()=>p.locator('[data-testid="ambient-radio"] > div').last();
 const shot=async(loc,name)=>{const bb=await loc.evaluate(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}});await p.screenshot({path:path.join(OUT,name+'.png'),omitBackground:true,clip:bb});console.log('shot',name,Math.round(bb.width),Math.round(bb.height));};
 await tick(6);
+console.log(await p.evaluate(()=>{const r=document.querySelector('[data-testid="ambient-radio"]');return r?[r.children.length,getComputedStyle(r).display,r.getBoundingClientRect().width]:'none'}));
 await shot(radio(),'radio-off');
 // 1) rain
 await p.locator('[data-testid="ambient-radio-preset-rain"]').click();await tick(40);

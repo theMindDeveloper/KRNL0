@@ -21,24 +21,20 @@ const addPlanClick=(p)=>p.evaluate(()=>{const n=document.querySelector('[data-id
   await pin(600);await el('mother-todo','todo-typed.png');
   await inp.press('Enter');for(let k=0;k<14;k++)await pin(100);
   await el('mother-todo','todo-added.png');await el('mother-calendar','cal-added.png');
-  await ground('#22d3ee');await p.addStyleTag({content:SHADOW});await pin(300);
-  await p.screenshot({path:path.join(OUT,'pair-added.png'),clip:await union(p,['mother-todo','mother-calendar'],24,90)});
   await b.close();}
- // ── B: drag "Send the invoice" onto 15:00 ──
- {const {b,p,ground,fit}=await open({zoom:6,review:true});await ground('#ee8466');await fit(['mother-todo','mother-calendar']);await p.addStyleTag({content:SHADOW});
+ // ── B: drag "Send the invoice" onto 15:00 (element shots of both windows at each moment; the slide composes them) ──
+ {const {b,p,ground,fit}=await open({zoom:6,review:true});await ground('#141414');await fit(['mother-todo','mother-calendar']);
   const T=await p.evaluate(()=>document.querySelector('.react-flow__viewport').style.transform);
   const pin=async(ms)=>{await p.clock.runFor(ms);await p.evaluate(t=>{const v=document.querySelector('.react-flow__viewport');if(v&&v.style.transform!==t)v.style.transform=t;},T);};
-  await pin(300);const clip=await union(p,['mother-todo','mother-calendar'],24,90);
-  await p.screenshot({path:path.join(OUT,'pair-before-drag.png'),clip});
+  const both=async(tag)=>{for(const [id,n] of [['mother-todo','todo'],['mother-calendar','cal']])await p.locator(`[data-id="${id}"]`).screenshot({path:path.join(OUT,`${n}-${tag}.png`)});};
+  await pin(300);await both('before-drag');
   const row=p.locator('[data-id="mother-todo"]').getByText('Send the invoice').first();const rb=await row.boundingBox();
-  const cell=p.locator('[data-testid="week-cell-2026-11-24-15"]').first();const cb=await cell.boundingBox();console.log('row',rb,'cell',cb);
+  const cell=p.locator('[data-testid="week-cell-2026-11-24-15"]').first();const cb=await cell.boundingBox();
   await p.mouse.move(rb.x+30,rb.y+rb.height/2);await p.mouse.down();
   const N=26;for(let i=1;i<=N;i++){await p.mouse.move(rb.x+30+(cb.x+cb.width*0.45-rb.x-30)*i/N,rb.y+rb.height/2+(cb.y+cb.height*0.5-rb.y-rb.height/2)*i/N);await pin(40);}
-  await pin(200);await p.screenshot({path:path.join(OUT,'pair-drag.png'),clip});
+  await pin(200);await both('drag');
   await p.mouse.up();for(let k=0;k<12;k++)await pin(100);
-  await ground('#f4efe2');await pin(200);
-  await p.screenshot({path:path.join(OUT,'pair-dropped.png'),clip});
-  await p.locator('[data-id="mother-todo"]').screenshot({path:path.join(OUT,'todo-dropped.png')});
+  await both('dropped');
   await b.close();}
  console.log('done');
 })();

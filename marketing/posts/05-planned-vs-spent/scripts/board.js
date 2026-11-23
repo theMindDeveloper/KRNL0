@@ -4,6 +4,7 @@
   const pad = n => String(n).padStart(2, '0');
   const iso = (h, m = 0) => `2026-11-24T${pad(h)}:${pad(m)}:00`;
   const mutate = (b) => {
+    if (b.__mk) return b; b.__mk = true;   // boardLoad can be called more than once on the same object
     const nodes = b.nodes; const todo = nodes.find(n => n.kind === 'todo'); const items = todo.state.items = [];
     let seq = 0;
     const SKIP = window.__SKIP || '';
@@ -82,7 +83,7 @@
     const plannedOf = { 'gone-h': 90, 'gone-i': 60, 'gone-j': 90, 'gone-k': 60, 'gone-l': 120, 'gone-m': 45, 'gone-n': 90, 'gone-o': 45, 'gone-a': 120, 'gone-b': 90, 'gone-c': 90, 'gone-d': 120, 'gone-e': 30, 'gone-f': 90, 'gone-g': 60 };
     b.completions = [
       ...Object.keys(done).map((id) => { const n = nodes.find(x => x.id === id); return { taskId: id, text: n.state.text, plannedMin: n.state.plannedMin, completedAt: n.state.completedAt }; }),
-      ...Object.entries(plannedOf).map(([id, m]) => ({ taskId: id, text: pomo.state.history.find(h => h.taskId === id).label, plannedMin: m, completedAt: '2026-11-23T18:00:00.000Z' })),
+      ...Object.entries(plannedOf).map(([id, m]) => ({ taskId: id, text: pomo.state.history.find(h => h.taskId === id).label, plannedMin: m, completedAt: pomo.state.history.find(h => h.taskId === id).endedAt })),
     ];
     }
     const an = nodes.find(n => n.kind === 'analytics');
