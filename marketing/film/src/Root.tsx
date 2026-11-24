@@ -3,10 +3,14 @@ import { Composition } from "remotion";
 import { LookCube, LookCards, LookUI, LookWorld, LookTitle } from "./look/Look";
 import { Film } from "./film/Film";
 import TL from "./film/timeline.json";
+import { Reddit1, Reddit2, Reddit3 } from "./reddit/Reddit";
 const P = { fps: 30, width: 1920, height: 1080 };
 export const Root: React.FC = () => (
   <>
     <Composition id="Film" component={Film} durationInFrames={Math.round(TL.total * 30)} {...P} />
+    <Composition id="Reddit1" component={Reddit1} durationInFrames={1} {...P} />
+    <Composition id="Reddit2" component={Reddit2} durationInFrames={1} {...P} />
+    <Composition id="Reddit3" component={Reddit3} durationInFrames={1} {...P} />
     <Composition id="LookCube" component={LookCube} durationInFrames={240} {...P} />
     <Composition id="LookCards" component={LookCards} durationInFrames={180} {...P} />
     <Composition id="LookUI" component={LookUI} durationInFrames={180} {...P} />
