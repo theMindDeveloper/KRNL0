@@ -2,7 +2,8 @@
 # Renders the film in 4 muted video chunks + one audio track, then muxes them. A failed chunk only re-runs itself.
 set -e
 cd "$(dirname "$0")/.."
-export REMOTION_BROWSER=${REMOTION_BROWSER:-$(ls -d /opt/pw-browsers/chromium_headless_shell-1243/*/)chrome-headless-shell}
+B=$(ls -d /opt/pw-browsers/chromium_headless_shell-1243/*/ 2>/dev/null | head -1)
+[ -z "$REMOTION_BROWSER" ] && [ -n "$B" ] && export REMOTION_BROWSER=${B}chrome-headless-shell
 mkdir -p out/chunks
 N=5040; STEP=420
 # Small pieces (14 s) so a container restart loses at most one piece. c1.mp4 (frames 1260-2519) is an older finished block, reused if present.
