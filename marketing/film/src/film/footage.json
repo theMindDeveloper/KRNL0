@@ -37,13 +37,13 @@
   }
  },
  "S05-quickadd": {
-  "dur": 8.37,
+  "dur": 7,
   "markers": {
    "click": 0.967,
    "typeStart": 1.533,
-   "parsed": 3.567,
-   "enter": 4.967,
-   "landed": 6.233
+   "parsed": 2.2,
+   "enter": 3.6,
+   "landed": 4.867
   }
  },
  "S19-frame": {
@@ -74,6 +74,15 @@
    "tab_month": 1.2,
    "tab_year": 3.67,
    "settle": 5.17
+  }
+ },
+ "S26-clock-drag": {
+  "dur": 6.567,
+  "markers": {
+   "grab": 1.1,
+   "carry": 2.167,
+   "drop": 3.267,
+   "landed": 4.867
   }
  },
  "S02-glide": {
@@ -171,7 +180,7 @@
   }
  },
  "S03-tour-first-day": {
-  "dur": 10.433,
+  "dur": 10.1,
   "markers": {
    "orb-click": 1,
    "assistant-open": 2,
@@ -180,8 +189,8 @@
    "next-click": 5.067,
    "step-2-type-a-plan": 6.067,
    "typing": 6.833,
-   "enter": 8.467,
-   "step-3": 8.733
+   "enter": 8.133,
+   "step-3": 8.4
   }
  },
  "S15-analytics": {
@@ -233,15 +242,6 @@
    "hover": 2.233,
    "drop": 2.967,
    "landed": 4.433
-  }
- },
- "S26-clock-drag": {
-  "dur": 6.567,
-  "markers": {
-   "grab": 1.1,
-   "carry": 2.167,
-   "drop": 3.267,
-   "landed": 4.867
   }
  },
  "S27-clock-live": {

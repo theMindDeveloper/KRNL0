@@ -23,9 +23,9 @@ shots.append(dict(kind="intro", t0=0, t1=round(DROP + 0.034, 3)))
 world(DROP, tt["plan"][0], "reveal")
 title(*tt["plan"], ["Plan", "it."], LAV, "#c9f158")
 # Plan: Start with the plan. Type it... Review the proposal, eleven, one hour. Done. It's planned... on your calendar.
-dev("S01-boot", tt["plan"][1], 31.75, 0.4, [[0, 0.12, 0.1, 0.88, 0.92], [1.7, 0.06, 0.08, 0.94, 0.94]], tilt=(6, 12, -1), studio=LAV)
-t0 = 31.75; dev("S05-quickadd", t0, 40.05, 0.0,
-    [[0, *TODO5], [4.7, *PAIR], [5.8, *CAL5]], tilt=(8, -12, 1), studio=LAV)
+dev("S01-boot", tt["plan"][1], 33.4, 0.4, [[0, 0.12, 0.1, 0.88, 0.92], [1.7, 0.06, 0.08, 0.94, 0.94]], tilt=(6, 12, -1), studio=LAV)
+t0 = 33.4; dev("S05-quickadd", t0, 40.05, 0.0,
+    [[0, *TODO5], [3.5, *PAIR], [4.6, *CAL5]], tilt=(8, -12, 1), studio=LAV)
 dev("S08-calendar-day", 40.05, 41.48, 0.3, [[0, 0.25, 0.08, 0.75, 0.94], [1.4, 0.27, 0.1, 0.73, 0.9]], tilt=(10, 8, 0), studio=LAV)
 pick = W("pl", "pick"); dev("S06-drag", 41.48, tt["do"][0], 1.2 - (pick - 41.48), [[0, *PAIR], [2.2, 0.3, 0.07, 0.97, 0.97]], tilt=(7, -9, -1), studio=LAV)
 title(*tt["do"], ["Do", "it."], CYAN, "#c9f158")
