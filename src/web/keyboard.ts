@@ -51,7 +51,17 @@ export function installKeyboardLift(win: Window = window): () => void {
   };
 
   let t = 0;
+  // KRNL0's fields name plans and time, never people: the phone's "AutoFill
+  // Contact" bar (owner screenshot, 2026-11-25) has nothing to offer there. A
+  // field that says what it wants (email, password) keeps its own setting.
+  const noContactFill = (e: FocusEvent): void => {
+    const el = e.target;
+    if ((el instanceof HTMLInputElement && (el.type === 'text' || el.type === 'search' || el.type === '')) || el instanceof HTMLTextAreaElement) {
+      if (!el.hasAttribute('autocomplete')) el.setAttribute('autocomplete', 'off');
+    }
+  };
   const later = (): void => { win.clearTimeout(t); t = win.setTimeout(update, 60); };
+  win.document.addEventListener('focusin', noContactFill, true);
   vv.addEventListener('resize', update);
   vv.addEventListener('scroll', update);
   win.document.addEventListener('focusin', later);
@@ -62,6 +72,7 @@ export function installKeyboardLift(win: Window = window): () => void {
     vv.removeEventListener('scroll', update);
     win.document.removeEventListener('focusin', later);
     win.document.removeEventListener('focusout', later);
+    win.document.removeEventListener('focusin', noContactFill, true);
     win.clearTimeout(t);
     drop();
     root.style.removeProperty('--kb-inset');

@@ -141,6 +141,8 @@ describe('the on-screen keyboard (F20)', () => {
     vv.dispatchEvent(new Event('resize'));
     expect(document.documentElement.style.getPropertyValue('--kb-inset')).toBe('350px');
     expect(card.style.translate).toBe('0 -262px');
+    // KRNL0's fields are not for contacts: no "AutoFill Contact" bar.
+    expect(field.getAttribute('autocomplete')).toBe('off');
     vv.height = 800;
     vv.dispatchEvent(new Event('resize'));
     expect(document.documentElement.style.getPropertyValue('--kb-inset')).toBe('0px');
