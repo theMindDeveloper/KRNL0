@@ -299,6 +299,9 @@ body:has(.m-shell--phone) .dm-morning { bottom: calc(84px + env(safe-area-inset-
 /* The saved badge keeps one width in the desktop top bar; on a phone the board name needs that room. */
 .m-head .krnl-sync-badge { min-width: 0 !important; }
 
+/* F93/F94 on touch: a held finger draws on the Calendar and the Clock, so the
+   long press there selects no text (iOS) and opens no callout. */
+.m-shell [data-cal-day], .m-shell [data-testid="clock-dial"] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 /* ── A phone on its side: the dock (Decision 67, design D) ─────────────── */
 /* No header and no tab bar: a slim rail, and two windows side by side. */
 .m-shell--dock { flex-direction: row; }

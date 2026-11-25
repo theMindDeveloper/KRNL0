@@ -81,7 +81,7 @@ export function SoundSection() {
 
       <section className="st-card" style={dim}>
         <h3 className="st-card__title"><SettingsIcon name="sound" size={15} />Sound style</h3>
-        <div role="radiogroup" aria-label="Sound style" className="st-choices" style={{ gridTemplateColumns: `repeat(${SOUND_PACK_IDS.length}, minmax(0, 1fr))` }}>
+        <div role="radiogroup" aria-label="Sound style" className="st-choices">
           {SOUND_PACK_IDS.map((id) => {
             const p = SOUND_PACKS[id];
             return (

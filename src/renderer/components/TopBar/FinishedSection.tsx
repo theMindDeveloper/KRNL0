@@ -18,7 +18,7 @@ export function FinishedSection() {
     <div data-testid="settings-finished" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <section className="st-card">
         <h3 className="st-card__title"><SettingsIcon name="finished" size={15} />When finished cards leave the board</h3>
-        <div role="radiogroup" aria-label="When finished cards leave the board" className="st-choices" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+        <div role="radiogroup" aria-label="When finished cards leave the board" className="st-choices">
           {OPTIONS.map(([id, label, hint]) => (
             <button
               key={id}

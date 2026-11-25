@@ -9,6 +9,8 @@
 //   npm run release -- check                  the draft has everything (installer, latest.yml, web app)
 //   npm run release -- mac                    on an Apple silicon Mac, from the tag: build the .dmg and
 //                                             attach it to the draft (the website's Mac download)
+//   npm run release -- mac-keys               once per Mac: save the Google sign-in keys in its Keychain,
+//                                             so every Mac build has Google Calendar sign-in
 //   npm run release -- publish --yes          ONLY after the owner said OK: publish, then start the
 //                                             server's follow workflow (its release PR)
 //
@@ -180,11 +182,40 @@ function check() {
   say('Ask the owner for an OK. Then: npm run release -- publish --yes')
 }
 
+/** The Google sign-in keys live in GitHub secrets for CI and in this Mac's Keychain for the
+ *  Mac build (saved once with `mac-keys`), never in a file. A Mac build without them would ship
+ *  without Google Calendar sign-in, so it stops unless asked for with --no-google. */
+const GOOGLE_KEYS = ['KRNL0_GOOGLE_CLIENT_ID', 'KRNL0_GOOGLE_CLIENT_SECRET']
+const fromKeychain = (name) => { try { return out('security', ['find-generic-password', '-a', 'krnl0', '-s', name, '-w']) } catch { return '' } }
+function googleKeys() {
+  for (const k of GOOGLE_KEYS) if (!process.env[k]) { const v = fromKeychain(k); if (v) process.env[k] = v }
+  const missing = GOOGLE_KEYS.filter((k) => !process.env[k])
+  if (!missing.length) return say('Google sign-in keys: found (Keychain or shell).')
+  if (process.argv.includes('--no-google')) return say(`Building without Google sign-in (--no-google): ${missing.join(', ')} not set.`)
+  fail([
+    `${missing.join(' and ')} not found, so this build would have no Google Calendar sign-in.`,
+    '  Once per Mac: npm run release -- mac-keys   (paste each value from Google Cloud Console > Credentials)',
+    '  Or, to build without it: npm run release -- mac --no-google',
+  ].join('\n'))
+}
+
+/** Once per Mac: save the Google sign-in keys in the login Keychain. `security` asks for each
+ *  value itself (hidden), so it never shows on screen, in shell history or in a file. */
+function macKeys() {
+  if (process.platform !== 'darwin') fail('mac-keys is for the Mac that builds the .dmg.')
+  for (const k of GOOGLE_KEYS) {
+    say(`Paste ${k} (from Google Cloud Console > APIs & Services > Credentials > the Desktop OAuth client), then Return, twice:`)
+    live('security', ['add-generic-password', '-U', '-a', 'krnl0', '-s', k, '-w'])
+  }
+  say('Saved in the Keychain. Every `npm run release -- mac` on this Mac now builds with Google sign-in.')
+}
+
 /** macOS (Apple silicon) .dmg, built on this Mac from the tag and attached to the release.
  *  CI builds Windows only; the website's Mac button finds the .dmg on the release by name. */
 function mac() {
   if (process.platform !== 'darwin' || process.arch !== 'arm64') fail('the Mac build runs on an Apple silicon Mac.')
   checkTree()
+  googleKeys()
   out('git', ['fetch', 'origin', 'main', '--tags'])
   const v = JSON.parse(out('git', ['show', 'origin/main:package.json'])).version
   if (!out('git', ['tag', '--list', `v${v}`])) fail(`v${v} is not tagged yet. Run: npm run release -- tag`)
@@ -197,7 +228,6 @@ function mac() {
     live('node', [join(ROOT, 'node_modules', 'electron', 'install.js')])
   }
   live('npx', ['electron-rebuild', '-f', '-w', 'node-pty'])
-  if (!process.env['KRNL0_GOOGLE_CLIENT_ID']) say('Note: KRNL0_GOOGLE_CLIENT_ID is not set here, so this build says Google sign-in is not set up. Export it (and _SECRET) first to include it.')
   rmSync(join(ROOT, 'release'), { recursive: true, force: true })
   live('npm', ['run', 'build'])
   live('npx', ['electron-builder', '--mac', '--arm64', '--publish', 'never'])
@@ -238,8 +268,9 @@ try {
   else if (cmd === 'tag') tag()
   else if (cmd === 'check') check()
   else if (cmd === 'mac') mac()
+  else if (cmd === 'mac-keys') macKeys()
   else if (cmd === 'publish') publish(process.argv.includes('--yes'))
-  else fail('status | prepare patch|minor | tag | check | mac | publish --yes')
+  else fail('status | prepare patch|minor | tag | check | mac [--no-google] | mac-keys | publish --yes')
 } catch (err) {
   fail(err instanceof Error ? err.message : String(err))
 }
