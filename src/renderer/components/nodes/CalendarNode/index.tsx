@@ -1,3 +1,4 @@
+import { WindowName } from '../WindowName';
 import { useEffect, useRef, useState } from 'react';
 // ADR 0001 — CalendarNode (Slice 2: MonthView wired).
 // Slice 1 shell upgraded: 'month' case now renders the real MonthView.
@@ -116,7 +117,7 @@ export function CalendarNode({
       {/* window-frame.md — the standard header: name, then the views. */}
       <div className="krnl-node-header kw-head">
         <span className="kw-dot" style={{ background: 'var(--cyan)' }} />
-        <span className="kw-title">Calendar</span>
+        <WindowName>Calendar</WindowName>
         <span className="kw-sp" />
         <span className="kw-views nodrag" role="tablist" aria-label="Calendar view" data-testid="calendar-view-switch">
           {(['day', 'week', 'month', 'year'] as const).map((view) => (

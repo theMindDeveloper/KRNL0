@@ -13,6 +13,7 @@
 //   single onClick reads `data-date` from the target. 371 cells per
 //   habit → 1 listener.
 
+import { WindowName } from '../WindowName';
 import { useDismissOutside } from '../../ui/useDismissOutside';
 import { LineGlyph } from '../../ui/LineGlyph';
 import { SettingsIcon } from '../../ui/SettingsIcons';
@@ -305,7 +306,7 @@ export function HabitNode({
         <div className="krnl-node-header kw-head">
           <span className="kw-dot" style={{ background: 'var(--rust)' }} />
           {/* window-frame.md — the name, then one fact. */}
-          <span className="kw-title">Habits</span>
+          <WindowName>Habits</WindowName>
           <span className="kw-ctx" data-testid="habit-header-context" style={{ flex: 1 }}>{titleByView[view]}</span>
           {/* Week · Month · Year right here, not inside Settings. */}
           <span role="tablist" aria-label="Habit view" data-testid="habit-view-switch" className="nodrag kw-views">

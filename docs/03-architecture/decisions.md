@@ -3033,3 +3033,17 @@ Measured at 4x CPU in the development build, before → after: a plan moved on t
 
 **Consequences.** A board synced from an older version that still says Easy is migrated on load again. The Easy branches in components are dead code behind `isEasyBoard` and can be removed in a later clean-up.
 
+## Decision 67 — A phone on its side is a dock; windows you place yourself; More is a popup (2026-11-25)
+
+**Status:** Accepted (owner, 2026-11-25: design "KRNL0 phone sideways · Dock", direction D, "also on iPad").
+
+**Context.** Turned sideways, a phone is 568–932 px wide and only ~320–430 px tall, so the web app took the iPad layout (side rail, a header, two columns built for ~700 px of height): half of it was off screen and most of it could not be reached. The phone's More opened a whole page for two rows.
+
+**Decision.**
+1. *A fourth form factor, `dock`* (`useFormFactor.ts`): a coarse pointer, landscape, at most 500 px tall. No header, no tab bar: a slim rail (Today, Todos, Week, Habits, More) and the views beside it. Today is two windows side by side (Todo | Clock by default).
+2. *Windows you place yourself* (`Mobile/WindowSlots.tsx`): a slot holds one of the board's windows; the window's name (`nodes/WindowName.tsx`, the one `.kw-title` every window uses) becomes a button with a chevron only inside a slot (`WindowPickContext`), and opens a short list. A pick already shown elsewhere swaps places (`chooseSlot`, pure), so a window, above all the Timer, is never mounted twice. The choice is per device (`localStorage`), never synced. The iPad's four Today windows use the same slots.
+3. *The Timer pill*: on the dock, while no slot holds the Timer, a corner pill shows Start, or the task, time and Stop; its reading opens Focus.
+4. *More is a popup* (`Popover` in `WindowSlots.tsx`), above the tab on the phone and beside it on the dock (where it also holds Settings). The `more` view no longer exists as a page; a stored `more` opens Today.
+5. *Readable hours on a short screen*: `CalendarMinHourContext` (0 by default) sets a floor for an hour when the Calendar fits the day (Decision 60); the dock sets 20 px, so the hours scroll there instead of shrinking. A time row's label never shrinks (`.kw-range__label { flex-shrink: 0 }`).
+
+**Consequences.** The rail has no board switcher or saved badge on the dock (the upright phone has them). Two windows of the same kind cannot be shown at once by design.

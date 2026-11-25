@@ -17,6 +17,12 @@ The owner asked (2026-11-21) for big changes to the phone website: a better layo
 | F7 | Menus opened by touch have rows at least 44 px tall. |
 | F8 | The tab bar marks the open view with a filled pill behind its icon; every control answers on press. Notices (the morning line) sit above the tab bar. |
 | F9 | **Phone tabs: Today, Todos, Calendar, Habits, More.** Todos is the Plans window on its own page. More holds Insights and Canvas (a row each); while one of them is open, the More tab stays marked. The iPad's rail keeps Today, Week, Habits, Insights and Canvas. |
+| F10 | **A phone on its side is a dock** (Decision 67; owner, 2026-11-25: "when you move the phone sideways the whole UI bugs out"; design "KRNL0 phone sideways · Dock", direction D). A touch screen wider than tall and at most 500 px tall gets its own layout instead of the iPad's: no header and no tab bar, a slim rail at the side (Today, Todos, Week, Habits, More), and two windows side by side, by default **Todo on the left and the Clock on the right**. Every other view (Todos, Week, Habits, Insights, Canvas) takes the whole space beside the rail. |
+| F11 | **Choose what sits where** (owner pick "D, also on iPad"). Where a window's place can be chosen, its name in the header has a small chevron; a tap opens a short list (Todo, Timer, Clock, Calendar, Habits, Insights) and the pick goes there. A window already shown in another place swaps with it, so no window is ever shown twice. The choice stays on this device (not synced). |
+| F12 | **The Timer pill** (owner: "D doesn't have the timer, so you can't see it"). On the sideways phone, while neither window is the Timer, a pill sits in the bottom corner: idle, **Start**; running, the task and the time with **Stop**; a tap on its reading opens Focus (the Timer alone). It is gone while a window shows the Timer. |
+| F13 | **More is a small popup**, never a page (owner, 2026-11-25): on the phone it opens above its tab, on the sideways phone beside it in the rail, with Insights and Canvas (and Settings on the sideways phone, which has no header). One tap opens the pick; a tap outside or Esc closes it. While Insights or Canvas is open, More stays marked. |
+| F14 | **The iPad's Today has the same choice**: its four windows (by default Timer and Plans, Calendar and Habits) each change from their name, as in F11. |
+| F15 | **The Calendar stays readable sideways**: where the day cannot fit readably (the sideways phone), an hour keeps at least 20 px and the hours scroll, opening around now. Elsewhere the day still fits its window (Decision 60). A time row's label (the Clock's date) is never cut. |
 
 ## Non-Functional Requirements
 
@@ -34,10 +40,15 @@ The owner asked (2026-11-21) for big changes to the phone website: a better layo
 - **UC-P3:** On the canvas they pan with one finger, pinch in, drag a card to a new place, and long-press another card: its menu opens, nothing is selected, the menu stays open after the lift.
 - **UC-P4:** They long-press a number on the Clock: the Clock's menu opens; the number is not selected.
 
+- **UC-P5:** The owner props the phone on its side next to the laptop: Todo on the left, the Clock on the right, the Timer pill in the corner. They tap Start on the pill, and later Stop.
+- **UC-P6:** They tap the Clock's name, pick Calendar, and the Calendar takes that side; picking Todo for the right side swaps the two.
+- **UC-P7:** On the iPad they put the Clock where Habits was.
+
 ## User Stories
 
 - As a user on my phone, I want to see what is on now and next as soon as I open KRNL0, so that I know what to do.
 - As a user on my phone, I want touch to work like any app (pan, pinch, drag, long-press for options), so that I can plan with one hand.
+- As a user, I want my phone on its side to work as a small dock beside me, showing the two windows I choose and the running timer.
 
 ## Gherkin Scenarios (ATDD)
 
@@ -63,4 +74,24 @@ Feature: Canvas touch (F5)
   Then the canvas zooms in
   When I drag a card with one finger
   Then the card moves
+
+Feature: The phone on its side (F10-F12)
+  Given the phone is held sideways
+  Then a rail sits at the side and Todo and the Clock sit side by side
+  And the Timer pill says Start in the corner
+  When I tap the Clock's name and pick Timer
+  Then the Timer takes that side and the pill is gone
+  When I tap Todo's name and pick Timer
+  Then Todo and the Timer swap sides
+
+Feature: More is a popup (F13)
+  When I tap More
+  Then a small list opens at it with Insights and Canvas
+  When I tap Insights
+  Then Insights opens, the list closes, and More stays marked
+
+Feature: The iPad chooses too (F14)
+  Given the iPad shows Today
+  When I tap Habits' name and pick Clock
+  Then the Clock sits where Habits was
 ```

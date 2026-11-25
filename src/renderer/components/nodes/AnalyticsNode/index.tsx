@@ -17,6 +17,7 @@
  * Read-only — no connectors, no node edges. Spawned via dock or `A` shortcut.
  */
 
+import { WindowName } from '../WindowName';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { TimeLogHeatmap } from './TimeLogHeatmap';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
@@ -580,7 +581,7 @@ export function AnalyticsNode({
           the name, the view switch at the right (here the range), one icon. */}
       <div className="krnl-node-header an-head kw-head" style={titlebarStyle}>
         <span className="kw-dot" style={dotStyle} aria-hidden />
-        <span className="kw-title">Analytics</span>
+        <WindowName>Analytics</WindowName>
         <span className="kw-sp" />
         <span className="kw-views nodrag" role="group" aria-label="Range" data-testid="analytics-range-switch">
           {RANGE_PRESETS.map((days) => (

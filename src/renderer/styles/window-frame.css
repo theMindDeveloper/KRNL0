@@ -288,6 +288,11 @@
   .kw-range__label, .kw-range > span.kw-range__label { font-size: 12.5px; }
   .kw-range .kw-btn:not(:has(svg)) { padding: 0 6px; }
 }
+/* A time row's label (a date, a week) is never cut (owner, 2026-11-25: the
+   Clock's "Wed, Nov 25" lost its last letters in a narrow window on a phone
+   held sideways). It is an inline-flex box, so text-overflow never showed an
+   ellipsis: the words were simply clipped. The label keeps its width. */
+.kw-range__label, .kw-range > span.kw-range__label { flex-shrink: 0; overflow: visible; }
 /* Only a header's own switch with four or more views needs the letters
    (Day Week Month Year); three always fit, and ranges like 7d / 30d never shorten. */
 @container (max-width: 295px) {
