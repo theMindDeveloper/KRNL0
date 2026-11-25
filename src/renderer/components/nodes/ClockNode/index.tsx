@@ -1,3 +1,4 @@
+import { WindowName } from '../WindowName';
 import { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { calendarGhost, subscribeCalendarGhost } from '../CalendarNode/DropGhost';
 import { SettingsIcon } from '../../ui/SettingsIcons';
@@ -433,7 +434,7 @@ export function ClockNode({
         {/* window-frame.md — the standard header: name, then one view switch. */}
         <div className="krnl-node-header kw-head" style={{ margin: '-10px -14px 0' }}>
           <span aria-hidden className="kw-dot" style={{ background: isToday ? 'var(--cyan)' : 'var(--ink-4)', boxShadow: isToday ? '0 0 0 2px color-mix(in srgb, var(--cyan) 25%, transparent)' : 'none' }} />
-          <span className="kw-title">Clock</span>
+          <WindowName>Clock</WindowName>
           <span className="kw-sp" />
           <span className="kw-views nodrag" role="group" aria-label="Clock view" data-testid="clock-view-switch">
             <button

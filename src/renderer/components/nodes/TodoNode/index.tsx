@@ -1,3 +1,4 @@
+import { WindowName } from '../WindowName';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { beginCalendarDrag } from '../CalendarNode/calendarDrag';
 import { useDismissOutside } from '../../ui/useDismissOutside';
@@ -809,7 +810,7 @@ export function TodoNode({ node, onCommand, slotIndex = 2, slotTotal = MOTHER_TO
         <div className="krnl-node-header kw-head">
           <span data-testid="todo-header" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <span className="kw-dot" style={{ color: 'var(--cyan)', background: 'var(--cyan)' }} />
-            <span className="kw-title">Todos</span>
+            <WindowName>Todos</WindowName>
             <span className="kw-ctx" data-testid="todo-open-count">{undoneCount}</span>
             {/* PR8 — overdue count badge in rust. Only visible when at least
                 one undone item's scheduled-end has passed. */}

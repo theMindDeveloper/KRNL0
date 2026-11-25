@@ -13,7 +13,8 @@ import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost } from 
 import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
 import { CALENDAR_LAYOUT_EVENT, CALENDAR_REVEAL_EVENT, showTask, unscheduleTask } from '../../../store/scheduleActions';
 import { highlightElement } from '../../../store/highlight';
-import { startTransition, useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
+import { startTransition, useContext, useMemo, useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
+import { CalendarMinHourContext } from './minHour';
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useReactFlow } from '@xyflow/react';
@@ -427,7 +428,10 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
   // Decision 60 — the day fits the window by default (no scroll, no empty
   // band under 23:00, at any size); zooming in makes the hours taller from
   // there. Zoom ZOOM_FIT (the old default, 2) is "fits"; more is taller.
-  const fillRow = bodyH > 0 ? Math.max(0, (bodyH - 2 * GRID_PAD) / rowCount) : 0;
+  // A screen too short to fit the day readably (a phone on its side) sets a
+  // floor for an hour (CalendarMinHourContext); the hours then scroll.
+  const minHour = useContext(CalendarMinHourContext);
+  const fillRow = bodyH > 0 ? Math.max(minHour, (bodyH - 2 * GRID_PAD) / rowCount) : 0;
   const rowFor = (z: number): number => (fillRow > 0 ? fillRow * Math.max(1, z / ZOOM_FIT) : MIN_ROW_HEIGHT * z);
   const zoomFloor = fillRow > 0 ? ZOOM_FIT : CAL_ZOOM_MIN;
   const rowHeight = rowFor(shownZoom);
@@ -1580,7 +1584,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
     const a = zoomAnchor.current;
     if (el && fillRow > 0 && a) {
       const k = Math.max(1, z / ZOOM_FIT);
-      el.style.setProperty('--rh', `calc(100cqh / ${rowCount} * ${k})`);
+      el.style.setProperty('--rh', `calc(max(${minHour}px, 100cqh / ${rowCount}) * ${k})`);
       el.scrollTop = Math.max(0, (a.min / 60) * (fillRow * k) + GRID_PAD - a.offset);
       zoomAnchor.current = null;
       startTransition(() => setLiveZoom(z));
@@ -3293,7 +3297,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
           overscrollBehavior: 'contain',
           position: 'relative',
           padding: `${GRID_PAD}px 0`,
-          ...(cssRows ? { containerType: 'size', ['--rh' as string]: `calc(100cqh / ${rowCount} * ${zoomK})` } : {}),
+          ...(cssRows ? { containerType: 'size', ['--rh' as string]: `calc(max(${minHour}px, 100cqh / ${rowCount}) * ${zoomK})` } : {}),
         }}
       >
         {/* Time gutter — drag it up or down to zoom the hours (Decision 58). */}

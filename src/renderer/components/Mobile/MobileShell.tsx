@@ -1,7 +1,11 @@
-// The web app on a phone or an iPad (Decision 51, Decision 56). One shell,
-// two arrangements of the board's own windows:
+// The web app on a phone or an iPad (Decision 51, Decision 56, Decision 67).
+// One shell, three arrangements of the board's own windows:
 //   phone   header · one view · tab bar (Today, Todos, Calendar, Habits, More)
-//   tablet  side rail (Today, Week, Habits, Insights, Canvas) · two-column Today
+//   dock    a phone on its side: slim rail (Today, Todos, Week, Habits, More) ·
+//           two windows you choose, side by side, and the Timer pill
+//   tablet  side rail (Today, Week, Habits, Insights, Canvas) · two-column
+//           Today whose four windows you choose
+// More (phone and dock) is a small popup, not a page.
 // Today on a phone (design "KRNL0 phone Today", direction A, 2026-11-22) fits
 // one screen: the date and one line, the Clock with the day's plans as arcs,
 // the day's items as small chips, and one compact Timer card. Todos have their
@@ -25,6 +29,9 @@ import { MotherWindow } from './MotherWindow';
 import { toneOf, useDayAgenda } from './DayList';
 import { dayLine, type AgendaItem, type DayAgenda } from './dayAgenda';
 import type { FormFactor } from './useFormFactor';
+import { Popover, TimerPill, WindowSlots, useSlots } from './WindowSlots';
+import type { MotherKind } from './MotherWindow';
+import { CalendarMinHourContext, DOCK_MIN_HOUR } from '../nodes/CalendarNode/minHour';
 import logo from '../../assets/launch/logo.webp';
 import './mobile.css';
 
@@ -40,8 +47,11 @@ const VIEWS: ReadonlyArray<{ id: View; phone: string; tablet: string; d: string 
   { id: 'more', phone: 'More', tablet: 'More', d: 'M4.5 12h1M11.5 12h1M18.5 12h1' },
 ];
 const viewOf = (id: View) => VIEWS.find((v) => v.id === id)!;
-/** The phone's tab bar; Insights and Canvas open from More. */
+/** The phone's tab bar and the sideways phone's rail; Insights and Canvas open from More. */
 const PHONE_TABS: View[] = ['today', 'todos', 'calendar', 'habits', 'more'];
+type Shell = Exclude<FormFactor, 'desktop'>;
+/** Phone and sideways phone: small screens, More holds the rest. */
+const small = (ff: Shell): boolean => ff !== 'tablet';
 /** The iPad's rail (its Today already holds the Plans). */
 const TABLET_RAIL: View[] = ['today', 'calendar', 'habits', 'insights', 'canvas'];
 
@@ -49,7 +59,8 @@ const VIEW_KEY = 'krnl0-web-view';
 const readView = (): View => {
   try {
     const v = sessionStorage.getItem(VIEW_KEY);
-    if (v && VIEWS.some((x) => x.id === v)) return v as View;
+    // More is a popup now, never a page of its own.
+    if (v && v !== 'more' && VIEWS.some((x) => x.id === v)) return v as View;
   } catch { /* private window */ }
   return 'today';
 };
@@ -161,14 +172,15 @@ const CAL_VIEW_KEY = 'krnl0-web-calendar-view';
 const CAL_TODAY_KEY = 'krnl0-web-calendar-today';
 type CalView = 'day' | 'week' | 'month' | 'year';
 
-function CalendarView({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
-  // A phone shows one day by default; its choice stays on this phone (the
-  // stored view is the desktop's and is never changed from here).
+function CalendarView({ ff }: { ff: Shell }) {
+  // A phone shows one day by default, a phone on its side the week; the
+  // choice stays on this phone (the stored view is the desktop's and is never
+  // changed from here).
   const [calView, setCalView] = useState<CalView>(() => {
     try { const v = sessionStorage.getItem(CAL_VIEW_KEY); if (v === 'day' || v === 'week' || v === 'month' || v === 'year') return v; } catch { /* private window */ }
-    return 'day';
+    return ff === 'dock' ? 'week' : 'day';
   });
-  const phoneCal = ff === 'phone' ? {
+  const phoneCal = small(ff) ? {
     configOverride: { view: calView },
     intercept: (command: string, args: Record<string, unknown>): boolean => {
       if (command !== 'calendar.setView') return false;
@@ -191,7 +203,7 @@ function CalendarView({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
   }, []);
   // Decision 56 - the phone gives the Calendar the whole screen (the Clock is
   // on Today); an iPad has room for both side by side.
-  if (ff === 'phone') return <div className="m-fill m-cal m-enter" data-testid="m-calendar"><MotherWindow kind="calendar" label="Calendar" {...phoneCal} /></div>;
+  if (small(ff)) return <div className="m-fill m-cal m-enter" data-testid="m-calendar"><MotherWindow kind="calendar" label="Calendar" {...phoneCal} /></div>;
   return (
     <div className="m-fill m-cal-split m-enter" data-testid="m-calendar">
       <div className="m-grow"><MotherWindow kind="calendar" label="Calendar" /></div>
@@ -323,49 +335,78 @@ function PhoneToday({ onFocus, onOpenCalendar }: { onFocus: () => void; onOpenCa
   );
 }
 
-/** More (phone): the views that do not fit the tab bar. */
-function MoreView({ onOpen }: { onOpen: (v: View) => void }) {
-  const rows: Array<{ id: View; hint: string }> = [
-    { id: 'insights', hint: 'Where your time went' },
-    { id: 'canvas', hint: 'Your board, free to arrange' },
-  ];
+const MORE_ROWS: Array<{ id: View; hint: string }> = [
+  { id: 'insights', hint: 'Where your time went' },
+  { id: 'canvas', hint: 'Your board, free to arrange' },
+];
+
+/** More (phone and sideways phone): a small popup at its tab, a tap opens the pick. */
+function MorePopup({ at, ff, onOpen, onSettings, onClose }: { at: DOMRect; ff: Shell; onOpen: (v: View) => void; onSettings: () => void; onClose: () => void }) {
   return (
-    <div className="m-fill m-more m-enter" data-testid="m-more">
-      {rows.map((r) => (
-        <button key={r.id} type="button" className="m-more__row" onClick={() => onOpen(r.id)} data-testid={`m-more-${r.id}`}>
-          <Icon d={viewOf(r.id).d} />
-          <span className="m-more__text"><strong>{viewOf(r.id).phone}</strong><span>{r.hint}</span></span>
-          <Icon d="M9 6l6 6-6 6" size={18} />
+    <Popover anchor={at} side={ff === 'dock' ? 'right' : 'above'} label="More" onClose={onClose} testId="m-more">
+      {MORE_ROWS.map((r) => (
+        <button key={r.id} type="button" role="menuitem" className="m-pop__item" onClick={() => { onOpen(r.id); onClose(); }} data-testid={`m-more-${r.id}`}>
+          <Icon d={viewOf(r.id).d} size={20} />
+          <span className="m-pop__text"><strong>{viewOf(r.id).phone}</strong><span>{r.hint}</span></span>
         </button>
       ))}
-    </div>
+      {/* The sideways phone has no header: Settings is here. */}
+      {ff === 'dock' && (
+        <button type="button" role="menuitem" className="m-pop__item" onClick={() => { onSettings(); onClose(); }} data-testid="m-more-settings">
+          <Icon d={GEAR} size={20} />
+          <span className="m-pop__text"><strong>Settings</strong><span>How KRNL0 looks and sounds</span></span>
+        </button>
+      )}
+    </Popover>
   );
 }
 
+/** iPad Today: four windows in two columns, each one yours to choose (its name). */
+const TABLET_SLOTS: MotherKind[] = ['pomo', 'todo', 'calendar', 'habit'];
+const slotClass = (k: MotherKind): string => (k === 'pomo' ? 'm-slot m-slot--timer' : k === 'habit' ? 'm-slot m-slot--habits-tab' : 'm-grow');
 function TabletToday() {
+  const [slots, choose] = useSlots('krnl0-web-tablet-slots', TABLET_SLOTS);
   return (
-    <div className="m-today-grid" data-testid="m-today">
-      <div className="m-col">
-        <div className="m-slot m-slot--timer"><MotherWindow kind="pomo" label="Timer" /></div>
-        <div className="m-grow"><MotherWindow kind="todo" label="Plans" /></div>
+    <WindowSlots slots={slots} onChoose={choose} render={(slot) => (
+      <div className="m-today-grid" data-testid="m-today">
+        <div className="m-col">
+          <div className={slotClass(slots[0]!)}>{slot(0)}</div>
+          <div className={slotClass(slots[1]!)}>{slot(1)}</div>
+        </div>
+        <div className="m-col">
+          <div className={slotClass(slots[2]!)}>{slot(2)}</div>
+          <div className={slotClass(slots[3]!)}>{slot(3)}</div>
+        </div>
       </div>
-      <div className="m-col">
-        <div className="m-grow"><MotherWindow kind="calendar" label="Calendar" /></div>
-        <div className="m-slot m-slot--habits-tab"><MotherWindow kind="habit" label="Habits" /></div>
-      </div>
-    </div>
+    )} />
   );
 }
 
-function ViewBody({ view, ff, onFocus, onOpenCalendar, onOpen }: { view: View; ff: Exclude<FormFactor, 'desktop'>; onFocus: () => void; onOpenCalendar: () => void; onOpen: (v: View) => void }) {
+/** The sideways phone's Today (design D): two windows you choose, and the Timer pill while neither is the Timer. */
+const DOCK_SLOTS: MotherKind[] = ['todo', 'clock'];
+function DockToday({ onFocus }: { onFocus: () => void }) {
+  const [slots, choose] = useSlots('krnl0-web-dock-slots', DOCK_SLOTS);
+  const reading = useTimerReading();
+  return (
+    <WindowSlots slots={slots} onChoose={choose} render={(slot) => (
+      <div className="m-dock m-enter" data-testid="m-today">
+        <div className="m-grow">{slot(0)}</div>
+        <div className="m-grow">{slot(1)}</div>
+        {!slots.includes('pomo') && <TimerPill reading={reading} onOpen={onFocus} />}
+      </div>
+    )} />
+  );
+}
+
+function ViewBody({ view, ff, onFocus, onOpenCalendar }: { view: View; ff: Shell; onFocus: () => void; onOpenCalendar: () => void }) {
   switch (view) {
-    case 'today': return ff === 'phone' ? <PhoneToday onFocus={onFocus} onOpenCalendar={onOpenCalendar} /> : <TabletToday />;
+    case 'more':
+    case 'today': return ff === 'phone' ? <PhoneToday onFocus={onFocus} onOpenCalendar={onOpenCalendar} /> : ff === 'dock' ? <DockToday onFocus={onFocus} /> : <TabletToday />;
     case 'todos': return <div className="m-fill m-enter" data-testid="m-todos"><MotherWindow kind="todo" label="Todos" /></div>;
-    case 'more': return <MoreView onOpen={onOpen} />;
     case 'calendar': return <CalendarView ff={ff} />;
     case 'habits': return <div className="m-fill m-enter"><MotherWindow kind="habit" label="Habits" /></div>;
     case 'insights': return <div className="m-fill m-enter"><MotherWindow kind="analytics" label="Insights" /></div>;
-    case 'canvas': return <div className="m-fill m-canvas" data-testid="m-canvas"><EmbeddedCanvasCell /><FitOnFirstOpen phone={ff === 'phone'} /></div>;
+    case 'canvas': return <div className="m-fill m-canvas" data-testid="m-canvas"><EmbeddedCanvasCell /><FitOnFirstOpen phone={small(ff)} /></div>;
   }
 }
 
@@ -390,12 +431,13 @@ function Focus({ onClose }: { onClose: () => void }) {
 
 // ── The shell ───────────────────────────────────────────────────────────────
 
-export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
+export function MobileShell({ ff }: { ff: Shell }) {
   const easy = useEasyMode();
   const boardReady = useBoardStore((s) => !!s.board);
   const [view, setViewState] = useState<View>(readView);
   const [focus, setFocus] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [more, setMore] = useState<DOMRect | null>(null);
   const [theme, chooseTheme] = useTheme();
   const reading = useTimerReading();
   const todayLine = useTodayLine();
@@ -428,20 +470,22 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
   if (!boardReady) return <div className="m-shell" />;
 
   // On a phone, Insights and Canvas live under More: the More tab stays marked there.
-  const tabOf = (v: View): View => (ff === 'phone' && (v === 'insights' || v === 'canvas') ? 'more' : v);
-  const nav = (ff === 'phone' ? PHONE_TABS : TABLET_RAIL).map(viewOf).map((v) => (
+  const tabOf = (v: View): View => (small(ff) && (v === 'insights' || v === 'canvas') ? 'more' : v);
+  const nav = (small(ff) ? PHONE_TABS : TABLET_RAIL).map(viewOf).map((v) => (
     <button
       key={v.id}
       type="button"
-      className={`m-nav__item${tabOf(view) === v.id ? ' on' : ''}`}
+      className={`m-nav__item${tabOf(view) === v.id ? ' on' : ''}${v.id === 'more' && more ? ' open' : ''}`}
       aria-current={tabOf(view) === v.id ? 'page' : undefined}
-      onClick={() => setView(v.id)}
+      {...(v.id === 'more' ? { 'aria-haspopup': 'menu' as const, 'aria-expanded': !!more } : {})}
+      onClick={(e) => { if (v.id === 'more') setMore(more ? null : e.currentTarget.getBoundingClientRect()); else setView(v.id); }}
       data-testid={`m-nav-${v.id}`}
     >
       <Icon d={v.d} />
       <span>{ff === 'phone' ? v.phone : v.tablet}</span>
     </button>
   ));
+  const morePopup = more && <MorePopup at={more} ff={ff} onOpen={setView} onSettings={() => setSettings(true)} onClose={() => setMore(null)} />;
 
   const settingsButton = (
     <button type="button" className="m-icon-btn" aria-label="Settings" onClick={() => setSettings(true)} data-testid="m-settings"><Icon d={GEAR} /></button>
@@ -463,17 +507,18 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
   return (
     <MothersElsewhereContext.Provider value={true}>
     <div className={`m-shell m-shell--${ff}`} data-testid={`m-shell-${ff}`}>
-      {ff === 'tablet' && (
+      {ff !== 'phone' && (
         <nav className="m-rail" aria-label="Views">
           <img src={logo} alt="KRNL0" className="m-logo m-logo--rail" />
           {nav}
           <span className="m-spacer" />
-          {settingsButton}
+          {ff === 'tablet' && settingsButton}
         </nav>
       )}
 
       <div className="m-main">
-        <header className="m-head">
+        {/* A phone on its side has no room for a header: the rail and More hold it all. */}
+        {ff !== 'dock' && <header className="m-head">
           {ff === 'phone' && <img src={logo} alt="KRNL0" className="m-logo" />}
           {ff === 'tablet' && (
             <div className="m-head__title">
@@ -487,13 +532,17 @@ export function MobileShell({ ff }: { ff: Exclude<FormFactor, 'desktop'> }) {
           <span className="m-spacer" />
           {ff === 'tablet' && view === 'today' && <FocusPill onOpen={() => setFocus(true)} />}
           {ff === 'phone' && settingsButton}
-        </header>
+        </header>}
         <main className="m-body">
-          <ViewBody view={view} ff={ff} onFocus={() => setFocus(true)} onOpenCalendar={openCalendarToday} onOpen={setView} />
+          {/* A phone on its side is too short to fit a day: an hour keeps 20 px and the hours scroll. */}
+          <CalendarMinHourContext.Provider value={ff === 'dock' ? DOCK_MIN_HOUR : 0}>
+            <ViewBody view={view} ff={ff} onFocus={() => setFocus(true)} onOpenCalendar={openCalendarToday} />
+          </CalendarMinHourContext.Provider>
         </main>
       </div>
 
       {ff === 'phone' && <nav className="m-tabbar" aria-label="Views">{nav}</nav>}
+      {morePopup}
 
       {settings && <SettingsModal theme={theme} onTheme={chooseTheme} onClose={() => setSettings(false)} />}
     </div>

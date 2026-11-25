@@ -302,3 +302,69 @@ body:has(.m-shell--phone) .dm-morning { bottom: calc(84px + env(safe-area-inset-
 /* F93/F94 on touch: a held finger draws on the Calendar and the Clock, so the
    long press there selects no text (iOS) and opens no callout. */
 .m-shell [data-cal-day], .m-shell [data-testid="clock-dial"] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* ── A phone on its side: the dock (Decision 67, design D) ─────────────── */
+/* No header and no tab bar: a slim rail, and two windows side by side. */
+.m-shell--dock { flex-direction: row; }
+.m-shell--dock .m-rail {
+  width: auto; min-width: 72px; gap: 2px;
+  padding: max(8px, env(safe-area-inset-top)) 6px max(8px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+}
+.m-shell--dock .m-logo--rail { width: 28px; height: 28px; border-radius: 8px; margin-bottom: 4px; }
+.m-shell--dock .m-rail .m-nav__item { width: 60px; min-height: 52px; font-size: 10.5px; gap: 2px; }
+.m-shell--dock .m-rail .m-nav__item .m-icon { width: 44px; height: 26px; padding: 3px 11px; }
+.m-shell--dock .m-body { padding: 8px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) 8px; }
+.m-shell--dock .m-body:has(> .m-canvas) { padding: 0; }
+.m-shell--dock .m-canvas { border: 0; border-radius: 0; }
+.m-shell--dock .m-canvas .react-flow__minimap { display: none; }
+.m-dock { position: relative; flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); gap: 8px; }
+.m-dock > .m-grow { min-height: 0; }
+.m-slotwin { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.m-nav__item.open { color: var(--ink); }
+.m-nav__item.open .m-icon { background: var(--paper-3); }
+
+/* A window's name you can tap to put another window there (WindowName.tsx). */
+.kw-title--pick {
+  appearance: none; border: 0; background: transparent; cursor: pointer; font: inherit; color: inherit;
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  min-height: 40px; margin: -6px 0; padding: 0 6px 0 0; border-radius: 8px;
+}
+.kw-title--pick svg { color: var(--ink-3); flex-shrink: 0; }
+.kw-title--pick:active { transform: scale(0.97); }
+
+/* The Timer in the corner, while neither window is the Timer. */
+.m-pill {
+  position: absolute; right: 10px; bottom: 10px; z-index: 5;
+  display: flex; align-items: center; gap: 6px; padding: 4px;
+  border-radius: 14px; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--paper-3), var(--shadow-2, 0 8px 24px rgba(0,0,0,.35));
+}
+.m-pill--live { background: color-mix(in srgb, var(--acid) 12%, var(--paper-2)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 35%, var(--paper-3)), var(--shadow-2, 0 8px 24px rgba(0,0,0,.35)); }
+.m-pill__read { appearance: none; border: 0; background: transparent; color: var(--ink); cursor: pointer; font: inherit;
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 6px 0 10px; max-width: 220px; }
+.m-pill__what { font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-pill__time { font-size: 15px; font-weight: 700; color: var(--acid-ink, var(--acid)); }
+.m-pill__go { appearance: none; border: 0; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 10px;
+  background: var(--acid); color: var(--acid-on, #141410); }
+.m-pill__read:active, .m-pill__go:active { transform: scale(0.97); }
+
+/* A small menu at a button: More, and "Show here" for a window's place. */
+.m-pop-backdrop { position: fixed; inset: 0; z-index: 260; }
+.m-pop {
+  position: fixed; z-index: 261; min-width: 220px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px;
+  border-radius: 14px; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--paper-3), var(--shadow-2, 0 18px 44px rgba(0,0,0,.45));
+  animation: m-enter 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.m-pop__cap { padding: 6px 10px 2px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.m-pop__item {
+  appearance: none; border: 0; background: transparent; color: var(--ink); cursor: pointer; font: inherit; text-align: left;
+  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 10px; border-radius: 10px;
+}
+.m-pop__item:active { background: var(--paper-3); }
+.m-pop__item.on { background: color-mix(in srgb, var(--acid) 12%, var(--paper-2)); }
+.m-pop__item .m-icon { color: var(--acid-ink, var(--acid)); }
+.m-pop__text { display: flex; flex-direction: column; min-width: 0; }
+.m-pop__text strong { font-size: 14.5px; font-weight: 600; }
+.m-pop__text span { font-size: 12.5px; color: var(--ink-3); }
+.m-pop__check { margin-left: auto; }
+@media (prefers-reduced-motion: reduce) { .m-pop { animation: none; } }

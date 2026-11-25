@@ -127,7 +127,7 @@ describe('One name per window; no second summary rows (window-frame.md)', () => 
   });
   it('Clock: named Clock; no week rings and no "now" box under the dial', () => {
     const s = src('ClockNode/index.tsx');
-    expect(s).toContain('<span className="kw-title">Clock</span>');
+    expect(s).toContain('<WindowName>Clock</WindowName>');
     expect(s).not.toContain('data-testid="clock-week-marks"');
     expect(s).not.toContain('`free · ');
   });
@@ -254,8 +254,8 @@ describe('The window standard: one header, time row and footer (owner pick, 2026
     expect(css).toContain('.kw-action { height: 34px; border: 0;');
   });
   it('a header is the name, then one fact: Todos and Habits no longer put the fact inside the name', () => {
-    expect(read('components/nodes/TodoNode/index.tsx')).toContain('<span className="kw-title">Todos</span>');
-    expect(read('components/nodes/HabitNode/index.tsx')).toContain('<span className="kw-title">Habits</span>');
+    expect(read('components/nodes/TodoNode/index.tsx')).toContain('<WindowName>Todos</WindowName>');
+    expect(read('components/nodes/HabitNode/index.tsx')).toContain('<WindowName>Habits</WindowName>');
   });
   it('the slot badge over a window header in the Free layout is not drawn', () => {
     expect(read('components/nodes/MotherFrame/index.tsx')).toContain('const SHOW_SLOT_BADGE: boolean = false;');

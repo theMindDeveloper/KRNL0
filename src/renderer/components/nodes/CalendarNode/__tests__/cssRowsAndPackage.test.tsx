@@ -28,7 +28,7 @@ describe('the hours are sized by CSS (Decision 61)', () => {
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
     const body = document.querySelector('[data-testid="calendar-grid-body"]') as HTMLElement;
     expect(body.getAttribute('data-css-rows')).toBe('true');
-    expect(body.getAttribute('style')).toContain('--rh: calc(100cqh / 24 * 1)');
+    expect(body.getAttribute('style')).toContain('--rh: calc(max(0px, 100cqh / 24) * 1)');
     expect(body.getAttribute('style')).toContain('container-type: size');
     const cell = document.querySelector('[data-testid="week-cell-2026-05-14-10"]') as HTMLElement;
     expect(cell.getAttribute('style')).toContain('var(--rh)');

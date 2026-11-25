@@ -1,3 +1,4 @@
+import { WindowName } from '../WindowName';
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SettingsIcon } from '../../ui/SettingsIcons';
 import { NumberStepper } from '../../ui/NumberStepper';
@@ -361,12 +362,7 @@ export function PomoNode({
           background: state.status === 'running' ? 'var(--acid)' : state.status === 'break' || state.status === 'paused' ? 'var(--rust)' : 'var(--ink-4)',
           boxShadow: state.status === 'running' ? '0 0 0 3px color-mix(in srgb, var(--acid) 22%, transparent)' : 'none',
         }} />
-        <span
-          data-testid="pomo-header-label"
-          className="kw-title"
-        >
-          {headerLeft}
-        </span>
+        <WindowName testId="pomo-header-label">{headerLeft}</WindowName>
         {/* The session code gives way first: one line, never wrapped. */}
         <span className="kw-ctx" data-testid="pomo-observe-status" role="status" style={{ color: headerTone, fontWeight: 500, flexShrink: 0 }}>{headerRight}</span>
         <span className="kw-sp" />
