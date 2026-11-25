@@ -368,3 +368,7 @@ body:has(.m-shell--phone) .dm-morning { bottom: calc(84px + env(safe-area-inset-
 .m-pop__text span { font-size: 12.5px; color: var(--ink-3); }
 .m-pop__check { margin-left: auto; }
 @media (prefers-reduced-motion: reduce) { .m-pop { animation: none; } }
+
+/* The on-screen keyboard (src/web/keyboard.ts): the shell ends above it, so a
+   field at the bottom of a window stays in sight while you type. */
+.m-shell { bottom: var(--kb-inset, 0px); }

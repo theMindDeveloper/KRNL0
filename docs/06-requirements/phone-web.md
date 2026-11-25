@@ -23,6 +23,14 @@ The owner asked (2026-11-21) for big changes to the phone website: a better layo
 | F13 | **More is a small popup**, never a page (owner, 2026-11-25): on the phone it opens above its tab, on the sideways phone beside it in the rail, with Insights and Canvas (and Settings on the sideways phone, which has no header). One tap opens the pick; a tap outside or Esc closes it. While Insights or Canvas is open, More stays marked. |
 | F14 | **The iPad's Today has the same choice**: its four windows (by default Timer and Plans, Calendar and Habits) each change from their name, as in F11. |
 | F15 | **The Calendar stays readable sideways**: where the day cannot fit readably (the sideways phone), an hour keeps at least 20 px and the hours scroll, opening around now. Elsewhere the day still fits its window (Decision 60). A time row's label (the Clock's date) is never cut. |
+| F16 | **One touch rule for every window** (Decision 68; owner, 2026-11-25: "we don't actually have touch support"; #305, #306, #307). A finger that moves at once scrolls (the hours, a list, the page) or pans the canvas, as before. A finger **held still for about half a second** on something you can move picks it up; from then on the gesture is KRNL0's: the page does not scroll, the canvas does not pan or zoom and the page does not zoom, until the finger lifts. On a desktop touch screen too. |
+| F17 | **Hold, then drag** moves plans, events and habits on the Calendar (Week, Day, Month; in Free and My layout and the web app), carries a Todo row, a habit or a card to the Calendar, and draws a new box on empty time (F93/F94). The box shows as soon as the hold fires. A mouse and a pen pick up at once, as before. |
+| F18 | **Edges a finger can grab**: a block's top and bottom edges are 16 px for a finger (7 for a mouse); on a block shorter than 48 px its lower half stretches it, so even a small plan can be made longer. Events the same. |
+| F19 | **The long-press menu and the hold agree**: a hold lifted in place opens the item's menu (mark, when, rename…); a hold that moves carries it, with no menu. On something that does not carry, the menu opens on the hold and closes if the finger then moves on. |
+| F20 | **Two fingers on the Calendar zoom its hours only**, never the canvas behind it or the page (#306). |
+| F21 | **Carry a task onto the Calendar tab**: on the phone and the sideways phone, holding a carried task over the Calendar tab (or the rail's Week) for about half a second opens the Calendar, and the task drops on the time under the finger. |
+| F22 | **Above the keyboard**: while the on-screen keyboard is up, the app ends above it (a field at the bottom of a window stays in sight), and a card being typed in (the drag card, an event card) moves up until its field is above the keyboard; both go back when it closes. |
+| F23 | **The first layout is the one Reset makes** (owner, 2026-11-25): a new board, and a device that gets a board with no layout of its own (the layout is per device), open on My layout as Reset arranges it (Timer, Clock and Todos over a full-width Calendar; Habits, Analytics and the terminal hidden). A device that has its own layout, and a board from before the Station, keep theirs. |
 
 ## Non-Functional Requirements
 
@@ -43,6 +51,8 @@ The owner asked (2026-11-21) for big changes to the phone website: a better layo
 - **UC-P5:** The owner props the phone on its side next to the laptop: Todo on the left, the Clock on the right, the Timer pill in the corner. They tap Start on the pill, and later Stop.
 - **UC-P6:** They tap the Clock's name, pick Calendar, and the Calendar takes that side; picking Todo for the right side swaps the two.
 - **UC-P7:** On the iPad they put the Clock where Habits was.
+- **UC-P8:** On the iPad they hold a plan on the Calendar, drag it an hour later and let go; they hold a short plan's lower half and pull it longer; they pinch the hours bigger, and the canvas behind does not move.
+- **UC-P9:** On the phone they hold a to-do in Todos, carry it over the Calendar tab, wait a moment, and drop it on 15:00.
 
 ## User Stories
 
@@ -94,4 +104,25 @@ Feature: The iPad chooses too (F14)
   Given the iPad shows Today
   When I tap Habits' name and pick Clock
   Then the Clock sits where Habits was
+
+Feature: One touch rule (F16-F20)
+  Given the Calendar on an iPad
+  When a finger moves at once on a plan
+  Then the hours scroll and the plan stays
+  When a finger holds a plan still for half a second and drags it down an hour
+  Then the plan moves an hour later and nothing behind it moved
+  When a finger holds a plan and lifts in place
+  Then the plan's menu opens
+  When two fingers pinch the hours
+  Then only the hours zoom
+
+Feature: Carry to the Calendar tab (F21)
+  Given the phone shows Todos
+  When I hold a to-do and carry it over the Calendar tab for half a second
+  Then the Calendar opens and the to-do drops on the time I let go at
+
+Feature: First layout (F23)
+  Given my board has never been opened on this iPad
+  When I open KRNL0 on it
+  Then it shows My layout as Reset makes it
 ```

@@ -32,6 +32,7 @@ import type { FormFactor } from './useFormFactor';
 import { Popover, TimerPill, WindowSlots, useSlots } from './WindowSlots';
 import type { MotherKind } from './MotherWindow';
 import { CalendarMinHourContext, DOCK_MIN_HOUR } from '../nodes/CalendarNode/minHour';
+import { isCalendarDragging } from '../nodes/CalendarNode/calendarDrag';
 import logo from '../../assets/launch/logo.webp';
 import './mobile.css';
 
@@ -460,6 +461,25 @@ export function MobileShell({ ff }: { ff: Shell }) {
     if (wasRunning.current && !reading) setFocus(false);
     wasRunning.current = !!reading;
   }, [reading]);
+  // Decision 68 — carrying a task (hold, then drag) and holding it over the
+  // Calendar tab opens the Calendar, so it can be dropped on a time there.
+  useEffect(() => {
+    let timer = 0;
+    let over: string | null = null;
+    const onMove = (e: PointerEvent): void => {
+      const target = isCalendarDragging() && typeof document.elementsFromPoint === 'function'
+        ? document.elementsFromPoint(e.clientX, e.clientY).find((n): n is HTMLElement => n instanceof HTMLElement && !!n.dataset.springView)
+        : undefined;
+      const v = target?.dataset.springView ?? null;
+      if (v === over) return;
+      over = v;
+      window.clearTimeout(timer);
+      if (v) timer = window.setTimeout(() => setView(v as View), 450);
+    };
+    window.addEventListener('pointermove', onMove, true);
+    return () => { window.removeEventListener('pointermove', onMove, true); window.clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Help › What's new › "Show me" and others open Settings by event (as on the desktop).
   useEffect(() => {
     const open = (): void => setSettings(true);
@@ -478,6 +498,7 @@ export function MobileShell({ ff }: { ff: Shell }) {
       className={`m-nav__item${tabOf(view) === v.id ? ' on' : ''}${v.id === 'more' && more ? ' open' : ''}`}
       aria-current={tabOf(view) === v.id ? 'page' : undefined}
       {...(v.id === 'more' ? { 'aria-haspopup': 'menu' as const, 'aria-expanded': !!more } : {})}
+      {...(v.id === 'calendar' ? { 'data-spring-view': 'calendar' } : {})}
       onClick={(e) => { if (v.id === 'more') setMore(more ? null : e.currentTarget.getBoundingClientRect()); else setView(v.id); }}
       data-testid={`m-nav-${v.id}`}
     >

@@ -3047,3 +3047,22 @@ Measured at 4x CPU in the development build, before → after: a plan moved on t
 5. *Readable hours on a short screen*: `CalendarMinHourContext` (0 by default) sets a floor for an hour when the Calendar fits the day (Decision 60); the dock sets 20 px, so the hours scroll there instead of shrinking. A time row's label never shrinks (`.kw-range__label { flex-shrink: 0 }`).
 
 **Consequences.** The rail has no board switcher or saved badge on the dock (the upright phone has them). Two windows of the same kind cannot be shown at once by design.
+
+## Decision 68 — One touch rule: hold to pick up; KRNL0 owns a held gesture; the first layout is Reset's (2026-11-25)
+
+**Status:** Accepted (owner, 2026-11-25).
+
+**Context.** On the iPad the windows did not work by touch: a finger on a plan moved the page or the canvas instead of the plan, a drawn box moved the canvas too (#305), a pinch zoomed the Calendar, the canvas and the page at once (#306), the Clock's drag could not be stretched, a 7 px edge could not be grabbed, and the long-press menu opened while a task was being carried (#307). Every drag started on the press, and the browser or the canvas took the finger as soon as it moved. Separately, a new iPad opened on an old first arrangement, not My layout as Reset makes it: the layout is per device and never synced.
+
+**Decision.**
+1. *Hold to pick up* (`holdToDraw.ts`): `beginCalendarDrag`, the one drag engine (Decision 63), waits for a still finger (450 ms) when the press is touch; then the box shows at once. A finger that moves first is a scroll. Mouse and pen are unchanged.
+2. *A held gesture is KRNL0's* (`ui/touchGesture.ts`): `ownTouch()` while held; one window-level, capture, non-passive `touchmove` (and Safari `gesture*`) guard, installed at start, stops the page's scroll and pinch and keeps the event from React Flow's pane, so the canvas neither pans nor zooms.
+3. *Finger-sized edges* (`edgeZonePx`): 16 px for a finger, 7 for a mouse; under 48 px the lower half stretches a block.
+4. *Menu and hold agree*: a hold lifted in place dispatches the item's own `contextmenu`; the web long-press (`src/web/touch.ts`) does not fire while a gesture is owned, and closes its menu (`closeCurrentOverlay`) when the finger moves on after it opened.
+5. *A pinch on the hours stops there* (WeekView: `stopPropagation`, `preventDefault`, `gesture*`).
+6. *Spring-loaded Calendar tab* (MobileShell): while a Calendar drag runs, resting over a `data-spring-view` tab for 450 ms opens it; a Calendar registered mid-drag is measured on the next move.
+7. *The on-screen keyboard* (`src/web/keyboard.ts`): `visualViewport` gives `--kb-inset` (the shell's bottom) and lifts a fixed card holding the focused field; `interactive-widget=resizes-content` for browsers that support it.
+8. *First layout* (`withResetLayout`, `migrateFreshDeviceLayout`): a new board, and a schema-2 board with no layout mode, no geometry and no window places (a device's first copy), get My layout as Reset makes it.
+
+**Consequences.** A touch drag now takes a short hold; a quick swipe always scrolls. The window-level non-passive listener makes touch scrolling wait for one cheap check. Desktop touch screens follow the same rule.
+

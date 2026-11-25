@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { installTouchGuard } from './components/ui/touchGesture';
 import { PocketApp } from './pocket/PocketApp';
 import {
   installGlobalErrorCapture,
@@ -16,6 +17,9 @@ import { installDockThemes } from './styles/dock-themes';
 import { accentTokens, installAccentSync, loadAccent, onAccentChange } from './themes/accent';
 import { installTaskColors } from './store/taskColors';
 import { installFrameBudget } from './utils/frameBudget';
+
+// Decision 68 — one touch rule for a touch screen on the desktop too (installed before any touch begins).
+installTouchGuard();
 
 // Decision 37 — the pocket timer window loads this bundle with ?pocket=1. It is
 // a view of the Pomo node: it must not load, save or log the board, so it skips

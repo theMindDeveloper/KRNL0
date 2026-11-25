@@ -7,7 +7,7 @@
 import { pickerOpen } from '../../ui/Popover';
 import { passRightClick, useOneOverlay } from '../../ui/oneOverlay';
 import { KindIcon, KIND_LABEL } from '../../ui/kindIcons';
-import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, nowMark, registerCalendarSurface, SNAP_EDGE_PX, SNAP_NOW_MIN, type CalendarSurface, type DragItem, type DragKind, type DragMode, type DragOrigin, type Target } from './calendarDrag';
+import { beginCalendarDrag, edgeZonePx, isTouchPress, checkCalendarDragLanded, isCalendarDragging, nowMark, registerCalendarSurface, SNAP_EDGE_PX, SNAP_NOW_MIN, type CalendarSurface, type DragItem, type DragKind, type DragMode, type DragOrigin, type Target } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
 import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost } from './DropGhost';
 import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
@@ -1003,7 +1003,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
   // 2026-11-21). The bands take no pointer events (drops on the hours under
   // them must still land), so the day column finds the event under the press.
   const RT_EDGE_PX = 6;
-  const routineEdgeAt = (dayYMD: string, e: { clientX: number; clientY: number; currentTarget: HTMLElement }) => {
+  const routineEdgeAt = (dayYMD: string, e: { clientX: number; clientY: number; currentTarget: HTMLElement; pointerType?: string }) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const scale = screenScale(e.currentTarget);
     const relY = Math.max(0, e.clientY - rect.top) / scale;
@@ -1012,7 +1012,11 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
     if (!r || r.occ.skipped || (r.occ as RoutineSpan).spill) return null;
     const topPx = (r.occ.startMin / 60) * rowHeight;
     const botPx = (r.occ.endMin / 60) * rowHeight;
-    const mode: 'move' | 'top' | 'bottom' = relY >= botPx - RT_EDGE_PX ? 'bottom' : relY <= topPx + RT_EDGE_PX - 1 && botPx - topPx > 3 * RT_EDGE_PX ? 'top' : 'move';
+    // Decision 68 — a finger gets a fingertip's worth of edge (zones in grid px).
+    const z = isTouchPress(e) ? edgeZonePx(true, (botPx - topPx) * scale) : null;
+    const bot = z ? z.bottom / scale : RT_EDGE_PX;
+    const top = z ? z.top / scale : (botPx - topPx > 3 * RT_EDGE_PX ? RT_EDGE_PX - 1 : 0);
+    const mode: 'move' | 'top' | 'bottom' = relY >= botPx - bot ? 'bottom' : top > 0 && relY <= topPx + top ? 'top' : 'move';
     return { r, mode, rect, scale };
   };
   // Decision 60 — the event under the pointer lights up like a plan does.
@@ -1621,24 +1625,36 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
     // Two fingers on a touch screen.
     let pinch: { d: number; z: number } | null = null;
     const dist = (t: TouchList): number => Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY);
+    // Decision 68 (#306) — a pinch on the hours zooms the hours only: it stops
+    // here, so the canvas behind (React Flow listens further up) does not zoom
+    // or pan, and the browser does not zoom the page.
     const onTouchStart = (e: TouchEvent): void => {
-      if (e.touches.length === 2) pinch = { d: dist(e.touches), z: liveZoomRef.current ?? (state.zoom ?? 2) };
+      if (e.touches.length !== 2) return;
+      pinch = { d: dist(e.touches), z: liveZoomRef.current ?? (state.zoom ?? 2) };
+      e.stopPropagation();
     };
     const onTouchMove = (e: TouchEvent): void => {
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
+      e.stopPropagation();
       zoomTo(pinch.z * (dist(e.touches) / Math.max(1, pinch.d)), (e.touches[0]!.clientY + e.touches[1]!.clientY) / 2);
     };
     const onTouchEnd = (e: TouchEvent): void => { if (e.touches.length < 2) pinch = null; };
+    // Safari's own page zoom.
+    const onGesture = (e: Event): void => { e.preventDefault(); e.stopPropagation(); };
     el.addEventListener('wheel', onWheel, { passive: false });
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: false });
     el.addEventListener('touchend', onTouchEnd, { passive: true });
+    el.addEventListener('gesturestart', onGesture, { passive: false });
+    el.addEventListener('gesturechange', onGesture, { passive: false });
     return () => {
       el.removeEventListener('wheel', onWheel);
       el.removeEventListener('touchstart', onTouchStart);
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('gesturestart', onGesture);
+      el.removeEventListener('gesturechange', onGesture);
     };
   }, [zoomTo, state.zoom]);
   // Dragging the hour gutter up or down stretches the hours, like a ruler.
@@ -2034,8 +2050,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
       const startBlockDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
         if (e.button !== 0 || isContinuation) return;
         const r = e.currentTarget.getBoundingClientRect();
-        const zone = Math.min(7, r.height / 3);
-        const mode: DragMode = resizable && r.bottom - e.clientY <= zone ? 'bottom' : resizable && e.clientY - r.top <= zone && r.height >= 18 ? 'top' : 'move';
+        // Decision 68 — a finger gets a fingertip's worth of edge (a short block: its lower half).
+        const zone = edgeZonePx(isTouchPress(e), r.height);
+        const mode: DragMode = resizable && r.bottom - e.clientY <= zone.bottom ? 'bottom' : resizable && zone.top > 0 && e.clientY - r.top <= zone.top ? 'top' : 'move';
         if (mode !== 'move') { e.preventDefault(); e.stopPropagation(); }
         beginCalendarDrag(e, {
           item: { kind: 'task', id: task.id, name: task.text, tone: taskTone, lenMin: Math.max(1, sliceEndMin - sliceStartMin), plannedMin: task.plannedMin },

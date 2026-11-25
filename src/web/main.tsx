@@ -28,6 +28,8 @@ import { WebTransport } from './sync/transport';
 import { createWebBridge } from './bridge';
 import { FirstRun } from './FirstRun';
 import { installLongPressMenu } from './touch';
+import { installKeyboardLift } from './keyboard';
+import { installTouchGuard } from '../renderer/components/ui/touchGesture';
 
 const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0';
 const FIRST_SYNC_WAIT_MS = 12_000;
@@ -82,6 +84,9 @@ window.setTimeout(() => { try { sessionStorage.removeItem('krnl0-reloaded-for-up
 async function boot(): Promise<void> {
   // Touch screens: a long-press opens the right-click menus of the board's windows.
   if (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) installLongPressMenu();
+  // Decision 68 — one touch rule (installed before any touch begins) and cards above the on-screen keyboard.
+  installTouchGuard();
+  installKeyboardLift();
   const el = document.getElementById('root');
   if (!el) throw new Error('Missing #root element');
   const root = createRoot(el);

@@ -1,12 +1,12 @@
-// F93 / F94 on a touch screen (owner, 2026-11-25: "why doesn't it work on
-// mobile with touch?"). A finger that moves scrolls the hours, as before; a
-// finger held still on empty time for HOLD_MS starts drag to add there, like a
-// phone calendar. One helper for the Calendar and the Clock.
-//
-// While the hold waits nothing is stopped, so a swipe scrolls at once. Once it
-// fires, the page may no longer scroll under the finger (touchmove is stopped)
-// and the long-press menu (Android's contextmenu, the iOS callout) stays shut
-// until the finger lifts, so the box follows the finger and nothing else opens.
+// Hold, then drag: how a finger picks something up in KRNL0 (Decision 68,
+// first for drag to add, calendar-clock-visuals F93/F94, owner 2026-11-25).
+// A finger that moves scrolls the hours, as before; a finger held still for
+// HOLD_MS on something you can move, or on empty time, picks it up (a short
+// buzz where the device has one). From then on the gesture is KRNL0's
+// (ownTouch): the page does not scroll and the canvas does not pan under it,
+// and the long-press menu stays shut, until the finger lifts.
+
+import { ownTouch } from '../../ui/touchGesture';
 
 export const HOLD_MS = 450;
 /** A finger that moves further than this before the hold fires is a scroll. */
@@ -25,18 +25,20 @@ export function holdToDraw(start: HoldStart, onHold: (at: { clientX: number; cli
   let x = start.clientX;
   let y = start.clientY;
   let fired = false;
+  let release: (() => void) | null = null;
 
-  const blockMenu = (ev: Event): void => { ev.preventDefault(); ev.stopPropagation(); };
-  const blockScroll = (ev: TouchEvent): void => { if (fired && ev.cancelable) ev.preventDefault(); };
+  // The phone's own long-press menu stays shut; KRNL0's own (a hold lifted
+  // in place opens the item's menu, calendarDrag.ts) is not the phone's.
+  const blockMenu = (ev: Event): void => { if (!ev.isTrusted) return; ev.preventDefault(); ev.stopPropagation(); };
   window.addEventListener('contextmenu', blockMenu, true);
-  window.addEventListener('touchmove', blockScroll, { passive: false });
 
-  const release = (): void => {
+  const finish = (): void => {
     window.removeEventListener('pointerup', lifted, true);
     window.removeEventListener('pointercancel', lifted, true);
     // Android sends its long-press menu around the lift: keep it shut a moment longer.
     window.setTimeout(() => window.removeEventListener('contextmenu', blockMenu, true), 300);
-    window.removeEventListener('touchmove', blockScroll);
+    release?.();
+    release = null;
   };
   const stopWaiting = (): void => {
     window.clearTimeout(timer);
@@ -44,14 +46,14 @@ export function holdToDraw(start: HoldStart, onHold: (at: { clientX: number; cli
   };
   const moved = (ev: PointerEvent): void => {
     if (ev.pointerId !== id) return;
-    if (Math.hypot(ev.clientX - start.clientX, ev.clientY - start.clientY) > HOLD_SLOP_PX) { stopWaiting(); release(); return; }
+    if (Math.hypot(ev.clientX - start.clientX, ev.clientY - start.clientY) > HOLD_SLOP_PX) { stopWaiting(); finish(); return; }
     x = ev.clientX;
     y = ev.clientY;
   };
   const lifted = (ev: PointerEvent): void => {
     if (ev.pointerId !== id) return;
     stopWaiting();
-    release();
+    finish();
     // After a hold, the mouse events a browser may copy from the lift must not
     // land on the card that has just opened (its backdrop closes on mousedown).
     if (fired) {
@@ -63,6 +65,7 @@ export function holdToDraw(start: HoldStart, onHold: (at: { clientX: number; cli
   const timer = window.setTimeout(() => {
     window.removeEventListener('pointermove', moved, true);
     fired = true;
+    release = ownTouch();
     try { navigator.vibrate?.(12); } catch { /* no buzz on this device */ }
     onHold({ clientX: x, clientY: y });
   }, HOLD_MS);
@@ -70,5 +73,5 @@ export function holdToDraw(start: HoldStart, onHold: (at: { clientX: number; cli
   window.addEventListener('pointermove', moved, true);
   window.addEventListener('pointerup', lifted, true);
   window.addEventListener('pointercancel', lifted, true);
-  return () => { stopWaiting(); release(); };
+  return () => { stopWaiting(); finish(); };
 }

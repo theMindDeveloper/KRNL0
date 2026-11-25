@@ -123,12 +123,14 @@ describe('Clock: hold, then drag round (F94 on touch)', () => {
 });
 
 describe('holdToDraw', () => {
-  it('keeps the long-press menu shut and stops the page scrolling once the hold has fired', () => {
+  it("lets KRNL0's own menu through and stops the page scrolling once the hold has fired", () => {
     const onHold = vi.fn();
     holdToDraw({ pointerId: 7, clientX: 10, clientY: 10 }, onHold);
+    // The phone's own menu is a trusted event (blocked; jsdom cannot make one);
+    // KRNL0's own long-press menu (a hold lifted in place) must get through.
     const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     window.dispatchEvent(menu);
-    expect(menu.defaultPrevented).toBe(true);
+    expect(menu.defaultPrevented).toBe(false);
     const early = new Event('touchmove', { cancelable: true });
     window.dispatchEvent(early);
     expect(early.defaultPrevented).toBe(false); // still waiting: a scroll is a scroll

@@ -15,6 +15,9 @@
 // Fields keep the system's own long-press (select, paste). A second finger
 // (a pinch) or a move cancels it.
 
+import { isTouchOwned } from '../renderer/components/ui/touchGesture';
+import { closeCurrentOverlay } from '../renderer/components/ui/oneOverlay';
+
 export const HOLD_MS = 480;
 export const SLOP_PX = 10;
 /** How long after a long-press the phone's own right-click and click are dropped. */
@@ -61,6 +64,9 @@ export function installLongPressMenu(doc: Document = document, opts: LongPressOp
     start = { x: t.clientX, y: t.clientY, target: target ?? doc };
     timer = setTimeout(() => {
       if (!start) return;
+      // A held finger already picked something up (hold, then drag: Decision
+      // 68): no menu; lifted in place, the drag itself opens it.
+      if (isTouchOwned()) { timer = null; return; }
       fired = true;
       swallowUntil = now() + AFTER_MS;
       clearSelection();
@@ -73,7 +79,11 @@ export function installLongPressMenu(doc: Document = document, opts: LongPressOp
   const onMove = (e: TouchEvent): void => {
     if (!start) return;
     const t = e.touches[0];
-    if (e.touches.length !== 1 || !t || Math.hypot(t.clientX - start.x, t.clientY - start.y) > SLOP_PX) clear();
+    if (e.touches.length !== 1 || !t || Math.hypot(t.clientX - start.x, t.clientY - start.y) > SLOP_PX) {
+      // The menu opened, then the finger moved on: it is a drag, not a choice (as on iOS).
+      if (fired) { closeCurrentOverlay(); fired = false; }
+      clear();
+    }
   };
 
   const onEnd = (e: TouchEvent): void => {
