@@ -3780,3 +3780,12 @@ Typecheck clean; all tests pass.
 **PRs/Commits:** branch `fix/phone-settings-fit`
 **Files changed:** `src/renderer/styles/launch.css`, `src/renderer/components/TopBar/FinishedSection.tsx`, `SoundSection.tsx`, `PocketSection.tsx`, `tests/unit/renderer/stChoicesRule.test.ts` (new)
 **Summary:** Owner screenshots from the phone website: in Settings › Finished cards and › Sounds, "Overnight", "Crisp" and "SND01 · Sine" ran past their cards' edges. Three sections forced three equal columns (`gridTemplateColumns: repeat(3, …)` inline), about 95 px each on a phone. The rule now lives in one place: `.st-choices` fits as many 136 px columns as the width allows and wraps the rest (`repeat(auto-fit, minmax(min(100%, 136px), 1fr))`), and a card's words break inside it rather than spill. The inline column counts are gone, and a test fails if one comes back. Checked in the browser at 390 and 320 px wide: no control in any Settings section spills; at desktop width the cards still sit in one row.
+
+---
+
+## [2026-11-25] — Drag to add works with a finger (hold, then drag)
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `fix/touch-drag-to-add`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/holdToDraw.ts` (new), `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/ClockNode/index.tsx`, `src/renderer/components/Mobile/mobile.css`, `src/renderer/components/Tour/tours.ts`, `src/renderer/components/nodes/CalendarNode/__tests__/touchHold.test.tsx` (new), `docs/06-requirements/calendar-clock-visuals.md`
+**Summary:** Owner: "why doesn't it work on mobile with touch?" Drag to add (F93/F94) returned early for every finger, so a touch could only scroll, and the phone website (the server's Today and Calendar tabs) could not add time at all. Now a finger that moves still scrolls, and a finger held still on empty time for 450 ms starts the box (or the Clock's wedge) there, with a short buzz; it then follows the finger and the page stops scrolling under it. A hold let go without a drag opens the card for half an hour. One helper, `holdToDraw`, serves both: until the hold fires nothing is stopped; after it, touchmove is stopped, the long-press menu stays shut, and the mouse events a browser copies from the lift cannot close the card that just opened. Text selection and the iOS callout are off on the Calendar's days and the Clock's dial on the phone website. The Calendar and Clock tour cards say "On a phone: hold, then drag" (the voice lines are unchanged). A mouse and a pen draw at once, as before.

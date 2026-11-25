@@ -67,6 +67,7 @@ import { hourWindow, stepHourWindow } from './hourWindow';
 import { allDayOn, linksOf, partOnDay, type CalendarLink, type LinkedEvent } from '../../../../shared/calsync/types';
 import { LinkedEmptyHint, LinkedInfoCard, linkedLook } from './OtherCalendars';
 import { DragAddCard, hmOfMin } from './DragAddCard';
+import { holdToDraw } from './holdToDraw';
 import { useLayoutEffect, type PointerEvent as ReactPointerEvent } from 'react';
 import { EVENT_TEXT, eventLines, eventTitleAndPlace, eventTitleAndPlaceOf } from './eventText';
 import { parseQuickAdd } from '../../../../shared/quickAdd';
@@ -1026,7 +1027,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
   // grows with you, and on release a small card beside it names it.
   const [drawBox, setDrawBox] = useState<{ day: string; a: number; b: number; card: null | { x: number; y: number } } | null>(null);
   const drewRef = useRef(0);
-  const startDrawBox = (dayYMD: string, e: ReactPointerEvent<HTMLDivElement>): void => {
+  // On a touch screen it starts after a hold (holdToDraw): the box shows at
+  // once, and a hold let go without a drag opens the card for half an hour.
+  const startDrawBox = (dayYMD: string, e: { currentTarget: HTMLDivElement; clientX: number; clientY: number; altKey: boolean }, touch = false): void => {
     const col = e.currentTarget;
     const rect = col.getBoundingClientRect();
     const scale = screenScale(col);
@@ -1070,10 +1073,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
     const endCap = a < nowRel ? nowRel : Infinity;
     const x0 = e.clientX;
     const y0 = e.clientY;
-    let moved = false;
+    let moved = touch;
+    let dragged = false;
+    if (touch) setDrawBox({ day: dayYMD, a, b: Math.min(endCap, a + S), card: null });
     const move = (ev: PointerEvent): void => {
-      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+      if (!dragged && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
       moved = true;
+      dragged = true;
       const raw = minAtPoint(ev.clientX, ev.clientY);
       const m = toNow(raw, Math.round(raw / S) * S, ev.altKey);
       // At least 5 minutes, at most 12 hours (an event's limit); it may run into the next day.
@@ -1092,7 +1098,9 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
       if (!moved) return;
       drewRef.current = Date.now();
       const r = col.getBoundingClientRect();
-      setDrawBox((cur) => {
+      setDrawBox((prev) => {
+        // A hold let go where it started: half an hour (to the now line from the past).
+        const cur = prev && touch && !dragged ? { ...prev, b: Math.min(endCap, a + 30) } : prev;
         if (!cur) return cur;
         const top = r.top + (Math.max(0, Math.min(cur.a, cur.b)) / 60) * rowHeight * scale;
         const room = window.innerWidth - r.right;
@@ -1116,8 +1124,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
       const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
       const frac = (e.clientX - rect.left) / Math.max(1, rect.width);
       if (routineAt(dayYMD, minute, frac) || linkedAt(dayYMD, minute, frac, true)) return;
-      // A finger on a phone or tablet scrolls the hours; drawing is for a mouse or a pen.
-      if (e.pointerType === 'touch') return;
+      // A finger that moves scrolls the hours; a finger held still draws (holdToDraw).
+      if (e.pointerType === 'touch') {
+        const col = e.currentTarget;
+        holdToDraw(e, (p) => startDrawBox(dayYMD, { currentTarget: col, clientX: p.clientX, clientY: p.clientY, altKey: false }, true));
+        return;
+      }
       startDrawBox(dayYMD, e);
       return;
     }
