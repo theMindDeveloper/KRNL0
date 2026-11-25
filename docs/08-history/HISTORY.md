@@ -3854,3 +3854,18 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+---
+
+## [2026-11-25] — v0.17.2 published
+
+**Type:** Release (published)
+**PRs/Commits:** tag `v0.17.2` (PRs #308, #310, notes #309, release #311); server krnl0-server #32 (v0.2.10); website krnl0-website #13
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:**
+- KRNL0 0.17.2 published on the owner's yes: one touch rule (hold, then drag), cards above the keyboard, the first layout is Reset's. The first release built on Node 24 (actions v7/v8). The draft had the Windows installer, its blockmap, `latest.yml` (0.17.2), the web app with a matching checksum, and the Apple silicon `.dmg` from the owner's Mac (Keychain keys, `npm run release -- mac`).
+- The release step's first test run failed on a timing-dependent unhandled rejection in the Terminal's start-up (all tests passed); fixed in #310 before the release PR.
+- Server 0.2.10 (website KRNL0 0.17.2): verified with `updater verify` (signed, 9 files match), published on the owner's yes.
+- krnl0.com: fallback version 0.17.2 and "Hold, then drag" in What's new (krnl0-website #13, merged).
+- Not yet tried on a real iPad or phone: the owner checks after updating the server. Left: the Microsoft Store package for 0.17.2 (owner submits).
