@@ -3798,3 +3798,15 @@ Typecheck clean; all tests pass.
 **PRs/Commits:** branch `feat/phone-dock`
 **Files changed:** `src/renderer/components/Mobile/useFormFactor.ts`, `MobileShell.tsx`, `WindowSlots.tsx` (new), `mobile.css`, `src/renderer/components/nodes/WindowName.tsx` (new), the six windows' headers (Timer, Todo, Calendar, Clock, Habits, Analytics), `CalendarNode/minHour.ts` (new), `CalendarNode/WeekView.tsx`, `src/renderer/styles/window-frame.css`, `tests/unit/renderer/phoneDock.test.tsx` (new), `docs/06-requirements/phone-web.md` (F10–F15), `docs/03-architecture/decisions.md` (Decision 67)
 **Summary:** Owner: turned sideways, the phone website "bugs out": it took the iPad layout, built for ~700 px of height, on a ~390 px tall screen. Designed on the canvas "KRNL0 phone sideways · Dock"; the owner picked D, "also on iPad", plus a timer you can always see and More as a small popup. A phone on its side now gets a dock: a slim rail and two windows side by side (Todo and the Clock by default). Tapping a window's name opens a short list to put another window there; a window shown elsewhere swaps places, so none is shown twice. The choice stays on the device. While neither window is the Timer, a pill in the corner says Start, or shows the task, the time and Stop. The iPad's four Today windows are chosen the same way. More opens a small popup above its tab (phone) or beside it (dock, where it also holds Settings) instead of a page. Found while checking it in the browser: the Clock's date was cut in a narrow window (a flex label never shows its ellipsis), so a time row's label no longer shrinks; and the Calendar squeezed a whole day into ~130 px, so on the dock an hour keeps 20 px and the hours scroll (desktop unchanged). Checked in a local web preview at 740x380 (sideways), 1024x768 (iPad) and 375x812 (upright).
+
+## [2026-11-25] — Release v0.17.1
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.17.1`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.17.0 → 0.17.1`. Notes: `docs/releases/v0.17.1.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
