@@ -3765,3 +3765,9 @@ Typecheck clean; all tests pass.
 - Server 0.2.8 (website KRNL0 0.17.0): verified with `updater verify` (signed, 9 files match), published on the owner's yes; `:latest` matches the signed digest.
 - krnl0.com: fallback version 0.17.0 and the 0.17 news list (krnl0-website #11, merged).
 - Left: the Microsoft Store package for 0.17.0 (`npm run package:store` from the tag, submitted by the owner in Partner Center).
+## [2026-11-25] — The Mac build always has Google sign-in
+
+**Type:** Chore
+**PRs/Commits:** branch `fix/mac-build-keys`
+**Files changed:** `scripts/release.mjs`, `docs/releases/RELEASING.md`, `docs/08-history/HISTORY.md`
+**Summary:** The Mac .dmg is built by hand on the owner's Mac, which had no Google OAuth keys, so Mac builds shipped without "Sign in with Google" unless someone typed the keys in first. New `npm run release -- mac-keys` saves both keys once in the Mac's login Keychain (`security` asks for them hidden, never a file or a chat). `npm run release -- mac` now reads them from the Keychain by itself, and stops before building if they are missing, so a Mac release never loses Google sign-in by accident; `mac --no-google` builds without them on purpose.

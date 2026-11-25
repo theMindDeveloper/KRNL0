@@ -168,8 +168,14 @@ signature and the image, and uploads `KRNL0-X.Y.Z-arm64.dmg` + `.blockmap` to th
 `check` says when the `.dmg` is still missing.
 
 - Google sign-in (Calendar) comes from `KRNL0_GOOGLE_CLIENT_ID` / `_SECRET` at build time.
-  CI has them as secrets; export them in the Mac's shell before `mac` or the Mac build says
-  Google sign-in is not set up (everything else works).
+  CI has them as GitHub secrets. The Mac keeps them in its **Keychain**: run
+  `npm run release -- mac-keys` **once per Mac** and paste each value (Google Cloud Console >
+  APIs & Services > Credentials > the Desktop OAuth client; GitHub never shows a saved secret
+  again). `security` asks for them hidden, so they never land in a file, shell history or a chat.
+  After that every `mac` build reads them by itself. `mac` **stops** if they are missing, so a
+  release never ships to Mac without Google sign-in by accident; `mac --no-google` builds
+  without it on purpose. Agents building on the Mac: never ask the owner to paste the keys
+  into a chat; point them at `mac-keys`.
 - Smoke test before Publish: `release/mac-arm64/KRNL0.app` with
   `KRNL0_USER_DATA=<tmp> KRNL0_BOARD_DIR=<tmp>` (keeps your real board out of it). Start the
   Pomo, minimise: the floating timer must appear; restore: it hides. Run `krnl pomo start` in
