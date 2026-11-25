@@ -3810,3 +3810,17 @@ Typecheck clean; all tests pass.
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+---
+
+## [2026-11-25] — v0.17.1 published
+
+**Type:** Release (published)
+**PRs/Commits:** tag `v0.17.1` (PRs #297, #299, #300, #301, notes #302, release #303); server krnl0-server #30 (v0.2.9); website krnl0-website #12
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:**
+- KRNL0 0.17.1 published on the owner's yes. The draft had the Windows installer, its blockmap, `latest.yml` (0.17.1), the web app with a matching checksum, and the Apple silicon `.dmg` built on the owner's Mac from the tag (Google sign-in keys from its Keychain).
+- Server 0.2.9 (website KRNL0 0.17.1): verified with `updater verify` (signed, 9 files match), published on the owner's yes.
+- krnl0.com: fallback version 0.17.1 and "Your phone on its side" in What's new (krnl0-website #12, merged).
+- Left: the Microsoft Store package for 0.17.1 (`npm run package:store` from the tag, submitted by the owner in Partner Center). The release workflow's actions run on Node 20, which GitHub has deprecated: worth updating.
