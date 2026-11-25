@@ -3731,3 +3731,12 @@ Also on the canvas "KRNL0 Drag to add time": four drafts (A switch, B one row, C
 **Files changed:** `src/renderer/components/nodes/PomoNode/DoingPicker.tsx`, `src/renderer/components/nodes/CalendarNode/DragAddCard.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/dragToAdd.test.tsx`
 **Summary:** Owner screenshot. The drag card is 300 px wide with its border and padding, and the name list inside it was also 300 px, so the "What was it?" field ran about 10 px past the card's inside, up to its right edge. `DoingList` takes a `width` (300 by default, for its own popovers); the drag card passes `100%`, so the list fills the card's inside with even margins.
 
+---
+
+## [2026-11-25] — 0.17 release notes and tour steps
+
+**Type:** Docs / Feature
+**PRs/Commits:** branch `feat/drag-to-add-and-free-spots` (PR #295)
+**Files changed:** `src/shared/whatsnew.ts`, `src/renderer/components/Launch/WhatsNewDialog.tsx`, `src/renderer/assets/launch/plate-dragadd.webp`, `plate-names.webp`, `plate-accent.webp`, `docs/releases/v0.17.0.md`, `CHANGELOG.md`, `src/renderer/components/Tour/tours.ts`, `src/renderer/components/Tour/voice/`, `tests/unit/renderer/tours.test.tsx`
+**Summary:** What's new 0.17 designed on the canvas "KRNL0 0.17 · What's new" and approved by the owner: "Drag to add your time." (Show me: the Calendar tour), "Name any time you spent." (the Timer tour), "Your colour, a smoother canvas." (opens Settings), plus the full-notes list. The three pictures are rendered from the canvas at 2x with a see-through background like the earlier plates. Tutorial gate: the Calendar, Clock and Timer tours gained a step each for drag to add and naming any time, voiced like the rest.
+

@@ -7,7 +7,7 @@
 
 import { minorOf } from './appState';
 
-export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone' | 'update' | 'calendar' | 'events' | 'move' | 'calendars' | 'bothways' | 'phonetoday';
+export type WhatsNewArt = 'mini' | 'menubar' | 'feedback' | 'streak' | 'sessions' | 'guide' | 'board' | 'boards' | 'windows' | 'cards' | 'sync' | 'phone' | 'update' | 'calendar' | 'events' | 'move' | 'calendars' | 'bothways' | 'phonetoday' | 'dragadd' | 'names' | 'accent';
 /** What "Show me" does for a highlight. */
 export type WhatsNewAction = 'pomo' | 'feedback' | 'settings' | 'tour' | 'none';
 
@@ -40,6 +40,52 @@ export interface WhatsNewRelease {
 }
 
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    // Designed on the canvas "KRNL0 0.17 · What's new" (approved by the owner, 2026-11-25).
+    minor: '0.17',
+    date: 'Nov 2026',
+    summary: 'Drag to add your time, name any time you spent, your own colour',
+    items: [
+      {
+        label: 'Drag to add your time',
+        kicker: 'New · Calendar and Clock',
+        caption: 'Drag across empty time, then say what it is.',
+        title: 'Drag to add\nyour time.',
+        body: 'Drag across empty hours on the Calendar, or round the Clock. Time that has passed asks what it was and logs it. Time ahead becomes a task, an event or something that repeats. It lands on the edge of the block next to it and can run past midnight.',
+        art: 'dragadd',
+        action: 'tour',
+        tour: 'calendar',
+      },
+      {
+        label: 'Name any time you spent',
+        kicker: 'New · What was it?',
+        caption: 'Any name, not only a task. Your names come back.',
+        title: 'Name any time\nyou spent.',
+        body: 'A game, a call, a walk: past time takes any name, not only a task. Names you used come back as you type, even from their first letters, and the kind pill files the time under Play, Study or a kind you make. In Analytics, merge two names and their time adds up.',
+        art: 'names',
+        action: 'tour',
+        tour: 'pomo',
+      },
+      {
+        label: 'Your colour, a smoother canvas',
+        kicker: 'New · Settings › Appearance',
+        caption: 'Pick a colour, or type your own.',
+        title: 'Your colour,\na smoother canvas.',
+        body: 'Settings › Appearance › Accent colour: pick one of eight, or type your own. KRNL0 keeps it readable. The canvas moves more smoothly too: no lag when you start to pan, and sharp text while you zoom.',
+        art: 'accent',
+        action: 'settings',
+      },
+    ],
+    more: [
+      'One mode: Easy mode is gone, everyone gets the whole of KRNL0. If you used Easy, your timer stays a stopwatch.',
+      'The Clock: a drag carries on round the dial into the other half of the day, or into tomorrow.',
+      'Drags move in 5-minute steps and catch on the time now. A drag that starts in the past stops at now.',
+      'The Calendar has calmer hour rows and less room on top; the Google note can be hidden.',
+      'A new card never lands on a window or on top of another card.',
+      'Analytics: merge two names into one, and all their time moves with it.',
+      'Commands: krnl pomo add --text, krnl time rename, krnl theme accent.',
+    ],
+  },
   {
     // Designed on the canvas "KRNL0 0.16 · What's new" (approved by the owner, 2026-11-23).
     minor: '0.16',

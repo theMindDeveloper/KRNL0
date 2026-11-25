@@ -61,7 +61,8 @@ describe('TourHost', () => {
     document.body.appendChild(target);
     render(<TourHost />);
     act(() => { startTour('clock'); });
-    // go to the "press WEEK" step
+    // go to the "press WEEK" step (after the dial, click and drag-to-add steps)
+    act(() => { fireEvent.click(screen.getByTestId('tour-next')); });
     act(() => { fireEvent.click(screen.getByTestId('tour-next')); });
     act(() => { fireEvent.click(screen.getByTestId('tour-next')); });
     expect(screen.getByTestId('tour-text').textContent).toMatch(/Week/);

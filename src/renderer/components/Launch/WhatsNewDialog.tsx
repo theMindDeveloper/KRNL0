@@ -30,6 +30,9 @@ import artMove from '../../assets/launch/plate-move.webp';
 import artCalendars from '../../assets/launch/plate-calendars.webp';
 import artBothways from '../../assets/launch/plate-bothways.webp';
 import artPhoneToday from '../../assets/launch/plate-phonetoday.webp';
+import artDragAdd from '../../assets/launch/plate-dragadd.webp';
+import artNames from '../../assets/launch/plate-names.webp';
+import artAccent from '../../assets/launch/plate-accent.webp';
 import { startTour } from '../Tour/TourHost';
 import { tourById } from '../Tour/tours';
 import { IS_WEB } from '../../platform';
@@ -40,6 +43,7 @@ const ART: Record<WhatsNewArt, string> = {
   boards: artBoards, windows: artWindows, cards: artCards, sync: artSync, phone: artPhone, update: artUpdate,
   calendar: artCalendar, events: artEvents, move: artMove,
   calendars: artCalendars, bothways: artBothways, phonetoday: artPhoneToday,
+  dragadd: artDragAdd, names: artNames, accent: artAccent,
 };
 
 function runAction(item: WhatsNewItem): void {

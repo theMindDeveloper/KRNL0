@@ -5,6 +5,23 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] — unreleased
+
+### Added
+- Drag to add on the Calendar and the Clock: past time asks what it was and logs it; time ahead becomes a task (to Todo), an event or a repeating event (Task · Event · Repeats, remembered). Blocks land on the edge of their neighbour (Alt: free) and can run past midnight in the week (calendar-clock-visuals F93/F94, Decision 62).
+- Name any time: past time and the running timer take any name, not only a task; names you used come back (initials too); the kind pill files time under a kind, and can make a new one; merge names in Analytics; `krnl pomo add --text`, `krnl time rename` (time-log F22).
+- Accent colour in Settings › Appearance, eight colours or your own, kept readable; `krnl theme accent`.
+- New steps in the Calendar, Clock and Timer tours.
+
+### Changed
+- Easy mode is retired: boards in Easy open in Advanced and keep their stopwatch; new boards start in Advanced on the stopwatch; `krnl settings mode easy` is refused (Decision 66).
+- New cards the app places itself land off every window and card (Decision 66).
+- Drags move in 5-minute steps and snap to the time now; a drag from the past stops at the now line. The Clock turns to the other half of the day or the next day instead of a second ring.
+- A smoother canvas: one steady layer, a sliding grid, sharp text while zooming (Decision 65). Calmer Calendar hours, less room on top, a hideable Google note.
+
+### Fixed
+- The "What was it?" list is as tall as its names (no empty gap) and fits its card.
+
 ## [0.16.2] — 2026-11-23
 
 ### Added
