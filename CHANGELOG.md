@@ -5,7 +5,7 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.17.0] — unreleased
+## [0.17.0] — 2026-11-25
 
 ### Added
 - Drag to add on the Calendar and the Clock: past time asks what it was and logs it; time ahead becomes a task (to Todo), an event or a repeating event (Task · Event · Repeats, remembered). Blocks land on the edge of their neighbour (Alt: free) and can run past midnight in the week (calendar-clock-visuals F93/F94, Decision 62).

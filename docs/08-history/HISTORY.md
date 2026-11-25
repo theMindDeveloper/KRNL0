@@ -3740,3 +3740,14 @@ Also on the canvas "KRNL0 Drag to add time": four drafts (A switch, B one row, C
 **Files changed:** `src/shared/whatsnew.ts`, `src/renderer/components/Launch/WhatsNewDialog.tsx`, `src/renderer/assets/launch/plate-dragadd.webp`, `plate-names.webp`, `plate-accent.webp`, `docs/releases/v0.17.0.md`, `CHANGELOG.md`, `src/renderer/components/Tour/tours.ts`, `src/renderer/components/Tour/voice/`, `tests/unit/renderer/tours.test.tsx`
 **Summary:** What's new 0.17 designed on the canvas "KRNL0 0.17 · What's new" and approved by the owner: "Drag to add your time." (Show me: the Calendar tour), "Name any time you spent." (the Timer tour), "Your colour, a smoother canvas." (opens Settings), plus the full-notes list. The three pictures are rendered from the canvas at 2x with a see-through background like the earlier plates. Tutorial gate: the Calendar, Clock and Timer tours gained a step each for drag to add and naming any time, voiced like the rest.
 
+## [2026-11-25] — Release v0.17.0
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.17.0`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.16.2 → 0.17.0`. Notes: `docs/releases/v0.17.0.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
