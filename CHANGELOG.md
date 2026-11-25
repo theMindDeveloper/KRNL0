@@ -5,6 +5,22 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.2] — unreleased
+
+### Added
+- Touch: hold, then drag moves plans, events and habits, draws new boxes and carries to-dos and habits onto the Calendar; while held, nothing behind moves (Decision 68, phone-web F16–F17).
+- Touch: a carried task held over the phone's Calendar tab opens the Calendar to drop it (F21).
+
+### Fixed
+- A finger on a plan moved the view instead of the plan, in My layout and on the canvas (#307).
+- Drawing a box with a finger moved the canvas too (#305); a pinch on the Calendar zoomed the canvas and the page as well (#306).
+- Block edges are fingertip-sized; a short plan stretches from its lower half (F18).
+- Holding a task to carry it no longer opens its menu; hold and lift in place opens it (F19).
+- The Clock's drag round the dial stretches with a finger.
+- The on-screen keyboard no longer covers cards; no "AutoFill Contact" on KRNL0's fields (F22).
+- A new board, or a device's first copy of a board, opens on My layout as Reset arranges it (F23).
+- Release builds run on Node 24 (the Node 20 actions runtime was deprecated).
+
 ## [0.17.1] — 2026-11-25
 
 ### Added
