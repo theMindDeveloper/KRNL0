@@ -3751,3 +3751,17 @@ Also on the canvas "KRNL0 Drag to add time": four drafts (A switch, B one row, C
 - After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
 
 Typecheck clean; all tests pass.
+
+---
+
+## [2026-11-25] — v0.17.0 published
+
+**Type:** Release (published)
+**PRs/Commits:** tag `v0.17.0`; server krnl0-server #28 (v0.2.8); website krnl0-website #11
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:**
+- KRNL0 0.17.0 published on the owner's yes. The draft had the Windows installer, its blockmap, `latest.yml` (0.17.0), the web app with a matching checksum, and the Apple silicon `.dmg` built on the owner's Mac from the tag with the Google sign-in keys read from its Keychain.
+- Server 0.2.8 (website KRNL0 0.17.0): verified with `updater verify` (signed, 9 files match), published on the owner's yes; `:latest` matches the signed digest.
+- krnl0.com: fallback version 0.17.0 and the 0.17 news list (krnl0-website #11, merged).
+- Left: the Microsoft Store package for 0.17.0 (`npm run package:store` from the tag, submitted by the owner in Partner Center).
