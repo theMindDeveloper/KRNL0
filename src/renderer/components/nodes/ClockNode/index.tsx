@@ -36,6 +36,7 @@ import { msAtWallHours } from './wallHours';
 import { localYMD } from '../../../../shared/ymd';
 import { CX, CY, R_FACE, pt, arcPath, sectorPath } from './dialGeometry';
 import { DragAddCard, hmOfMin } from '../CalendarNode/DragAddCard';
+import { holdToDraw } from '../CalendarNode/holdToDraw';
 
 /** F94 — the Clock's drag steps (minutes) and how close an end must come to now to land on it. */
 export const DIAL_STEP_MIN = 5;
@@ -580,72 +581,82 @@ export function ClockNode({
             // #207 F7b — right-click an empty part of the dial: log time that
             // wasn't recorded at that hour (arcs and wedges stop their own).
             onPointerDown={(ev) => {
-              // A finger scrolls on a phone or tablet; drawing is for a mouse or a pen.
-              if (ev.button !== 0 || ev.pointerType === 'touch') return;
+              if (ev.button !== 0) return;
               // Only empty dial: anything drawn there keeps its own click.
               if ((ev.target as Element).closest?.('[data-testid^="clock-reality"], [data-testid^="clock-task"], [data-testid^="clock-plan"], [data-testid^="clock-event"], [data-testid^="clock-habit"], [data-testid^="clock-routine"], [data-testid^="clock-due"], [data-testid^="clock-carried"], a, button')) return;
               const svg = ev.currentTarget;
-              const hOf = (cx: number, cy: number): number => {
-                const r = svg.getBoundingClientRect();
-                const a = Math.atan2(cy - (r.top + r.height / 2), cx - (r.left + r.width / 2));
-                return ((((a + Math.PI / 2) / (Math.PI * 2)) * 12) % 12 + 12) % 12;
-              };
-              let prev = hOf(ev.clientX, ev.clientY);
-              const day0 = selectedDate;
-              const S = DIAL_STEP_MIN;
-              // An end within a few minutes of the time now lands exactly on it (owner, 2026-11-24).
-              // The minute already begun (floor): an end snapped to now is never in the future, so it logs.
-              const nowMin = Math.floor((Date.now() - ymdStartMs(day0)) / 60_000);
-              const toNow = (raw: number, onGrid: number): number => (Math.abs(raw - nowMin) <= DIAL_SNAP_NOW_MIN ? nowMin : onGrid);
-              const raw0 = (viewWindow * 12 + prev) * 60;
-              const m0 = toNow(raw0, Math.round(raw0 / S) * S);
-              // A drag that starts in the past stops at the now line: it is always logged time (owner, 2026-11-25).
-              const fromPast = m0 < nowMin;
-              let cum = 0;
-              let moved = false;
-              // The half (and day) the dial shows follows the moving end: past 12 it
-              // turns to the other half, past midnight to the next day (no second ring).
-              let shownHalf = Math.floor(raw0 / 720);
-              dialStartRef.current = { date: day0, window: viewWindow === 1 ? 1 : 0 };
-              const move = (e: PointerEvent): void => {
-                const h = hOf(e.clientX, e.clientY);
-                let d = h - prev;
-                if (d > 6) d -= 12;
-                if (d <= -6) d += 12;
-                cum += d;
-                prev = h;
-                if (!moved && Math.abs(cum) * 60 < 10) return;
-                moved = true;
-                const raw = raw0 + cum * 60;
-                // At least 5 minutes, at most 12 hours.
-                let m = toNow(raw, Math.round(raw / S) * S);
-                if (m >= m0) m = Math.max(m0 + S, Math.min(m, m0 + 720, fromPast ? nowMin : Infinity)); else m = Math.min(m0 - S, Math.max(m, m0 - 720));
-                // The half holding the moving end (an end exactly on 12:00 still belongs to the half it closes).
-                const half = Math.floor((m > m0 ? m - 1 : m) / 720);
-                if (half !== shownHalf) {
-                  shownHalf = half;
-                  const dayOff = Math.floor(half / 2);
-                  const date = addDaysYMD(day0, dayOff);
-                  if (date !== selectedDateRef.current) onCommand('clock.setSelectedDate', { date });
-                  onCommand('clock.setViewWindow', { window: ((half % 2) + 2) % 2 === 1 ? 1 : 0 });
-                }
-                setDialDraw({ day0, m0, m, card: null });
-              };
-              const stop = (): void => {
-                window.removeEventListener('pointermove', move);
-                window.removeEventListener('pointerup', up);
-                window.removeEventListener('pointercancel', cancel);
-              };
-              // The browser took the pointer: no card, nothing drawn.
-              const cancel = (): void => { stop(); if (moved) cancelDialDraw(); else dialStartRef.current = null; };
-              const up = (e: PointerEvent): void => {
-                stop();
-                if (!moved) { dialStartRef.current = null; return; }
-                setDialDraw((cur) => (cur ? { ...cur, card: { x: e.clientX + 14, y: e.clientY - 20 } } : cur));
-              };
-              window.addEventListener('pointermove', move);
-              window.addEventListener('pointerup', up);
-              window.addEventListener('pointercancel', cancel);
+              // A finger that moves scrolls; a finger held still draws (holdToDraw).
+              if (ev.pointerType === 'touch') { holdToDraw(ev, (p) => begin(p.clientX, p.clientY, true)); return; }
+              begin(ev.clientX, ev.clientY, false);
+              function begin(x0: number, y0: number, touch: boolean): void {
+                const hOf = (cx: number, cy: number): number => {
+                  const r = svg.getBoundingClientRect();
+                  const a = Math.atan2(cy - (r.top + r.height / 2), cx - (r.left + r.width / 2));
+                  return ((((a + Math.PI / 2) / (Math.PI * 2)) * 12) % 12 + 12) % 12;
+                };
+                let prev = hOf(x0, y0);
+                const day0 = selectedDate;
+                const S = DIAL_STEP_MIN;
+                // An end within a few minutes of the time now lands exactly on it (owner, 2026-11-24).
+                // The minute already begun (floor): an end snapped to now is never in the future, so it logs.
+                const nowMin = Math.floor((Date.now() - ymdStartMs(day0)) / 60_000);
+                const toNow = (raw: number, onGrid: number): number => (Math.abs(raw - nowMin) <= DIAL_SNAP_NOW_MIN ? nowMin : onGrid);
+                const raw0 = (viewWindow * 12 + prev) * 60;
+                const m0 = toNow(raw0, Math.round(raw0 / S) * S);
+                // A drag that starts in the past stops at the now line: it is always logged time (owner, 2026-11-25).
+                const fromPast = m0 < nowMin;
+                let cum = 0;
+                let moved = touch;
+                let dragged = false;
+                // The half (and day) the dial shows follows the moving end: past 12 it
+                // turns to the other half, past midnight to the next day (no second ring).
+                let shownHalf = Math.floor(raw0 / 720);
+                dialStartRef.current = { date: day0, window: viewWindow === 1 ? 1 : 0 };
+                const move = (e: PointerEvent): void => {
+                  const h = hOf(e.clientX, e.clientY);
+                  let d = h - prev;
+                  if (d > 6) d -= 12;
+                  if (d <= -6) d += 12;
+                  cum += d;
+                  prev = h;
+                  if (!dragged && Math.abs(cum) * 60 < 10) return;
+                  moved = true;
+                  dragged = true;
+                  const raw = raw0 + cum * 60;
+                  // At least 5 minutes, at most 12 hours.
+                  let m = toNow(raw, Math.round(raw / S) * S);
+                  if (m >= m0) m = Math.max(m0 + S, Math.min(m, m0 + 720, fromPast ? nowMin : Infinity)); else m = Math.min(m0 - S, Math.max(m, m0 - 720));
+                  // The half holding the moving end (an end exactly on 12:00 still belongs to the half it closes).
+                  const half = Math.floor((m > m0 ? m - 1 : m) / 720);
+                  if (half !== shownHalf) {
+                    shownHalf = half;
+                    const dayOff = Math.floor(half / 2);
+                    const date = addDaysYMD(day0, dayOff);
+                    if (date !== selectedDateRef.current) onCommand('clock.setSelectedDate', { date });
+                    onCommand('clock.setViewWindow', { window: ((half % 2) + 2) % 2 === 1 ? 1 : 0 });
+                  }
+                  setDialDraw({ day0, m0, m, card: null });
+                };
+                const stop = (): void => {
+                  window.removeEventListener('pointermove', move);
+                  window.removeEventListener('pointerup', up);
+                  window.removeEventListener('pointercancel', cancel);
+                };
+                // The browser took the pointer: no card, nothing drawn.
+                const cancel = (): void => { stop(); if (moved) cancelDialDraw(); else dialStartRef.current = null; };
+                const up = (e: PointerEvent): void => {
+                  stop();
+                  if (!moved) { dialStartRef.current = null; return; }
+                  // A hold let go where it started: half an hour (to now from the past), in this half of the dial.
+                  const held = touch && !dragged ? Math.min(m0 + 30, (Math.floor(m0 / 720) + 1) * 720, fromPast ? nowMin : Infinity) : null;
+                  setDialDraw((cur) => (cur ? { ...cur, ...(held !== null ? { m: held } : {}), card: { x: e.clientX + 14, y: e.clientY - 20 } } : cur));
+                };
+                // On a touch screen the wedge shows as soon as the hold fires.
+                if (touch) setDialDraw({ day0, m0, m: Math.min(m0 + S, fromPast ? nowMin : Infinity), card: null });
+                window.addEventListener('pointermove', move);
+                window.addEventListener('pointerup', up);
+                window.addEventListener('pointercancel', cancel);
+              }
             }}
             onContextMenu={(ev) => {
               ev.preventDefault();

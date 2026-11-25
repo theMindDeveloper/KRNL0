@@ -3765,3 +3765,12 @@ Typecheck clean; all tests pass.
 - Server 0.2.8 (website KRNL0 0.17.0): verified with `updater verify` (signed, 9 files match), published on the owner's yes; `:latest` matches the signed digest.
 - krnl0.com: fallback version 0.17.0 and the 0.17 news list (krnl0-website #11, merged).
 - Left: the Microsoft Store package for 0.17.0 (`npm run package:store` from the tag, submitted by the owner in Partner Center).
+
+---
+
+## [2026-11-25] — Drag to add works with a finger (hold, then drag)
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `fix/touch-drag-to-add`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/holdToDraw.ts` (new), `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/ClockNode/index.tsx`, `src/renderer/components/Mobile/mobile.css`, `src/renderer/components/Tour/tours.ts`, `src/renderer/components/nodes/CalendarNode/__tests__/touchHold.test.tsx` (new), `docs/06-requirements/calendar-clock-visuals.md`
+**Summary:** Owner: "why doesn't it work on mobile with touch?" Drag to add (F93/F94) returned early for every finger, so a touch could only scroll, and the phone website (the server's Today and Calendar tabs) could not add time at all. Now a finger that moves still scrolls, and a finger held still on empty time for 450 ms starts the box (or the Clock's wedge) there, with a short buzz; it then follows the finger and the page stops scrolling under it. A hold let go without a drag opens the card for half an hour. One helper, `holdToDraw`, serves both: until the hold fires nothing is stopped; after it, touchmove is stopped, the long-press menu stays shut, and the mouse events a browser copies from the lift cannot close the card that just opened. Text selection and the iOS callout are off on the Calendar's days and the Clock's dial on the phone website. The Calendar and Clock tour cards say "On a phone: hold, then drag" (the voice lines are unchanged). A mouse and a pen draw at once, as before.
