@@ -5,6 +5,20 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.1] — unreleased
+
+### Added
+- The phone website held sideways is a dock: a slim rail and two windows side by side (Todo and the Clock), with a timer pill (Start; or the task, time and Stop) while neither window is the Timer (phone-web F10, F12; Decision 67).
+- Tap a window's name to choose which window sits there; a window shown elsewhere swaps places. The iPad's four Today windows change the same way. Kept per device (F11, F14).
+- More on the phone is a small popup at its tab, not a page (F13).
+
+### Fixed
+- Drag to add works with a finger: hold still on empty time, then drag; a swipe still scrolls (calendar-clock-visuals F93/F94).
+- Settings option cards wrap to fit a phone instead of spilling past their edges.
+- A time row's label (the Clock's date) is never cut in a narrow window.
+- The Calendar's hours keep 20 px and scroll on a phone held sideways.
+- The Mac build reads the Google sign-in keys from the Mac's Keychain (`npm run release -- mac-keys` once per Mac).
+
 ## [0.17.0] — 2026-11-25
 
 ### Added
