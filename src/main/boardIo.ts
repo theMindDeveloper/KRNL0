@@ -14,7 +14,7 @@ import { homedir } from 'os';
 import { backupCorruptBoard, BoardCorruptError, BoardUnreadableError, readBoardText, seedBoard, writeFileAtomic } from './persistence/board';
 
 export const BOARD_DIR =
-  process.env.KRNL0_BOARD_DIR ?? join(homedir(), 'Documents', app.getName());
+  process.env.KRNL0_BOARD_DIR ?? join(homedir(), 'Documents', app?.getName?.() ?? 'KRNL0');
 export const BOARD_PATH = join(BOARD_DIR, 'board.json');
 export const ASSETS_DIR = join(BOARD_DIR, 'assets');
 

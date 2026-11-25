@@ -5,6 +5,15 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.2] — 2026-11-23
+
+### Added
+- KRNL0 for Mac (Apple silicon, M1 and newer): a disk image, `KRNL0-0.16.2-arm64.dmg`, on the release. The Mac button on krnl0.com finds it there.
+
+### Fixed
+- `krnl pomo …` commands (start, stop, config and the rest) failed in the installed app with "Cannot find module '../../main/boardIo'". (#291)
+- The terminal's welcome banner showed v0.0.0 in the installed app; it shows the app's version again. (#291)
+
 ## [0.16.1] — 2026-11-23
 
 ### Added

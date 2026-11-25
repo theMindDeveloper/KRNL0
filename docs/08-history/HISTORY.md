@@ -3509,6 +3509,44 @@ Typecheck clean; all tests pass.
 
 **Summary:** The owner wanted a license that lets people use the code but not build a competing product, with no automatic change of license after two years (the FSL turns each version into Apache 2.0 after two years). `LICENSE.md` is now the PolyForm Shield License 1.0.0 (official text) with the Required Notice, a `Licensor Line of Business` line (so the Discontinued Products clause does not open the door if KRNL0 pauses) and a note that versions up to 0.16.0 stay under FSL, whose text moved to `LICENSES/FSL-1.1-ALv2.md`. `package.json` said MIT by mistake; it now says `PolyForm-Shield-1.0.0`. Old copies cannot be recalled: whoever has a version up to 0.16.0 keeps its FSL rights. The only other committer (two lockfile commits, one reverted) has no code left in the project, so no relicense consent is needed. The v0.16.1 notes and CHANGELOG now cover the plan-from-now features, the Store and the license.
 
+## [2026-11-23] — v0.16.1 published, with KRNL0 server 0.2.6
+
+**Type:** Release (published)
+**PRs/Commits:** #286 (Store build, calm badge), #287 (notes), #288 (release PR), #289 (plan from now, license), tag `v0.16.1` (re-tagged once: the first draft was never published and was replaced so the features and the license are inside); server: theMindDeveloper/krnl0-server#25; website: theMindDeveloper/krnl0-website#9
+**Files changed:** `docs/08-history/HISTORY.md`, `docs/releases/store-listing.md`, `README.md`
+
+**Summary:** A small release: drag a plan to today and it snaps to the time now, a small Now button on the add card, the calm "saved · synced" badge, the Microsoft Store channel (a Store copy is updated by the Store) and the new license (PolyForm Shield 1.0.0 from this version; up to 0.16.0 stays FSL). The owner asked for the whole train to run. The draft was checked by `npm run release -- check` (installer, blockmap, `latest.yml` 0.16.1, web app checksum) and published. The follow workflow opened server 0.2.6 (website = KRNL0 0.16.1); its release build passed, `release.json` says web 0.16.1 with the signed image digest, it was published and `:latest` was checked against that digest. The krnl0.com fallback version is 0.16.1 and its license wording was corrected (the FAQ no longer promises open source after two years). The Store submission is not done: the developer account is locked by Microsoft pending the owner's recovery; the listing text is in `docs/releases/store-listing.md`.
+
+## [2026-11-23] — Mac .dmg in the release train; packaged `krnl pomo` and banner fixed
+
+**Type:** Bug Fix / Chore
+**PRs/Commits:** branch `fix/mac-dmg-release`, issue #291
+**Files changed:** `src/sys/commands/pomo.ts`, `src/main/boardIo.ts`, `src/main/ipc/handlers.ts`, `tests/unit/main/noRelativeRequire.test.ts`, `scripts/release.mjs`, `docs/releases/RELEASING.md`, `.github/workflows/release.yml`, `CHANGELOG.md`, `docs/releases/v0.16.2.md`
+
+**Summary:** The owner asked for a Mac build, on their Mac, offered on the website. No release had ever had a `.dmg`, so krnl0.com's Mac button said "Coming soon". Building the `.dmg` and running it with isolated data showed that every main-side `krnl pomo` command failed in a packaged app: `pomo.ts` loaded `../../main/boardIo` with a runtime `require`, which keeps its source path after electron-vite bundles main into one file (Windows was affected too). The terminal banner read `../../../package.json`, which is outside app.asar, so it said v0.0.0. Fixes: static imports (`boardIo` tolerates a missing Electron `app` in tests), `app.getVersion()` for the banner, and a test that fails on any source-relative `require` in `src/main`/`src/sys`. The packaged Mac app was checked: the floating timer (dial, capsule, box) shows when the main window is minimised and hides on restore, its Stop button stops the board's timer, the menu-bar timer runs, node-pty spawns a shell, the `.dmg` verifies and the app's ad-hoc signature is valid. `npm run release -- mac` now builds the `.dmg` from the tag on an Apple silicon Mac (fetching Electron and rebuilding node-pty, which npm 11 skips) and attaches it to the release; `check` reminds when it is missing.
+
+## [2026-11-23] — Release v0.16.2
+
+**Type:** Release
+**PRs/Commits:** release PR on `chore/release-v0.16.2`
+**Files changed:** `package.json`, `package-lock.json`, `CHANGELOG.md`, `docs/08-history/HISTORY.md`
+
+**Summary:**
+- Version `0.16.1 → 0.16.2`. Notes: `docs/releases/v0.16.2.md`.
+- After publishing, the server's follow workflow opens the KRNL0 server release that ships this website.
+
+Typecheck clean; all tests pass.
+
+## [2026-11-23] — v0.16.2 published: KRNL0 for Mac, with KRNL0 server 0.2.7
+
+**Type:** Release (published)
+**PRs/Commits:** #292 (fix + Mac step), #293 (release PR), tag `v0.16.2`; server: theMindDeveloper/krnl0-server#27 (v0.2.7); website: theMindDeveloper/krnl0-website#10
+**Files changed:** `docs/08-history/HISTORY.md`
+
+**Summary:** The owner asked for a Mac build made on their Mac, offered on the website, and the whole release run without them. CI built the Windows draft; `npm run release -- check` passed (installer, blockmap, `latest.yml` 0.16.2, web app checksum). On the Mac, `npm run release -- mac` built `KRNL0-0.16.2-arm64.dmg` from the tag, verified the image and the ad-hoc signature, and attached it with its blockmap. The packaged 0.16.2 app was smoke-tested with isolated data: the banner says v0.16.2, `krnl pomo start` works, and minimising shows the always-on-top floating timer. Then the release was published. The follow workflow opened server 0.2.7 (web 0.16.2, signed image digest in `release.json`); it was merged, built, published, and `:latest` moved. krnl0.com: fallback version 0.16.2, the homepage says Windows and Mac, and the download page's licence line says PolyForm Shield. The live download page offers the `.dmg` as "Download for Mac". Not done: the Mac build has no Google sign-in client (CI-only secrets), so Google Calendar sign-in says "not set up" on Mac; and the Microsoft Store submission needs Windows and the owner.
+
+---
+
 ## [2026-11-24] — Smooth canvas: no lag when a pan starts, one steady layer, a sliding grid
 
 **Type:** Performance / Bug Fix

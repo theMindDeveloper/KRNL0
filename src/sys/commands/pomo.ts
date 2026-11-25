@@ -17,6 +17,10 @@ import {
   type PomoEnv,
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
+// Static imports: main is bundled into one file, so a runtime require of a relative path
+// has nothing to find in a packaged app (#291).
+import * as boardIo from '../../main/boardIo';
+import { listBoards } from '../../main/persistence/boards';
 import { resolveNodeRef, resolutionError } from '../../shared/dispatch/resolveRef';
 import { pomoEditSegment as fsmEditSegment, pomoAddSegmentFilling, spanProblem, hmOf, ymdOf } from '../../renderer/components/nodes/PomoNode/spanEdit';
 import type { BoardShape } from '../../shared/dispatch/types';
@@ -48,10 +52,8 @@ function findPomoNode(board: BoardWithNodes) {
   ) as (Record<string, unknown> & { state?: Partial<PomoState>; config?: Record<string, unknown> }) | undefined;
 }
 
-function getBoardIo() {
-  // Lazy import of boardIo to avoid Electron `app.getName()` crash in test env.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return require('../../main/boardIo') as typeof import('../../main/boardIo');
+function getBoardIo(): typeof boardIo {
+  return boardIo;
 }
 
 const cliEnv = (): PomoEnv => ({
@@ -64,8 +66,6 @@ function timerElsewhere(): string | null {
   try {
     const dir = (getBoardIo() as { BOARD_DIR?: unknown }).BOARD_DIR;
     if (typeof dir !== 'string' || !dir) return null;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { listBoards } = require('../../main/persistence/boards') as typeof import('../../main/persistence/boards');
     const list = listBoards(dir);
     if (!list.recording) return null;
     return list.boards.find((b) => b.id === list.recording!.boardId)?.name ?? null;
