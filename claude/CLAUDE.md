@@ -75,7 +75,7 @@ If you forget syntax, ask the CLI — don't guess.
 
 Every plan is one block of time on the Calendar (its When, its length). There is no "focus task" any more: `krnl task kind <ref> focus` is refused. The timer is its own window and works one of two ways, for the whole board:
 
-- **Observe** — a stopwatch: start it, stop it, it records the span. Easy mode always works this way (it calls the timer "Record").
+- **Observe** — a stopwatch: start it, stop it, it records the span. New boards start on it.
 - **Pomodoro** — sessions and breaks from the timer's settings.
 
 ```
@@ -83,14 +83,15 @@ krnl pomo config --mode observe|pomodoro
 krnl pomo config [--session 25] [--short 5] [--long 15] [--every 4] [--face auto|minimal|ascii|lcd|blocks|vapor|vu|outline|mac]
 krnl pomo start|pause|resume|break|extend|stop [--at HH:MM]|discard|status
 krnl pomo tag <task-ref>                       # what the running span is for
-krnl pomo add --start HH:MM --end HH:MM [--task <ref>]   # record time that wasn't recorded
-krnl pomo segments [--date YYYY-MM-DD] / pomo segment <id> --start/--end / pomo retag / pomo delete-segment
+krnl pomo add --start HH:MM --end HH:MM [--task <ref> | --text "Age of Empires 2" [--tag <kind>]]   # record time that wasn't recorded: a task, or a free name and its kind of work
+krnl pomo segments [--date YYYY-MM-DD] / pomo segment <id> --start/--end / pomo retag <id> [<task> | --text "name" [--tag <kind>]] / pomo delete-segment
+krnl time rename "AOE2" "Age of Empires 2" [--tag <kind>]   # merge a name into another: all its recorded time moves (Analytics: one row)
 ```
 A plan's length is `krnl task duration <ref> <minutes>` (fine while the timer runs).
 
 ### Modes and layout
 ```
-krnl settings mode easy|advanced        # Easy hides deadlines, reminders, the terminal, Pomodoro naming
+krnl settings mode                      # always advanced (Easy mode was retired in 0.17)
 krnl settings layout station|canvas
 krnl settings grid on|off
 ```
@@ -321,6 +322,7 @@ krnl undo / krnl redo                        # need renderer
 krnl theme set <light|dark>                  # mutation; needs renderer
 krnl theme show                              # read
 krnl theme frames / krnl theme frame <style>  # window frame styles
+krnl theme accent <rrggbb|green|cyan|blue|violet|pink|red|orange|amber|reset>   # the accent colour (KRNL0 green by default); type hex WITHOUT "#" (a shell reads it as a comment); needs renderer
 krnl tour list / krnl tour start <id>         # guided tours
 krnl sound … / krnl sfx play|stop|list        # sound packs, volume, UI sounds
 ```

@@ -9,7 +9,7 @@
 | F1 | Calendar and Clock use one lane packer (`store/laneLayout.ts`). Overlapping blocks form a cluster, every block in a cluster reports the same lane count, and a block widens over lanes that stay free for its whole interval. |
 | F2 | *(Superseded by F16.)* Calendar reality used to be a thin rail on the left edge of each day column. Planned task and habit blocks still keep a small left gutter, where the highlight's edge shows. |
 | F3 | Reality colours: focus = a faint wash in the colour of the task it is tagged with (acid when untagged) with a solid edge. Break = a faint neutral hatch with a dashed edge. A pause is a gap. The live span is a little stronger. |
-| F4 | Right-clicking a reality span (Calendar highlight or Clock wedge) opens its menu (F17). **Left-clicking** a Clock wedge or a Calendar highlight (#203 — the day column hit-tests, since the bands take no pointer events; several overlapping spans open the picker, whose rows then open their details), or **Details…** in the menu, opens the popup with start, end and duration, a **Counts toward** selector (retag), and Delete. A left click on a task block still opens the task popup. |
+| F4 | Right-clicking a reality span (Calendar highlight or Clock wedge) opens its menu (F17). **Left-clicking** a Clock wedge or a Calendar highlight (#203 — the day column hit-tests, since the bands take no pointer events; several overlapping spans open the picker, whose rows then open their details), or **Details…** in the menu, opens the popup with start, end and duration, a **Time spent on** (was "Counts toward"; any name, kind or task since time-log F21) selector (retag), and Delete. A left click on a task block still opens the task popup. |
 | F5 | Planned blocks show their real time range even when they cross midnight, and are at least 14 px tall. How much text they show is set by F13. |
 | F6 | Block states: done = faded (✓ when there is room). Missed = planned time passed while still open (lighter tint, "missed" in the agenda). Overrun = tracked > planned: a rust strip on the right edge at any size, plus "+Xm over" in the time line when it fits. |
 | F7 | Habit blocks are tinted with a coloured edge, like tasks, not a solid bright bar. |
@@ -26,10 +26,10 @@
 | F18 | **Clock parity.** The Clock day view offers the same menus from the same builder (`ContextMenu/scheduleMenus.ts`): right-click a task arc or a task-list row for the task menu, and a pomo wedge for the segment menu. The Clock has no task details popup, so its task menu has no **Details…**. |
 | F19 | **CLI twins.** Tag / Untag → `pomo retag <seg> <task|none>`. Delete segment → `pomo delete-segment <seg>`. Start focus → `task pomo <ref>`. Mark done → `task toggle <ref>`. Unschedule → `task unschedule <ref>`. `pomo segments [--date] [--json]` lists segment ids. |
 | F20 | **No scrolling.** The Calendar hour grid shows a window of whole hours that fits the panel. The wheel, the ‹ HH–HH › pager, or a drag held at the top/bottom edge flips to the next window. The agenda list and the Clock task list page by whole rows (`ui/PagedView`). The Clock dial flexes to the free space, so the whole Clock always fits. |
-| F21 | **A tagged span names its task** (#204). The Calendar band shows the task name (faint, top-right), the details popup title is the task name, the right-click menu has a **Tagged: <task>** line, and the layer picker row names it. The name is the task's current text, else the span's own label (the task text at tagging time) when the task node is gone. The **Counts toward** selector lists open tasks, then done tasks (✓, newest first); a span whose task was deleted keeps an extra "<name> (deleted)" option instead of reading blank. CLI: `krnl pomo segments [--json]` prints `→ <task>` / a `taskName` field. |
+| F21 | **A tagged span names its task** (#204). The Calendar band shows the task name (faint, top-right), the details popup title is the task name, the right-click menu has a **Tagged: <task>** line, and the layer picker row names it. The name is the task's current text, else the span's own label (the task text at tagging time) when the task node is gone. The **Time spent on** selector lists open tasks, then done tasks (✓, newest first); a span whose task was deleted keeps an extra "<name> (deleted)" option instead of reading blank. CLI: `krnl pomo segments [--json]` prints `→ <task>` / a `taskName` field. |
 | F22 | **The Clock follows now** (#201). At app start a past day, or today in the other half, snaps to today and the current 12-hour half; a future day is kept. When the local day changes, a clock showing the day that ended moves to the new day; at noon or midnight a clock showing today's ending half flips to the new half. A clock browsing another day is never moved. Applied through `clock.goNow` / `clock.setViewWindow` (`ClockNode/follow.ts`); CLI `krnl clock now`. `selectedDate` stays persisted (ADR 0004 §3). |
 | F23 | **Clock overlay never takes the pointer** (#202). Ticks, numerals, the readout, hands, second hand and hub are one `pointer-events: none` group, so hovering or clicking a wedge under a numeral works. |
-| F24 | **Clock names tagged spans too** (#204). The Clock span menu shows **Tagged: <task>** and lists open, then done ✓ tasks (same builder as F21); its **Counts toward** select lists a span's deleted task under the span label. |
+| F24 | **Clock names tagged spans too** (#204). The Clock span menu shows **Tagged: <task>** and lists open, then done ✓ tasks (same builder as F21); its **Time spent on** select lists a span's deleted task under the span label. |
 | F25 | **One popup for recorded time** (#207, time-log F15): left- and right-click open the same popup on Calendar and Clock; times are edited by double-clicking them; Counts toward uses the compact picker (time-log F16). Right-click on empty time offers **Log time here…** (Calendar) / **Log time at HH:MM…** (Clock). |
 | F26 | **Plan vs reality on the block** (#207, storyboard B): a planned block with tagged work on its day reads "started 20m late / 10m early / on time" next to "+X over" / "X tracked". |
 | F27 | **App open/close markers** (time-log F14) and **month hours** (Calendar month cells show the day's recorded work, top-left). |
@@ -99,6 +99,9 @@
 | F90 | (Decision 63) **Nothing moves when connections stop placing tasks:** a task placed by a chain keeps that time as its own. |
 | F91 | (Decision 63) **"Add next" gives a time:** a task made after another starts where that one ends (the card and the CLI). |
 | F92 | (Decision 63) **Small connection dots:** smaller, shown on hover, as easy to drag from as before; no line from a hidden card. |
+| F93 | **Drag to add on the Calendar** (owner pick B, canvas "KRNL0 Drag to add time", 2026-11-24: "click and expand the box… then you name it… without right-clicking"). Press on empty time in Week or Day and drag: a box grows with the pointer (5-minute steps, 5 min to 12 h; amended 2026-11-24) and shows its times. A start within a few minutes of the time now, today, lands exactly on it. A box that starts in the past stops at the now line however far it is pulled, so it is always logged time (amended 2026-11-25); a box that starts in the future is a task or an event (below). Carried into the next day's column (Week), the box runs on past midnight there (up to 12 h; amended 2026-11-25). Every move and resize of a plan also steps by 5 minutes at any zoom, and the ghost follows the pointer with no glide, so the steps feel like no snap at all. Near another block (a plan, an event, another calendar's event) an edge lands on its edge (amended 2026-11-25, owner: "snap into the next task when I'm near it"): within about 6 px a start lands on its end or its start, an end on its start or its end, so blocks sit back to back or side by side; further away it is free and may overlap. This holds for a drawn box, a moved or resized plan or event, and a plan carried in from Todo; Alt held turns it off. On release a small card opens beside it: in the future, the day and times ("Sat 9 → Sun 10" past midnight), a name field, one row **Task · Event · Repeats** (amended 2026-11-25, owner pick "Task or event B"; it remembers the last pick) and **Add task · to Todo** or **Add event** (Enter). Task makes a plan in Todo at that time (ticked, Pomo can focus on it); Event happens once on that day; Repeats shows the days, the box's day picked; all in the past, the "what was it" field of Log past time (time-log F21/F22: names you used, plans, a kind pill), and picking a name logs the time. Esc or a click away cancels. A press without a drag does nothing; double-click and right-click keep their exact-time cards. |
+| F94 | **Drag round the Clock** (same pick). Press on an empty part of the dial and drag round: the time is drawn as a wedge in the 12 hours shown, in 5-minute steps; a start within a few minutes of the time now lands on it, and a drag that starts in the past stops at now (as F93). Carried past the 12 (amended 2026-11-24, owner: "without creating another layer") the dial itself turns to the other half, AM to PM, or past midnight to the next day, and the wedge goes on there with a "+1 day" mark when the day changed; there is no outer ring. The card keeps the whole stretch (at most 12 h). On release the F93 card opens at the pointer: past time is logged, future time becomes an event. Arcs, wedges and dues keep their own click. |
+
 ## Non-Functional Requirements
 
 | ID | Requirement |
@@ -304,3 +307,47 @@ Feature: Connections are only drawn (F89-F91)
   When I move "Draft" to 14:00
   Then "Review" stays at 10:00
 ```
+
+Feature: Drag to add (F93, F94)
+
+  Scenario: F93 a box in the past logs time
+    Given it is 23:00
+    When the user drags on empty hours today and types "Chess" in the card
+    Then a recorded span named "Chess" covers the box
+
+  Scenario: F93 a box in the future adds an event
+    When the user drags on empty hours later today, names it "Design review" and presses Enter
+    Then a one-time event "Design review" is on that day at the box's time
+
+  Scenario: F94 the Clock carries on past 12
+    When the user drags round the AM dial from 9 past the top to 3
+    Then the dial turns to PM, no outer ring is drawn, and the card says 09:00 → 15:00
+
+  Scenario: F93/F94 a start near now lands on now
+    Given it is 15:02
+    When the user drags round the PM dial from 3 to 6
+    Then the card says 15:02 → 18:00
+    And on the Calendar a drag that starts just after 12:00 at 12:02 starts at 12:02
+
+  Scenario: F93/F94 a drag from the past stops at now
+    Given it is 15:02
+    When the user drags round the PM dial from 12 past 3 to 6
+    Then the wedge stops at 15:02 and the card logs 12:00 → 15:02
+    And on the Calendar at 12:02 a box pulled from 10:00 to 14:00 stops at 12:02 and logs
+    But a drag that starts after now is still an event
+
+  Scenario: F93 the card asks: task or event
+    When the user drags a box later today, picks Task, types "Study" and presses Enter
+    Then a plan "Study" is in Todo at the box's time and length
+    And the next box's card opens on Task
+
+  Scenario: F93 a box runs past midnight
+    When the user presses on Saturday at 22:00, drags to the bottom and on into Sunday's column at 01:00
+    Then the box goes on at the top of Sunday and the card says Sat 9 → Sun 10, 22:00 → 01:00
+
+  Scenario: F93 near another block it lands on its edge
+    Given an event from 10:00 to 11:00
+    When the user presses at 11:08 and drags down to 12:20
+    Then the box is 11:00 → 12:20, right after the event
+    And with Alt held it is 11:05 → 12:20
+    And a plan moved so its end comes near 12:00 under a block at 12:00 ends at 12:00

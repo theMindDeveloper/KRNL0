@@ -586,9 +586,12 @@ export function linkedAround(links: readonly CalendarLink[], fromYMD: string, af
 /**
  * When the week, day or month shown has no event from the other calendars:
  * one quiet line saying they are there and when the next one is (so an empty
- * view never reads as "it did not sync"). A click goes there.
+ * view never reads as "it did not sync"). A click goes there. In the week it
+ * sits inside the empty ANY TIME strip (never a row of its own); its × hides
+ * it for good (layer `linkedNote`, back from the Calendar menu or
+ * `krnl cal layers note on`).
  */
-export function LinkedEmptyHint({ links, fromYMD, toYMD, period, onJump }: { links: readonly CalendarLink[]; fromYMD: string; toYMD: string; period: string; onJump: (ymd: string) => void }) {
+export function LinkedEmptyHint({ links, fromYMD, toYMD, period, onJump, onHide, inline = false }: { links: readonly CalendarLink[]; fromYMD: string; toYMD: string; period: string; onJump: (ymd: string) => void; onHide?: () => void; inline?: boolean }) {
   const shown = links.filter((l) => l.on && l.events.length > 0);
   if (!shown.length) return null;
   const any = shown.some((l) => l.events.some((e) => (e.allDay ? e.start <= toYMD && e.end > fromYMD : e.start.slice(0, 10) <= toYMD && e.end.slice(0, 10) >= fromYMD)));
@@ -598,14 +601,23 @@ export function LinkedEmptyHint({ links, fromYMD, toYMD, period, onJump }: { lin
   const names = [...new Set(shown.map((l) => l.name))];
   const from = names.length === 1 ? names[0]! : 'your other calendars';
   const day = around.ev.start.slice(0, 10);
+  const h = inline ? 20 : 26;
   return (
-    <button type="button" data-testid="calendar-linked-hint" className="nodrag" onClick={() => onJump(day)}
-      title={`Go to ${around.ev.title}`}
-      style={{ alignSelf: 'center', margin: '4px auto', display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 999, border: 0, cursor: 'pointer',
-        background: 'var(--paper-2)', color: 'var(--ink-2)', fontFamily: 'var(--font-read)', fontSize: 12, whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-      <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: `var(--${around.link.color})` }} />
-      Nothing from {from} {period} · {around.when === 'next' ? 'next' : 'last'}: {around.ev.title}, {dayLabel(day)}
-    </button>
+    <span data-testid="calendar-linked-hint-wrap" className="nodrag" style={{ alignSelf: 'center', margin: inline ? 0 : '4px auto', display: 'inline-flex', alignItems: 'center', maxWidth: '100%', minWidth: 0, height: h, borderRadius: 999, background: 'var(--paper-2)', pointerEvents: 'auto' }}>
+      <button type="button" data-testid="calendar-linked-hint" onClick={() => onJump(day)}
+        title={`Go to ${around.ev.title}`}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, height: h, padding: onHide ? '0 4px 0 10px' : '0 10px', borderRadius: 999, border: 0, cursor: 'pointer',
+          background: 'transparent', color: 'var(--ink-3)', fontFamily: 'var(--font-read)', fontSize: inline ? 11.5 : 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span aria-hidden style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: `var(--${around.link.color})` }} />
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>Nothing from {from} {period} · {around.when === 'next' ? 'next' : 'last'}: {around.ev.title}, {dayLabel(day)}</span>
+      </button>
+      {onHide && (
+        <button type="button" data-testid="calendar-linked-hint-hide" aria-label="Hide this note" title="Hide this note (Calendar menu brings it back)" onClick={(e) => { e.stopPropagation(); onHide(); }}
+          style={{ flexShrink: 0, width: h, height: h, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 0, borderRadius: 999, background: 'transparent', color: 'var(--ink-4)', cursor: 'pointer' }}>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      )}
+    </span>
   );
 }
 

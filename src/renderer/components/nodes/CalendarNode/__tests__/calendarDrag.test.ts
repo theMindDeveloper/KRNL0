@@ -53,6 +53,36 @@ describe('the one target rule', () => {
   });
 });
 
+describe('near another block it lands on its edge (owner, 2026-11-25)', () => {
+  const origin = { day: '2026-05-14', startMin: 600, endMin: 660 };
+  // Another block 12:00–13:00 that day; none the next day.
+  const edgesOn = (day: string) => (day === '2026-05-14' ? [720, 780] : []);
+  const base = { origin, startMin: 615, lenMin: 60, gran: 5, dayChange: true, edgesOn, edgeRange: 10 } as const;
+
+  it('moved: the start lands on its end, or the end on its start (back to back)', () => {
+    // Start would be 13:07: lands on 13:00, right after it.
+    expect(dragTarget({ ...base, mode: 'move', now: { day: '2026-05-14', min: 615 + 187 } })).toMatchObject({ startMin: 780, endMin: 840 });
+    // End would be 11:52: lands on 12:00, right before it.
+    expect(dragTarget({ ...base, mode: 'move', now: { day: '2026-05-14', min: 615 + 52 } })).toMatchObject({ startMin: 660, endMin: 720 });
+  });
+  it('side by side: a start near its start lands on it (both at 12:00)', () => {
+    expect(dragTarget({ ...base, mode: 'move', now: { day: '2026-05-14', min: 615 + 124 } })).toMatchObject({ startMin: 720, endMin: 780 });
+  });
+  it('further away it is free, in 5-minute steps (it may overlap)', () => {
+    expect(dragTarget({ ...base, mode: 'move', now: { day: '2026-05-14', min: 615 + 145 } })).toMatchObject({ startMin: 745, endMin: 805 });
+  });
+  it('a pulled edge lands on the neighbour too', () => {
+    expect(dragTarget({ ...base, mode: 'bottom', startMin: 660, now: { day: '2026-05-14', min: 714 } }).endMin).toBe(720);
+  });
+  it('carried in from Todo: lands on the edge near the pointer', () => {
+    expect(dragTarget({ ...base, mode: 'move', origin: null, startMin: null, now: { day: '2026-05-14', min: 784 } })).toMatchObject({ startMin: 780, endMin: 840 });
+  });
+  it('another day has its own blocks; a range of 0 (Alt held) turns it off', () => {
+    expect(dragTarget({ ...base, mode: 'move', now: { day: '2026-05-15', min: 615 + 187 } }).startMin).toBe(785);
+    expect(dragTarget({ ...base, edgeRange: 0, mode: 'move', now: { day: '2026-05-14', min: 615 + 187 } }).startMin).toBe(785);
+  });
+});
+
 describe('the one look', () => {
   const t = { day: '2026-05-14', startMin: 540, endMin: 600 };
 

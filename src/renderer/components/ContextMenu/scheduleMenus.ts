@@ -32,6 +32,9 @@ export interface MenuSegment {
   /** #204 — name of the task the span counts toward (task text, else the
    *  span's own label when the task is gone). Shown as "Tagged: X". */
   taskName?: string | null;
+  /** The span's own name and kind of work when it has no task (time-log F21). */
+  label?: string | null;
+  tag?: string | null;
 }
 
 export interface MenuTask {
@@ -86,10 +89,11 @@ export function segmentMenuItems(
     // #207 UX — one entry that opens a searchable picker, instead of a
     // "Tag → <task>" line per task (the menu grew with every task).
     items.push({
-      label: seg.taskId ? 'Change task…' : 'Count toward a task…',
+      // time-log F21 — the same list as "What are you doing?": a task, a typed name or a kind of work.
+      label: seg.taskId ? 'Change task…' : seg.label ? 'Change what it was…' : 'Name this time…',
       onSelect: () => {
         const at = opts.at ?? { x: Math.round(window.innerWidth / 2), y: Math.round(window.innerHeight / 3) };
-        openRetagPicker({ segId: seg.id, taskId: seg.taskId ?? null, x: at.x, y: at.y });
+        openRetagPicker({ segId: seg.id, taskId: seg.taskId ?? null, label: seg.label ?? null, tag: seg.tag ?? null, x: at.x, y: at.y });
       },
     });
     if (seg.taskId) items.push({ label: 'Untag', onSelect: () => retagSegment(seg.id, null) });

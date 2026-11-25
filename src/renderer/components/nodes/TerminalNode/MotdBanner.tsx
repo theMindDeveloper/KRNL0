@@ -21,7 +21,7 @@ const LOGO_LINES = [
   '╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝ ╚═════╝ ',
 ];
 
-const ACID = '#c9f158';
+const ACID = 'var(--acid)';
 const DIM = '#6b6657';
 
 export interface MotdBannerProps {

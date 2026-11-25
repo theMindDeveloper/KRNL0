@@ -66,7 +66,7 @@ export function Ascii({ m, s, elapsedPct, remainingPct, running }: TimerFaceProp
           letterSpacing: '-0.03em',
           color: 'var(--term-acid)',
           fontVariantNumeric: 'tabular-nums',
-          textShadow: '0 0 12px rgba(201,241,88,0.45)',
+          textShadow: '0 0 12px color-mix(in srgb, var(--acid) 45%, transparent)',
           lineHeight: 1,
           margin: '4px 0 8px',
         }}

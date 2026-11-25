@@ -35,6 +35,22 @@ import { SPACE, popupColumn } from '../../ui/spacing';
 import { msAtWallHours } from './wallHours';
 import { localYMD } from '../../../../shared/ymd';
 import { CX, CY, R_FACE, pt, arcPath, sectorPath } from './dialGeometry';
+import { DragAddCard, hmOfMin } from '../CalendarNode/DragAddCard';
+
+/** F94 — the Clock's drag steps (minutes) and how close an end must come to now to land on it. */
+export const DIAL_STEP_MIN = 5;
+export const DIAL_SNAP_NOW_MIN = 8;
+/** Local midnight of a YYYY-MM-DD day, in ms. */
+function ymdStartMs(ymd: string): number {
+  const [y, m, d] = ymd.split('-').map(Number) as [number, number, number];
+  return new Date(y, m - 1, d).getTime();
+}
+function addDaysYMD(ymd: string, n: number): string {
+  const [y, m, d] = ymd.split('-').map(Number) as [number, number, number];
+  const t = new Date(y, m - 1, d + n);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+}
+import { addPastSegment, addPlanAt, habitMotherCommand } from '../../../store/scheduleActions';
 import { ClockCarriedArc } from './ClockCarriedArc';
 import {
   planForDay, realityForDay, collectTaskInfo, collectScheduledHabits, carriedClockId, type TaskEntry,
@@ -182,6 +198,27 @@ export function ClockNode({
   // Right-click menus — the same builders as the Calendar, so a task or a
   // pomo segment offers the same actions on both surfaces.
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  // calendar-clock-visuals F94: drag round the dial to add time (owner pick,
+  // canvas "KRNL0 Drag to add time"). Minutes from the shown day's 00:00
+  // (past 24:00 = the next morning); the card opens on release.
+  // `day0`: the day shown when the drag began; m0 / m are minutes from its 00:00
+  // (below 0 = the day before, past 1440 = the next day).
+  const selectedDateRef = useRef(selectedDate);
+  selectedDateRef.current = selectedDate;
+  const viewWindowRef = useRef(viewWindow);
+  viewWindowRef.current = viewWindow;
+  const [dialDraw, setDialDraw] = useState<{ day0: string; m0: number; m: number; card: null | { x: number; y: number } } | null>(null);
+  // The half and day shown when the drag began: a cancelled drag (Esc, a click
+  // away, the browser taking the pointer) turns the dial back to them.
+  const dialStartRef = useRef<{ date: string; window: 0 | 1 } | null>(null);
+  const cancelDialDraw = (): void => {
+    setDialDraw(null);
+    const s = dialStartRef.current;
+    dialStartRef.current = null;
+    if (!s) return;
+    if (s.date !== selectedDateRef.current) onCommand('clock.setSelectedDate', { date: s.date });
+    if (s.window !== viewWindowRef.current) onCommand('clock.setViewWindow', { window: s.window });
+  };
   // Recorded time: right-click opens the same popup as left-click (one place).
   const openSegmentMenu = (seg: RealitySegment, e: React.MouseEvent) => {
     e.preventDefault();
@@ -542,6 +579,74 @@ export function ClockNode({
           <svg
             // #207 F7b — right-click an empty part of the dial: log time that
             // wasn't recorded at that hour (arcs and wedges stop their own).
+            onPointerDown={(ev) => {
+              // A finger scrolls on a phone or tablet; drawing is for a mouse or a pen.
+              if (ev.button !== 0 || ev.pointerType === 'touch') return;
+              // Only empty dial: anything drawn there keeps its own click.
+              if ((ev.target as Element).closest?.('[data-testid^="clock-reality"], [data-testid^="clock-task"], [data-testid^="clock-plan"], [data-testid^="clock-event"], [data-testid^="clock-habit"], [data-testid^="clock-routine"], [data-testid^="clock-due"], [data-testid^="clock-carried"], a, button')) return;
+              const svg = ev.currentTarget;
+              const hOf = (cx: number, cy: number): number => {
+                const r = svg.getBoundingClientRect();
+                const a = Math.atan2(cy - (r.top + r.height / 2), cx - (r.left + r.width / 2));
+                return ((((a + Math.PI / 2) / (Math.PI * 2)) * 12) % 12 + 12) % 12;
+              };
+              let prev = hOf(ev.clientX, ev.clientY);
+              const day0 = selectedDate;
+              const S = DIAL_STEP_MIN;
+              // An end within a few minutes of the time now lands exactly on it (owner, 2026-11-24).
+              // The minute already begun (floor): an end snapped to now is never in the future, so it logs.
+              const nowMin = Math.floor((Date.now() - ymdStartMs(day0)) / 60_000);
+              const toNow = (raw: number, onGrid: number): number => (Math.abs(raw - nowMin) <= DIAL_SNAP_NOW_MIN ? nowMin : onGrid);
+              const raw0 = (viewWindow * 12 + prev) * 60;
+              const m0 = toNow(raw0, Math.round(raw0 / S) * S);
+              // A drag that starts in the past stops at the now line: it is always logged time (owner, 2026-11-25).
+              const fromPast = m0 < nowMin;
+              let cum = 0;
+              let moved = false;
+              // The half (and day) the dial shows follows the moving end: past 12 it
+              // turns to the other half, past midnight to the next day (no second ring).
+              let shownHalf = Math.floor(raw0 / 720);
+              dialStartRef.current = { date: day0, window: viewWindow === 1 ? 1 : 0 };
+              const move = (e: PointerEvent): void => {
+                const h = hOf(e.clientX, e.clientY);
+                let d = h - prev;
+                if (d > 6) d -= 12;
+                if (d <= -6) d += 12;
+                cum += d;
+                prev = h;
+                if (!moved && Math.abs(cum) * 60 < 10) return;
+                moved = true;
+                const raw = raw0 + cum * 60;
+                // At least 5 minutes, at most 12 hours.
+                let m = toNow(raw, Math.round(raw / S) * S);
+                if (m >= m0) m = Math.max(m0 + S, Math.min(m, m0 + 720, fromPast ? nowMin : Infinity)); else m = Math.min(m0 - S, Math.max(m, m0 - 720));
+                // The half holding the moving end (an end exactly on 12:00 still belongs to the half it closes).
+                const half = Math.floor((m > m0 ? m - 1 : m) / 720);
+                if (half !== shownHalf) {
+                  shownHalf = half;
+                  const dayOff = Math.floor(half / 2);
+                  const date = addDaysYMD(day0, dayOff);
+                  if (date !== selectedDateRef.current) onCommand('clock.setSelectedDate', { date });
+                  onCommand('clock.setViewWindow', { window: ((half % 2) + 2) % 2 === 1 ? 1 : 0 });
+                }
+                setDialDraw({ day0, m0, m, card: null });
+              };
+              const stop = (): void => {
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', up);
+                window.removeEventListener('pointercancel', cancel);
+              };
+              // The browser took the pointer: no card, nothing drawn.
+              const cancel = (): void => { stop(); if (moved) cancelDialDraw(); else dialStartRef.current = null; };
+              const up = (e: PointerEvent): void => {
+                stop();
+                if (!moved) { dialStartRef.current = null; return; }
+                setDialDraw((cur) => (cur ? { ...cur, card: { x: e.clientX + 14, y: e.clientY - 20 } } : cur));
+              };
+              window.addEventListener('pointermove', move);
+              window.addEventListener('pointerup', up);
+              window.addEventListener('pointercancel', cancel);
+            }}
             onContextMenu={(ev) => {
               ev.preventDefault();
               const r = ev.currentTarget.getBoundingClientRect();
@@ -882,6 +987,25 @@ export function ClockNode({
                 must never take the pointer, or hovering a numeral (or the
                 second hand passing under a still cursor) "leaves" the wedge
                 and the hover flickers / the click misses. */}
+            {/* F94: the time being dragged, as a wedge in the 12 hours the dial shows (the
+                dial turns to the other half, or day, as the end goes past 12; no second ring).
+                Drawn over the face and the arcs (under it, the face hid it), under the numbers. */}
+            {dialDraw && (() => {
+              const s0 = Math.min(dialDraw.m0, dialDraw.m);
+              const e0 = Math.max(dialDraw.m0, dialDraw.m);
+              const off = Math.round((ymdStartMs(selectedDate) - ymdStartMs(dialDraw.day0)) / 86_400_000) * 1440;
+              const h0 = off + viewWindow * 720;
+              const h1 = h0 + 720;
+              const inS = Math.max(s0, h0);
+              const inE = Math.min(e0, h1);
+              const nextDay = Math.floor((e0 - 1) / 1440) > Math.floor(s0 / 1440);
+              return (
+                <g data-testid="clock-drag-span" pointerEvents="none">
+                  {inE > inS && <path d={sectorPath((inS - off) / 60, (inE - off) / 60, R_FACE)} fill="color-mix(in srgb, var(--acid) 22%, transparent)" stroke="var(--acid)" strokeWidth={1.2} />}
+                  <text x={CX} y={CY + 30} textAnchor="middle" style={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--acid-ink, var(--acid))' }}>{hmOfMin(((s0 % 1440) + 1440) % 1440)} → {hmOfMin(((e0 % 1440) + 1440) % 1440)}{nextDay ? ' +1 day' : ''}</text>
+                </g>
+              );
+            })()}
             <g data-testid="clock-face-overlay" pointerEvents="none">
             {/* 60 tick marks */}
             {Array.from({ length: 60 }).map((_, i) => {
@@ -1113,6 +1237,50 @@ export function ClockNode({
       {ctxMenu && (
         <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onDismiss={() => setCtxMenu(null)} />
       )}
+      {dialDraw?.card && (() => {
+        const s0 = Math.min(dialDraw.m0, dialDraw.m);
+        const e0 = Math.max(dialDraw.m0, dialDraw.m);
+        const [yy, mm, dd] = dialDraw.day0.split('-').map(Number) as [number, number, number];
+        const startMs = new Date(yy, mm - 1, dd, 0, s0).getTime();
+        const endMs = new Date(yy, mm - 1, dd, 0, e0).getTime();
+        // The day the time starts on (a drag back past 00:00 starts the day before).
+        const startDay = new Date(startMs);
+        const day = `${startDay.getFullYear()}-${String(startDay.getMonth() + 1).padStart(2, '0')}-${String(startDay.getDate()).padStart(2, '0')}`;
+        const startMin = startDay.getHours() * 60 + startDay.getMinutes();
+        return (
+          <DragAddCard
+            x={dialDraw.card.x}
+            y={dialDraw.card.y}
+            day={day}
+            startMin={startMin}
+            endMin={startMin + (e0 - s0)}
+            past={endMs <= Date.now()}
+            onClose={cancelDialDraw}
+            onAddEvent={(d) => {
+              setDialDraw(null);
+              dialStartRef.current = null;
+              const isoDow = ((startDay.getDay() + 6) % 7) + 1;
+              const time = hmOfMin(startMin);
+              const len = e0 - s0;
+              if (d.mode === 'once') void habitMotherCommand('habit.add', { name: d.name, kind: 'routine', schedule: { kind: 'weekly', days: [isoDow], timeOfDay: time, durationMin: len }, on: day });
+              else {
+                const days = [...d.days].sort();
+                void habitMotherCommand('habit.add', { name: d.name, kind: 'routine', schedule: days.length === 7 ? { kind: 'daily', timeOfDay: time, durationMin: len } : { kind: 'weekly', days, timeOfDay: time, durationMin: len } });
+              }
+            }}
+            onAddTask={(name) => {
+              setDialDraw(null);
+              dialStartRef.current = null;
+              void addPlanAt(name, day, hmOfMin(startMin), e0 - s0);
+            }}
+            onLog={(c) => {
+              const err = c.taskId ? addPastSegment(startMs, endMs, c.taskId) : addPastSegment(startMs, endMs, null, c.label, c.tag);
+              if (!err) { setDialDraw(null); dialStartRef.current = null; }
+              return err;
+            }}
+          />
+        );
+      })()}
       {taskPopup && (
         <TaskInfoPopup {...taskPopup} onClose={() => setTaskPopup(null)} />
       )}
@@ -1162,7 +1330,8 @@ export function ClockNode({
                 taskId={realityPopup.seg.taskId ?? null}
                 taskName={spanTaskName(useBoardStore.getState().board?.nodes, realityPopup.seg)}
                 categoryTag={realityPopup.seg.tag ?? null}
-                onChanged={(taskId) => setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } })}
+                label={realityPopup.seg.label}
+                onChanged={(what) => setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, ...what } })}
               />
             )}
             {!realityPopup.seg.live && (

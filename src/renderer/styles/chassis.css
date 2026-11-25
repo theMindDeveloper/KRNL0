@@ -45,14 +45,14 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   border-radius: 3px !important;
   border: 0 !important;
   box-shadow:
-    inset 0 0 0 1px rgba(201,241,88,0.18),
+    inset 0 0 0 1px color-mix(in srgb, var(--acid) 18%, transparent),
     inset 0 0 0 2px rgba(0,0,0,0.5),
     0 0 0 3px rgba(0,0,0,0.35),
-    0 0 24px -6px rgba(201,241,88,0.12) !important;
+    0 0 24px -6px color-mix(in srgb, var(--acid) 12%, transparent) !important;
 }
 [data-theme="dark"][data-dock="telemetry"] .mother-frame {
   box-shadow:
-    inset 0 0 0 1px rgba(201,241,88,0.22),
+    inset 0 0 0 1px color-mix(in srgb, var(--acid) 22%, transparent),
     inset 0 0 0 2px rgba(0,0,0,0.85),
     0 0 0 3px rgba(0,0,0,0.6) !important;
 }
@@ -196,7 +196,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   color: #d4cfc0;
   text-shadow: 0 1px 0 rgba(0,0,0,0.5);
 }
-.md-synth-top .brand .n { color: var(--acid); text-shadow: 0 0 6px rgba(201,241,88,0.6); }
+.md-synth-top .brand .n { color: var(--acid); text-shadow: 0 0 6px color-mix(in srgb, var(--acid) 60%, transparent); }
 .md-synth-top .model {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -326,7 +326,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 
 .md-synth-knob .arc .lit {
   stroke: var(--acid);
-  filter: drop-shadow(0 0 3px rgba(201,241,88,0.6));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--acid) 60%, transparent));
 }
 
 .md-synth-vu { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
@@ -352,7 +352,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
  * of the previous hard-coded :nth-child counts. */
 .md-synth-vu .row span[data-active='true'] {
   background: var(--acid);
-  box-shadow: 0 0 3px rgba(201,241,88,0.55);
+  box-shadow: 0 0 3px color-mix(in srgb, var(--acid) 55%, transparent);
   border-color: rgba(0,0,0,0.5);
   transition: background 180ms, box-shadow 180ms;
 }
@@ -394,7 +394,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   inset: 2px;
   border-radius: 50%;
   border: 1.5px solid var(--acid);
-  box-shadow: 0 0 6px rgba(201,241,88,0.5), inset 0 0 4px rgba(201,241,88,0.4);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--acid) 50%, transparent), inset 0 0 4px color-mix(in srgb, var(--acid) 40%, transparent);
 }
 .md-synth-jack .lbl {
   font-family: var(--font-mono);
@@ -405,7 +405,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 }
 .md-synth-jacks .arrow {
   font-family: var(--font-mono);
-  color: rgba(201,241,88, 0.84);
+  color: color-mix(in srgb, var(--acid) 84%, transparent);
   font-size: 14px;
 }
 
@@ -424,7 +424,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   box-shadow:
     inset 0 0 0 1.5px var(--acid),
     inset 0 2px 4px rgba(0,0,0,0.7),
-    0 0 8px rgba(201,241,88,0.4);
+    0 0 8px color-mix(in srgb, var(--acid) 40%, transparent);
 }
 .md-synth-jack-interactive:active { transform: translateY(0); }
 .md-synth-jack-interactive:active .hole {
@@ -449,7 +449,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 }
 .md-synth-serial .id {
   color: var(--acid);
-  text-shadow: 0 0 4px rgba(201,241,88,0.4);
+  text-shadow: 0 0 4px color-mix(in srgb, var(--acid) 40%, transparent);
 }
 .md-synth-serial-link {
   color: rgba(212,207,192, 0.79);
@@ -460,7 +460,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
 .dock-chassis .md-synth-serial-link { pointer-events: auto; }
 .md-synth-serial-link:hover {
   color: var(--acid);
-  text-shadow: 0 0 4px rgba(201,241,88,0.3);
+  text-shadow: 0 0 4px color-mix(in srgb, var(--acid) 30%, transparent);
 }
 
 /* VU live-mode — when the radio is playing, the bar gap shrinks and bars
@@ -470,7 +470,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   transition: background 60ms, box-shadow 60ms;
 }
 .md-synth-vu.md-synth-vu-live .row {
-  filter: drop-shadow(0 0 4px rgba(201,241,88,0.15));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--acid) 15%, transparent));
 }
 
 /* ============================================================
@@ -480,7 +480,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   background: linear-gradient(180deg, #16140e 0%, #0a0905 100%);
   border-radius: 6px;
   box-shadow:
-    inset 0 0 0 1px rgba(201,241,88,0.14),
+    inset 0 0 0 1px color-mix(in srgb, var(--acid) 14%, transparent),
     inset 0 0 0 2px rgba(0,0,0,0.5),
     inset 0 1px 0 rgba(255,255,255,0.06),
     /* layered outer shadow — close/sharp + far/soft for depth */
@@ -494,7 +494,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
   position: absolute;
   inset: 0;
   background: repeating-linear-gradient(180deg,
-    transparent 0 2px, rgba(201,241,88,0.022) 2px 3px);
+    transparent 0 2px, color-mix(in srgb, var(--acid) 2.2%, transparent) 2px 3px);
   border-radius: inherit;
   pointer-events: none;
   mix-blend-mode: screen;
@@ -514,7 +514,7 @@ html[data-grid="off"] .react-flow__background { display: none !important; }
     linear-gradient(270deg, var(--acid) 0 12px, transparent 12px) bottom right / 12px 1px no-repeat,
     linear-gradient(0deg, var(--acid) 0 12px, transparent 12px) bottom right / 1px 12px no-repeat;
   opacity: 0.85;
-  filter: drop-shadow(0 0 4px rgba(201,241,88,0.5));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--acid) 50%, transparent));
 }
 
 /* ── Telemetry light-mode — glassy panel override ─────────────────────
@@ -576,7 +576,7 @@ html:not([data-theme="dark"]) .md-tel-wave .grid {
  * so the line reads against the cream glass. */
 .md-tel-wave-line {
   stroke: var(--acid);
-  filter: drop-shadow(0 0 3px rgba(201,241,88,0.6));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--acid) 60%, transparent));
 }
 html:not([data-theme="dark"]) .md-tel-wave-line {
   stroke: #2f4012;
@@ -661,7 +661,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   display: grid;
   grid-template-columns: 1.1fr 2.2fr 1.3fr 1.1fr 1fr;
   gap: 1px;
-  background: rgba(201,241,88,0.12);
+  background: color-mix(in srgb, var(--acid) 12%, transparent);
   padding: 1px;
   border-radius: 3px;
 }
@@ -682,7 +682,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   display: flex; gap: 6px;
 }
 .md-tel-cell .k .num {
-  background: rgba(201,241,88,0.15);
+  background: color-mix(in srgb, var(--acid) 15%, transparent);
   color: var(--acid);
   padding: 0 4px;
   border-radius: 1px;
@@ -693,7 +693,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   color: var(--acid);
   letter-spacing: 0.06em;
   font-weight: 500;
-  text-shadow: 0 0 6px rgba(201,241,88,0.45);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--acid) 45%, transparent);
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
 }
@@ -715,8 +715,8 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(201,241,88,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(201,241,88,0.06) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--acid) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--acid) 6%, transparent) 1px, transparent 1px);
   background-size: 14px 8px;
   pointer-events: none;
 }
@@ -724,7 +724,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-bars span {
   width: 5px;
   background: var(--acid);
-  box-shadow: 0 0 4px rgba(201,241,88,0.6);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--acid) 60%, transparent);
   border-radius: 1px;
 }
 .md-tel-bars span:nth-child(1) { height: 30%; }
@@ -735,14 +735,14 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 /* When the bar's slot is below the current streak count, it dims out so
  * the lit/un-lit count reflects real data. data-on='true' = lit. */
 .md-tel-bars span[data-on='false'] {
-  background: rgba(201,241,88,0.08);
+  background: color-mix(in srgb, var(--acid) 8%, transparent);
   box-shadow: none;
 }
 .md-tel-gauge { position: relative; margin-top: 4px; }
 .md-tel-gauge .track {
   height: 6px;
-  background: rgba(201,241,88,0.08);
-  border: 1px solid rgba(201,241,88,0.18);
+  background: color-mix(in srgb, var(--acid) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acid) 18%, transparent);
   border-radius: 1px;
   overflow: hidden;
   position: relative;
@@ -753,7 +753,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   left: 0; top: 0; bottom: 0;
   width: var(--fill, 72%);
   background: linear-gradient(90deg, var(--rust) 0%, var(--acid) 60%, var(--acid) 100%);
-  box-shadow: 0 0 6px rgba(201,241,88,0.5);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--acid) 50%, transparent);
   transition: width 320ms ease;
 }
 .md-tel-gauge .ticks {
@@ -771,7 +771,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   bottom: 6px; left: 6px; right: 6px;
   height: 58px;
   background: #0a0805;
-  border: 1px solid rgba(201,241,88,0.12);
+  border: 1px solid color-mix(in srgb, var(--acid) 12%, transparent);
   border-radius: 3px;
   display: flex;
   align-items: stretch;
@@ -782,7 +782,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   flex: 0 0 auto;
   gap: 2px;
   padding: 4px 8px;
-  background: rgba(201,241,88,0.04);
+  background: color-mix(in srgb, var(--acid) 4%, transparent);
   /* 6 bays × ~104px = 624 + gutters. Stable on any chassis width. */
 }
 .md-tel-bay {
@@ -792,7 +792,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   justify-content: center;
   padding: 2px 8px;
   background: rgba(0,0,0,0.45);
-  border: 1px solid rgba(201,241,88,0.18);
+  border: 1px solid color-mix(in srgb, var(--acid) 18%, transparent);
   border-radius: 2px;
   position: relative;
   overflow: hidden;
@@ -825,7 +825,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--acid);
-  text-shadow: 0 0 4px rgba(201,241,88,0.4);
+  text-shadow: 0 0 4px color-mix(in srgb, var(--acid) 40%, transparent);
   text-transform: uppercase;
   font-weight: 600;
   margin-top: 0;
@@ -837,7 +837,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-bay .meter {
   margin-top: 3px;
   height: 3px;
-  background: rgba(201,241,88,0.1);
+  background: color-mix(in srgb, var(--acid) 10%, transparent);
   border-radius: 1px;
   overflow: hidden;
   position: relative;
@@ -859,8 +859,8 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   font-family: var(--font-mono);
   font-size: 8px;
   letter-spacing: 0.06em;
-  color: rgba(201,241,88,0.85);
-  text-shadow: 0 0 3px rgba(201,241,88,0.3);
+  color: color-mix(in srgb, var(--acid) 85%, transparent);
+  text-shadow: 0 0 3px color-mix(in srgb, var(--acid) 30%, transparent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -877,7 +877,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 /* Bays as clickable buttons — jumps the camera to the matching mother. */
 .dock-chassis .md-tel-bay-interactive { pointer-events: auto; }
 .md-tel-bay-interactive {
-  border: 1px solid rgba(201,241,88,0.18);
+  border: 1px solid color-mix(in srgb, var(--acid) 18%, transparent);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
@@ -886,7 +886,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-bay-interactive:hover {
   transform: translateY(-1px);
   border-color: var(--acid);
-  box-shadow: 0 0 12px rgba(201,241,88,0.2);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--acid) 20%, transparent);
 }
 .md-tel-bay-interactive:active { transform: translateY(0); }
 .md-tel-bay-interactive:focus-visible { outline: 1px solid var(--acid); outline-offset: 2px; }
@@ -905,12 +905,12 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   pointer-events: auto;
 }
 .dock-chassis .md-tel-credit { pointer-events: auto; }
-.md-tel-credit:hover { text-shadow: 0 0 5px rgba(201,241,88,0.5); }
+.md-tel-credit:hover { text-shadow: 0 0 5px color-mix(in srgb, var(--acid) 50%, transparent); }
 
 .md-tel-log {
   flex: 1 1 0;
   min-width: 0;
-  border-left: 1px solid rgba(201,241,88,0.12);
+  border-left: 1px solid color-mix(in srgb, var(--acid) 12%, transparent);
   padding: 4px 10px;
   display: flex;
   flex-direction: column;
@@ -925,12 +925,12 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-log .head {
   font-size: 7px;
   letter-spacing: 0.24em;
-  color: rgba(201,241,88,0.7);
+  color: color-mix(in srgb, var(--acid) 70%, transparent);
   text-transform: uppercase;
   margin-bottom: 2px;
 }
 .md-tel-log .row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.md-tel-log .row .ts { color: rgba(201,241,88, 0.84); margin-right: 6px; }
+.md-tel-log .row .ts { color: color-mix(in srgb, var(--acid) 84%, transparent); margin-right: 6px; }
 .md-tel-log .row .rust { color: var(--rust); }
 
 /* Side panel — horizontal layout. Wider, shallower so content sits in one
@@ -938,7 +938,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-side {
   width: 220px;
   flex-shrink: 0;
-  border-left: 1px solid rgba(201,241,88,0.12);
+  border-left: 1px solid color-mix(in srgb, var(--acid) 12%, transparent);
   padding: 0 10px;
   display: flex;
   flex-direction: row;
@@ -949,7 +949,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .md-tel-side .head {
   font-size: 7px;
   letter-spacing: 0.18em;
-  color: rgba(201,241,88,0.7);
+  color: color-mix(in srgb, var(--acid) 70%, transparent);
   text-transform: uppercase;
   white-space: nowrap;
   flex-shrink: 0;
@@ -959,7 +959,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   line-height: 1;
   color: var(--acid);
   letter-spacing: 0.02em;
-  text-shadow: 0 0 5px rgba(201,241,88,0.45);
+  text-shadow: 0 0 5px color-mix(in srgb, var(--acid) 45%, transparent);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1015,7 +1015,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   position: absolute;
   inset: -4px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(201,241,88,0.22) 0%, transparent 65%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--acid) 22%, transparent) 0%, transparent 65%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 180ms ease;
@@ -1028,7 +1028,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   display: grid;
   place-items: center;
   background: linear-gradient(180deg, #2a261e 0%, #14110d 100%);
-  border: 1px solid rgba(201,241,88,0.30);
+  border: 1px solid color-mix(in srgb, var(--acid) 30%, transparent);
   color: var(--acid);
   box-shadow:
     0 2px 6px rgba(0,0,0,0.35),
@@ -1086,15 +1086,15 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 .krnl-dock-style-btn.is-armed {
   /* When a non-classic style is selected, the trigger gets a permanent
    * acid hairline so the user can see "a frame is on" at a glance. */
-  border-color: rgba(201,241,88,0.45);
+  border-color: color-mix(in srgb, var(--acid) 45%, transparent);
   color: var(--ink);
-  box-shadow: inset 0 0 0 1px rgba(201,241,88,0.08);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 8%, transparent);
 }
 .krnl-dock-style-btn.is-open {
   background: #1a1814;
   color: var(--acid);
   border-color: var(--acid);
-  box-shadow: 0 0 0 2px rgba(201,241,88,0.18);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acid) 18%, transparent);
 }
 .krnl-dock-style-btn:focus-visible {
   outline: 1px solid var(--acid);
@@ -1158,7 +1158,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   height: 6px;
   border-radius: 50%;
   background: var(--acid);
-  box-shadow: 0 0 6px rgba(201,241,88,0.55);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--acid) 55%, transparent);
 }
 
 .dsp-tiles {
@@ -1205,10 +1205,10 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   background: #1a1814;
   border-color: var(--acid);
   color: var(--acid);
-  box-shadow: 0 0 0 1px var(--acid), 0 0 14px rgba(201,241,88,0.20);
+  box-shadow: 0 0 0 1px var(--acid), 0 0 14px color-mix(in srgb, var(--acid) 20%, transparent);
 }
 .dsp-tile.is-active::after {
-  background: linear-gradient(135deg, rgba(201,241,88,0.10) 0%, transparent 55%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--acid) 10%, transparent) 0%, transparent 55%);
   opacity: 1;
 }
 .dsp-tile:focus-visible {
@@ -1230,9 +1230,9 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
 }
 .dsp-tile:hover .dsp-tile__glyph { color: var(--ink); }
 .dsp-tile.is-active .dsp-tile__glyph {
-  background: rgba(201,241,88,0.10);
+  background: color-mix(in srgb, var(--acid) 10%, transparent);
   color: var(--acid);
-  box-shadow: inset 0 0 0 1px rgba(201,241,88,0.35);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acid) 35%, transparent);
 }
 
 .dsp-tile__label {
@@ -1249,7 +1249,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   text-transform: uppercase;
   line-height: 1;
 }
-.dsp-tile.is-active .dsp-tile__sub { color: rgba(201,241,88, 0.79); }
+.dsp-tile.is-active .dsp-tile__sub { color: color-mix(in srgb, var(--acid) 79%, transparent); }
 
 .dsp-tile__check {
   position: absolute;
@@ -1262,7 +1262,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   place-items: center;
   background: var(--acid);
   color: #1a1814;
-  box-shadow: 0 0 6px rgba(201,241,88,0.4);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--acid) 40%, transparent);
 }
 
 /* Dark-theme adjustment — flyout uses paper tokens which already flip. */
@@ -2249,7 +2249,7 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   border-color: var(--acid, #c9f158);
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.35),
-    0 0 8px rgba(201, 241, 88, 0.18);
+    0 0 8px color-mix(in srgb, var(--acid) 18%, transparent);
 }
 .station-drag-handle:active,
 .station-drag-handle[data-dragging='true'] {
@@ -2259,8 +2259,8 @@ html:not([data-theme="dark"])[data-dock="telemetry"] .mother-frame {
   background: var(--paper-3);
   border-color: var(--acid, #c9f158);
   box-shadow:
-    inset 0 0 0 1px rgba(201, 241, 88, 0.4),
-    0 0 12px rgba(201, 241, 88, 0.35);
+    inset 0 0 0 1px color-mix(in srgb, var(--acid) 40%, transparent),
+    0 0 12px color-mix(in srgb, var(--acid) 35%, transparent);
   transform: translateX(-50%) translateY(1px);
 }
 .station-drag-handle:focus-visible {
@@ -3906,11 +3906,11 @@ body { counter-reset: krnl-mother; }
   pointer-events: none;
   z-index: 6;
   background:
-    linear-gradient(#c9f158, #c9f158) 0 0 / 12px 2px no-repeat,
-    linear-gradient(#c9f158, #c9f158) 0 0 / 2px 12px no-repeat,
-    linear-gradient(#c9f158, #c9f158) 100% 100% / 12px 2px no-repeat,
-    linear-gradient(#c9f158, #c9f158) 100% 100% / 2px 12px no-repeat;
-  filter: drop-shadow(0 0 4px #c9f158);
+    linear-gradient(var(--acid), var(--acid)) 0 0 / 12px 2px no-repeat,
+    linear-gradient(var(--acid), var(--acid)) 0 0 / 2px 12px no-repeat,
+    linear-gradient(var(--acid), var(--acid)) 100% 100% / 12px 2px no-repeat,
+    linear-gradient(var(--acid), var(--acid)) 100% 100% / 2px 12px no-repeat;
+  filter: drop-shadow(0 0 4px var(--acid));
 }
 
 /* Synthesizer — a panel screw at the right end of every header. */

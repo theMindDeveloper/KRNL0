@@ -58,6 +58,19 @@ describe('kind marks (top right)', () => {
     expect(document.querySelector('[data-testid="task-replan-t-missed"]')).not.toBeNull();
   });
 
+  it('a plan has ONE mark in its corner: a done plan the check only, never the task mark under it', () => {
+    const b = useBoardStore.getState().board!;
+    useBoardStore.setState({ board: { ...b, nodes: b.nodes.map((n) => (n.id === 't-next' ? { ...n, state: { ...(n.state as object), done: true, doneAt: '2026-05-15T16:00:00.000Z' } } : n)) } as never });
+    render(<WeekView state={state} config={config} onCommand={() => undefined} />);
+    expect(document.querySelector('[data-testid="task-done-check-t-next"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="task-kind-t-next"]')).toBeNull();
+    // No block draws two corner marks.
+    for (const block of document.querySelectorAll('[data-testid^="task-block-"]')) {
+      const marks = block.querySelectorAll('[data-testid^="task-done-check-"], [data-testid^="task-kind-"], [data-testid^="task-replan-"]');
+      expect(marks.length, block.getAttribute('data-testid') ?? '').toBeLessThanOrEqual(1);
+    }
+  });
+
   it('a repeating event shows the repeat mark; a one-time event the event mark', () => {
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
     expect(document.querySelector('[data-testid="calendar-routine-kind-ev-lecture"]')?.getAttribute('data-kind')).toBe('repeat');

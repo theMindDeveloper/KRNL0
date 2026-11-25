@@ -58,6 +58,10 @@ export interface CalendarSurface {
   slotAt(x: number, y: number): Slot | null;
   /** The snap in minutes. */
   gran(): number;
+  /** The starts and ends (minutes) of the blocks on a day, leaving out the one with `exceptId`. */
+  edges?(day: string, exceptId: string): readonly number[];
+  /** How many minutes SNAP_EDGE_PX is at the zoom shown. */
+  edgeRange?(): number;
   /** Lands it; returns "has the board got it?" to hold the ghost until then, or null. */
   commit(item: DragItem, result: DropResult, origin: DragOrigin | null, mode: DragMode): (() => boolean) | null;
   /** The original steps back while carried (null: back to normal). Not for an edge pulled. */
@@ -104,27 +108,53 @@ export function dragTarget(a: {
   dayChange: boolean;
   /** The real time now: a start close to it on today's column snaps to exactly it. */
   nowMark?: { day: string; min: number };
+  /** The starts and ends of the other blocks on a day (the one carried left out). */
+  edgesOn?: (day: string) => readonly number[];
+  /** How close (minutes) an edge must come to another block's edge to land on it; 0: off. */
+  edgeRange?: number;
 }): Target {
   const g = Math.max(1, a.gran);
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-  // A start within SNAP_NOW_MIN of the time now (today only) lands exactly on it,
-  // so a plan can start from the point you are in. The grid is used everywhere else.
-  const snapNow = (day: string, raw: number, onGrid: number): number =>
-    a.nowMark && a.nowMark.day === day && Math.abs(raw - a.nowMark.min) <= SNAP_NOW_MIN ? clamp(a.nowMark.min, 0, 1440 - g) : onGrid;
+  const r = a.edgeRange ?? 0;
+  // Owner, 2026-11-24/25: a start within SNAP_NOW_MIN of the time now (today)
+  // lands exactly on it; an edge near another block's start or end lands on it
+  // (back to back, or side by side at the same time). The nearest wins; the
+  // 5-minute grid is used everywhere else, so it can still overlap freely.
+  // `len` > 0: the end may land instead (the start that puts it there).
+  const near = (day: string, rawS: number, len: number, withNow: boolean): number | null => {
+    let best: number | null = null;
+    let bd = Infinity;
+    const consider = (start: number, dist: number) => { if (dist < bd) { bd = dist; best = start; } };
+    if (withNow && a.nowMark && a.nowMark.day === day && Math.abs(rawS - a.nowMark.min) <= SNAP_NOW_MIN) consider(a.nowMark.min, Math.abs(rawS - a.nowMark.min));
+    if (r > 0 && a.edgesOn) {
+      for (const e of a.edgesOn(day)) {
+        if (Math.abs(rawS - e) <= r) consider(e, Math.abs(rawS - e));
+        if (len > 0 && Math.abs(rawS + len - e) <= r) consider(e - len, Math.abs(rawS + len - e));
+      }
+    }
+    return best;
+  };
   if (!a.origin || a.startMin === null) {
-    const s = snapNow(a.now.day, a.now.min, clamp(Math.floor(a.now.min / g) * g, 0, 1440 - g));
-    return { day: a.now.day, startMin: s, endMin: Math.min(1440, s + Math.max(g, a.lenMin)) };
+    const len = Math.max(g, a.lenMin);
+    const s = clamp(near(a.now.day, a.now.min, len, true) ?? Math.floor(a.now.min / g) * g, 0, 1440 - g);
+    return { day: a.now.day, startMin: s, endMin: Math.min(1440, s + len) };
   }
   const o = a.origin;
   const raw = o.startMin + (a.now.min - a.startMin);
   const d = Math.round((a.now.min - a.startMin) / g) * g;
-  if (a.mode === 'top') return { day: o.day, startMin: Math.min(snapNow(o.day, raw, clamp(o.startMin + d, 0, o.endMin - g)), o.endMin - g), endMin: o.endMin };
-  if (a.mode === 'bottom') return { day: o.day, startMin: o.startMin, endMin: clamp(o.endMin + d, o.startMin + g, o.startMin + 1440) };
+  if (a.mode === 'top') return { day: o.day, startMin: clamp(near(o.day, raw, 0, true) ?? o.startMin + d, 0, o.endMin - g), endMin: o.endMin };
+  if (a.mode === 'bottom') {
+    const rawEnd = o.endMin + (a.now.min - a.startMin);
+    return { day: o.day, startMin: o.startMin, endMin: clamp(near(o.day, rawEnd, 0, false) ?? o.endMin + d, o.startMin + g, o.startMin + 1440) };
+  }
   const len = o.endMin - o.startMin;
   const day = a.dayChange ? a.now.day : o.day;
-  const s = snapNow(day, raw, clamp(o.startMin + d, 0, 1440 - g));
+  const s = clamp(near(day, raw, len, true) ?? o.startMin + d, 0, 1440 - g);
   return { day, startMin: s, endMin: s + len };
 }
+
+/** How far (screen px) an edge reaches for another block's edge. */
+export const SNAP_EDGE_PX = 6;
 
 /** How close (minutes) a start must be to the time now to snap onto it. */
 export const SNAP_NOW_MIN = 4;
@@ -177,6 +207,8 @@ interface Active {
   x: number;
   y: number;
   startMin: number | null;
+  /** Alt held: no landing on other blocks' edges (placed exactly where it is let go). */
+  free?: boolean;
   started: boolean;
   raf: number;
   over: CalendarSurface | null;
@@ -288,6 +320,8 @@ function targetAt(a: Active, s: CalendarSurface, slot: { day: string; min: numbe
     dayChange: canChangeDay(a.item),
     // Not for a habit (a rule for every day, not a start on one day).
     ...(a.item.kind !== 'habit' ? { nowMark: nowMark() } : {}),
+    // Owner, 2026-11-25: near another block it lands on its edge (Alt: no).
+    ...(a.item.kind !== 'habit' && !a.free && s.edges ? { edgesOn: (day: string) => s.edges!(day, a.item.id), edgeRange: s.edgeRange?.() ?? 0 } : {}),
   });
 }
 
@@ -450,6 +484,7 @@ function onMove(ev: PointerEvent): void {
   if (!a || a.external) return;
   a.x = ev.clientX;
   a.y = ev.clientY;
+  a.free = ev.altKey;
   if (!a.started) {
     if (Math.hypot(a.x - a.x0, a.y - a.y0) < 4) return;
     begin(a);

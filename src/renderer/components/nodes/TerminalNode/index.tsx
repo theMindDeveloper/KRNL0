@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { loadAccent, onAccentChange } from '../../../themes/accent';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import type { NodeProps } from '../types';
@@ -43,7 +44,14 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
   const ended = activeSessionId === null && hadSessionRef.current;
   // xterm colours come from the frame-style manifest and follow live switches (ADR 0009 F8).
   const { style: frameStyle, mode: frameMode } = useFrameTheme();
-  const xtermColors = xtermFor(frameStyle, frameMode);
+  // The cursor takes the accent colour (Settings → Appearance) when one is set.
+  const [accent, setAccent] = useState<string | null>(loadAccent);
+  useEffect(() => onAccentChange(() => setAccent(loadAccent())), []);
+  const styleXterm = xtermFor(frameStyle, frameMode);
+  const xtermColors = useMemo(
+    () => (styleXterm && accent ? { ...styleXterm, cursor: accent } : styleXterm),
+    [styleXterm, accent],
+  );
   const xtermColorsRef = useRef(xtermColors);
   xtermColorsRef.current = xtermColors;
   useEffect(() => {
@@ -147,7 +155,8 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
         theme: { ...(xtermColorsRef.current ?? {
           background: '#05040a',
           foreground: '#d4cfc0',
-          cursor: '#c9f158',
+          // xterm needs a real colour: the accent (Settings → Appearance), else KRNL0 green.
+          cursor: loadAccent() ?? '#c9f158',
           cursorAccent: '#0e0d0b',
         }) },
         cursorBlink: true,

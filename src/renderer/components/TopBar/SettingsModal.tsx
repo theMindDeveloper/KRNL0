@@ -17,6 +17,7 @@ import { PocketSection } from './PocketSection';
 import { BackupsSection, CelebrationsSection } from './LaunchSettings';
 import { SoundSection } from './SoundSection';
 import { FinishedSection } from './FinishedSection';
+import { AccentPicker } from './AccentPicker';
 import { Switch } from '../ui/Switch';
 import { gridScopeOf } from '../Canvas/alignGrid';
 import { SettingsIcon, type SettingsIconName } from '../ui/SettingsIcons';
@@ -146,10 +147,8 @@ function Card({ title, icon, children }: { title?: string; icon?: SettingsIconNa
 }
 
 function General({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void }) {
-  const setUiMode = useBoardStore((s) => s.setUiMode);
   const alignGrid = useBoardStore((s) => gridScopeOf(s.board?.alignGrid));
   const setAlignGrid = useBoardStore((s) => s.setAlignGrid);
-  const easy = useEasyMode();
   const [dockStyle, setDockStyle] = useDockStyle();
   return (
     <>
@@ -173,24 +172,9 @@ function General({ theme, onTheme }: { theme: Theme; onTheme: (t: Theme) => void
             </button>
           ))}
         </div>
+        <AccentPicker />
       </Card>
-      {/* Easy / Advanced — Easy hides the links between features; data is the same. */}
-      <Card title="Mode" icon="mode">
-        <div role="radiogroup" aria-label="Easy or Advanced" className="st-choices">
-          {([
-            ['easy', 'Easy', 'Plan your day and see where the time went'],
-            ['advanced', 'Advanced', 'Connect tasks, categories and focus'],
-          ] as const).map(([m, label, hint]) => {
-            const on = (m === 'easy') === easy;
-            return (
-              <button key={m} type="button" role="radio" aria-checked={on} data-testid={`settings-mode-${m}`} onClick={() => setUiMode(m)} className="st-choice st-choice--text">
-                <span className="st-choice__label"><SettingsIcon name={m} size={15} />{label}</span>
-                <span className="st-choice__hint">{hint}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
+      {/* Mode: Easy is retired (2026-11-25); KRNL0 has one mode, so there is nothing to pick. */}
       <Card title="Canvas" icon="box">
         <div className="st-row">
           <div style={{ flex: 1, minWidth: 0 }}>

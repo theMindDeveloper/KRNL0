@@ -162,6 +162,14 @@ export function CalendarNode({
               testId: 'calendar-menu-othercals',
               onSelect: () => openOtherCals(ownMenu.x, ownMenu.y),
             },
+            // The "Nothing from … this week" note: hidden with its ×, back from here.
+            ...(hasLinks && layers.linked ? [{
+              label: 'Note when a week has nothing',
+              icon: layers.linkedNote ? <MenuIcon name="check" /> : <span />,
+              hint: layers.linkedNote ? 'shown' : 'hidden',
+              testId: 'calendar-menu-linked-note',
+              onSelect: () => onCommand('calendar.setLayers', { linkedNote: !layers.linkedNote }),
+            }] : []),
             ...(config.view === 'month' && !easy ? [{
               label: 'Habits',
               icon: layers.habits ? <MenuIcon name="check" /> : <span />,

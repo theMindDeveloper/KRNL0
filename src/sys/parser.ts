@@ -21,7 +21,7 @@ export type SysCommand =
   | { kind: 'pomo'; sub: 'retag'; segmentId: string | undefined; ref: string | undefined; text?: string | undefined; tag?: string | undefined }
   | { kind: 'pomo'; sub: 'delete-segment'; segmentId: string | undefined }
   | { kind: 'pomo'; sub: 'segment'; segmentId: string | undefined; start: string | undefined; end: string | undefined }
-  | { kind: 'pomo'; sub: 'add'; start: string | undefined; end: string | undefined; ref: string | undefined; text: string | undefined }
+  | { kind: 'pomo'; sub: 'add'; start: string | undefined; end: string | undefined; ref: string | undefined; text: string | undefined; tag?: string | undefined }
   | { kind: 'pomo'; sub: 'segments'; date: string | undefined; json: boolean }
   | { kind: 'todo'; sub: 'list'; json: boolean; scope: 'today' | 'done' | 'archived' | 'all' }
   | { kind: 'todo'; sub: 'tag'; ref: string | undefined; tag: string | undefined }
@@ -73,6 +73,7 @@ export type SysCommand =
   // Decision 35 — durable time log reads (time-log F13)
   | { kind: 'time'; sub: 'log'; from: string | undefined; to: string | undefined; json: boolean }
   | { kind: 'time'; sub: 'report'; month: string | undefined; by: string | undefined; json: boolean }
+  | { kind: 'time'; sub: 'rename'; from: string | undefined; to: string | undefined; tag?: string | undefined }
   | { kind: 'draw'; sub: 'list'; json: boolean }
   | { kind: 'media'; sub: 'add'; url: string | undefined; at: { x: number; y: number } | undefined }
   | { kind: 'media'; sub: 'list'; json: boolean }
@@ -235,6 +236,7 @@ export type SysCommand =
   // ADR 0009 — frame styles
   | { kind: 'theme'; sub: 'frames'; json: boolean }
   | { kind: 'theme'; sub: 'frame'; value: string | undefined }
+  | { kind: 'theme'; sub: 'accent'; value: string | undefined }
   | { kind: 'invalid'; message: string }
 ;
 
@@ -504,7 +506,7 @@ export class SysParser {
       if (sub === 'retag') return { kind: 'pomo', sub: 'retag', segmentId: rest[0], ref: rest[1]?.startsWith('--') ? undefined : rest[1], text: flag(rest, 'text'), tag: flag(rest, 'tag') };
       if (sub === 'delete-segment') return { kind: 'pomo', sub: 'delete-segment', segmentId: rest[0] };
       if (sub === 'segment') return { kind: 'pomo', sub: 'segment', segmentId: rest[0]?.startsWith('--') ? undefined : rest[0], start: flag(rest, 'start'), end: flag(rest, 'end') };
-      if (sub === 'add') return { kind: 'pomo', sub: 'add', start: flag(rest, 'start'), end: flag(rest, 'end'), ref: flag(rest, 'task'), text: flag(rest, 'text') };
+      if (sub === 'add') return { kind: 'pomo', sub: 'add', start: flag(rest, 'start'), end: flag(rest, 'end'), ref: flag(rest, 'task'), text: flag(rest, 'text'), tag: flag(rest, 'tag') };
       if (sub === 'segments') return { kind: 'pomo', sub: 'segments', date: flag(rest, 'date'), json: hasFlag(rest, 'json') };
       if (sub === 'start') {
         const minutesRaw = flag(rest, 'minutes');
@@ -703,6 +705,10 @@ export class SysParser {
     if (cmd === 'time') {
       if (sub === 'log') {
         return { kind: 'time', sub: 'log', from: flag(rest, 'from'), to: flag(rest, 'to'), json: hasFlag(rest, 'json') };
+      }
+      if (sub === 'rename' || sub === 'merge') {
+        const words = rest.filter((w, i) => !w.startsWith('--') && !(i > 0 && rest[i - 1] === '--tag'));
+        return { kind: 'time', sub: 'rename', from: words[0], to: words[1], tag: flag(rest, 'tag') };
       }
       if (sub === 'report' || sub === undefined) {
         return { kind: 'time', sub: 'report', month: flag(rest, 'month'), by: flag(rest, 'by'), json: hasFlag(rest, 'json') };
@@ -1031,6 +1037,10 @@ export class SysParser {
       }
       if (sub === 'frame') {
         return { kind: 'theme', sub: 'frame', value: rest[0] };
+      }
+      // The accent colour (Settings → Appearance): #rrggbb, a preset name, or reset.
+      if (sub === 'accent') {
+        return { kind: 'theme', sub: 'accent', value: rest[0] };
       }
       // Decision 29 — theme show (headless-capable read)
       if (sub === 'show' || sub === undefined) {

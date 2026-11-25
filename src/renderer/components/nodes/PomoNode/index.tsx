@@ -215,18 +215,6 @@ export function PomoNode({
     : state.activeTaskId ? { label: state.label || 'task', tag: null, taskId: state.activeTaskId }
     : state.label ? { label: state.label, tag: state.tag ?? null, taskId: null } : null;
   const continueName = doing?.label ?? '';
-  const recents: DoingChoice[] = [];
-  if (observe) {
-    const seen = new Set<string>();
-    for (let i = state.history.length - 1; i >= 0 && recents.length < 8; i--) {
-      const r = state.history[i]!;
-      if (r.kind === 'break' || (!r.taskId && !r.label)) continue;
-      const key = r.taskId ?? `${r.label}|${r.tag ?? ''}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      recents.push({ label: r.label || 'task', tag: r.taskId ? null : r.tag ?? null, taskId: r.taskId ?? null });
-    }
-  }
   const guessCategory = (text: string) => spanTagFor(useBoardStore.getState().board, text);
   const taskName = (id: string) => {
     const n = useBoardStore.getState().board?.nodes.find((x) => x.id === id);
@@ -669,12 +657,11 @@ export function PomoNode({
             <DoingPicker
               caption={state.status === 'running' ? 'doing' : 'next'}
               current={doing}
-              recents={recents}
               tasks={tagOptions}
               library={tagLibrary}
               onPick={(c) => c.taskId
                 ? onCommand('pomo.tag', { taskId: c.taskId })
-                : onCommand('pomo.setLiveLabel', { label: c.label, ...(c.tag ? { tag: c.tag } : {}) })}
+                : onCommand('pomo.setLiveLabel', { label: c.label, tag: c.tag })}
               onClear={() => onCommand('pomo.tag', { taskId: null })}
             />
           )}

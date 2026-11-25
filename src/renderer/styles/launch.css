@@ -106,7 +106,7 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 .pk-pulse { animation: pkPulse 1.4s ease-in-out infinite; }
 @keyframes pkPulse { 50% { opacity: .45; } }
 /* The node's Observe dash inside the always-dark capsule card. */
-.pk-dash { --ink: #f4efe2; --ink-2: #ddd6c6; --ink-3: #b3aa94; --ink-4: #8f8572; --paper-2: #1f1d18; --paper-3: #2f2b24; --acid: #c9f158; --rust: #ee8466; }
+.pk-dash { --ink: #f4efe2; --ink-2: #ddd6c6; --ink-3: #b3aa94; --ink-4: #8f8572; --paper-2: #1f1d18; --paper-3: #2f2b24; --rust: #ee8466; } /* --acid: the accent from <html> */
 @media (prefers-reduced-motion: reduce) { .pk-pulse { animation: none; } }
 .ln-seg > button:disabled { opacity: .4; cursor: default; }
 
@@ -149,7 +149,7 @@ html.krnl-pocket, html.krnl-pocket body, html.krnl-pocket #root { background: tr
 .st-swatch i { border-radius: 3px; }
 .st-swatch i:first-child { grid-row: span 2; }
 .st-swatch--light { background: #ebe1c2; } .st-swatch--light i { background: #f6efd0; box-shadow: inset 0 0 0 1px #d6cfbf; } .st-swatch--light i:nth-child(2) { background: #a9c94a; }
-.st-swatch--dark { background: #131210; } .st-swatch--dark i { background: #1f1d18; box-shadow: inset 0 0 0 1px #2f2b24; } .st-swatch--dark i:nth-child(2) { background: #c9f158; }
+.st-swatch--dark { background: #131210; } .st-swatch--dark i { background: #1f1d18; box-shadow: inset 0 0 0 1px #2f2b24; } .st-swatch--dark i:nth-child(2) { background: var(--acid); }
 @media (max-width: 800px) { .st { width: calc(100vw - 32px); } .st-nav { width: 64px; } .st-nav__item > span:last-child, .st-nav__title { display: none; } }
 
 /* Settings rows, slider and chips (Sounds, Finished cards). */

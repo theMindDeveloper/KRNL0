@@ -2856,7 +2856,7 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
    - **A habit moves as itself:** all of its boxes glide with the pointer (DOM transform), only the time line shows; let go, they stay there until the board has the new time and hand over in the same frame.
    - **The Clock follows:** the ghost carries what it is (`refId`, `refKind`); the Clock draws that task or event at the ghost's time on its day while it is carried (`dayModel.withCarried`), redrawing only when the slot changes.
    - **A small Calendar still reads:** a short event gets one small line of its name; a short or slim plan a small one-line name (only a sliver is bare).
-   - **The canvas moves as one picture** while it pans or zooms (`will-change` on the viewport during the gesture, sharp again after); the card animation applies only to a card carried to the Calendar, not to every card.
+   - **The canvas moves as one picture** while it pans or zooms (`will-change` on the viewport during the gesture, sharp again after; superseded by Decision 65: the canvas is one layer all the time); the card animation applies only to a card carried to the Calendar, not to every card.
    - **Moving keeps the grab spot:** a block moved on the Calendar keeps the point it was grabbed by under the pointer (`grabMin` in the drag note and payload), as an event does; something from outside starts where it is let go. Off the hours (over Todo, over ANY TIME) the ghost hides and the box stands in.
    - **Architecture:** one ghost element per Calendar grid and one box per page, moved by `transform` / `translate` in an animation frame from a tiny store (`setCalendarGhost`, `moveCarry`); the week is re-drawn only when a drag starts and ends. (Re-drawing the whole week on every slot change is what made drags stutter.) A guard test fails if a place that drags plans sets its own drag picture or skips `startCarry`.
 3. **A canvas card onto the Calendar.** Let go over a day: planned there (or on that day, any time over ANY TIME); a planned card moves; the card glides back to its place on the canvas and the plan lands with a short pop.
@@ -2885,6 +2885,8 @@ Decision 33 made canvases half-shared: notes and drawings per canvas, plans, hab
 5. CLI: `krnl event add "<name>" --on <date> --at HH:MM [--for]`; `krnl event list` shows both kinds.
 
 **Consequences.** Decision 58's "the footer adds a plan" is replaced. Existing plans stay tasks (no migration). Tour lines that say "add a plan on the Calendar" change.
+
+**Amended 2026-11-25 (owner: "what if I want to add a task, not an event there?").** Drag to add (F93/F94) asks the one question on its card: one row **Task · Event · Repeats** (canvas "KRNL0 Drag to add time", draft "Task or event B"). Task makes a plan in Todo at the dragged time (`todo.add` + `task.schedule`, the same as `krnl todo add` then `krnl task schedule --at --duration`); Event and Repeats are as before. The row remembers the last pick (per viewer). The add field, double-click and "New here…" still make events only.
 
 ## Decision 63 — One drag engine, one overlay at a time, kind marks, connections only drawn (2026-11-22)
 
@@ -2985,3 +2987,49 @@ Measured at 4x CPU in the development build, before → after: a plan moved on t
 - The Calendar's layers gain one for read-only calendars (`linked`). All-day events of other calendars are chips in the existing ANY TIME strip, not a new row.
 - The owner creates and keeps the Google Cloud project.
 - The feature ends with a tutorial ("Your other calendars") and designed release notes.
+
+---
+
+## Decision 65 — Smooth canvas: one steady GPU layer, a sliding grid, no page-wide style checks (2026-11-24)
+
+**Context.** The owner (2026-11-23): moving around the Free canvas stuttered, and some windows (the Calendar, text) flickered while it moved, "like a VA monitor". Requirements: `docs/06-requirements/canvas-smoothness.md`. Four causes were found in the pan path:
+1. Decision 61 turned `will-change: transform` on the viewport on at the first pan frame and off 160 ms after the last one. Each switch rebuilds the whole canvas picture (once into its own layer, once back), so every pause in a trackpad or wheel pan hitched twice. Text in its own layer is smoothed differently from text drawn on the page, so text-heavy windows visibly changed at each switch: the flicker.
+2. React Flow's `<Background>` moves its dot pattern by changing the pattern's `x`/`y`: both full-screen dot layers were drawn again on every pan frame, and tiny dots at fractional offsets shimmer.
+3. A trackpad pan moves the viewport by fractions of a pixel; a layer drawn between pixels is blurred a little differently every frame (text shimmer).
+4. `CanvasFlow` and `useViewportPersistence` subscribed to the store's viewport, which is written at the end of every pan and zoom: the whole canvas component re-rendered there.
+5. **The main cause of the lag when a pan starts (measured, 2026-11-24).** A trace of the built app on the owner's 240 Hz screen showed a 23 ms style recalculation of the whole page inside the mouse-down of every drag. The one-line rule for controls in `tokens.css` (`:where(button, …):where(:not(:has(div, p, [class*="hint"], [class*="desc"])))`, since v0.11.0) tests a class *substring* inside `:has()`, so Chromium re-checks the whole canvas on **any** class change anywhere: React Flow marking the pane `dragging`, a card becoming `selected`, Decision 61's `is-canvas-moving`. Removing only that rule took the cost from 25 ms to 0; no other rule mattered.
+6. Hovering a window set `hoveredNodeId` (wires drawn bold), a ~4 ms React render; during a pan the windows slide under the pointer, so it fired mid-pan. And the `krnl-pointer-held` class on `<html>` (for embeds) made React Flow's layout read at pointer-down walk the page (~4 ms).
+
+**Decision.**
+1. **One layer, always.** `.krnl-canvas .react-flow__viewport { will-change: opacity }` for as long as the canvas is shown (Free and the Station cell that embeds it). A pan only moves that layer. The hint is opacity, never transform: a `will-change: transform` layer keeps the scale it was first drawn at, so a zoom stretched a soft picture and a timed redraw snapped it sharp after (the owner, same day: "a blur flickering effect when zooming"). Measured on the owner's board with screen captures mid-zoom: the opacity-hinted layer is as sharp mid-zoom as at rest (edge variance 675/708 vs 635/666), pans at p95 4.3 ms, and zoom frames stay under 13 ms. No class toggles and no timers.
+2. **Whole pixels.** On every move the remainder of the viewport's translate to the next device pixel is taken back with the CSS `translate` property on the viewport (under half a pixel; React Flow keeps writing `transform`).
+3. **The grid slides** (`Canvas/CanvasGrid.tsx`): the same two dot layers (32 / 160 flow units, same sizes, colours and phase) are drawn into one SVG one tile larger than the canvas on each side, drawn again only when the zoom changes, and moved by a GPU `translate3d` (snapped to device pixels) from a React Flow store subscription, with no React render on pan.
+4. **No re-render at a move's end.** `CanvasFlow` reads the saved viewport once as React Flow's starting point; `useViewportPersistence` is a store subscription (same 500 ms debounce, Decision 7).
+5. **`:has()` never tests a class substring.** The one-line rule names its wrap parts (`.hint`, `.desc`, `.col-desc`, `.st-row__hint`, …), the same list as `WRAP_PARTS` in the dev overflow guard; a test fails on `[class*=` / `[class^=` / `[class$=` inside any `:has()` in the renderer's CSS, and when the two lists differ. A new hint or description part inside a control is added to both.
+6. **Nothing reacts to hover while a button is held** (windows do not set `hoveredNodeId` mid-drag), and `krnl-pointer-held` is set only when the page holds an iframe.
+
+**Measured** (built app, the owner's board, middle-drag after 5 s idle, 240 Hz): installed v0.16.1 — first movement 26–59 ms after the press, 5–7 freezes over 20 ms per drag, longest 33–54 ms; with this decision — first movement 3–8 ms, no freeze over 20 ms, longest 8–12 ms, 95 % of frames at 4.3 ms. The probe and trace scripts drive the app over the Chrome DevTools Protocol (real input events), not the screen.
+
+**Supersedes** Decision 61 §2's "the canvas moves as one picture while it pans or zooms (… sharp again after)": the picture is now kept, not switched per gesture.
+
+**Rejected.**
+- *Keep the per-gesture switch with a longer timeout:* fewer hitches, but each switch still flickers text.
+- *No layer at all (before Decision 61):* every pan frame redraws every window on the canvas; a big Calendar made that slow.
+- *Re-render React Flow's `<Background>` less often:* it owns its pattern position; it cannot slide without a redraw.
+
+**Consequences.** Text on the canvas keeps one kind of smoothing at all times (the layer's), also at rest. A rested zoom costs one redraw. The viewport bus (`rfToScreen`) and drag geometry are unaffected (the pixel correction is under half a pixel).
+
+---
+
+## Decision 66 — New cards find a free spot; Easy mode is retired (2026-11-25)
+
+**Status:** Accepted (owner, 2026-11-25).
+
+**Context.** Tasks added one after another step right along the canvas and ran into the Calendar window (1400 tall since Decision 60), drawn on top of it. Separately, the owner asked for Advanced to be the only mode, also for boards still set to Easy.
+
+**Decision.**
+1. *One placement rule* (`src/shared/spawnPlace.ts`, pure, used by the renderer and the sys CLI): when the app picks a card's place, it keeps the usual spot if free, else takes the nearest free spot right of, left of, under or above whatever is in the way (searched a few steps deep). Obstacles: the windows of the row at their **drawn** place and size (the same math as CanvasFlow: `motherRowXs`, the most common row y, Station-hidden windows left out), and every card on the same canvas except frames. A place the user picks (drop, paste, `--at`) is never moved. In the renderer it is `addNode(node, { clear: true })`.
+2. *Easy is retired.* `migrateRetireEasy` (first step of `migrateBoard`) drops `uiMode: 'easy'` and keeps Easy's stopwatch (the Pomo window gets `config.mode = 'observe'` unless a timer mode was picked); the seed has no `uiMode` and its Pomo window starts on Stopwatch (`mode: 'observe'`, as Easy did; owner, 2026-11-25); Settings has no Mode card; the `modes` tour is Easy-only (never listed); `setUiMode('easy')` and `krnl settings mode easy` do nothing. No schema change: `uiMode` stays an optional field, so older versions still read the board.
+
+**Consequences.** A board synced from an older version that still says Easy is migrated on load again. The Easy branches in components are dead code behind `isEasyBoard` and can be removed in a later clean-up.
+

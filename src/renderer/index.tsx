@@ -13,6 +13,7 @@ import './styles/window-frame.css';
 import './styles/launch.css';
 import '@xterm/xterm/css/xterm.css';
 import { installDockThemes } from './styles/dock-themes';
+import { accentTokens, installAccentSync, loadAccent, onAccentChange } from './themes/accent';
 import { installTaskColors } from './store/taskColors';
 import { installFrameBudget } from './utils/frameBudget';
 
@@ -27,6 +28,21 @@ if (!isPocket) installBoardSaveLogging();
 // defineDockTheme() pipeline. Inject before React renders so the canvas
 // paints themed on first frame, not on rehydration.
 installDockThemes();
+// The accent colour (Settings → Appearance): the main window writes it with the
+// frame style (applyFrameTheme); the floating timer has no style, so it writes
+// it here. Either window follows a change made in the other.
+installAccentSync();
+if (isPocket) {
+  const applyPocketAccent = (): void => {
+    const el = document.documentElement;
+    const mode = el.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const acc = loadAccent();
+    for (const k of ['--acid', '--acid-glow', '--acid-faint', '--acid-ink', '--accent-on-dark', '--term-acid', '--btn-primary-ring', '--btn-primary-bg', '--btn-primary-bg-hover', '--btn-primary-fg']) el.style.removeProperty(k);
+    if (acc) for (const [k, v] of Object.entries(accentTokens(acc, mode))) el.style.setProperty(k, v);
+  };
+  applyPocketAccent();
+  onAccentChange(applyPocketAccent);
+}
 if (!isPocket) {
   // #207 — every current task gets its own colour (kept in step with the board).
   installTaskColors();

@@ -194,7 +194,7 @@ export function SynthesizerChrome() {
       config: {},
       isMother: false,
     };
-    useBoardStore.getState().addNode(node);
+    useBoardStore.getState().addNode(node, { clear: true });
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
     emit('sys.cmd', 'jack-in: text node spawned', { severity: 'info' });

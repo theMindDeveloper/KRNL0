@@ -16,9 +16,12 @@ import { useBoardStore, pushHistory } from './boardStore';
 import { unscheduleOne } from './chainSchedule';
 import type { Board } from '../../shared/types';
 import { saveBoard } from './eventLog';
-import { pomoDeleteSegment, pomoRetagSegment, pomoStopAt } from '../components/nodes/PomoNode/commands';
-import { pomoEditSegment, pomoAddSegment, spanProblem } from '../components/nodes/PomoNode/spanEdit';
-import { spanTagFor } from './spanTags';
+import { pomoDeleteSegment, pomoRenameFreeName, pomoRetagSegment, pomoStopAt } from '../components/nodes/PomoNode/commands';
+import { pomoEditSegment, pomoAddSegmentFilling, spanProblem } from '../components/nodes/PomoNode/spanEdit';
+import { spanTagFor, boardTagLibrary } from './spanTags';
+import { slugifyTag } from '../../shared/tags/classify';
+import { todoAddTag } from '../components/nodes/TodoNode/commands';
+import type { TodoState } from '../components/nodes/TodoNode/types';
 import type { PomoState } from '../components/nodes/PomoNode/types';
 import { selectSchedule } from './scheduleSelector';
 import type { TaskState } from '../components/nodes/TaskNode/types';
@@ -34,6 +37,56 @@ export function deleteSegment(segId: string): void {
   if (!pomo) return;
   st.updateNode(pomo.id, { state: pomoDeleteSegment(pomo.state as PomoState, { id: segId }) });
   persist();
+}
+
+/**
+ * What a recorded span was (time-log F21): a task, or a free name with its
+ * kind of work (picked, else classified from the name), or nothing (null:
+ * left unnamed). Same choices as naming the time while it records.
+ */
+export function setSegmentWhat(segId: string, what: { label: string; tag: string | null; taskId: string | null } | null): void {
+  if (what?.taskId) { retagSegment(segId, what.taskId); return; }
+  const st = useBoardStore.getState();
+  const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
+  if (!pomo) return;
+  const label = what?.label.trim() ?? '';
+  // The list always says the kind: a kind, or null for "No kind" (never guessed over).
+  const tag = label && what?.tag ? spanTagFor(st.board ?? null, label, what.tag) : null;
+  st.updateNode(pomo.id, { state: pomoRetagSegment(pomo.state as PomoState, { id: segId, taskId: null, label, tag }) });
+  persist();
+}
+
+/**
+ * time-log F22 — merge the free name `from` into `to` (Analytics' "Merge
+ * into…"): all its recorded time moves over. Returns how many spans moved.
+ */
+export function mergeFreeName(from: string, to: string, tag: string | null = null): number {
+  const st = useBoardStore.getState();
+  const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
+  if (!pomo) return 0;
+  const r = pomoRenameFreeName(pomo.state as PomoState, { from, to, tag });
+  if (r.state === pomo.state) return 0;
+  st.updateNode(pomo.id, { state: r.state });
+  persist();
+  return r.count;
+}
+
+/**
+ * time-log F22 — "+ New kind" in the kind pill: a kind of work (a tag in the
+ * Todo list's library, ADR 0016) made from the picker. Returns its id (an
+ * existing kind of that name is reused), or null when nothing could be made.
+ */
+export function addKind(label: string): string | null {
+  const name = label.trim();
+  if (!name) return null;
+  const st = useBoardStore.getState();
+  const todo = st.board?.nodes.find((n) => n.kind === 'todo' && n.isMother) ?? st.board?.nodes.find((n) => n.kind === 'todo');
+  if (!todo) return null;
+  const known = boardTagLibrary(st.board ?? null).find((t) => t.label.toLowerCase() === name.toLowerCase() || t.id === slugifyTag(name));
+  if (known) return known.id;
+  st.updateNode(todo.id, { state: todoAddTag(todo.state as TodoState, { label: name }) });
+  persist();
+  return boardTagLibrary(useBoardStore.getState().board ?? null).find((t) => t.id === slugifyTag(name.slice(0, 24)))?.id ?? null;
 }
 
 export function retagSegment(segId: string, taskId: string | null): void {
@@ -351,20 +404,26 @@ export function editSegmentTimes(segId: string, startMs: number, endMs: number):
   return null;
 }
 
-/** Record time that wasn't recorded. Returns why it can't, or null when done. */
-export function addPastSegment(startMs: number, endMs: number, taskId: string | null, label = ''): string | null {
+/**
+ * Record time that wasn't recorded. Returns why it can't, or null when done.
+ * With no task, `label` is a free name ("Age of Empires 2") and `tag` the kind
+ * of work picked for it: left out, it is classified from the name (the same
+ * rule as naming the time while it records — time-log F21); null keeps it
+ * without a kind ("No kind" in the kind pill).
+ */
+export function addPastSegment(startMs: number, endMs: number, taskId: string | null, label = '', tag?: string | null): string | null {
   const st = useBoardStore.getState();
   const pomo = st.board?.nodes.find((n) => n.kind === 'pomo');
   if (!pomo) return 'No Pomodoro on the board';
   const state = pomo.state as PomoState;
-  const problem = spanProblem(state, { startMs, endMs }, Date.now());
-  if (problem) return problem;
   const task = taskId ? st.board?.nodes.find((n) => n.id === taskId) : undefined;
   const text = task ? (task.state as TaskState).text : label.trim();
-  const tag = !taskId && text ? spanTagFor(st.board ?? null, text, null) : null;
-  st.updateNode(pomo.id, {
-    state: pomoAddSegment(state, { id: crypto.randomUUID(), startMs, endMs, taskId, label: text, tag }),
-  });
+  // `tag` left out: guessed from the name; null: "No kind" was picked, kept empty.
+  const spanTag = !taskId && text && tag !== null ? spanTagFor(st.board ?? null, text, tag ?? null) : null;
+  // F23 — over something already recorded, the free parts around it are logged.
+  const r = pomoAddSegmentFilling(state, { id: crypto.randomUUID(), startMs, endMs, taskId, label: text, tag: spanTag });
+  if (r.problem) return r.problem;
+  st.updateNode(pomo.id, { state: r.state });
   persist();
   return null;
 }

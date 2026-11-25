@@ -224,7 +224,9 @@ describe('Aligned and unified (owner list, 2026-11-20)', () => {
     expect(read('components/ui/TaskInfoPopup.tsx')).toContain("fontFamily: 'var(--font-read)', fontSize: 13, whiteSpace: 'nowrap'");
     const p = read('components/nodes/PomoNode/DoingPicker.tsx');
     expect(p).not.toContain("textTransform: 'uppercase'");
-    expect(p).toContain("'Or a kind of work'");
+    // time-log F22 (owner pick C, 2026-11-24): the kinds sit behind a small pill in the field, in the reading font.
+    expect(p).toContain("aria-label=\"Kind of work\"");
+    expect(p).toContain("fontFamily: 'var(--font-read)'");
   });
   it('the Year view has the standard time row and names its colours', () => {
     const y = read('components/nodes/CalendarNode/YearView.tsx');

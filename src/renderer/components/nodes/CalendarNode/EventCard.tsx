@@ -162,7 +162,7 @@ export function EventCard({ x, y, dayLabel, initial, allowOnce, submitLabel, onS
           <div style={cardRow}>
             <span style={cardLabel}>Time</span>
             <div style={cardCtls}>
-              <TimeField value={timeText} onChange={setTimeText} testId="event-time" minuteStep={15} onEnter={submit} onEscape={onClose} style={cardTime} />
+              <TimeField value={timeText} onChange={setTimeText} testId="event-time" minuteStep={5} onEnter={submit} onEscape={onClose} style={cardTime} />
               {time && <span data-testid="event-end" style={cardNote}>– {end}</span>}
             </div>
           </div>

@@ -257,8 +257,10 @@ export function MotherFrame({
       ref={frameRef}
       className="mother-frame"
       data-tour={nodeId}
-      onMouseEnter={() => setHoveredNodeId(nodeId)}
-      onMouseLeave={() => setHoveredNodeId(null)}
+      // Decision 65 — not while a button is held: during a pan the windows
+      // slide under the pointer, and each hover re-rendered the wires mid-pan.
+      onMouseEnter={(e) => { if (e.buttons === 0) setHoveredNodeId(nodeId); }}
+      onMouseLeave={() => { if (useBoardStore.getState().hoveredNodeId !== null) setHoveredNodeId(null); }}
       style={{
         position: 'relative',
         // Canvas: fixed 540×540 (RF flow coords). Station: fill the resizable

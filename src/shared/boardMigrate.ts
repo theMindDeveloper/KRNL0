@@ -49,8 +49,7 @@ export function seedBoard(): PartialBoard {
     layoutMode: 'station',
     canvases: [{ id: DEFAULT_CANVAS_ID, name: DEFAULT_CANVAS_NAME }],
     activeCanvasId: DEFAULT_CANVAS_ID,
-    // New boards start in Easy mode (existing boards without it stay Advanced).
-    uiMode: 'easy',
+    // Easy mode is retired (owner, 2026-11-25): new boards are Advanced (no uiMode).
     nodes: [
       {
         id: 'mother-pomo',
@@ -71,7 +70,8 @@ export function seedBoard(): PartialBoard {
         },
         // Decision 22 — canonical PomoConfig shape.
         // ADR 0008 § 4.2 — stationSlot backfilled for station layout
-        config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, stationSlot: 'top-left' } /* no face: the frame style picks it (ADR 0009 F7) */,
+        // New boards start on Stopwatch, as Easy did (owner, 2026-11-25).
+        config: { sessionMin: 25, shortBreakMin: 5, longBreakMin: 15, longBreakEvery: 4, mode: 'observe', stationSlot: 'top-left' } /* no face: the frame style picks it (ADR 0009 F7) */,
       },
       {
         // #207 — first start: Pomo, Todo, Calendar, Clock (top row), then Habits,
@@ -734,6 +734,31 @@ function validateBoardInvariants(board: unknown): unknown {
  * the seed here: the next save would overwrite the user's only copy.
  */
 
+/**
+ * Easy mode is retired (owner, 2026-11-25: "use advanced mode as default …
+ * hide easy mode also for users that have easy mode still enabled"). A board
+ * still in Easy opens in Advanced; the data is the same in both modes.
+ */
+export function migrateRetireEasy(board: unknown): unknown {
+  if (!board || typeof board !== 'object') return board;
+  const b = board as Record<string, unknown>;
+  if (b['uiMode'] !== 'easy') return board;
+  const { uiMode: _gone, ...rest } = b;
+  void _gone;
+  // Easy's timer was always a stopwatch: keep it (Pomo's Stopwatch = 'observe'),
+  // unless the user had already picked a timer mode.
+  if (Array.isArray(rest['nodes'])) {
+    rest['nodes'] = (rest['nodes'] as unknown[]).map((n) => {
+      const node = n as { kind?: unknown; isMother?: unknown; config?: unknown } | null;
+      if (!node || node.kind !== 'pomo' || node.isMother !== true) return n;
+      const cfg = (node.config && typeof node.config === 'object' ? node.config : {}) as Record<string, unknown>;
+      if (cfg['mode'] === 'pomodoro' || cfg['mode'] === 'observe') return n;
+      return { ...node, config: { ...cfg, mode: 'observe' } };
+    });
+  }
+  return rest;
+}
+
 export function migrateBoard(parsed: unknown): unknown {
   // Migration order matters: shape-promoting migrations (pomo config rename,
   // task plannedMin backfill from durationMin) must run BEFORE
@@ -781,7 +806,7 @@ export function migrateBoard(parsed: unknown): unknown {
                     migrateTaskKind(
                       migrateTaskPlannedMin(
                         migratePomoConfig(
-                          migrateMotherPositions(parsed),
+                          migrateMotherPositions(migrateRetireEasy(parsed)),
                         ),
                       ),
                     ),

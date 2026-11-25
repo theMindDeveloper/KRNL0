@@ -17,16 +17,18 @@ const boardPath = join(dir, 'board.json');
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe('Easy mode data', () => {
-  it('F1: a new board is easy; a board without uiMode is advanced', () => {
-    expect(seedBoard().uiMode).toBe('easy');
-    expect(isEasyBoard(seedBoard() as never)).toBe(true);
+  // Easy is retired (Decision 66, 2026-11-25): new boards are Advanced, and a
+  // board still in Easy opens in Advanced.
+  it('a new board is advanced; a board without uiMode is advanced', () => {
+    expect(seedBoard().uiMode).toBeUndefined();
+    expect(isEasyBoard(seedBoard() as never)).toBe(false);
     expect(isEasyBoard({} as never)).toBe(false);
   });
 
-  it('uiMode round-trips through the schema and the loader', () => {
+  it('a board saved in Easy loads in Advanced and still passes the schema', () => {
     const seeded = { ...seedBoard(), uiMode: 'easy' };
     writeFileSync(boardPath, JSON.stringify(seeded));
-    expect((loadBoardFrom(boardPath) as { uiMode?: string }).uiMode).toBe('easy');
+    expect((loadBoardFrom(boardPath) as { uiMode?: string }).uiMode).toBeUndefined();
     expect(BoardSchema.safeParse(loadBoardFrom(boardPath)).success).toBe(true);
   });
 });

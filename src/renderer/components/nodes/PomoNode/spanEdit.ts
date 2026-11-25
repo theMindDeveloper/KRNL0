@@ -134,3 +134,50 @@ export function ymdOf(ms: number): string {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+/**
+ * time-log F23 — the parts of `times` not already recorded (work spans and
+ * the live session), each at least a minute. Logging past time over a
+ * stretch that holds a small recorded piece fills around it instead of
+ * refusing the whole stretch (owner, 2026-11-24).
+ */
+export function freeParts(state: PomoState, times: SpanTimes, nowMs: number): SpanTimes[] {
+  const taken: SpanTimes[] = [];
+  for (const r of state.history) {
+    if (r.kind === 'break') continue;
+    taken.push({ startMs: Date.parse(r.startedAt), endMs: Date.parse(r.endedAt) });
+  }
+  const live = liveSpan(state, nowMs);
+  if (live) taken.push(live);
+  taken.sort((a, b) => a.startMs - b.startMs);
+  const out: SpanTimes[] = [];
+  let cur = times.startMs;
+  for (const t of taken) {
+    if (t.endMs <= cur || t.startMs >= times.endMs) continue;
+    if (t.startMs > cur) out.push({ startMs: cur, endMs: Math.min(t.startMs, times.endMs) });
+    cur = Math.max(cur, t.endMs);
+    if (cur >= times.endMs) break;
+  }
+  if (cur < times.endMs) out.push({ startMs: cur, endMs: times.endMs });
+  return out.filter((p) => p.endMs - p.startMs >= 60_000);
+}
+
+/**
+ * Record a work span after the fact, around anything already recorded in it
+ * (F23): one span per free part. `problem` is set when nothing can be added
+ * (the future, end before start, or all of it already recorded).
+ */
+export const pomoAddSegmentFilling = (
+  state: PomoState,
+  args: { id: string; startMs: number; endMs: number; taskId?: string | null; label?: string; tag?: string | null; nowMs?: number },
+): { state: PomoState; parts: SpanTimes[]; problem: string | null } => {
+  const nowMs = args.nowMs ?? Date.now();
+  const problem = spanProblem(state, args, nowMs);
+  if (!problem) return { state: pomoAddSegment(state, { ...args, nowMs }), parts: [{ startMs: args.startMs, endMs: args.endMs }], problem: null };
+  if (!problem.startsWith('Overlaps')) return { state, parts: [], problem };
+  const parts = freeParts(state, args, nowMs);
+  if (parts.length === 0) return { state, parts: [], problem: 'All of that time is already recorded' };
+  let next = state;
+  parts.forEach((p, i) => { next = pomoAddSegment(next, { ...args, ...p, id: i === 0 ? args.id : `${args.id}-${i + 1}`, nowMs }); });
+  return { state: next, parts, problem: null };
+};

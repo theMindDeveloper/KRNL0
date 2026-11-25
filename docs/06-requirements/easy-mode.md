@@ -1,5 +1,7 @@
 # Easy mode / Advanced mode
 
+> **Retired 2026-11-25 (owner: "use advanced mode as default in app … hide easy mode also for users that have easy mode still enabled").** KRNL0 has one mode, Advanced. A board still in Easy opens in Advanced and keeps its stopwatch (`migrateRetireEasy`: Pomo set to Stopwatch unless a timer mode was picked); new boards start in Advanced with the timer on Stopwatch (as Easy did); Settings has no Mode card; the "Easy and Advanced" tour is not listed; `krnl settings mode easy` answers that Easy is gone. The Easy code paths stay behind the one gate (`isEasyBoard`) until they are removed. The rest of this page is history.
+
 *Status: **built** (all proposals approved). Q1: no Pomodoro in Easy. Q2: chains kept. Q3: task → habit links hidden. Q4: existing boards stay Advanced. Q5: Easy / Advanced.*
 
 ## Why

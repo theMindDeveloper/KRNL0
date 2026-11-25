@@ -8,6 +8,7 @@
 // mother window, and switching modes never moves anything.
 import type { Node as KrnlNode } from '../../../shared/types/node';
 import { tallestMother } from '../../../shared/motherLayout';
+import { motherRowYOf } from '../../../shared/spawnPlace';
 
 export const MOTHER_ROW_HEIGHT = 540;
 /** Space between the row and the topmost node (room for the slot badge). */
@@ -21,8 +22,5 @@ const GRID = 40;
  */
 export function motherRowY(nodes: readonly KrnlNode[]): number {
   void MOTHER_ROW_HEIGHT; void MOTHER_ROW_GAP; void GRID; void tallestMother;
-  const counts = new Map<number, number>();
-  for (const n of nodes) if (n.isMother) counts.set(n.position.y, (counts.get(n.position.y) ?? 0) + 1);
-  if (counts.size === 0) return 0;
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]![0];
+  return motherRowYOf(nodes);
 }

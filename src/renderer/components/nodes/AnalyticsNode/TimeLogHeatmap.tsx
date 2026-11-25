@@ -16,6 +16,10 @@ import { useBoardStore } from '../../../store/boardStore';
 import { boardTagLibrary } from '../../../store/spanTags';
 import { toneVarForTask } from '../../../utils/taskColor';
 import { CategoryIcon } from '../PomoNode/CategoryIcon';
+import { createPortal } from 'react-dom';
+import { DoingList } from '../PomoNode/DoingPicker';
+import { mergeFreeName } from '../../../store/scheduleActions';
+import { Z } from '../../ui/layers';
 
 type Span = 'week' | 'month';
 
@@ -68,12 +72,23 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
     return m;
   }, [todoNode]);
 
+  // time-log F22 — right-click a name row: merge it into another name.
+  const [merge, setMerge] = useState<{ name: string; x: number; y: number } | null>(null);
+  // Recorded time changed (a merge, a new span): read the log again, a moment
+  // later so the save that writes it has landed.
+  const history = useBoardStore((st) => (st.board?.nodes.find((n) => n.kind === 'pomo')?.state as { history?: unknown } | undefined)?.history);
+  const [rev, setRev] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setRev((v) => v + 1), 500);
+    return () => clearTimeout(t);
+  }, [history]);
+
   useEffect(() => {
     let alive = true;
-    setEntries(null);
     void queryTimeLog(r.from, r.to).then((e) => { if (alive) setEntries(e); });
     return () => { alive = false; };
-  }, [r.from, r.to]);
+  }, [r.from, r.to, rev]);
+  useEffect(() => { setEntries(null); }, [r.from, r.to]);
 
   const fold: TimeLogFold | null = useMemo(() => (entries ? foldTimeLog(entries, { fromYMD: r.from, toYMD: r.to }) : null), [entries, r.from, r.to]);
 
@@ -146,7 +161,14 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
             const tag = rowTag(t);
             const ti = tag ? tagInfo(tag) : undefined;
             return (
-              <div role="row" key={t.key} data-testid="time-log-row" style={{ display: 'flex', alignItems: 'center', height: ROW_H }}>
+              <div
+                role="row"
+                key={t.key}
+                data-testid="time-log-row"
+                title={!t.taskId && t.taskText ? 'Right-click to merge this name into another' : undefined}
+                onContextMenu={!t.taskId && t.taskText ? (e) => { e.preventDefault(); e.stopPropagation(); setMerge({ name: t.taskText, x: e.clientX, y: e.clientY }); } : undefined}
+                style={{ display: 'flex', alignItems: 'center', height: ROW_H }}
+              >
                 <span title={t.taskText} style={{ width: NAME_W, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, paddingRight: 8, minWidth: 0 }}>
                   <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: color, flexShrink: 0, opacity: t.done ? 0.5 : 1 }} />
                   <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: t.taskId ? ink1 : 'var(--k-an-ink-2, var(--ink-2))', textDecoration: t.done ? 'line-through' : 'none' }}>
@@ -219,6 +241,36 @@ export function TimeLogHeatmap({ width, height }: { width: number; height: numbe
             })}
           </div>
         </div>
+      )}
+      {merge && createPortal(
+        <>
+          <div onClick={() => setMerge(null)} onContextMenu={(e) => { e.preventDefault(); setMerge(null); }} style={{ position: 'fixed', inset: 0, zIndex: Z.popupBackdrop }} />
+          <div
+            role="dialog"
+            aria-label={`Merge ${merge.name}`}
+            data-testid="time-log-merge"
+            style={{
+              position: 'fixed', zIndex: Z.popup, width: 302,
+              left: Math.max(8, Math.min(merge.x + 4, window.innerWidth - 310)), top: Math.max(8, Math.min(merge.y + 6, window.innerHeight - 260)),
+              background: 'var(--paper)', border: '1px solid var(--paper-3)', borderRadius: 10, boxShadow: 'var(--shadow-2)', fontFamily: 'var(--font-read)',
+            }}
+          >
+            <div style={{ padding: '10px 12px 2px', fontSize: 12.5, color: 'var(--ink-3)' }}>
+              Merge <span style={{ color: 'var(--ink)' }}>“{merge.name}”</span> into… (all its time moves)
+            </div>
+            <DoingList
+              testIdPrefix="merge-name"
+              namesOnly
+              exclude={[merge.name]}
+              current={null}
+              tasks={[]}
+              library={library}
+              onPick={(c) => { mergeFreeName(merge.name, c.label, c.tag); setMerge(null); }}
+              onClose={() => setMerge(null)}
+            />
+          </div>
+        </>,
+        document.body,
       )}
     </div>
   );

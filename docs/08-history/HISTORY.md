@@ -3544,3 +3544,199 @@ Typecheck clean; all tests pass.
 **Files changed:** `docs/08-history/HISTORY.md`
 
 **Summary:** The owner asked for a Mac build made on their Mac, offered on the website, and the whole release run without them. CI built the Windows draft; `npm run release -- check` passed (installer, blockmap, `latest.yml` 0.16.2, web app checksum). On the Mac, `npm run release -- mac` built `KRNL0-0.16.2-arm64.dmg` from the tag, verified the image and the ad-hoc signature, and attached it with its blockmap. The packaged 0.16.2 app was smoke-tested with isolated data: the banner says v0.16.2, `krnl pomo start` works, and minimising shows the always-on-top floating timer. Then the release was published. The follow workflow opened server 0.2.7 (web 0.16.2, signed image digest in `release.json`); it was merged, built, published, and `:latest` moved. krnl0.com: fallback version 0.16.2, the homepage says Windows and Mac, and the download page's licence line says PolyForm Shield. The live download page offers the `.dmg` as "Download for Mac". Not done: the Mac build has no Google sign-in client (CI-only secrets), so Google Calendar sign-in says "not set up" on Mac; and the Microsoft Store submission needs Windows and the owner.
+
+---
+
+## [2026-11-24] — Smooth canvas: no lag when a pan starts, one steady layer, a sliding grid
+
+**Type:** Performance / Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/Canvas/CanvasFlow.tsx`, `src/renderer/components/Canvas/canvasLayer.ts` (new), `src/renderer/components/Canvas/CanvasGrid.tsx` (new), `src/renderer/store/useViewportPersistence.ts`, `src/renderer/styles/reactflow-theme.css`, `docs/03-architecture/decisions.md` (Decision 65), `docs/06-requirements/canvas-smoothness.md` (new), `tests/unit/renderer/canvasSmoothness.test.tsx` (new), `tests/__mocks__/@xyflow/react.tsx` (store stub), `src/renderer/styles/tokens.css`, `src/renderer/dev/overflowGuard.ts`, `src/renderer/components/nodes/MotherFrame/index.tsx`
+
+**Summary:** The owner reported that moving around the canvas stuttered and that some windows (the Calendar, text) flickered while it moved. Four causes, four fixes (Decision 65):
+- The viewport's GPU layer was switched on at the first pan frame and off 160 ms after the last one (Decision 61). Each pause in a pan rebuilt the whole canvas twice (the hitch), and text changed its smoothing at every switch (the flicker). The layer is now kept for as long as the canvas is shown; only a zoom that has rested drops it for one frame so it is drawn sharp at the new size.
+- The viewport is put on whole device pixels (a CSS `translate` correction under half a pixel), so text no longer shimmers while it slides between pixels.
+- React Flow's two `<Background>` dot layers were drawn again across the whole screen on every pan frame. `CanvasGrid` draws the same dots once per zoom and slides them with a GPU transform.
+- The canvas component re-rendered at the end of every pan and zoom (two store subscriptions to the viewport). It now reads the saved viewport once, and saving is a plain store subscription (same 500 ms debounce).
+- **The main cause of the start lag, found by tracing the built app:** the one-line rule for controls in `tokens.css` tested `[class*="hint"]` inside `:has()`, so every class change anywhere (React Flow marking the pane `dragging` at a drag's start, a card being selected) re-checked the whole page: 23 ms in every mouse-down. The rule now names its hint/desc parts (same list as the dev overflow guard); a test forbids class-substring tests inside `:has()`.
+- Hovering windows no longer re-renders the wires while a button is held (windows slide under the pointer mid-pan), and the embed guard class goes on `<html>` only when there is an iframe.
+Measured on the owner's 240 Hz screen and board (built app, drag after idle): v0.16.1 — first movement 26–59 ms, 5–7 freezes over 20 ms per drag; now 3–8 ms and none (longest frame 8–12 ms).
+Works the same in Free and in the Station cell that embeds the canvas. Tests map F1–F7.
+
+## [2026-11-24] — Log past time and "Time spent on" take any name, not only tasks
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/PomoNode/DoingPicker.tsx` (list split out as `DoingList`), `src/renderer/components/ui/SpanEditor.tsx` (`WhatPickButton`, Log time, retag host, `CountsToward`), `src/renderer/store/scheduleActions.ts` (`setSegmentWhat`, `addPastSegment` takes a kind of work), `src/renderer/components/ContextMenu/scheduleMenus.ts`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/ClockNode/index.tsx`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/sys/commands/pomo.ts`, `claude/CLAUDE.md`, `docs/06-requirements/time-log.md` (F21, UC-L5), `tests/unit/renderer/whatWasThisTime.test.tsx` (new), `tests/unit/sys/pomo.addName.test.ts` (new)
+
+**Summary:** The owner could not log past time for something that is not a task ("counting my time playing Age of Empires"), and the recorded-time popup said "Counts toward" and listed tasks for a span named "Age of Empires 2". Recorded time already held a free name and a kind of work, and the live timer's "What are you doing?" offered both, but Log past time and Counts toward used an older task-only button (it even dropped the categories time-log F17 asked for). Now Log past time ("What"), the popup's **Time spent on** and the right-click **Change what it was… / Name this time…** open the same list as "What are you doing?": type a name, pick a plan (done ones as they are, for past time), or a kind of work; "Leave it unnamed" clears it. A free name with no kind picked is classified from the name, as while recording. CLI: `krnl pomo add … --text "name" [--tag <kind>]` (new `--tag`); `krnl pomo retag <id> --text … --tag …` already existed. Requirement time-log F21.
+
+## [2026-11-24] — Names you used come back: a small field that completes, and merge in Analytics
+
+**Type:** Feature (small) / Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/PomoNode/nameMatch.ts` (new), `src/renderer/components/nodes/PomoNode/DoingPicker.tsx` (`DoingList` rebuilt), `src/renderer/components/nodes/PomoNode/commands.ts` (`pomoRenameFreeName`), `src/renderer/components/nodes/PomoNode/index.tsx`, `src/renderer/components/ui/SpanEditor.tsx`, `src/renderer/store/scheduleActions.ts` (`mergeFreeName`), `src/renderer/components/nodes/AnalyticsNode/TimeLogHeatmap.tsx`, `src/shared/timelog/fold.ts`, `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/sys/commands/pomo.ts`, `claude/CLAUDE.md`, `docs/06-requirements/time-log.md` (F22, UC-L6), `tests/unit/renderer/nameMatch.test.ts` (new), `tests/unit/renderer/whatWasThisTime.test.tsx`, `tests/unit/sys/pomo.addName.test.ts`
+
+**Summary:** The owner asked how Analytics counts free time and found the list ugly ("so big, and when you type it completely changes its form"). Analytics adds free time up by its name (case and spaces ignored), and the list never offered names used before, so "AOE2" and "Age of Empires 2" became two rows. Designed on the canvas "KRNL0 What was this time" (five boards); the owner picked draft C. The list is now a field and at most five lines in one fixed-size box: opened, the names you used last, then plans; typing finds a name by its start, a word start, its initials ("aoe") or inside, finishes it in grey (Tab or Enter takes it), and offers "New name" only when no free name is spelled so; a small kind pill shows the name's last kind and opens the kinds in the same box. The Pomo, Log past time, Time spent on and the right-click entry all use it. Analytics' time table: right-click a name row → Merge into… moves all its recorded time (spans still on the board; the time log records it as a retag). CLI `krnl time rename "<from>" "<to>" [--tag <kind>]`. The fold collapses inner spaces in name keys, as the picker does.
+
+## [2026-11-24] — Calendar: less room on top, a hideable Google note, calmer hour rows
+
+**Type:** Bug Fix / Polish
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `MonthView.tsx`, `OtherCalendars.tsx`, `index.tsx`, `types.ts`, `commands.ts`, `src/sys/commands/cal.ts`, `docs/06-requirements/calendar-sync.md`, `tests/unit/renderer/calendarTopRoom.test.tsx` (new)
+
+**Summary:** The owner found the top of the Calendar (Station) took a lot of room and the "Nothing from Google Calendar this week" note could not be hidden. Measured in a Station cell: header 41, week row 36, day names 29, ANY TIME 26 and the note's own row 34 px before the first hour. The note now sits inside the empty ANY TIME strip (no row of its own) and has a ×: it is a Calendar layer (`linkedNote`), back from the Calendar menu ("Note when a week has nothing") or `krnl cal layers note on|off`; Month has the same ×. The every-other-hour shade is 1.1 % (was 2.6 %) and the half-hour dashes 7 % (was 10 %): a slight accent, the hour lines unchanged. Drag-to-add on the Calendar and the Clock (Notion-style) is drafted on the canvas "KRNL0 Drag to add time", waiting for the owner's pick.
+
+## [2026-11-24] — Drag to add on the Calendar and the Clock; "New kind" in the kind pill
+
+**Type:** Feature (small)
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/DragAddCard.tsx` (new), `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/ClockNode/index.tsx`, `src/renderer/components/nodes/PomoNode/DoingPicker.tsx`, `src/renderer/store/scheduleActions.ts` (`addKind`), `docs/06-requirements/calendar-clock-visuals.md` (F93, F94), `docs/06-requirements/time-log.md`, `src/renderer/components/nodes/CalendarNode/__tests__/dragToAdd.test.tsx` (new)
+
+**Summary:** The owner asked for Notion Calendar's way of adding: press, drag, name it, Enter, with no right-click and no typing times. Drafted on the canvas "KRNL0 Drag to add time"; the owner picked B (a small card beside the box), with the Clock draft along. Calendar Week and Day: drag on empty hours draws a box (15 min steps, up to 12 h); on release a small card beside it adds an event (name, times, Once / Repeats) or, when the box is all in the past, logs it with the "what was it" field. Clock: drag round the dial; past the 12 the time goes on into the next 12 hours on an outer ring; the same card opens. The kind pill got **New kind** (the owner: "Play isn't a built-in kind"): it makes the kind in the Todo tag library and files the name under it.
+
+## [2026-11-24] — Fixes: past time over a recorded piece, the Clock's drag wedge, one corner mark on plans
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/PomoNode/spanEdit.ts` (`freeParts`, `pomoAddSegmentFilling`), `src/renderer/store/scheduleActions.ts`, `src/renderer/components/ui/SpanEditor.tsx`, `src/renderer/components/nodes/CalendarNode/DragAddCard.tsx`, `WeekView.tsx`, `src/renderer/components/nodes/ClockNode/index.tsx`, `src/sys/commands/pomo.ts`, `docs/06-requirements/time-log.md` (F23), tests (`spanEdit`, `whatWasThisTime`, `pomo.addName`, `dragToAdd`, `kindMarks`)
+
+**Summary:** Three bugs the owner reported.
+- **Past time over a small recorded piece could not be added** (Log past time refused the whole stretch; the new drag card closed and added nothing). Now the free parts around what is recorded are added (time-log F23), in the app and in `krnl pomo add`; the cards never close silently on a refusal; a Calendar drag may start on recorded time.
+- **The Clock's drag wedge was invisible:** traced in the built app over the DevTools protocol (the drag and the card worked, a capture showed no wedge). It was drawn right after the bezel, so the face painted over it. It is now drawn over the face and the arcs, under the numbers. (The owner's dial also looked empty because all of today's recorded time was in the morning while the Clock showed the afternoon half.)
+- **Two marks on top of each other in a plan's corner:** the done check (or the old list mark) and the Decision 63 task mark were both at top 4 / right 4. Each plan now has one corner mark: the check when done, the replan button when missed, else the task mark; the old list mark is gone. A test fails if a block draws two.
+
+
+## [2026-11-24] — Review of this update: five problems fixed before release
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/sys/SysFacade.ts`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/ClockNode/index.tsx`, `src/renderer/store/scheduleActions.ts`, `src/renderer/components/nodes/PomoNode/index.tsx`, `src/renderer/components/Canvas/commandDispatch.ts`, `src/renderer/components/Canvas/CanvasGrid.tsx`, `src/renderer/launch/launchStore.ts`, `src/sys/commands/calLinks.ts`, `docs/06-requirements/time-log.md`, `docs/06-requirements/calendar-clock-visuals.md`, tests (`pomo.addName`, `dragToAdd`, `whatWasThisTime`, `canvasSmoothness`)
+
+**Summary:** The owner asked for a search for bugs, validation problems and conflicts this update causes. Found and fixed:
+- `krnl time rename` changed the board but never reached the time log (the CLI logs time changes only for pomo/task/todo verbs), so Analytics kept the old name. `time rename` is now logged; a test reads the log.
+- "No kind" in the kind pill was guessed over (the save treated null as "not chosen"): "Code review" with No kind still landed under Code. Now left out = guessed, null = kept empty, in the store and the live timer.
+- Drag-to-add started on a finger too (the phone and tablet web app scroll the hours by touch) and treated a cancelled pointer as a release (a card popped up). Now mouse and pen only; `pointercancel` clears the box. Same on the Clock.
+- The dot grid's SVG pattern ids were fixed strings; two canvases on screen would share them. Now unique per grid.
+- A too-wide renumbering (time-log F20 → F21) had also changed two unrelated "(F20)" comments (launch milestones, `cal unlink`); restored. The requirement docs that still described the task-only "Counts toward" and the "For" row now describe "Time spent on" and "What".
+Checked and fine: canvas switching never relied on the removed viewport re-render; the Calendar layers schema is not used to strip saved state; every class containing "hint"/"desc" is in the one-line rule's list; no tour targets a renamed element; the viewport pixel snap is measured through the DOM where code reads it.
+
+## [2026-11-24] — Deeper review: two more fixes, real-app checks
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/Canvas/canvasLayer.ts`, `src/renderer/components/nodes/CalendarNode/DragAddCard.tsx`, `docs/06-requirements/canvas-smoothness.md` (F2), `tests/unit/renderer/canvasSmoothness.test.tsx`
+
+**Summary:** A line-by-line read of every changed file, plus checks in the built app over the DevTools protocol (real input). Fixed: the sharp redraw after a zoom waited only for the zoom to rest, so a pan that went on after a zoom got one hitch mid-pan; it now waits for all movement to rest. The drag-to-add card did not take part in "one card at a time", so a task popup could stay open beside it; it now closes the others. Checked in the built app: a mouse drag on the Calendar's hours draws the box, opens the card with the name field focused, Esc closes both, a plain click opens nothing; panning after all of this update is still a steady 240 fps (first movement 4–9 ms, no frame over 20 ms).
+
+## [2026-11-24] — Calendar hours: no alternating shade
+
+**Type:** Polish
+**Files changed:** `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `tests/unit/renderer/calendarTopRoom.test.tsx`
+
+**Summary:** The owner still saw stripes after the every-other-hour shade went to 1.1 % (measured on their screenshot: 24 vs 27 brightness, plain on a VA screen). The shade is gone (it was Decision 58's "an hour reads as a band"); the hour lines and the half-hour dashes mark the hours.
+
+## [2026-11-24] — Canvas: sharp while zooming (no blur flicker)
+
+**Type:** Bug Fix
+**Files changed:** `src/renderer/styles/reactflow-theme.css`, `src/renderer/components/Canvas/canvasLayer.ts`, `src/renderer/components/Canvas/CanvasFlow.tsx`, `docs/03-architecture/decisions.md` (Decision 65), `docs/06-requirements/canvas-smoothness.md` (F2), `tests/unit/renderer/canvasSmoothness.test.tsx`
+
+**Summary:** After the pan fix the owner saw a blur flicker when zooming. The canvas layer was hinted `will-change: transform`, which keeps the scale it was drawn at: every wheel step stretched a soft picture, and a timed redraw snapped it sharp (soft, sharp, soft, sharp). Three options were measured in the built app on the owner's board (screen captures mid-zoom for sharpness, frame times for pan and zoom); the layer is now hinted `will-change: opacity`, which Chromium draws again at each zoom step: as sharp mid-zoom as at rest, pan p95 4.3 ms, zoom frames under 13 ms. The timed redraw and its class are gone.
+
+## [2026-11-24] — Accent colour, 5-minute drags, the Clock turns instead of a second ring
+
+**Type:** Feature
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/themes/accent.ts` (new), `src/renderer/themes/applyFrameTheme.ts`, `src/renderer/components/TopBar/AccentPicker.tsx` (new), `src/renderer/components/TopBar/SettingsModal.tsx`, `src/renderer/index.tsx`, `src/renderer/pocket/*`, styles and components that had the green written in (chassis, reactflow-theme, launch, tokens, manifests, Orb, Commander, KpiTiles, AnalyticsSettings, MotdBanner, Ascii, TerminalNode), `src/sys/parser.ts`, `src/sys/SysFacade.ts`, `src/renderer/store/useCliDispatch.ts`, `claude/CLAUDE.md`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/ClockNode/index.tsx`, `docs/06-requirements/theme-engine.md` (F13), `docs/06-requirements/calendar-clock-visuals.md` (F93, F94), tests (`accent`, `dragToAdd`)
+
+**Summary:** Three asks from the owner.
+- **Accent colour** (theme-engine F13): Settings → General → Appearance has eight swatches, a field for any colour and "Reset to KRNL0 green". The accent goes on `<html>` after the frame style's tokens, so it holds in every style and mode; greens that were written in as literals now read `--acid`. Colours too dark for the dark text on buttons are refused with a reason. `krnl theme accent <#rrggbb|name|reset>`.
+- **Calendar drags in 5-minute steps** at any zoom, for adding, moving and resizing; the ghost and the drop line no longer glide (no CSS transition), so the steps read as no snap. A drag-to-add start near the time now lands on it.
+- **Clock:** a drag carried past 12 turns the dial to the other half (AM to PM, or to the next day past midnight) instead of drawing an outer ring; a start near the time now lands on it; 5-minute steps.
+- A cancelled Clock drag (Esc, a click away, the pointer taken) turns the dial back to the half and day it started on; dragging back across 12 turns it back too. The terminal cursor follows the accent live. `theme accent` is in the CLI's command list.
+- Left green on purpose: named colours and identities (the `spine` olive task tone, the logo, Ambient Radio's station colour, pen colours, the shared milestone card, Blueprint's paper tints).
+- Older drop tests let go 7.5 minutes below the hour (which 15-minute steps rounded away); they now let go on the hour line, since 5-minute steps keep that difference.
+
+## [2026-11-24] — Review of the accent, 5-minute and Clock work: four fixes
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/themes/accent.ts`, `src/renderer/themes/applyFrameTheme.ts`, `src/renderer/store/useCliDispatch.ts`, `src/sys/SysFacade.ts`, `src/shared/cli/commandRegistry.ts`, `claude/CLAUDE.md`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/EventCard.tsx`, tests (`accent`, `dragToAdd`)
+
+**Summary:** A read of the new code found:
+- **Dark-only styles (Nuclear, Submarine) with the app set to Light** got the light accent: text in the accent went a dark shade on a dark surface. The accent now uses the mode the style is really shown in.
+- **The accent forced the button colours,** so Blueprint's cream-on-navy buttons lost their own text colour, and a dark button could show accent text on an accent fill. Buttons are now left to the style (those filled with the accent say `var(--acid)` and follow on their own); only an accent-filled dark button gets the accent's hover.
+- **`krnl theme accent #6aa8ff` reached the app empty:** a shell reads `#…` after a space as a comment. The help and the messages now say to type `6aa8ff` (which always worked); `Reset` in any case works.
+- **Double-click and right-click on the Calendar still rounded to 15 minutes** (10:40 opened 10:30). They use the 5-minute step now, and the event card's minute list steps by 5.
+
+## [2026-11-25] — A drag from the past stops at the now line
+
+**Type:** Feature (small)
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/ClockNode/index.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/dragToAdd.test.tsx`, `docs/06-requirements/calendar-clock-visuals.md`
+
+**Summary:** Owner ask: logging past time should not run on past the time now. A drag on the Clock or the Calendar that starts in the past now stops at the now line however far it is pulled, so it always opens the "log this time" card; one that starts in the future is still an event. The Clock's time now is the minute already begun (floor, was round), so an end snapped to now is never 30 seconds in the future and turned into an event by mistake. F93/F94 amended, scenario added, three tests.
+
+## [2026-11-25] — Calendar: blocks land on each other's edges
+
+**Type:** Feature (small)
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/calendarDrag.ts`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, tests (`calendarDrag`, `dragToAdd`), `docs/06-requirements/calendar-clock-visuals.md`
+
+**Summary:** Owner ask: "snap into the next task when I'm near it", while things can still run in parallel. The one drag rule (`dragTarget`) takes the starts and ends of the other blocks on the target day (plans, events, other calendars' events; the one carried left out): within about 6 screen px (at most 15 minutes) a start lands on a neighbour's end or start, an end on its start or end; the nearest wins, the time now included. Further away the 5-minute grid stays, so blocks can overlap anywhere. Applies to moves, resizes, plans carried in from Todo and the drawn box; Alt held turns it off. Habits are left as they are. F93 amended, scenario added, eight tests.
+
+Also on the canvas "KRNL0 Drag to add time": four drafts (A switch, B one row, C pill, D asked after the name) for choosing Task or Event on the drag card; nothing built until one is picked.
+
+## [2026-11-25] — Drag to add asks: Task, Event or Repeats; a box can run past midnight
+
+**Type:** Feature
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/CalendarNode/DragAddCard.tsx`, `src/renderer/components/nodes/CalendarNode/WeekView.tsx`, `src/renderer/components/nodes/ClockNode/index.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/dragToAdd.test.tsx`, `docs/03-architecture/decisions.md` (Decision 62 amended), `docs/06-requirements/calendar-clock-visuals.md`, `docs/06-requirements/one-time-events.md`
+
+**Summary:** Owner pick "Task or event B" on the canvas "KRNL0 Drag to add time". The drag card's Once / Repeats row is now one row **Task · Event · Repeats** with the app's kind icons; Task adds a plan to Todo at the dragged time and length (`addPlanAt`: `todo.add` + `task.schedule`, both in the CLI), Event and Repeats are as before. The row remembers the last pick per viewer (`localStorage`, wrapped; the first pick is Event). Same card on the Clock. On the Calendar (Week) a box carried into the next day's column runs on past midnight (the day before works the same way); its part on the next day is drawn there, the card says "Sat 9 → Sun 10", and the past stop, the now snap and the edge snap count across the two days. Three tests.
+
+---
+
+## [2026-11-25] — The "what was it" list fits its lines
+
+**Type:** Polish
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/PomoNode/DoingPicker.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/dragToAdd.test.tsx`, `docs/06-requirements/time-log.md`
+**Summary:** Owner report: with two names the past-time card kept an empty gap for five. The name list (`DoingList`, used by the drag card, Pomo's "What are you doing?", Log past time and Analytics' merge) is now as tall as the lines it shows, with the same maximum of five lines (`maxHeight` instead of a fixed `height`). time-log F22 amended.
+
+---
+
+## [2026-11-25] — New cards land on a free spot
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/shared/spawnPlace.ts` (new), `src/shared/motherLayout.ts`, `src/renderer/store/boardStore.ts`, `src/renderer/components/Canvas/commandDispatch.ts`, `src/renderer/components/Canvas/CanvasFlow.tsx`, `src/renderer/components/Canvas/motherRow.ts`, `src/renderer/store/useCliDispatch.ts`, `src/renderer/components/ChassisLayer/SynthesizerChrome.tsx`, `src/sys/commands/task.ts`, `src/sys/commands/text.ts`, `src/sys/commands/image.ts`, `tests/unit/shared/spawnPlace.test.ts`, `docs/06-requirements/task-node.md`, `docs/03-architecture/decisions.md`
+**Summary:** Owner report (screenshot: a new task card on top of the Calendar). Every card the app places itself (Todo add, subtask, Add next, parallel, Calendar drop, habit card, Synthesizer note, the dock's new note/shape/frame, CLI `task add` and `text`/`image add` without `--at`) now goes to the nearest spot off every window (at its drawn place and size) and every other card on that canvas. Places the user picks are kept. Decision 66, task-node F23.
+
+---
+
+## [2026-11-25] — Easy mode retired; Advanced for everyone
+
+**Type:** Feature
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/shared/boardMigrate.ts`, `src/renderer/components/TopBar/SettingsModal.tsx`, `src/renderer/components/Tour/tours.ts`, `src/renderer/store/boardStore.ts`, `src/sys/commands/info.ts`, `src/shared/cli/commandRegistry.ts`, `tests/unit/shared/spawnPlace.test.ts`, `docs/06-requirements/easy-mode.md`, `docs/03-architecture/decisions.md`
+**Summary:** Owner request. Boards still in Easy open in Advanced (`migrateRetireEasy`, no schema bump) and keep the stopwatch Easy gave them (Pomo `config.mode = 'observe'` unless a timer mode was already picked); new boards start in Advanced with the timer on Stopwatch (owner pick); the Mode card left Settings; the "Easy and Advanced" tour is no longer listed; `krnl settings mode easy` says Easy is gone. Decision 66.
+
+---
+
+## [2026-11-25] — The past-time card's field no longer touches its right edge
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `TMD/canvas-performance-smoothness-9af8a0`
+**Files changed:** `src/renderer/components/nodes/PomoNode/DoingPicker.tsx`, `src/renderer/components/nodes/CalendarNode/DragAddCard.tsx`, `src/renderer/components/nodes/CalendarNode/__tests__/dragToAdd.test.tsx`
+**Summary:** Owner screenshot. The drag card is 300 px wide with its border and padding, and the name list inside it was also 300 px, so the "What was it?" field ran about 10 px past the card's inside, up to its right edge. `DoingList` takes a `width` (300 by default, for its own popovers); the drag card passes `100%`, so the list fills the card's inside with even margins.
+
+---
+
+## [2026-11-25] — 0.17 release notes and tour steps
+
+**Type:** Docs / Feature
+**PRs/Commits:** branch `feat/drag-to-add-and-free-spots` (PR #295)
+**Files changed:** `src/shared/whatsnew.ts`, `src/renderer/components/Launch/WhatsNewDialog.tsx`, `src/renderer/assets/launch/plate-dragadd.webp`, `plate-names.webp`, `plate-accent.webp`, `docs/releases/v0.17.0.md`, `CHANGELOG.md`, `src/renderer/components/Tour/tours.ts`, `src/renderer/components/Tour/voice/`, `tests/unit/renderer/tours.test.tsx`
+**Summary:** What's new 0.17 designed on the canvas "KRNL0 0.17 · What's new" and approved by the owner: "Drag to add your time." (Show me: the Calendar tour), "Name any time you spent." (the Timer tour), "Your colour, a smoother canvas." (opens Settings), plus the full-notes list. The three pictures are rendered from the canvas at 2x with a see-through background like the earlier plates. Tutorial gate: the Calendar, Clock and Timer tours gained a step each for drag to add and naming any time, voiced like the rest.
+

@@ -305,7 +305,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
     summary: 'Read and set app settings',
     subcommands: [
       { name: 'show', usage: 'settings show [--json]', summary: 'theme + viewport + boardPath + version' },
-      { name: 'mode', usage: 'settings mode [easy|advanced]', summary: 'Show or set the UI mode (Easy hides links between features; data is the same)' },
+      { name: 'mode', usage: 'settings mode', summary: 'Show the UI mode (always advanced: Easy mode is retired)' },
       { name: 'grid', usage: 'settings grid [off|cards|all]', summary: 'Show or set Align to grid: cards only, or everything (things you move settle on an invisible grid, never on top of each other)' },
       { name: 'layout', usage: 'settings layout [classic|free|reset]', summary: 'Show or pick the layout, as in the layout menu of the top bar: classic = My layout (yours to arrange, kept as you leave it), free = Free canvas. reset puts My layout back as it came (every window in its first place and size). "mine", "station" and "canvas" work too; Ctrl+Shift+L flips Station and Free' },
       { name: 'station-layout', usage: 'settings station-layout [classic]', summary: 'Show which arrangement the Station uses (My layout, classic; the Grid and Planner presets were retired)' },
@@ -494,6 +494,7 @@ export const CLI_REGISTRY: CliCommandSpec[] = [
       { name: 'show', usage: 'theme show [--json]', summary: 'Read current theme from settings (headless-capable)' },
       { name: 'frames', usage: 'theme frames [--json]', summary: 'List the window frame styles' },
       { name: 'frame', usage: 'theme frame <style>', summary: 'Set the window frame style' },
+      { name: 'accent', usage: 'theme accent <rrggbb|name|reset>', summary: 'Set the accent colour (reset = KRNL0 green; requires open renderer)' },
     ],
   },
   {

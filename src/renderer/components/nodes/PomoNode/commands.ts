@@ -646,3 +646,31 @@ export const pomoDevClearSeeded = (state: PomoState): PomoState => ({
   ...state,
   history: state.history.filter((r) => r.label !== 'DEV'),
 });
+
+/**
+ * time-log F22 — merge (or rename) a free name: every recorded work span
+ * named `from` (case and spaces ignored, task spans untouched) takes the name
+ * `to`, and `tag` when one is given (else keeps its own kind). The name being
+ * recorded right now follows too. Analytics adds them up as one row.
+ */
+export const pomoRenameFreeName = (
+  state: PomoState,
+  args: { from: string; to: string; tag?: string | null },
+): { state: PomoState; count: number } => {
+  const key = (s: string): string => s.trim().replace(/\s+/g, ' ').toLowerCase();
+  const from = key(args.from);
+  const to = args.to.trim();
+  if (!from || !to) return { state, count: 0 };
+  let count = 0;
+  const history = state.history.map((r) => {
+    if (r.taskId || r.kind === 'break' || key(r.label ?? '') !== from) return r;
+    count++;
+    return { ...r, label: to, ...(args.tag ? { tag: args.tag } : {}) };
+  });
+  const live = !state.activeTaskId && key(state.label ?? '') === from;
+  if (!count && !live) return { state, count: 0 };
+  return {
+    state: { ...state, history, ...(live ? { label: to, ...(args.tag ? { tag: args.tag } : {}) } : {}) },
+    count,
+  };
+};

@@ -79,9 +79,10 @@ describe('settings layout (Decision 54: the layout menu)', () => {
 });
 
 describe('settings mode', () => {
-  it('sets easy / advanced', async () => {
-    expect((await facade().run(['settings', 'mode', 'easy'])).ok).toBe(true);
-    expect(read().uiMode).toBe('easy');
+  it('Easy is retired: only advanced is accepted (Decision 66)', async () => {
+    expect((await facade().run(['settings', 'mode', 'easy'])).ok).toBe(false);
+    expect(read().uiMode).not.toBe('easy');
+    expect((await facade().run(['settings', 'mode', 'advanced'])).ok).toBe(true);
     expect((await facade().run(['settings', 'mode', 'nope'])).ok).toBe(false);
   });
 });
@@ -115,10 +116,10 @@ describe('clock half / cal zoom', () => {
   it('cal layers shows and switches the recorded rail and habit pills', async () => {
     seed();
     const changed = vi.fn();
-    expect((await facade().run(['cal', 'layers'])).message).toBe('recorded on · habits on · routines on · linked on');
+    expect((await facade().run(['cal', 'layers'])).message).toBe('recorded on · habits on · routines on · linked on · note on');
     const off = await facade(changed).run(['cal', 'layers', 'habits', 'off']);
     expect(off.ok).toBe(true);
-    expect(node('mother-calendar').state['layers']).toEqual({ recorded: true, habits: false, routines: true, linked: true });
+    expect(node('mother-calendar').state['layers']).toEqual({ recorded: true, habits: false, routines: true, linked: true, linkedNote: true });
     expect(changed).toHaveBeenCalled();
     expect((await facade().run(['cal', 'layers', 'habits', 'maybe'])).ok).toBe(false);
     expect((await facade().run(['cal', 'layers', 'pomo', 'on'])).ok).toBe(false);

@@ -34,6 +34,12 @@ import { uiSounds } from '../../sfx/uiSounds';
 /** Dispatch `krnl:ensure-visible` so CanvasFlow can pan the camera if the
  *  spawned rect sits outside the current viewport. No-op outside a browser
  *  (test environments) and in station mode (CanvasFlow's listener gates). */
+/** Where a node added with `clear` ended up (it may have moved off a window or card). */
+function placedAt(id: string, fallback: { x: number; y: number }): { x: number; y: number } {
+  const p = useBoardStore.getState().board?.nodes.find((n) => n.id === id)?.position ?? fallback;
+  return { x: p.x, y: p.y };
+}
+
 function notifySpawnVisible(rect: { x: number; y: number; width: number; height: number }) {
   if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
   window.dispatchEvent(new CustomEvent('krnl:ensure-visible', { detail: rect }));
@@ -378,7 +384,9 @@ function applyCommand(node: Node, command: string, args: Args): DispatchResult |
         case 'pomo.setLiveLabel': {
           const label = String(args['label'] ?? '');
           const explicit = typeof args['tag'] === 'string' ? args['tag'] : null;
-          const tag = label.trim() ? spanTagFor(useBoardStore.getState().board ?? null, label, explicit) : null;
+          // tag: null means "No kind" was picked (kept empty); left out, it is guessed from the name.
+          const noKind = 'tag' in args && args['tag'] === null;
+          const tag = label.trim() && !noKind ? spanTagFor(useBoardStore.getState().board ?? null, label, explicit) : null;
           return { state: pomoSetLiveLabel(s as never, { label, tag }) };
         }
         // DEV-only (#180 viz testing) — seed/clear synthetic reality segments.
@@ -1047,12 +1055,12 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       };
 
       const { addNode, addEdge } = useBoardStore.getState();
-      addNode(childNode);
+      addNode(childNode, { clear: true });
       addEdge(edge);
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       emit('task.created', `subtask ${shortId(childNodeId)} added under ${shortId(nodeId)}`, { refId: childNodeId });
-      notifySpawnVisible({ x: childNode.position.x, y: childNode.position.y, ...TASK_RECT });
+      notifySpawnVisible({ ...placedAt(childNode.id, childNode.position), ...TASK_RECT });
       return;
     }
 
@@ -1149,13 +1157,13 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       // own time where this one ends (when this one is on the Calendar).
       const srcEnd = selectSchedule(freshBoard).placements.get(nodeId)?.endISO ?? '';
       const { addNode, addEdge } = useBoardStore.getState();
-      addNode(newNode);
+      addNode(newNode, { clear: true });
       addEdge(edge);
       if (/T\d{2}:\d{2}/.test(srcEnd)) makeCommandHandler(newNodeId)('task.setSchedule', { scheduledFor: srcEnd.slice(0, 16) });
       const updated = useBoardStore.getState().board;
       if (updated) void saveBoard(updated);
       emit('task.created', `next task ${shortId(newNodeId)} after ${shortId(nodeId)}`, { refId: newNodeId });
-      notifySpawnVisible({ x: newNode.position.x, y: newNode.position.y, ...TASK_RECT });
+      notifySpawnVisible({ ...placedAt(newNode.id, newNode.position), ...TASK_RECT });
       return;
     }
 
@@ -1515,7 +1523,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       };
 
       const { addNode } = useBoardStore.getState();
-      addNode(taskNode);
+      addNode(taskNode, { clear: true });
 
       // Set taskNodeId on the TodoItem (bidirectional link)
       const boardAfterAdd = useBoardStore.getState().board;
@@ -1536,7 +1544,7 @@ function _dispatch(nodeId: string, command: string, args: Args): void {
       const finalBoard = useBoardStore.getState().board;
       if (finalBoard) void saveBoard(finalBoard);
       emit('task.created', `task ${shortId(taskNodeId)} added via todo`, { refId: taskNodeId });
-      notifySpawnVisible({ x: position.x, y: position.y, ...TASK_RECT });
+      notifySpawnVisible({ ...placedAt(taskNodeId, position), ...TASK_RECT });
       return;
     }
 
@@ -1848,7 +1856,7 @@ export function spawnHabitCard(board: { nodes: Node[] }, habitMother: Node, habi
     state: { habitId },
     config: { days: 28 },
   };
-  useBoardStore.getState().addNode(lane);
+  useBoardStore.getState().addNode(lane, { clear: true });
   const updated = useBoardStore.getState().board;
   if (updated) void saveBoard(updated);
   emit('node.added', `habit card for ${habitId.slice(0, 8)}`, { refId: lane.id });
@@ -1902,7 +1910,7 @@ function promoteTodoItemToTask(itemId: string, plannedMin?: number): string | nu
     isMother: false,
     state: taskState,
     config: { showDuration: true },
-  });
+  }, { clear: true });
   updateNode(todoNode.id, { state: todoLinkTask(todoNode.state as TodoState, { itemId, taskNodeId }) });
   emit('task.created', `task ${shortId(taskNodeId)} added via calendar drop`, { refId: taskNodeId });
   return taskNodeId;

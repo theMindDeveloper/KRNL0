@@ -26,7 +26,7 @@ describe('parsing', () => {
     expect(SysParser.parse(['cal', 'import', 'a.ics', '--dry-run'])).toMatchObject({ kind: 'cal', sub: 'import', file: 'a.ics', dryRun: true });
   });
   it('the linked layer switches like the others', () => {
-    expect(calendarSetLayers({ selectedDate: null, anchorDate: '2026-11-22' }, { linked: false }).layers).toEqual({ recorded: true, habits: true, routines: true, linked: false });
+    expect(calendarSetLayers({ selectedDate: null, anchorDate: '2026-11-22' }, { linked: false }).layers).toEqual({ recorded: true, habits: true, routines: true, linked: false, linkedNote: true });
   });
 });
 

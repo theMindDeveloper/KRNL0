@@ -22,6 +22,7 @@ Today a frame style (Classic, Synthesizer, Telemetry, Nuclear (id `krnl-dock`), 
 | F10 | Fonts a style needs are bundled with the app and loaded only while that style is active; nothing is fetched from the network at runtime. |
 | F11 | Component bodies use plain surface tokens; textures (scanlines, brushed metal, wood grain, grids) are confined to chrome and the canvas background. |
 | F12 | Switching frame style or mode never loses component detail: every control, readout and menu a component has in Classic is present in every other style. |
+| F13 | **Accent colour** (owner, 2026-11-24: "change any color instead of the app's green, and a reset for the default KRNL0 green"). Settings → General → Appearance has eight swatches, a field for any colour (`#rrggbb`, `#rgb` or a swatch name) and **Reset to KRNL0 green**. The accent is written on `<html>` after the frame style's tokens (`--acid`, its glow and faint tints, `--acid-ink`, `--accent-on-dark`, `--term-acid`, the primary button), so it holds in every style and mode; on light paper text in the accent is a deeper shade of it. A colour too dark for the dark text drawn on it (contrast below 4.5:1 against near-black) is refused with a reason. Kept per device; other open windows (the pocket timer) follow at once. CLI: `krnl theme accent <#rrggbb|name|reset>`. |
 
 ---
 
@@ -120,6 +121,15 @@ Feature: Frame-style theme engine
   Scenario: F10 — fonts are local
     When frame style "krnl-dock" is active
     Then its fonts load from bundled files and no network font request is made
+
+  Scenario: F13 — the accent replaces the green, and Reset brings it back
+    Given frame style "pro" in dark mode
+    When the user picks the blue swatch in Settings
+    Then <html> has "--acid" set to "#6aa8ff"
+    When the user types "#111111"
+    Then it is refused as too dark and the accent stays blue
+    When the user presses "Reset to KRNL0 green"
+    Then <html> has "--acid" set to "#c9f158"
 
   Scenario: F12 — no detail is lost
     Given frame style "pro"

@@ -26,13 +26,16 @@ export interface CalendarLayers {
   routines: boolean;
   /** Decision 64 — events from other calendars (Google, iCloud, links). */
   linked: boolean;
+  /** The quiet "Nothing from Google Calendar this week · next: …" note
+   *  (calendar-sync F-empty). Its × turns it off; the Calendar menu turns it back on. */
+  linkedNote: boolean;
 }
 
-export const DEFAULT_CAL_LAYERS: CalendarLayers = { recorded: true, habits: true, routines: true, linked: true };
+export const DEFAULT_CAL_LAYERS: CalendarLayers = { recorded: true, habits: true, routines: true, linked: true, linkedNote: true };
 
 export function calendarLayersOf(state: { layers?: Partial<CalendarLayers> | undefined } | null | undefined): CalendarLayers {
   const l = state?.layers;
-  return { recorded: l?.recorded !== false, habits: l?.habits !== false, routines: l?.routines !== false, linked: l?.linked !== false };
+  return { recorded: l?.recorded !== false, habits: l?.habits !== false, routines: l?.routines !== false, linked: l?.linked !== false, linkedNote: l?.linkedNote !== false };
 }
 
 export const CAL_ZOOM_MIN = 1;

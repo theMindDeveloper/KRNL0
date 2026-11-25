@@ -119,8 +119,10 @@ export function settingsMode(
   if (!raw) return { ok: false, message: 'No board found' };
   const current = raw.uiMode === 'easy' ? 'easy' : 'advanced';
   if (mode === undefined) return { ok: true, message: `mode: ${current}`, data: { mode: current } };
-  if (mode !== 'easy' && mode !== 'advanced') {
-    return { ok: false, message: `settings mode: expected easy or advanced, got "${mode}"` };
+  // Easy is retired (2026-11-25): KRNL0 has one mode.
+  if (mode === 'easy') return { ok: false, message: 'settings mode: Easy mode is gone; KRNL0 has one mode (advanced)' };
+  if (mode !== 'advanced') {
+    return { ok: false, message: `settings mode: expected advanced, got "${mode}"` };
   }
   saveBoardTo(ctx.boardPath, { ...raw, uiMode: mode, savedAt: new Date().toISOString() });
   ctx.onBoardChanged?.();

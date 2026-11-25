@@ -119,7 +119,7 @@ interface TaskInfo {
 }
 
 const rowKey = (taskId: string | null, text: string): string =>
-  taskId ? `task:${taskId}` : text.trim() ? `label:${text.trim().toLowerCase()}` : UNTAGGED;
+  taskId ? `task:${taskId}` : text.trim() ? `label:${text.trim().replace(/\s+/g, ' ').toLowerCase()}` : UNTAGGED;
 
 /**
  * Fold `entries` for the local days `fromYMD`..`toYMD`. Pass every entry that
