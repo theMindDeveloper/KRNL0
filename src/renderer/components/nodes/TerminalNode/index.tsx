@@ -217,6 +217,9 @@ export function TerminalNode({ node, onCommand, slotIndex = 4, slotTotal = MOTHE
           const { CanvasAddon } = await import('@xterm/addon-canvas');
           term.loadAddon(new CanvasAddon());
         } catch { /* fall through to DOM */ }
+        // The window may be gone by the time the addon has loaded (the page
+        // closed, or a test's fake browser was torn down): nothing to start.
+        if (typeof window === 'undefined') return;
         term.open(host);
         await startTerminalSession({
           term,
