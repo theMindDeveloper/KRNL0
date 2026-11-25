@@ -3771,3 +3771,12 @@ Typecheck clean; all tests pass.
 **PRs/Commits:** branch `fix/mac-build-keys`
 **Files changed:** `scripts/release.mjs`, `docs/releases/RELEASING.md`, `docs/08-history/HISTORY.md`
 **Summary:** The Mac .dmg is built by hand on the owner's Mac, which had no Google OAuth keys, so Mac builds shipped without "Sign in with Google" unless someone typed the keys in first. New `npm run release -- mac-keys` saves both keys once in the Mac's login Keychain (`security` asks for them hidden, never a file or a chat). `npm run release -- mac` now reads them from the Keychain by itself, and stops before building if they are missing, so a Mac release never loses Google sign-in by accident; `mac --no-google` builds without them on purpose.
+
+---
+
+## [2026-11-25] — Settings option cards fit a phone
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `fix/phone-settings-fit`
+**Files changed:** `src/renderer/styles/launch.css`, `src/renderer/components/TopBar/FinishedSection.tsx`, `SoundSection.tsx`, `PocketSection.tsx`, `tests/unit/renderer/stChoicesRule.test.ts` (new)
+**Summary:** Owner screenshots from the phone website: in Settings › Finished cards and › Sounds, "Overnight", "Crisp" and "SND01 · Sine" ran past their cards' edges. Three sections forced three equal columns (`gridTemplateColumns: repeat(3, …)` inline), about 95 px each on a phone. The rule now lives in one place: `.st-choices` fits as many 136 px columns as the width allows and wraps the rest (`repeat(auto-fit, minmax(min(100%, 136px), 1fr))`), and a card's words break inside it rather than spill. The inline column counts are gone, and a test fails if one comes back. Checked in the browser at 390 and 320 px wide: no control in any Settings section spills; at desktop width the cards still sit in one row.
