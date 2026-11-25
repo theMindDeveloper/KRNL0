@@ -15,6 +15,7 @@
 // Calendars register as surfaces (slot under a point, what a drop does);
 // everything else here is shared.
 
+import { holdToDraw } from './holdToDraw';
 import { calendarGhost, endCarry, ghostTimes, moveCarry, setCalendarGhost, startCarry, type CarryShow, type GhostSpec } from './DropGhost';
 import { afterPaint } from '../../../utils/afterPaint';
 
@@ -192,7 +193,10 @@ const surfaces = new Set<CalendarSurface>();
 /** A Calendar view offers itself as a place to drop on. */
 export function registerCalendarSurface(s: CalendarSurface): () => void {
   surfaces.add(s);
-  return () => { surfaces.delete(s); };
+  // A Calendar that opens mid-drag (a phone's Calendar tab, opened by holding
+  // a carried task over it) is measured on the next move.
+  if (active?.started) geomDirty = true;
+  return () => { surfaces.delete(s); if (active?.started) geomDirty = true; };
 }
 
 interface Active {
@@ -217,6 +221,8 @@ interface Active {
   onEnd?: () => void;
   /** The element it was picked up from (it keeps the pointer, and its cursor shows everywhere). */
   cap?: { el: Element; id: number; cursor: string };
+  /** Picked up by a held finger (Decision 68): where, and on what. Lifted there without moving, it is the long-press menu instead. */
+  touchHold?: { x: number; y: number; el: unknown };
 }
 
 let active: Active | null = null;
@@ -508,6 +514,16 @@ function onUp(ev: PointerEvent): void {
   active = null;
   if (!a.started) return;
   stopClickOnce();
+  // Held and lifted where it was picked up: the long-press menu, not a move.
+  const h = a.touchHold;
+  if (h && Math.hypot(ev.clientX - h.x, ev.clientY - h.y) < 8) {
+    finishVisuals(a, false);
+    endCarry();
+    if (typeof Element !== 'undefined' && h.el instanceof Element && h.el.isConnected) {
+      h.el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: h.x, clientY: h.y, button: 2, buttons: 2 }));
+    }
+    return;
+  }
   drop(a, ev.clientX, ev.clientY);
 }
 
@@ -532,6 +548,41 @@ function onKey(e: KeyboardEvent): void {
  */
 export function beginCalendarDrag(
   e: { clientX: number; clientY: number; button?: number },
+  spec: Parameters<typeof startDrag>[1],
+): void {
+  if (e.button !== undefined && e.button !== 0) return;
+  // Decision 68 — a finger picks it up by holding still (a finger that moves
+  // scrolls); then the box shows at once and the gesture is KRNL0's.
+  if ((e as { pointerType?: unknown }).pointerType === 'touch' && typeof window !== 'undefined') {
+    const from = (e as { currentTarget?: unknown }).currentTarget;
+    const pointerId = (e as { pointerId?: unknown }).pointerId;
+    holdToDraw({ pointerId: typeof pointerId === 'number' ? pointerId : 0, clientX: e.clientX, clientY: e.clientY }, (p) => {
+      startDrag({ clientX: p.clientX, clientY: p.clientY, currentTarget: from, pointerId }, spec);
+      const a = active;
+      if (!a) return;
+      a.touchHold = { x: p.clientX, y: p.clientY, el: from };
+      if (!a.started) { begin(a); schedulePaint(); }
+    });
+    return;
+  }
+  startDrag(e, spec);
+}
+
+/** Whether a press is a finger (bigger edges to grab, hold to pick up). */
+export function isTouchPress(e: { pointerType?: unknown }): boolean {
+  return e.pointerType === 'touch';
+}
+
+/** The edge zone of a block, in screen px: 7 for a mouse; a fingertip's worth for touch (Decision 68). */
+export function edgeZonePx(touch: boolean, height: number): { bottom: number; top: number } {
+  if (!touch) return { bottom: Math.min(7, height / 3), top: height >= 18 ? Math.min(7, height / 3) : 0 };
+  // A short block: its lower half pulls the end (the upper half moves it).
+  if (height < 48) return { bottom: height * 0.45, top: 0 };
+  return { bottom: 16, top: 16 };
+}
+
+function startDrag(
+  e: { clientX: number; clientY: number; button?: number; currentTarget?: unknown; pointerId?: unknown },
   spec: {
     item: DragItem;
     origin?: DragOrigin | null;

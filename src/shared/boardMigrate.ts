@@ -2,6 +2,7 @@
 // app (main, sys CLI) and the web app (Decision 51) open every board the same way.
 // Moved from src/main/persistence/board.ts, which re-exports them.
 
+import { CLASSIC_HIDDEN, CLASSIC_SLOTS, resetClassicGeometry } from './stationLayouts';
 import { normalizeCanvases, DEFAULT_CANVAS_ID, DEFAULT_CANVAS_NAME } from './canvas';
 // Decision 63: tasks placed only by a chain get that time as their own (once).
 import { migrateChainTimes } from '../renderer/store/chainTimes';
@@ -40,7 +41,8 @@ export interface PartialBoard {
 }
 
 export function seedBoard(): PartialBoard {
-  return {
+  // Decision 68 — a new board opens on My layout exactly as Reset makes it.
+  return withResetLayout({
     version: 1,
     schemaVersion: 2,   // ADR 0008 § 4.1 — new boards start at schema v2
     savedAt: new Date().toISOString(),
@@ -138,7 +140,7 @@ export function seedBoard(): PartialBoard {
       { ...analyticsMotherSeed(), position: { x: 1400, y: 0 }, config: { stationSlot: 'top-right-lower' } },
     ],
     edges: [],
-  };
+  });
 }
 
 // Wave C (LifeOS UI refresh) — 540px spacing to accommodate the new 500x500
@@ -621,11 +623,47 @@ export function migrateWhenModel(items: unknown[], nodes: unknown[], state: Reco
   });
 }
 
+/**
+ * Decision 68 — My layout as Reset makes it (Timer, Clock and Todos over a
+ * full-width Calendar; Habits, Analytics and the terminal hidden): what a new
+ * board opens on, and what a device opens on the first time it gets a board
+ * with no layout of its own (layout is per device and never synced, so a new
+ * iPad got the old first arrangement, sometimes the Free canvas).
+ */
+export function withResetLayout<T extends { nodes?: unknown; layoutMode?: unknown; layoutGeometry?: unknown }>(board: T): T {
+  const b = board as Record<string, unknown>;
+  b['layoutMode'] = 'station';
+  const geo = (b['layoutGeometry'] ?? {}) as Record<string, unknown>;
+  b['layoutGeometry'] = { ...geo, station: resetClassicGeometry(undefined) };
+  if (Array.isArray(b['nodes'])) {
+    b['nodes'] = (b['nodes'] as unknown[]).map((n) => {
+      if (typeof n !== 'object' || n === null) return n;
+      const node = n as { kind?: string; isMother?: boolean; config?: Record<string, unknown> | null };
+      const slot = node.isMother ? CLASSIC_SLOTS[node.kind ?? ''] : undefined;
+      if (!slot) return n;
+      return { ...node, config: { ...(node.config ?? {}), stationSlot: slot, stationHidden: CLASSIC_HIDDEN.has(node.kind ?? '') } };
+    });
+  }
+  return board;
+}
+
+/** A board arriving on a device that has no layout of its own: My layout as Reset makes it. */
+function migrateFreshDeviceLayout(board: Record<string, unknown>): Record<string, unknown> {
+  if (board['schemaVersion'] !== 2) return board; // a board from before the Station keeps the canvas (ADR 0008 § 5)
+  if (board['layoutMode'] !== undefined || board['layoutGeometry'] !== undefined) return board;
+  const nodes = Array.isArray(board['nodes']) ? (board['nodes'] as Array<{ isMother?: boolean; config?: Record<string, unknown> | null }>) : [];
+  const mothers = nodes.filter((n) => n && typeof n === 'object' && n.isMother);
+  if (mothers.length === 0 || mothers.some((n) => typeof n.config?.['stationSlot'] === 'string')) return board;
+  return withResetLayout(board);
+}
+
 // ADR 0008 § 4.1 / § 5 — forward-only schemaVersion bump and layoutMode backfill.
 // Existing boards (schemaVersion 1 or missing) become 'canvas' (preserves today's
 // behaviour). New boards seeded by seedBoard() already carry schemaVersion: 2 and
 // layoutMode: 'station' so this migration is a no-op for them.
 function migrateLayoutMode(board: Record<string, unknown>): Record<string, unknown> {
+  // Decision 68 — first: a device with no layout of its own gets Reset's (before the canvas fallback below).
+  migrateFreshDeviceLayout(board);
   // Always set schemaVersion to 2 — whether it was 1, missing, or already 2.
   board['schemaVersion'] = 2;
 

@@ -18,6 +18,13 @@ export function claimOverlay(close: () => void): () => void {
   return () => { if (current?.id === id) current = null; };
 }
 
+/** Closes whatever overlay is on screen (a long-press menu the finger moved on from). */
+export function closeCurrentOverlay(): void {
+  const c = current;
+  current = null;
+  c?.close();
+}
+
 /** While `open`, this overlay is the one on screen. */
 export function useOneOverlay(open: boolean, close: () => void): void {
   const closeRef = useRef(close);

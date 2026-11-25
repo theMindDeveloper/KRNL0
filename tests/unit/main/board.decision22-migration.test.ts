@@ -323,6 +323,7 @@ describe('Decision 22 — board migration', () => {
     expect((clock!.state as { selectedDate?: string }).selectedDate).toMatch(
       /^\d{4}-\d{2}-\d{2}$/,
     );
-    expect(clock!.config).toEqual({ stationSlot: 'top-right-upper' });
+    // Decision 68 — the Clock sits where Reset puts it (top centre), shown.
+    expect(clock!.config).toEqual({ stationSlot: 'top-center', stationHidden: false });
   });
 });

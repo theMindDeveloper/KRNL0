@@ -241,13 +241,14 @@ describe('ADR 0008 — station-mode migration', () => {
       return (node?.config as Record<string, unknown> | undefined)?.['stationSlot'];
     };
 
+    // Decision 68 — a new board opens on My layout as Reset makes it (CLASSIC_SLOTS):
+    // Timer, Clock and Todos over a full-width Calendar; the rest hidden.
     expect(slotFor('pomo')).toBe('top-left');
-    expect(slotFor('todo')).toBe('top-center');
-    // #207 — top row Pomo, Todo, Calendar, Clock; bottom row Habits, Analytics.
-    expect(slotFor('habit')).toBe('bottom-right-pre');
-    expect(slotFor('calendar')).toBe('top-right-pre');
-    expect(slotFor('clock')).toBe('top-right-upper');
-    expect(slotFor('analytics')).toBe('top-right-lower');
+    expect(slotFor('clock')).toBe('top-center');
+    expect(slotFor('todo')).toBe('top-right-pre');
+    expect(slotFor('habit')).toBe('top-right-upper');
+    expect(slotFor('calendar')).toBe('top-right-lower');
+    expect(slotFor('analytics')).toBe('bottom-right-pre');
     expect(slotFor('term')).toBe('bottom-strip');
   });
 

@@ -42,7 +42,8 @@ describe('Decision 32 — analytics mother', () => {
     expect(m!.kind).toBe('analytics');
     expect(m!.isMother).toBe(true);
     expect(m!.position).toEqual({ x: 1400, y: 0 });
-    expect(m!.config).toMatchObject({ stationSlot: 'top-right-lower' });
+    // Decision 68 — a new board opens on My layout as Reset makes it: Analytics hidden in its slot.
+    expect(m!.config).toMatchObject({ stationSlot: 'bottom-right-pre', stationHidden: true });
   });
 
   it('F2: injects mother-analytics into a board that predates it', () => {
