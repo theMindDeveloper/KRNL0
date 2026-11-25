@@ -56,7 +56,7 @@ export function PocketSection() {
         </span>
         <Switch checked={state.enabled} onChange={flip} testId="settings-pocket-switch" title="Floating timer" />
       </div>
-      <div role="radiogroup" aria-label="Floating timer look" className="st-choices" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', opacity: state.enabled ? 1 : 0.5 }}>
+      <div role="radiogroup" aria-label="Floating timer look" className="st-choices" style={{ opacity: state.enabled ? 1 : 0.5 }}>
         {POCKET_LOOKS.map((look) => (
           <button
             key={look}
