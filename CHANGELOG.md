@@ -5,7 +5,7 @@ All notable changes to krnl0 will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.17.1] — unreleased
+## [0.17.1] — 2026-11-25
 
 ### Added
 - The phone website held sideways is a dock: a slim rail and two windows side by side (Todo and the Clock), with a timer pill (Start; or the task, time and Stop) while neither window is the Timer (phone-web F10, F12; Decision 67).
