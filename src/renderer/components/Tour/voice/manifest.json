@@ -982,5 +982,23 @@
     "tours": [
       "calendars"
     ]
+  },
+  "bf62c030": {
+    "text": "Any name works, not only a task: a game, a call, a walk. Names you used come back as you type, even from their first letters. The kind button files the time under Play, Study, or a kind you make.",
+    "tours": [
+      "pomo"
+    ]
+  },
+  "50c7d7cf": {
+    "text": "Or drag across empty hours. Time that has passed asks what it was, and logs it. Time ahead asks: a task, an event, or something that repeats. It lands on the edge of the block next to it. Hold Alt to place it freely.",
+    "tours": [
+      "calendar"
+    ]
+  },
+  "2bd0f7bb": {
+    "text": "Or drag round the dial over empty time. The past asks what it was, the future adds a task or an event. Keep going past twelve, and the dial turns to the other half of the day.",
+    "tours": [
+      "clock"
+    ]
   }
 }
