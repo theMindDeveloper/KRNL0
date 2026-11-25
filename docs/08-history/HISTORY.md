@@ -3765,3 +3765,12 @@ Typecheck clean; all tests pass.
 - Server 0.2.8 (website KRNL0 0.17.0): verified with `updater verify` (signed, 9 files match), published on the owner's yes; `:latest` matches the signed digest.
 - krnl0.com: fallback version 0.17.0 and the 0.17 news list (krnl0-website #11, merged).
 - Left: the Microsoft Store package for 0.17.0 (`npm run package:store` from the tag, submitted by the owner in Partner Center).
+
+---
+
+## [2026-11-25] — Settings option cards fit a phone
+
+**Type:** Bug Fix
+**PRs/Commits:** branch `fix/phone-settings-fit`
+**Files changed:** `src/renderer/styles/launch.css`, `src/renderer/components/TopBar/FinishedSection.tsx`, `SoundSection.tsx`, `PocketSection.tsx`, `tests/unit/renderer/stChoicesRule.test.ts` (new)
+**Summary:** Owner screenshots from the phone website: in Settings › Finished cards and › Sounds, "Overnight", "Crisp" and "SND01 · Sine" ran past their cards' edges. Three sections forced three equal columns (`gridTemplateColumns: repeat(3, …)` inline), about 95 px each on a phone. The rule now lives in one place: `.st-choices` fits as many 136 px columns as the width allows and wraps the rest (`repeat(auto-fit, minmax(min(100%, 136px), 1fr))`), and a card's words break inside it rather than spill. The inline column counts are gone, and a test fails if one comes back. Checked in the browser at 390 and 320 px wide: no control in any Settings section spills; at desktop width the cards still sit in one row.
