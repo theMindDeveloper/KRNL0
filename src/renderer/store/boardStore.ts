@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { resizeMotherIn } from '../../shared/motherLayout';
+import { placeClear, type PlaceNode } from '../../shared/spawnPlace';
+import { isStationHidden } from '../components/Station/stationVisibility';
 import { presetOf, presetRows, swapInRows, withPreset } from '../../shared/stationLayouts';
 import { saveBoard, setLiveViewportSource } from './eventLog';
 import { selectSchedule } from './scheduleSelector';
@@ -106,7 +108,12 @@ interface BoardStore {
   reloadBoard: (board: Board) => void;
   setHoveredNodeId: (id: string | null) => void;
   updateNode: (id: string, patch: Partial<Node>, opts?: { skipHistory?: boolean }) => void;
-  addNode: (node: Node) => void;
+  /**
+   * Add a free node. `clear`: the app picked the place, so the node moves to
+   * the nearest spot off every window and card (spawnPlace.ts). A place the
+   * user picked (drop, paste) is kept as it is.
+   */
+  addNode: (node: Node, opts?: { clear?: boolean }) => void;
   removeNode: (id: string) => void;
   addEdge: (edge: Edge) => void;
   removeEdge: (id: string) => void;
@@ -260,10 +267,11 @@ export const useBoardStore = create<BoardStore>((set) => ({
 
   // Free nodes always land on the active canvas — overwriting any canvasId a
   // pasted / duplicated node carried over from its source (Decision 33).
-  addNode: (node) =>
+  addNode: (node, opts) =>
     set((s) => {
       if (!s.board) return s;
-      const placed = isSharedNode(node) ? node : { ...node, canvasId: activeCanvasOf(s.board) };
+      const onCanvas = isSharedNode(node) ? node : { ...node, canvasId: activeCanvasOf(s.board) };
+      const placed = opts?.clear ? placeClear(s.board.nodes, onCanvas, isStationHidden as (n: PlaceNode) => boolean) : onCanvas;
       return {
         ...pushHistory(s),
         board: { ...s.board, nodes: [...s.board.nodes, placed] },
@@ -550,6 +558,8 @@ export const useBoardStore = create<BoardStore>((set) => ({
     }),
 
   setUiMode: (mode) => {
+    // Easy is retired (2026-11-25): nothing switches a board into it again.
+    if (mode === 'easy') return;
     set((s) => {
       if (!s.board) return s;
       const updated: Board = { ...s.board, uiMode: mode };

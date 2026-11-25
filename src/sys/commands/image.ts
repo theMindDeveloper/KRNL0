@@ -12,6 +12,7 @@ import { extname } from 'path';
 import { mutateBoard, readBoardFile } from '../../main/boardIo';
 import { writeAsset } from '../../main/ipc/assets';
 import type { SysResult } from '../SysFacade';
+import { placeClearLoose } from '../../shared/spawnPlace';
 import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
 import type { BoardShape } from '../../shared/dispatch/types';
 
@@ -84,7 +85,9 @@ export function imageAdd(
   }
   const id = newId();
   mutateBoard((board) => {
-    board.nodes.push({
+    // Typed --at is the user's place; otherwise the app picks a free spot (spawnPlace.ts).
+    const add = (n: (typeof board.nodes)[number]): void => { board.nodes.push(at ? n : placeClearLoose(board.nodes, n)); };
+    add({
       id,
       kind: 'image',
       position,

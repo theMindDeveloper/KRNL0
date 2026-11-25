@@ -265,7 +265,8 @@ export const TOURS: readonly Tour[] = [
       { say: "Analytics answers one question: where did my time go? Per day, and per task.", onlyIn: 'advanced', node: 'mother-analytics', target: ANALYTICS, badge: 'ANALYTICS', text: '**Analytics** answers "where did my time go" — **per day** and **per task**.' },
       { say: "Analytics answers one question: where did my time go? Per day, and per hour.", onlyIn: 'easy', node: 'mother-analytics', target: ANALYTICS, badge: 'ANALYTICS', text: '**Analytics** answers "where did my time go" — **per day** and **per hour**.' },
       { say: "The Terminal runs a real shell. Every part of the app has a kernel command, and Claude Code can work on your board from here.", onlyIn: 'advanced', node: 'mother-term', target: TERM, badge: 'TERMINAL', text: 'The **Terminal** runs a real shell. Every part of KRNL0 has a **krnl** command, and **Claude Code** can work on your board from here.' },
-      { say: "You're in {mode} mode. You can switch here: Settings, then Mode. Advanced connects tasks, categories and focus, and the Easy and Advanced tour shows you the difference.", press: GEAR, target: MODE, badge: 'EASY / ADVANCED', text: "You're in **{mode}** mode. Switch here in **Settings → Mode** — Advanced connects tasks, categories and focus. The **Easy and Advanced** tour shows the difference." },
+      // Easy is retired (Decision 66): there is no Mode card to point at, so this step never shows.
+      { onlyIn: 'easy', say: "You're in {mode} mode. You can switch here: Settings, then Mode. Advanced connects tasks, categories and focus, and the Easy and Advanced tour shows you the difference.", press: GEAR, target: MODE, badge: 'EASY / ADVANCED', text: "You're in **{mode}** mode. Switch here in **Settings → Mode** — Advanced connects tasks, categories and focus. The **Easy and Advanced** tour shows the difference." },
       { say: "And this is me! Ask me anything. I answer with Claude Code, and I can change your board for you. My menu also has a short tour of each window.", target: ORB, badge: 'ASK ME', text: 'And this is me. **Ask me anything**: I answer with Claude Code and can change your board for you. My menu also has **a short tour of each window**.' },
     ],
   },
@@ -455,6 +456,8 @@ export const TOURS: readonly Tour[] = [
   },
   {
     id: 'modes',
+    // Easy is retired (2026-11-25): no board is Easy, so this tour is never listed.
+    onlyIn: 'easy',
     examples: ['plan', 'recorded'],
     title: 'Easy and Advanced',
     summary: 'Where to switch, and what Advanced adds — live',

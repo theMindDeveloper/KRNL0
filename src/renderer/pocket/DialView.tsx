@@ -31,7 +31,7 @@ export function DialTab({ m }: { m: PocketModel }) {
         <button type="button" aria-label="Show the dial" title="Show the dial" onClick={() => setCollapsed(false)}
           style={{ ...NO_DRAG, border: 0, background: 'transparent', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: INK }}>
           {m.observe
-            ? <span style={{ width: 8, height: 8, borderRadius: 999, background: m.onBreak ? 'transparent' : ACID, boxShadow: m.onBreak ? `inset 0 0 0 1.5px ${MUTED}` : '0 0 0 3px rgba(201,241,88,.18)' }} />
+            ? <span style={{ width: 8, height: 8, borderRadius: 999, background: m.onBreak ? 'transparent' : ACID, boxShadow: m.onBreak ? `inset 0 0 0 1.5px ${MUTED}` : '0 0 0 3px color-mix(in srgb, var(--acid) 18%, transparent)' }} />
             : <Ring size={18} stroke={3} fraction={m.onBreak ? m.breakUsed : m.remaining} color={m.tone} />}
           <span style={{ fontFamily: MONO, fontSize: m.observe ? 13 : 15, fontWeight: 500 }}>{minutes}</span>
           <span style={{ ...labelStyle, fontSize: 11 }}>{m.observe ? <LineGlyph name="arrowUp" size={10} /> : m.onBreak ? 'break' : 'left'}</span>

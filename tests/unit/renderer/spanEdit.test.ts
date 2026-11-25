@@ -70,3 +70,21 @@ describe('CLI parse', () => {
     expect(SysParser.parse(['pomo', 'add', '--start', '09:00', '--end', '10:30', '--task', 'API'])).toEqual({ kind: 'pomo', sub: 'add', start: '09:00', end: '10:30', ref: 'API', text: undefined });
   });
 });
+
+describe('time-log F23 — logging over something already recorded fills around it', () => {
+  it('freeParts: the parts not recorded, each at least a minute', async () => {
+    const { freeParts } = await import('../../../src/renderer/components/nodes/PomoNode/spanEdit');
+    const s = state([rec('bit', t(15), t(15, 10)), rec('pause', t(16), t(16, 30), { kind: 'break' })]);
+    expect(freeParts(s, { startMs: t(14), endMs: t(17) }, NOW)).toEqual([{ startMs: t(14), endMs: t(15) }, { startMs: t(15, 10), endMs: t(17) }]);
+    expect(freeParts(s, { startMs: t(15), endMs: t(15, 10) }, NOW)).toEqual([]);
+  });
+  it('pomoAddSegmentFilling adds one span per free part, and says when all of it is taken', async () => {
+    const { pomoAddSegmentFilling } = await import('../../../src/renderer/components/nodes/PomoNode/spanEdit');
+    const s = state([rec('bit', t(15), t(15, 10))]);
+    const r = pomoAddSegmentFilling(s, { id: 'new', startMs: t(14), endMs: t(17), label: 'Chess', nowMs: NOW });
+    expect(r.problem).toBeNull();
+    expect(r.state.history.map((h) => [h.id, h.label])).toEqual([['new', 'Chess'], ['bit', 'bit'], ['new-2', 'Chess']]);
+    expect(pomoAddSegmentFilling(s, { id: 'x', startMs: t(15), endMs: t(15, 10), nowMs: NOW }).problem).toBe('All of that time is already recorded');
+    expect(pomoAddSegmentFilling(s, { id: 'x', startMs: t(22), endMs: t(23, 30), nowMs: NOW }).problem).toBe('That end time is in the future');
+  });
+});

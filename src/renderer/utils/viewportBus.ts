@@ -53,3 +53,8 @@ export function rfToScreen(rfX: number, rfY: number): { x: number; y: number } {
 export function getZoom(): number {
   return _zoom;
 }
+
+/** The canvas container's screen offset (CSS px), for snapping to device pixels. */
+export function getCanvasOrigin(): { left: number; top: number } {
+  return { left: _canvasLeft, top: _canvasTop };
+}

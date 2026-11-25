@@ -491,10 +491,10 @@ export function MonthView({ state, config, onCommand }: MonthViewProps) {
       </div>
 
       {/* Decision 64 — the month has nothing from the other calendars: say where the next is. */}
-      {linkedLayerOn && (() => {
+      {linkedLayerOn && calendarLayersOf(state).linkedNote && (() => {
         const mFirst = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-01`;
         const mLast = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-${String(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
-        return <LinkedEmptyHint links={linksOf({ calendarLinks: calendarLinksRaw })} fromYMD={mFirst} toYMD={mLast} period="this month" onJump={(d) => onCommand('calendar.setAnchor', { date: d })} />;
+        return <LinkedEmptyHint links={linksOf({ calendarLinks: calendarLinksRaw })} fromYMD={mFirst} toYMD={mLast} period="this month" onJump={(d) => onCommand('calendar.setAnchor', { date: d })} onHide={() => onCommand('calendar.setLayers', { linkedNote: false })} />;
       })()}
 
       {/* Day cell grid — 6 rows × 7 cols = 42 cells */}

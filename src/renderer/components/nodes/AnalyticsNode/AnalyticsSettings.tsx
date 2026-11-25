@@ -102,7 +102,7 @@ const pageCard: React.CSSProperties = {
 };
 const iconChip: React.CSSProperties = {
   width: 24, height: 24, flexShrink: 0, borderRadius: 7, display: 'grid', placeItems: 'center',
-  background: 'rgba(201,241,88,0.12)', color: 'var(--acid, #c9f158)',
+  background: 'color-mix(in srgb, var(--acid) 12%, transparent)', color: 'var(--acid, #c9f158)',
 };
 const row: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '4px 2px', borderRadius: 6,

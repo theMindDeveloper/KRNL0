@@ -11,6 +11,7 @@
 import type { FrameMode, FrameStyleId } from '../../shared/frameStyles';
 import { MANIFESTS } from './manifests';
 import type { ThemeManifest, TokenMap, XtermColors } from './types';
+import { accentTokens, loadAccent, onAccentChange } from './accent';
 
 let applied: string[] = [];
 
@@ -33,16 +34,27 @@ export function currentMode(root: HTMLElement = document.documentElement): Frame
   return root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
 
+let last: { id: FrameStyleId; root: HTMLElement } | null = null;
+
 export function applyFrameTheme(id: FrameStyleId, mode: FrameMode, root: HTMLElement = document.documentElement): void {
   for (const key of applied) root.style.removeProperty(key);
-  const entries = Object.entries(tokensFor(id, mode));
+  const base = tokensFor(id, mode);
+  const entries = Object.entries(base);
+  // The user's accent (Settings → Appearance) goes on top of the style's own,
+  // for the mode the style is shown in (a dark-only style stays dark).
+  const accent = loadAccent();
+  if (accent) entries.push(...Object.entries(accentTokens(accent, resolveMode(MANIFESTS[id], mode), base)));
   for (const [key, value] of entries) root.style.setProperty(key, value);
   applied = entries.map(([key]) => key);
+  last = { id, root };
   // F10 — bundled fonts load on demand; a failure only costs the fallback font.
   void MANIFESTS[id].loadFonts?.().catch(() => undefined);
   if (id === 'classic') root.removeAttribute('data-dock');
   else root.setAttribute('data-dock', id);
 }
+
+// A new accent: write the style's tokens again, with it, for the mode shown now.
+onAccentChange(() => { if (last) applyFrameTheme(last.id, currentMode(last.root), last.root); });
 
 /** Test hook: forget what was applied (jsdom roots are recreated per test). */
 export function resetAppliedTokens(): void {

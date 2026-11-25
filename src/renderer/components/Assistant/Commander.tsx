@@ -86,13 +86,13 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
           maxWidth: '90vw',
           background: 'rgba(14, 13, 11, 0.94)',
           backdropFilter: 'blur(18px) saturate(140%)',
-          border: '1px solid rgba(201, 241, 88, 0.22)',
+          border: '1px solid color-mix(in srgb, var(--acid) 22%, transparent)',
           borderRadius: 16,
           overflow: 'hidden',
           boxShadow: [
-            '0 0 0 1px rgba(201, 241, 88, 0.08)',
+            '0 0 0 1px color-mix(in srgb, var(--acid) 8%, transparent)',
             '0 24px 80px rgba(0, 0, 0, 0.6)',
-            '0 0 100px rgba(201, 241, 88, 0.18)',
+            '0 0 100px color-mix(in srgb, var(--acid) 18%, transparent)',
           ].join(', '),
           animation: 'ai-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
           fontFamily: 'var(--font-mono)',
@@ -115,7 +115,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '12px 16px',
-            borderBottom: '1px solid rgba(201, 241, 88, 0.15)',
+            borderBottom: '1px solid color-mix(in srgb, var(--acid) 15%, transparent)',
             fontSize: 11,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
@@ -185,7 +185,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
             <button
               type="button"
               onClick={onClose}
-              style={{ ...btnStyle, color: '#8a8270', borderColor: 'rgba(201,241,88,0.15)' }}
+              style={{ ...btnStyle, color: '#8a8270', borderColor: 'color-mix(in srgb, var(--acid) 15%, transparent)' }}
             >
               cancel
             </button>
@@ -196,10 +196,10 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
                 ...btnStyle,
                 flex: 1,
                 color: valid ? 'var(--accent-on-dark)' : '#6b6354',
-                borderColor: valid ? 'rgba(201,241,88,0.5)' : 'rgba(201,241,88,0.15)',
-                background: valid ? 'rgba(201,241,88,0.08)' : 'transparent',
+                borderColor: valid ? 'color-mix(in srgb, var(--acid) 50%, transparent)' : 'color-mix(in srgb, var(--acid) 15%, transparent)',
+                background: valid ? 'color-mix(in srgb, var(--acid) 8%, transparent)' : 'transparent',
                 cursor: valid ? 'pointer' : 'not-allowed',
-                textShadow: valid ? '0 0 6px rgba(201,241,88,0.4)' : 'none',
+                textShadow: valid ? '0 0 6px color-mix(in srgb, var(--acid) 40%, transparent)' : 'none',
               }}
             >
               › launch session
@@ -216,7 +216,7 @@ export function Commander({ onClose, onLaunch }: CommanderProps) {
 const inputStyle: React.CSSProperties = {
   width: '100%',
   background: 'rgba(0, 0, 0, 0.3)',
-  border: '1px solid rgba(201, 241, 88, 0.15)',
+  border: '1px solid color-mix(in srgb, var(--acid) 15%, transparent)',
   borderRadius: 6,
   color: '#d4cfc0',
   fontFamily: 'inherit',

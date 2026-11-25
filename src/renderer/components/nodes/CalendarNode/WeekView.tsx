@@ -7,7 +7,7 @@
 import { pickerOpen } from '../../ui/Popover';
 import { passRightClick, useOneOverlay } from '../../ui/oneOverlay';
 import { KindIcon, KIND_LABEL } from '../../ui/kindIcons';
-import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, registerCalendarSurface, type CalendarSurface, type DragItem, type DragKind, type DragMode, type DragOrigin, type Target } from './calendarDrag';
+import { beginCalendarDrag, checkCalendarDragLanded, isCalendarDragging, nowMark, registerCalendarSurface, SNAP_EDGE_PX, SNAP_NOW_MIN, type CalendarSurface, type DragItem, type DragKind, type DragMode, type DragOrigin, type Target } from './calendarDrag';
 import { sharedLanes, type KindSpan } from './routineLanes';
 import { CalendarGhostLayer, calendarGhost, ghostTimes, setCalendarGhost } from './DropGhost';
 import { doneLabel, markDoneAsPlanned, plannedEndMs, todoRowOf, wontDoTask } from '../../../store/planActions';
@@ -46,7 +46,7 @@ import { routineLanes } from './routineLanes';
 import { dayOnlyPlans } from './dayOnly';
 import { DueFlag } from './DueFlag';
 import { TimeField } from '../../ui/TimeField';
-import { applyPlanWhen, deletePlanOfTask, deleteRoutine, habitMotherCommand, planWhenOf, putPlanOnDay, toggleTaskDone } from '../../../store/scheduleActions';
+import { addPastSegment, addPlanAt, applyPlanWhen, deletePlanOfTask, deleteRoutine, habitMotherCommand, planWhenOf, putPlanOnDay, toggleTaskDone } from '../../../store/scheduleActions';
 import { WhenPopover } from '../../ui/WhenPopover';
 import type { Habit, HabitSchedule, IsoDow } from '../HabitNode/types';
 import { NowLine } from './NowLine';
@@ -66,6 +66,7 @@ import { showPlanGuide } from '../../PlanGuide';
 import { hourWindow, stepHourWindow } from './hourWindow';
 import { allDayOn, linksOf, partOnDay, type CalendarLink, type LinkedEvent } from '../../../../shared/calsync/types';
 import { LinkedEmptyHint, LinkedInfoCard, linkedLook } from './OtherCalendars';
+import { DragAddCard, hmOfMin } from './DragAddCard';
 import { useLayoutEffect, type PointerEvent as ReactPointerEvent } from 'react';
 import { EVENT_TEXT, eventLines, eventTitleAndPlace, eventTitleAndPlaceOf } from './eventText';
 import { parseQuickAdd } from '../../../../shared/quickAdd';
@@ -262,12 +263,15 @@ const ZOOM_FIT = 2;
 // can still set --k-cal-grid; the half hour stays a quiet dashed line.
 const CAL_HOUR_LINE = 'var(--k-cal-grid, color-mix(in srgb, var(--ink) 11%, transparent))';
 const CAL_DAY_LINE = 'var(--k-cal-grid, color-mix(in srgb, var(--ink) 11%, transparent))';
-const CAL_HOUR_BAND = 'color-mix(in srgb, var(--ink) 2.6%, transparent)';
-const CAL_HALF_LINE = 'linear-gradient(to right, color-mix(in srgb, var(--ink) 10%, transparent) 50%, transparent 0)';
+// Owner, 2026-11-24 (twice): the every-other-hour shade read as stripes, even at
+// 1.1 % (3 brightness levels, plain on a VA screen). No shade: the hour lines mark the hours.
+const CAL_HALF_LINE = 'linear-gradient(to right, color-mix(in srgb, var(--ink) 7%, transparent) 50%, transparent 0)';
 /** F31 — the wrapped name in a narrow block: 10 px mono, one letter about 5.5 px wide, 11 px a line. */
 const WRAP_CH_PX = 5.5;
 const WRAP_LINE_PX = 11;
 const MIN_BLOCK_PX = 14; // px — a planned block is never thinner than one text line
+/** Every drag on the hours (move, resize, add) snaps to this many minutes (owner, 2026-11-24). */
+export const DRAG_STEP_MIN = 5;
 /** Space between two blocks that touch in time. */
 const BLOCK_GAP = 3;
 
@@ -946,6 +950,19 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
     ];
     return sharedLanes(items);
   };
+  /**
+   * Owner, 2026-11-25: the starts and ends of what is on a day (plans, events,
+   * other calendars' events), so a block carried or drawn near one lands on it.
+   */
+  const edgesOf = (dayYMD: string, exceptId: string): number[] => {
+    const out: number[] = [];
+    if (layers.routines) for (const r of routineHitsOn(dayYMD)) if (r.h.id !== exceptId && !r.occ.skipped) out.push(r.occ.startMin, r.occ.endMin);
+    for (const sl of slicesByDay.get(dayYMD) ?? []) if (sl.task.id !== exceptId) out.push(sl.sliceStartMin, sl.sliceEndMin);
+    for (const x of linkedByDay.timed.get(dayYMD) ?? []) out.push(x.startMin, x.endMin);
+    return out;
+  };
+  /** SNAP_EDGE_PX in minutes at the zoom shown (screen px per hour). */
+  const edgeRangeAt = (hourScreenPx: number): number => (hourScreenPx > 0 ? Math.min(15, (SNAP_EDGE_PX * 60) / hourScreenPx) : 0);
   const linkedOnDay = (dayYMD: string) => {
     const hits = linkedByDay.timed.get(dayYMD) ?? [];
     if (!hits.length) return [];
@@ -1005,11 +1022,105 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
     const key = hit ? `${hit.r.h.id}@${dayYMD}` : null;
     if (key !== rtHover) setRtHover(key);
   };
+  // F93 — drag to add (owner pick B): press on empty time and drag; the box
+  // grows with you, and on release a small card beside it names it.
+  const [drawBox, setDrawBox] = useState<{ day: string; a: number; b: number; card: null | { x: number; y: number } } | null>(null);
+  const drewRef = useRef(0);
+  const startDrawBox = (dayYMD: string, e: ReactPointerEvent<HTMLDivElement>): void => {
+    const col = e.currentTarget;
+    const rect = col.getBoundingClientRect();
+    const scale = screenScale(col);
+    const minAt = (clientY: number): number => Math.max(0, Math.min(1440, ((clientY - rect.top) / scale / rowHeight) * 60));
+    const S = DRAG_STEP_MIN;
+    // An edge within a few minutes of the time now (today) lands exactly on it.
+    // Minutes are counted from this day's 00:00; the day after is 1440 and up,
+    // the day before below 0 (owner, 2026-11-25: "from now until 2 a.m.").
+    const [yy, mo, dd0] = dayYMD.split('-').map(Number) as [number, number, number];
+    const nowRel = Math.floor((Date.now() - new Date(yy, mo - 1, dd0).getTime()) / 60_000);
+    // Near the time now or another block's start or end (owner, 2026-11-25), an
+    // edge lands exactly on it: the nearest wins; Alt held, only the time now.
+    const edges = [
+      ...edgesOf(dayYMD, ''),
+      ...edgesOf(addDays(dayYMD, 1), '').map((m) => m + 1440),
+      ...edgesOf(addDays(dayYMD, -1), '').map((m) => m - 1440),
+    ];
+    const er = edgeRangeAt(rowHeight * scale);
+    const toNow = (raw: number, onGrid: number, alt = false): number => {
+      let best = onGrid;
+      let bd = Infinity;
+      if (Math.abs(raw - nowRel) <= SNAP_NOW_MIN) { best = nowRel; bd = Math.abs(raw - nowRel); }
+      if (!alt) for (const x of edges) { const dd = Math.abs(raw - x); if (dd <= er && dd < bd) { best = x; bd = dd; } }
+      return best;
+    };
+    // Carried into the next (or the day before's) column, the box goes on there.
+    const colOf = (d: string): DOMRect | null => rootRef.current?.querySelector(`[data-cal-day="${d}"]`)?.getBoundingClientRect() ?? null;
+    const nextCol = colOf(addDays(dayYMD, 1));
+    const prevCol = colOf(addDays(dayYMD, -1));
+    const inX = (r: DOMRect | null, x: number) => !!r && x >= r.left && x <= r.right;
+    const minAtPoint = (x: number, y: number): number => {
+      const m = minAt(y);
+      if (x > rect.right && inX(nextCol, x)) return 1440 + m;
+      if (x < rect.left && inX(prevCol, x)) return m - 1440;
+      return m;
+    };
+    const raw0 = minAt(e.clientY);
+    const a = Math.max(0, Math.min(1440 - S, toNow(raw0, Math.floor(raw0 / S) * S, e.altKey)));
+    // A box that starts in the past (before the now line) stops at the now
+    // line: it is always logged time (owner, 2026-11-25).
+    const endCap = a < nowRel ? nowRel : Infinity;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let moved = false;
+    const move = (ev: PointerEvent): void => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+      moved = true;
+      const raw = minAtPoint(ev.clientX, ev.clientY);
+      const m = toNow(raw, Math.round(raw / S) * S, ev.altKey);
+      // At least 5 minutes, at most 12 hours (an event's limit); it may run into the next day.
+      const b = m >= a ? Math.min(endCap, Math.max(a + S, Math.min(m, a + 720))) : Math.min(a - S, Math.max(m, a - 720));
+      setDrawBox({ day: dayYMD, a, b, card: null });
+    };
+    const stop = (): void => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+    };
+    // The browser took the pointer (a scroll, a lost window): no card, no box.
+    const cancel = (): void => { stop(); if (moved) setDrawBox(null); };
+    const up = (): void => {
+      stop();
+      if (!moved) return;
+      drewRef.current = Date.now();
+      const r = col.getBoundingClientRect();
+      setDrawBox((cur) => {
+        if (!cur) return cur;
+        const top = r.top + (Math.max(0, Math.min(cur.a, cur.b)) / 60) * rowHeight * scale;
+        const room = window.innerWidth - r.right;
+        return { ...cur, card: { x: room > 316 ? r.right + 8 : r.left - 308, y: top } };
+      });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+  };
+
   const onColumnPointerDown = (dayYMD: string, e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || !layers.routines) return;
+    if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest?.('.cal-block, .cal-habit, button')) return;
-    const hit = routineEdgeAt(dayYMD, e);
-    if (!hit) return;
+    const hit = layers.routines ? routineEdgeAt(dayYMD, e) : null;
+    if (!hit) {
+      // Empty time (no plan, event, habit or another calendar's event there): draw a box.
+      // Recorded time is background here: a drag over it logs around it (time-log F23).
+      if (layersAt(dayYMD, e as unknown as ReactMouseEvent<HTMLDivElement>).some((it) => it.kind !== 'reality')) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const minute = ((Math.max(0, e.clientY - rect.top) / screenScale(e.currentTarget)) / rowHeight) * 60;
+      const frac = (e.clientX - rect.left) / Math.max(1, rect.width);
+      if (routineAt(dayYMD, minute, frac) || linkedAt(dayYMD, minute, frac, true)) return;
+      // A finger on a phone or tablet scrolls the hours; drawing is for a mouse or a pen.
+      if (e.pointerType === 'touch') return;
+      startDrawBox(dayYMD, e);
+      return;
+    }
     const { r, mode } = hit;
     const span = r.occ as RoutineSpan;
     const len = Math.max(15, span.fullEnd - span.fullStart);
@@ -1110,7 +1221,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
   useDismissOutside(calAdding && calAddText.trim() !== '' && !calCardHidden, ['[data-testid="event-card"]', '[data-testid="when-popover"]', calAddRowRef], () => setCalCardHidden(true));
   const calAddInputRef = useRef<HTMLInputElement>(null);
   const openNewAt = (dayYMD: string, minute: number, x: number, y: number) => {
-    const snapMin = Math.max(0, Math.min(1425, Math.floor(minute / 15) * 15));
+    const snapMin = Math.max(0, Math.min(1440 - DRAG_STEP_MIN, Math.floor(minute / DRAG_STEP_MIN) * DRAG_STEP_MIN));
     const at = `${String(Math.floor(snapMin / 60)).padStart(2, '0')}:${String(snapMin % 60).padStart(2, '0')}`;
     const isoDow = ((new Date(`${dayYMD}T00:00:00`).getDay() + 6) % 7) + 1;
     setEventCard({ x, y, day: dayYMD, allowOnce: true, initial: { name: '', mode: 'once', days: [isoDow], time: at, lengthMin: 60 } });
@@ -1183,8 +1294,12 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
       return null;
     },
     // The list has no hour grid: a plan goes right after the row it is let go on.
-    gran: () => (useAgenda ? 5 : gran),
-    hover: (slot) => setAnyHot(slot && 'anyTime' in slot ? slot.anyTime : null),
+    // Owner, 2026-11-24: 5 minutes for every move, resize and add, at any zoom
+    // (15 was too coarse; with no glide the ghost then follows the pointer).
+    gran: () => DRAG_STEP_MIN,
+    edges: (day, exceptId) => edgesOf(day, exceptId),
+    edgeRange: () => edgeRangeAt(geom.current && geom.current.hourPx > 0 ? geom.current.hourPx : rowHeight * (rootRef.current ? screenScale(rootRef.current) : 1)),
+    hover:(slot) => setAnyHot(slot && 'anyTime' in slot ? slot.anyTime : null),
     // An edge pulled: the block is not stepped back (it stretches itself).
     setCarried: (id, mode) => { setCarriedId(mode && mode !== 'move' ? null : id); if (id) setTaskPopup(null); },
     preview: (item, target, origin, mode) => {
@@ -1215,7 +1330,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
         const ts = node?.state as { plannedMin?: number; durationMin?: number } | undefined;
         const planned = item.plannedMin ?? ts?.plannedMin ?? ts?.durationMin ?? item.lenMin;
         if (origin && mode !== 'move') {
-          const durN = Math.max(gran, result.endMin - result.startMin);
+          const durN = Math.max(DRAG_STEP_MIN, result.endMin - result.startMin);
           applyTaskState(item.id, (s0) => taskSetPlannedMin(s0, { minutes: durN }));
           scheduleTaskRef.current(item.id, iso, durN);
         } else scheduleTask(item.id, iso, planned);
@@ -1682,7 +1797,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
       const y = e.clientY;
       const future = clickMs > Date.now();
       const r = routineAt(dayYMD, minute, (e.clientX - rect.left) / Math.max(1, rect.width));
-      const snapMin = Math.max(0, Math.min(1425, Math.floor(minute / 15) * 15));
+      const snapMin = Math.max(0, Math.min(1440 - DRAG_STEP_MIN, Math.floor(minute / DRAG_STEP_MIN) * DRAG_STEP_MIN));
       const at = `${String(Math.floor(snapMin / 60)).padStart(2, '0')}:${String(snapMin % 60).padStart(2, '0')}`;
       const isoDow = ((new Date(yy, mm - 1, dd).getDay() + 6) % 7) + 1;
       setCtxMenu({
@@ -1720,6 +1835,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
   // block stops its own click, so only reality spans are hit here; several
   // overlapping spans open the picker, which then opens the details.
   function handleColumnClick(dayYMD: string, e: ReactMouseEvent<HTMLDivElement>) {
+    // The click that ends a drag-to-add is not a click on the hours.
+    if (Date.now() - drewRef.current < 400) return;
     const items = layersAt(dayYMD, e).filter((it) => it.kind === 'reality');
     if (items.length === 0) {
       // Decision 39 — a click on a routine band: skip, move or end it.
@@ -2074,17 +2191,13 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
               <CalIcon name="down" />
             </span>
           )}
-          {/* #171 — a done task shows a check, so it reads as finished.
-              Decision 59 — any other task shows a small list mark in the same
-              corner: it comes from your Todos (a repeating event shows ⟳). */}
+          {/* ONE mark in the top-right corner of a plan, never two (owner,
+              2026-11-24: the list mark, the task mark and the done check sat on
+              top of each other). Done: the check. Missed: the replan button.
+              Otherwise: the task kind mark (Decision 63) below. */}
           {isDone && !isContinuation && textual && (
             <span data-testid={`task-done-check-${task.id}`} aria-hidden style={{ position: 'absolute', top: blockH >= 22 ? 4 : '50%', transform: blockH >= 22 ? undefined : 'translateY(-50%)', right: 4, color: 'var(--acid-ink, var(--acid))', lineHeight: 0, pointerEvents: 'none' }}>
               <CalIcon name="check" />
-            </span>
-          )}
-          {!isDone && !isContinuation && textual && (
-            <span data-testid={`task-kind-mark-${task.id}`} aria-hidden title="A task from your Todos" style={{ position: 'absolute', top: blockH >= 22 ? 5 : '50%', transform: blockH >= 22 ? undefined : 'translateY(-50%)', right: 5, color: `color-mix(in srgb, ${taskTone} 40%, var(--ink-3))`, lineHeight: 0, pointerEvents: 'none' }}>
-              <CalIcon name="list" size={10} />
             </span>
           )}
           {/* Decision 28 §6 — work/break sub-regions.
@@ -2201,7 +2314,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
               block the question too. REPLAN shows how to drag it. */}
           {/* Only where it fits beside the title: in a small block the dashed
               outline says "missed" and the click popup offers the move. */}
-          {!isMissed && !isContinuation && textual && widthPx >= 60 && blockH >= 14 && (
+          {!isDone && !isMissed && !isContinuation && textual && widthPx >= 60 && blockH >= 14 && (
             <span
               aria-hidden
               data-testid={`task-kind-${task.id}`}
@@ -3042,7 +3155,7 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
           with no time; a chip dragged into the hours gets that time. Plans
           are solid chips, deadlines dashed flags. It grows with its content. */}
       {!useAgenda && (
-        <div data-testid="calendar-day-only-row" style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid var(--paper-3)', minHeight: 26, paddingRight: sbW }}>
+        <div data-testid="calendar-day-only-row" style={{ position: 'relative', display: 'flex', flexShrink: 0, borderBottom: '1px solid var(--paper-3)', minHeight: 26, paddingRight: sbW }}>
           <div title="Any time that day: drop a plan here to put it on a day with no hour; drag it into the hours to give it a time" style={{ width: GUTTER_WIDTH, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 9.5, lineHeight: '11px', letterSpacing: '0.06em', color: 'var(--ink-4)' }}>ANY<br />TIME</div>
           {weekDays.map((dayYMD) => (
             <div
@@ -3115,13 +3228,20 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
               })}
             </div>
           ))}
+          {/* The note about the other calendars lives in this strip when it is empty: no row of its own. */}
+          {layers.linked && layers.linkedNote && weekDays.length > 0 && weekDays.every((d) => !(dueByDay.get(d) ?? []).length && !(linkedByDay.allDay.get(d) ?? []).length) && (
+            <div style={{ position: 'absolute', top: 0, bottom: 0, left: GUTTER_WIDTH, right: sbW, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px', pointerEvents: 'none', minWidth: 0 }}>
+              <LinkedEmptyHint inline links={shownLinks} fromYMD={weekDays[0]!} toYMD={weekDays[weekDays.length - 1]!} period={singleDay ? 'this day' : 'this week'} onJump={(d) => onCommand('calendar.setAnchor', { date: d })} onHide={() => onCommand('calendar.setLayers', { linkedNote: false })} />
+            </div>
+          )}
         </div>
       )}
 
 
-      {/* Decision 64 — nothing from the other calendars in the days shown: say where the next is. */}
-      {layers.linked && weekDays.length > 0 && (
-        <LinkedEmptyHint links={shownLinks} fromYMD={weekDays[0]!} toYMD={weekDays[weekDays.length - 1]!} period={singleDay ? 'this day' : 'this week'} onJump={(d) => onCommand('calendar.setAnchor', { date: d })} />
+      {/* Decision 64 — nothing from the other calendars in the days shown: say where the next is.
+          In the hours view the note sits inside the empty ANY TIME strip (above); only the list has it as a line. */}
+      {useAgenda && layers.linked && layers.linkedNote && weekDays.length > 0 && (
+        <LinkedEmptyHint links={shownLinks} fromYMD={weekDays[0]!} toYMD={weekDays[weekDays.length - 1]!} period={singleDay ? 'this day' : 'this week'} onJump={(d) => onCommand('calendar.setAnchor', { date: d })} onHide={() => onCommand('calendar.setLayers', { linkedNote: false })} />
       )}
       {useAgenda && renderAgenda(weekDays[0]!)}
       {!useAgenda && singleDay && narrowDay && (
@@ -3325,8 +3445,6 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
                         height: rh(1),
                         boxSizing: 'border-box',
                         borderBottom: `1px solid ${CAL_HOUR_LINE}`,
-                        // Decision 58 — every other hour a shade deeper, so an hour reads as a band.
-                        backgroundColor: hour % 2 === 1 ? CAL_HOUR_BAND : undefined,
                         // #4 — a faint dashed half-hour line once the grid is
                         // tall enough to need it, so blocks read against a ruler.
                         backgroundImage: subMarks.length > 0 ? CAL_HALF_LINE : undefined,
@@ -3340,6 +3458,25 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
 
                 {/* Issue #166 — tracked reality as background highlights
                     (zIndex 0, no pointer events — behind habits and tasks) */}
+                {/* F93 — the box being drawn (and kept while its card is open). */}
+                {drawBox && (() => {
+                  // Its part on this column (it may run on into the next day, or start the day before).
+                  const off = dayYMD === drawBox.day ? 0 : dayYMD === addDays(drawBox.day, 1) ? 1440 : dayYMD === addDays(drawBox.day, -1) ? -1440 : null;
+                  if (off === null) return null;
+                  const s0 = Math.min(drawBox.a, drawBox.b);
+                  const e0 = Math.max(drawBox.a, drawBox.b);
+                  const ps = Math.max(0, s0 - off);
+                  const pe = Math.min(1440, e0 - off);
+                  if (pe <= ps) return null;
+                  const sm = (m: number) => ((m % 1440) + 1440) % 1440;
+                  return (
+                    <div data-testid={off === 0 ? 'cal-drag-box' : 'cal-drag-box-more'} style={{ position: 'absolute', left: 3, right: 3, top: rh(ps / 60), height: rh((pe - ps) / 60), zIndex: 6, boxSizing: 'border-box', pointerEvents: 'none',
+                      borderRadius: `${s0 - off >= 0 ? 7 : 0}px ${s0 - off >= 0 ? 7 : 0}px ${e0 - off <= 1440 ? 7 : 0}px ${e0 - off <= 1440 ? 7 : 0}px`,
+                      background: 'color-mix(in srgb, var(--acid) 14%, transparent)', border: '1.5px solid color-mix(in srgb, var(--acid) 70%, transparent)', padding: '3px 6px', overflow: 'hidden' }}>
+                      {off === 0 && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500, color: 'var(--acid-ink, var(--acid))', whiteSpace: 'nowrap' }}>{hmOfMin(sm(s0))} → {hmOfMin(sm(e0))}</span>}
+                    </div>
+                  );
+                })()}
                 {renderRoutineBands(dayYMD)}
                 {renderLinkedBlocks(dayYMD)}
                 {renderRealityBlocks(dayYMD)}
@@ -3651,6 +3788,42 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
         </>,
         document.body,
       )}
+      {drawBox?.card && (() => {
+        const s0 = Math.min(drawBox.a, drawBox.b);
+        const e0 = Math.max(drawBox.a, drawBox.b);
+        const [yy, mm, dd] = drawBox.day.split('-').map(Number) as [number, number, number];
+        const startMs = new Date(yy, mm - 1, dd, 0, s0).getTime();
+        const endMs = new Date(yy, mm - 1, dd, 0, e0).getTime();
+        // The day it starts on (a box drawn up into the day before starts there).
+        const sd = new Date(startMs);
+        const day = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, '0')}-${String(sd.getDate()).padStart(2, '0')}`;
+        const sMin = sd.getHours() * 60 + sd.getMinutes();
+        const len = e0 - s0;
+        return (
+          <DragAddCard
+            x={drawBox.card.x}
+            y={drawBox.card.y}
+            day={day}
+            startMin={sMin}
+            endMin={sMin + len}
+            past={endMs <= Date.now()}
+            onClose={() => setDrawBox(null)}
+            onAddEvent={(d) => {
+              setDrawBox(null);
+              submitEvent({ x: 0, y: 0, day, allowOnce: true, initial: { name: d.name, mode: d.mode, days: d.days, time: hmOfMin(sMin), lengthMin: len } }, { name: d.name, mode: d.mode, days: d.days, time: hmOfMin(sMin), lengthMin: len });
+            }}
+            onAddTask={(name) => {
+              setDrawBox(null);
+              void addPlanAt(name, day, hmOfMin(sMin), len);
+            }}
+            onLog={(c) => {
+              const err = c.taskId ? addPastSegment(startMs, endMs, c.taskId) : addPastSegment(startMs, endMs, null, c.label, c.tag);
+              if (!err) setDrawBox(null);
+              return err;
+            }}
+          />
+        );
+      })()}
       {eventCard && (
         <EventCard
           x={eventCard.x}
@@ -3853,7 +4026,8 @@ export function WeekView({ state, config, onCommand, singleDay = false, menuRef,
                 taskId={realityPopup.seg.taskId ?? null}
                 taskName={spanTaskName(realityPopup.seg)}
                 categoryTag={realityPopup.seg.tag ?? null}
-                onChanged={(taskId) => setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, taskId } })}
+                label={realityPopup.seg.label}
+                onChanged={(what) => setRealityPopup({ ...realityPopup, seg: { ...realityPopup.seg, ...what } })}
               />
             )}
             {/* #12 — delete a recorded segment (removes it from analytics too).

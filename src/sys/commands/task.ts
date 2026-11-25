@@ -40,6 +40,7 @@ import {
 } from '../../shared/dispatch/resolveRef';
 import type { AnyNode as SharedAnyNode, AnyEdge } from '../../shared/dispatch/types';
 import { TASK_STEP_X, TASK_STEP_Y, MOTHER_OFFSET_Y } from '../layout';
+import { placeClear } from '../../shared/spawnPlace';
 import { wouldCreateChainCycle } from '../../renderer/store/chainWalker';
 import { unscheduleOne } from '../../renderer/store/chainSchedule';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
@@ -248,7 +249,7 @@ export async function taskAdd(
   };
 
   updateNode(board, todoMother.id, { ...todoMother, state: linkedTodoState });
-  board.nodes = [...board.nodes, taskNode];
+  board.nodes = [...board.nodes, placeClear(board.nodes, taskNode)];
   // No chain edge: adding a task never chains it (todo-node F25). Chain by
   // hand with `task chain` / `task addNext`.
 
@@ -455,7 +456,7 @@ export async function taskSubtask(
     config: { showDuration: true },
   };
 
-  board.nodes = [...board.nodes, childNode];
+  board.nodes = [...board.nodes, placeClear(board.nodes, childNode)];
   board.edges = [
     ...board.edges,
     {
@@ -612,7 +613,7 @@ export async function taskSibling(
 
   // Decision 63: drawn only; the parallel task gets the source's start as its own time.
   const srcStart = selectSchedule(board as unknown as Board).placements.get(taskId)?.startISO ?? '';
-  board.nodes = [...board.nodes, newNode];
+  board.nodes = [...board.nodes, placeClear(board.nodes, newNode)];
   board.edges = [...edgesArr, ...forkEdges];
   if (/T\d{2}:\d{2}/.test(srcStart)) writeSchedule(board, newNodeId, srcStart.slice(0, 16));
 
@@ -915,7 +916,7 @@ export async function taskAddNext(
   // Decision 63: the connection is only drawn; the new task gets its own time
   // where the source ends (when the source is on the Calendar).
   const srcEnd = selectSchedule(board as unknown as Board).placements.get(sourceNode.id)?.endISO ?? '';
-  board.nodes = [...board.nodes, newNode];
+  board.nodes = [...board.nodes, placeClear(board.nodes, newNode)];
   if (/T\d{2}:\d{2}/.test(srcEnd)) writeSchedule(board, newNodeId, srcEnd.slice(0, 16));
 
   // Wire task.next → task.activate from source to new node (drawn only).

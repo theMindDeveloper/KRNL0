@@ -18,9 +18,15 @@ export interface Spill {
 
 const CONTROLS = 'button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], .task-tag';
 
+/**
+ * The parts that let a control wrap: the same list as the :has() in the
+ * tokens.css rule (named classes only, never [class*=…]: Decision 65).
+ */
+export const WRAP_PARTS = 'div, p, .hint, .desc, .col-desc, .st-row__hint, .st-choice__hint, .dock-key-hint, .enter-hint, .todo-empty-hint, .week-empty-hint, .sync-offline-hint, .calendar-linked-hint';
+
 /** A control that holds a title and a description may wrap (the CSS rule's exceptions). */
 function mayWrap(el: Element): boolean {
-  return el.hasAttribute('data-wrap') || !!el.querySelector('div, p, [class*="hint"], [class*="desc"]');
+  return el.hasAttribute('data-wrap') || !!el.querySelector(WRAP_PARTS);
 }
 
 /** Text spilling out of, wrapping inside, or cut off in a visible control. */

@@ -105,6 +105,42 @@ export function useStore<T>(selector: (state: any) => T): T {
   return selector({ transform: [0, 0, 1] });
 }
 
+// A tiny React Flow store (getState / setState / subscribe) so code that
+// follows the viewport imperatively (CanvasGrid) can be driven in tests.
+interface MockFlowState { transform: [number, number, number]; [key: string]: unknown }
+type MockFlowListener = (state: MockFlowState, prev: MockFlowState) => void;
+export interface MockFlowStore {
+  getState: () => MockFlowState;
+  setState: (partial: Partial<MockFlowState>) => void;
+  subscribe: (listener: MockFlowListener) => () => void;
+}
+function createMockFlowStore(): MockFlowStore {
+  let state: MockFlowState = { transform: [0, 0, 1] };
+  const listeners = new Set<MockFlowListener>();
+  return {
+    getState: () => state,
+    setState: (partial) => {
+      const prev = state;
+      state = { ...state, ...partial };
+      for (const l of listeners) l(state, prev);
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+  };
+}
+const MockFlowStoreContext = React.createContext<MockFlowStore>(createMockFlowStore());
+
+export function ReactFlowProvider({ children }: { children?: React.ReactNode }): React.ReactElement {
+  const [store] = React.useState(createMockFlowStore);
+  return <MockFlowStoreContext.Provider value={store}>{children}</MockFlowStoreContext.Provider>;
+}
+
+export function useStoreApi(): MockFlowStore {
+  return React.useContext(MockFlowStoreContext);
+}
+
 export function ViewportPortal({ children }: { children?: React.ReactNode }): React.ReactElement {
   return <div data-testid="viewport-portal">{children}</div>;
 }

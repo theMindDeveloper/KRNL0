@@ -8,6 +8,7 @@
 
 import { mutateBoard, readBoardFile } from '../../main/boardIo';
 import type { SysResult } from '../SysFacade';
+import { placeClearLoose } from '../../shared/spawnPlace';
 import { textSetLook } from '../../renderer/components/nodes/TextNode/commands';
 import { LOOK_KINDS, type TextLook, type TextState } from '../../renderer/components/nodes/TextNode/types';
 import { resolveNodeRef } from '../../shared/dispatch/resolveRef';
@@ -64,7 +65,9 @@ export function textAdd(
   }
   const id = newId();
   mutateBoard((board) => {
-    board.nodes.push({
+    // Typed --at is the user's place; otherwise the app picks a free spot (spawnPlace.ts).
+    const add = (n: (typeof board.nodes)[number]): void => { board.nodes.push(at ? n : placeClearLoose(board.nodes, n)); };
+    add({
       id,
       kind: 'text',
       position,

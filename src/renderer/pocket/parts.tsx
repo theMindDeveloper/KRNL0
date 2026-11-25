@@ -95,8 +95,10 @@ export function Ring({ size, stroke, fraction, color, track = '#2f2b24', pulse =
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
       {f > 0 && (
         <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+          cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={`${c * f} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          // In style, not the attribute: the colour may be var(--acid) (the accent).
+          style={{ stroke: color }}
           className={pulse ? 'pk-pulse' : undefined}
         />
       )}

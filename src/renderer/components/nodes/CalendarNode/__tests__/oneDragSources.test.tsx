@@ -74,7 +74,7 @@ describe('what a carried card lands as on the week', () => {
     render(<WeekView state={state} config={config} onCommand={() => undefined} />);
     const restore = mockCalendarLayout();
     try {
-      await act(async () => { await carryIn(canvasDragItem(lane(habitId))!, { x, y: hour * 40 + 5 }); });
+      await act(async () => { await carryIn(canvasDragItem(lane(habitId))!, { x, y: hour * 40 + 1 }); });
     } finally { restore(); }
   };
 

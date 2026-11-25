@@ -12,12 +12,13 @@ import {
   pomoDiscard as fsmDiscard,
   pomoDeleteSegment as fsmDeleteSegment,
   pomoRetagSegment as fsmRetag,
+  pomoRenameFreeName,
   pomoDropBlips,
   type PomoEnv,
 } from '../../renderer/components/nodes/PomoNode/commands';
 import { loadBoardFrom, saveBoardTo } from '../../main/persistence/board';
 import { resolveNodeRef, resolutionError } from '../../shared/dispatch/resolveRef';
-import { pomoEditSegment as fsmEditSegment, pomoAddSegment as fsmAddSegment, spanProblem, hmOf, ymdOf } from '../../renderer/components/nodes/PomoNode/spanEdit';
+import { pomoEditSegment as fsmEditSegment, pomoAddSegmentFilling, spanProblem, hmOf, ymdOf } from '../../renderer/components/nodes/PomoNode/spanEdit';
 import type { BoardShape } from '../../shared/dispatch/types';
 import { selectSchedule } from '../../renderer/store/scheduleSelector';
 import type { Board } from '../../shared/types';
@@ -391,11 +392,15 @@ export function pomoEditSegmentCmd(ctx: PomoTagCtx, segmentId: string | undefine
 }
 
 /**
- * `pomo add --start T --end T [--task <ref>] [--text "what"]` — record time
- * that wasn't recorded (#207 F7b). T as in `pomo segment`; HH:MM is today.
+ * `pomo add --start T --end T [--task <ref>] [--text "what"] [--tag <kind>]` —
+ * record time that wasn't recorded (#207 F7b). T as in `pomo segment`; HH:MM
+ * is today. Without a task, `--text` is a free name ("Age of Empires 2") and
+ * `--tag` its kind of work; with no `--tag` it is classified from the name
+ * (time-log F21, the same choices as Log past time in the app).
  */
-export function pomoAddSegmentCmd(ctx: PomoTagCtx, start: string | undefined, end: string | undefined, ref: string | undefined, text: string | undefined): SysResult {
-  if (!start || !end) return { ok: false, message: 'pomo add requires --start HH:MM --end HH:MM [--task <ref>] [--text "what"]' };
+export function pomoAddSegmentCmd(ctx: PomoTagCtx, start: string | undefined, end: string | undefined, ref: string | undefined, text: string | undefined, tagArg?: string | undefined): SysResult {
+  if (!start || !end) return { ok: false, message: 'pomo add requires --start HH:MM --end HH:MM [--task <ref>] [--text "what"] [--tag <kind>]' };
+  if (tagArg && (ref || !text)) return { ok: false, message: '--tag goes with --text (a name and its kind of work), not with --task' };
   const day = start.includes('T') ? start.slice(0, 10) : ymdOf(Date.now());
   const startMs = parseOnDay(start, day);
   let endMs = parseOnDay(end, day);
@@ -408,12 +413,15 @@ export function pomoAddSegmentCmd(ctx: PomoTagCtx, start: string | undefined, en
     const tag = ref ? resolveTag(board as unknown as BoardShape, ref) : { taskId: null, label: (text ?? '').trim() };
     if ('error' in tag) { result = { ok: false, message: tag.error }; return; }
     const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
-    const problem = spanProblem(prev, { startMs, endMs }, Date.now());
-    if (problem) { result = { ok: false, message: problem }; return; }
-    const spanTag = !tag.taskId && tag.label ? spanTagFor(board as unknown as Board, tag.label, null) : null;
+    const spanTag = !tag.taskId && tag.label ? spanTagFor(board as unknown as Board, tag.label, tagArg ?? null) : null;
+    if (tagArg && !spanTag) { result = { ok: false, message: `unknown tag "${tagArg}"` }; return; }
     const id = cliEnv().uuid();
-    node['state'] = { ...prev, history: fsmAddSegment(prev, { id, startMs, endMs, taskId: tag.taskId, label: tag.label, tag: spanTag }).history };
-    result = { ok: true, message: `added ${hmOf(startMs)}–${hmOf(endMs)}${tag.label ? ` "${tag.label}"` : ''} (segment ${id.slice(0, 8)})`, data: { id } };
+    // time-log F23 — over something already recorded, the free parts around it are added.
+    const r = pomoAddSegmentFilling(prev, { id, startMs, endMs, taskId: tag.taskId, label: tag.label, tag: spanTag });
+    if (r.problem) { result = { ok: false, message: r.problem }; return; }
+    node['state'] = { ...prev, history: r.state.history };
+    const parts = r.parts.map((p) => `${hmOf(p.startMs)}–${hmOf(p.endMs)}`).join(', ');
+    result = { ok: true, message: `added ${parts}${tag.label ? ` "${tag.label}"` : ''}${spanTag ? ` [${spanTag}]` : ''}${r.parts.length > 1 ? ' (around time already recorded)' : ''} (segment ${id.slice(0, 8)})`, data: { id, parts: r.parts.length } };
   });
   return result;
 }
@@ -700,4 +708,26 @@ function _pomoConfigViaPath(opts: Parameters<typeof pomoConfig>[0], boardPath: s
 function nextDaySameTime(ms: number): number {
   const d = new Date(ms);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, d.getHours(), d.getMinutes(), d.getSeconds()).getTime();
+}
+
+/**
+ * `krnl time rename "<from>" "<to>" [--tag <kind>]` (also `time merge`) —
+ * time-log F22: every recorded span named `from` (no task; case and spaces
+ * ignored) takes the name `to`, so Analytics adds them up as one row.
+ */
+export function pomoRenameNameCmd(ctx: PomoTagCtx, from: string | undefined, to: string | undefined, tagArg?: string | undefined): SysResult {
+  if (!from || !to || !from.trim() || !to.trim()) return { ok: false, message: 'time rename requires "<from>" "<to>" [--tag <kind>]' };
+  let result: SysResult = { ok: false, message: 'No Pomodoro node found on the board' };
+  mutatePomoBoard(ctx, (board) => {
+    const node = findPomoNode(board);
+    if (!node) return;
+    const tag = tagArg ? spanTagFor(board as unknown as Board, to, tagArg) : null;
+    if (tagArg && !tag) { result = { ok: false, message: `unknown tag "${tagArg}"` }; return; }
+    const prev = defaultState((node['state'] ?? {}) as Partial<PomoState>);
+    const r = pomoRenameFreeName(prev, { from, to, tag });
+    if (r.state === prev) { result = { ok: false, message: `no recorded time is named "${from.trim()}"` }; return; }
+    node['state'] = r.state;
+    result = { ok: true, message: `"${from.trim()}" → "${to.trim()}"${tag ? ` [${tag}]` : ''} (${r.count} span${r.count === 1 ? '' : 's'})`, data: { count: r.count } };
+  });
+  return result;
 }

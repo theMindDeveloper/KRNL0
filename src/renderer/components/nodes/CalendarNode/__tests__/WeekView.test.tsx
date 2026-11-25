@@ -301,7 +301,7 @@ describe('WeekView — drop to schedule', () => {
     const restore = mockCalendarLayout();
     try {
       // Tuesday (2026-05-12) is the 2nd column; 14:00.
-      await act(async () => { await carryIn(planItem('task-abc', 50), { x: 150, y: 14 * 40 + 5 }); });
+      await act(async () => { await carryIn(planItem('task-abc', 50), { x: 150, y: 14 * 40 + 1 }); });
       expect(onCommand).toHaveBeenCalledWith('calendar.schedule', {
         taskId: 'task-abc',
         scheduledFor: '2026-05-12T14:00',
@@ -321,7 +321,7 @@ describe('WeekView — drop to schedule', () => {
     );
     const restore = mockCalendarLayout();
     try {
-      await act(async () => { await carryIn(planItem('item-1', 25, { itemOnly: true }), { x: 150, y: 9 * 40 + 5 }); });
+      await act(async () => { await carryIn(planItem('item-1', 25, { itemOnly: true }), { x: 150, y: 9 * 40 + 1 }); });
       expect(onCommand).toHaveBeenCalledWith('calendar.schedule', {
         itemId: 'item-1',
         scheduledFor: '2026-05-12T09:00',
@@ -457,13 +457,13 @@ describe('WeekView — a habit from the Habit window: letting go opens the swap 
   it('moving over the hours does not open it; letting go does, and daily schedules it there', async () => {
     const onCommand = show();
     beginCalendarDrag({ clientX: -50, clientY: -50, button: 0 }, { item: habitItem('h1', 'Run') });
-    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 50, clientY: 9 * 40 + 5 }));
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 50, clientY: 9 * 40 + 1 }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeNull();
     // Let go on Wednesday 09:00.
-    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 9 * 40 + 5 }));
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 9 * 40 + 1 }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-    await act(async () => { await release(250, 9 * 40 + 5); });
+    await act(async () => { await release(250, 9 * 40 + 1); });
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
     act(() => { pickSwapOption('daily'); });
     act(() => { confirmSwapModal(30); });
@@ -476,7 +476,7 @@ describe('WeekView — a habit from the Habit window: letting go opens the swap 
 
   it('weekly uses the day it was let go on (Thursday 07:00 is ISO day 4)', async () => {
     const onCommand = show();
-    await act(async () => { await carryIn(habitItem('h2', 'Yoga'), { x: 350, y: 7 * 40 + 5 }); });
+    await act(async () => { await carryIn(habitItem('h2', 'Yoga'), { x: 350, y: 7 * 40 + 1 }); });
     expect(document.querySelector('[data-testid="habit-swap-modal"]')).toBeTruthy();
     act(() => { pickSwapOption('weekly'); });
     act(() => { confirmSwapModal(45); });
@@ -490,11 +490,11 @@ describe('WeekView — a habit from the Habit window: letting go opens the swap 
   it('the day and time are where it is let go, whatever it passed on the way', async () => {
     const onCommand = show();
     beginCalendarDrag({ clientX: -50, clientY: -50, button: 0 }, { item: habitItem('h3', 'Swim') });
-    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 50, clientY: 9 * 40 + 5 }));
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 50, clientY: 9 * 40 + 1 }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 14 * 40 + 5 }));
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 250, clientY: 14 * 40 + 1 }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-    await act(async () => { await release(250, 14 * 40 + 5); });
+    await act(async () => { await release(250, 14 * 40 + 1); });
     act(() => { pickSwapOption('weekly'); });
     act(() => { confirmSwapModal(15); });
     expect(onCommand).toHaveBeenCalledWith('calendar.scheduleHabit', {

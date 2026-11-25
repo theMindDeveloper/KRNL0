@@ -602,14 +602,14 @@ export function Orb() {
   const isRunning = orbState === 'running';
 
   const glowFilter = isHot
-    ? 'drop-shadow(0 0 28px rgba(201,241,88,0.95))'
+    ? 'drop-shadow(0 0 28px color-mix(in srgb, var(--acid) 95%, transparent))'
     : isPurple
       ? 'drop-shadow(0 0 26px rgba(180,140,240,0.85))'
       : isSpeaking
-        ? 'drop-shadow(0 0 24px rgba(201,241,88,0.7))'
+        ? 'drop-shadow(0 0 24px color-mix(in srgb, var(--acid) 70%, transparent))'
         : isRunning
           ? 'drop-shadow(0 0 22px rgba(107,78,168,0.75))'
-          : 'drop-shadow(0 0 22px rgba(201,241,88,0.45))';
+          : 'drop-shadow(0 0 22px color-mix(in srgb, var(--acid) 45%, transparent))';
 
   const showRings   = isHot || isSpeaking;
   const showRunRing = isRunning;
@@ -695,19 +695,19 @@ export function Orb() {
               ? 'rgba(14,13,11,0.96)'
               : 'rgba(14,13,11,0.94)',
             backdropFilter: 'blur(14px)',
-            border: `1px solid ${isRunning ? 'rgba(107,78,168,0.4)' : 'rgba(201,241,88,0.22)'}`,
+            border: `1px solid ${isRunning ? 'rgba(107,78,168,0.4)' : 'color-mix(in srgb, var(--acid) 22%, transparent)'}`,
             borderRadius: 10,
             padding: '8px 12px',
             fontFamily: isRunning ? 'var(--font-mono)' : 'var(--font-sans)',
             fontSize: isRunning ? 11 : 12.5,
-            color: isRunning ? '#c9f158' : '#d4cfc0',
+            color: isRunning ? 'var(--acid)' : '#d4cfc0',
             lineHeight: 1.5,
             pointerEvents: 'none',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
             animation: 'ai-panel-in 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
-          <span style={{ color: isRunning ? '#c9f158' : 'var(--accent-on-dark)', marginRight: 6, opacity: 0.8 }}>
+          <span style={{ color: isRunning ? 'var(--acid)' : 'var(--accent-on-dark)', marginRight: 6, opacity: 0.8 }}>
             <LineGlyph name={isRunning ? 'play' : 'diamond'} size={9} />
           </span>
           {caption}
@@ -727,15 +727,15 @@ export function Orb() {
             maxHeight: PANEL_H,
             background: 'rgba(14, 13, 11, 0.94)',
             backdropFilter: 'blur(18px) saturate(140%)',
-            border: '1px solid rgba(201, 241, 88, 0.22)',
+            border: '1px solid color-mix(in srgb, var(--acid) 22%, transparent)',
             borderRadius: 14,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             boxShadow: [
-              '0 0 0 1px rgba(201, 241, 88, 0.08)',
+              '0 0 0 1px color-mix(in srgb, var(--acid) 8%, transparent)',
               '0 20px 60px rgba(0, 0, 0, 0.6)',
-              '0 0 80px rgba(201, 241, 88, 0.15)',
+              '0 0 80px color-mix(in srgb, var(--acid) 15%, transparent)',
             ].join(', '),
             animation: 'ai-panel-in 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
           }}
@@ -747,7 +747,7 @@ export function Orb() {
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '10px 14px',
-              borderBottom: '1px solid rgba(201, 241, 88, 0.15)',
+              borderBottom: '1px solid color-mix(in srgb, var(--acid) 15%, transparent)',
               fontSize: 11,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
@@ -762,13 +762,13 @@ export function Orb() {
             </span>
             {history.length > 0 && (
               <button type="button" data-testid="orb-chat-menu" onClick={() => setShowMenu((v) => !v)} aria-pressed={showMenu} title="Tours and quick actions"
-                style={{ flexShrink: 0, whiteSpace: 'nowrap', marginLeft: 'auto', marginRight: 6, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: showMenu ? 'rgba(201,241,88,0.12)' : 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                style={{ flexShrink: 0, whiteSpace: 'nowrap', marginLeft: 'auto', marginRight: 6, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 25%, transparent)', background: showMenu ? 'color-mix(in srgb, var(--acid) 12%, transparent)' : 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
                 Tours
               </button>
             )}
             {history.length > 0 && (
               <button type="button" data-testid="orb-chat-new" onClick={newChat} title="Start a new conversation"
-                style={{ flexShrink: 0, whiteSpace: 'nowrap', marginRight: 8, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
+                style={{ flexShrink: 0, whiteSpace: 'nowrap', marginRight: 8, height: 22, padding: '0 8px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 25%, transparent)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11, cursor: 'pointer' }}>
                 New chat
               </button>
             )}
@@ -795,12 +795,12 @@ export function Orb() {
                 <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                   {claudeState === 'not-signed-in' && (
                     <button type="button" data-testid="orb-claude-signin" onClick={() => { setOpen(false); void launchClaudeInTerminal(false); }}
-                      style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.45)', background: 'rgba(201,241,88,0.12)', color: '#d4cfc0', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                      style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 45%, transparent)', background: 'color-mix(in srgb, var(--acid) 12%, transparent)', color: '#d4cfc0', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
                       Sign in
                     </button>
                   )}
                   <button type="button" data-testid="orb-claude-recheck" onClick={() => { setClaudeState(null); void claudeStatus().then(setClaudeState); }}
-                    style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.25)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                    style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 25%, transparent)', background: 'transparent', color: '#8a8270', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
                     Check again
                   </button>
                 </div>
@@ -817,15 +817,15 @@ export function Orb() {
                     onClick={() => { setOpen(false); setCommanderOpen(true); }}
                     style={{
                       textAlign: 'left',
-                      background: 'linear-gradient(90deg, rgba(201,241,88,0.18) 0%, rgba(201,241,88,0.06) 60%, rgba(201,241,88,0.10) 100%)',
-                      border: '1px solid rgba(201, 241, 88, 0.40)',
+                      background: 'linear-gradient(90deg, color-mix(in srgb, var(--acid) 18%, transparent) 0%, color-mix(in srgb, var(--acid) 6%, transparent) 60%, color-mix(in srgb, var(--acid) 10%, transparent) 100%)',
+                      border: '1px solid color-mix(in srgb, var(--acid) 40%, transparent)',
                       color: 'var(--accent-on-dark)',
                       padding: '6px 8px',
                       borderRadius: 4,
                       fontFamily: 'inherit',
                       fontSize: 11.5,
                       cursor: 'pointer',
-                      textShadow: '0 0 6px rgba(201,241,88,0.35)',
+                      textShadow: '0 0 6px color-mix(in srgb, var(--acid) 35%, transparent)',
                       letterSpacing: '0.02em',
                       marginBottom: 4,
                     }}
@@ -870,8 +870,8 @@ export function Orb() {
                       onClick={() => launchFlow(flow)}
                       style={{
                         textAlign: 'left',
-                        background: 'rgba(201, 241, 88, 0.06)',
-                        border: '1px solid rgba(201, 241, 88, 0.15)',
+                        background: 'color-mix(in srgb, var(--acid) 6%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--acid) 15%, transparent)',
                         color: '#d4cfc0',
                         padding: '5px 8px',
                         borderRadius: 4,
@@ -892,7 +892,7 @@ export function Orb() {
                     onClick={() => { setOpen(false); startTour('first-day'); }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%', boxSizing: 'border-box',
-                      background: 'rgba(201, 241, 88, 0.12)', border: '1px solid rgba(201, 241, 88, 0.4)', color: '#d4cfc0',
+                      background: 'color-mix(in srgb, var(--acid) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--acid) 40%, transparent)', color: '#d4cfc0',
                       padding: '8px 10px', borderRadius: 8, fontFamily: 'inherit', cursor: 'pointer',
                     }}
                   >
@@ -913,7 +913,7 @@ export function Orb() {
                         title={t.summary}
                         onClick={() => { setOpen(false); startTour(t.id); }}
                         style={{
-                          textAlign: 'left', background: 'transparent', border: '1px solid rgba(201, 241, 88, 0.15)', color: '#d4cfc0',
+                          textAlign: 'left', background: 'transparent', border: '1px solid color-mix(in srgb, var(--acid) 15%, transparent)', color: '#d4cfc0',
                           padding: '5px 8px', borderRadius: 4, fontFamily: 'inherit', fontSize: 11, cursor: 'pointer',
                           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}
@@ -966,7 +966,7 @@ export function Orb() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '10px 12px',
-              borderTop: '1px solid rgba(201, 241, 88, 0.15)',
+              borderTop: '1px solid color-mix(in srgb, var(--acid) 15%, transparent)',
               background: 'rgba(0, 0, 0, 0.2)',
             }}
           >
@@ -987,7 +987,7 @@ export function Orb() {
             />
             {thinking && (
               <button type="button" data-testid="orb-chat-stop" onClick={stopAsking}
-                style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(201,241,88,0.35)', background: 'transparent', color: '#d4cfc0', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
+                style={{ height: 24, padding: '0 10px', borderRadius: 6, border: '1px solid color-mix(in srgb, var(--acid) 35%, transparent)', background: 'transparent', color: '#d4cfc0', fontFamily: 'inherit', fontSize: 11.5, cursor: 'pointer' }}>
                 Stop
               </button>
             )}
@@ -1009,7 +1009,7 @@ export function Orb() {
           <defs>
             <radialGradient id="orbGrad" cx="35%" cy="35%" r="70%">
               <stop offset="0%"   stopColor="#f0ffb8" stopOpacity="1" />
-              <stop offset="35%"  stopColor={isRunning ? '#b4a0ff' : '#c9f158'} stopOpacity="0.95" />
+              <stop offset="35%"  style={{ stopColor: isRunning ? '#b4a0ff' : 'var(--acid)' }} stopOpacity="0.95" />
               <stop offset="70%"  stopColor={isRunning ? '#6b4ea8' : '#7fa830'} stopOpacity="0.9" />
               <stop offset="100%" stopColor="#1a2f00" stopOpacity="1" />
             </radialGradient>
@@ -1037,7 +1037,7 @@ export function Orb() {
             }}
           >
             <ellipse cx="40" cy="36" rx="22" ry="7"
-              fill={isRunning ? '#b4a0ff' : '#c9f158'} opacity="0.35" />
+              style={{ fill: isRunning ? '#b4a0ff' : 'var(--acid)' }} opacity="0.35" />
             <ellipse cx="40" cy="44" rx="18" ry="5"
               fill={isRunning ? '#6b4ea8' : '#7fa830'} opacity="0.4" />
           </g>
@@ -1053,7 +1053,7 @@ export function Orb() {
                 key={idx}
                 style={{
                   position: 'absolute', inset: 8, borderRadius: '50%',
-                  border: '1.5px solid rgba(201, 241, 88, 0.5)',
+                  border: '1.5px solid color-mix(in srgb, var(--acid) 50%, transparent)',
                   pointerEvents: 'none',
                   animation: 'ai-ring 1.6s ease-out infinite',
                   animationDelay: `${delay}s`,

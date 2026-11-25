@@ -17,8 +17,6 @@ import { rfToScreen, updateViewport, updateCanvasRect } from '../../utils/viewpo
 import { useCameraEnsureVisible } from '../../utils/cameraEnsureVisible';
 import {
   ReactFlow,
-  Background,
-  BackgroundVariant,
   Controls,
   MiniMap,
   Panel,
@@ -49,7 +47,7 @@ import { makeCommandHandler, deleteTaskNodesCascade } from './commandDispatch';
 import { Dock } from '../Dock';
 import { DrawLayer } from './DrawLayer';
 import { motherRowY } from './motherRow';
-import { motherRowXs } from '../../../shared/motherLayout';
+import { motherRowXs, MOTHER_ROW_START_X } from '../../../shared/motherLayout';
 import { DrawStrokeNode, STROKE_NODE_PREFIX, STROKE_Z, strokeBox } from './DrawStrokeNode';
 import type { DrawStroke } from '../../../shared/types/board';
 import { targetNodeIdAt } from './connectTarget';
@@ -58,6 +56,8 @@ import { canvasWheelItems } from './canvasWheel';
 import { useDrawStore } from '../../store/drawStore';
 import type { TextLook } from '../nodes/TextNode/types';
 import { ChassisLayer } from '../ChassisLayer';
+import { CanvasGrid } from './CanvasGrid';
+import { createCanvasLayer, snapViewportToPixels, type CanvasLayer } from './canvasLayer';
 import { useDockStyle } from '../ChassisLayer/useDockStyle';
 import { useLayerVisibility, kindToLayer } from '../../store/layerVisibility';
 import { finishedClockKey, finishedTaskIds, useFinishedCards } from '../../store/finishedCards';
@@ -89,7 +89,6 @@ import { undoable } from '../../store/undoNotice';
 
 // Canvas-mode mother row: first slot x and the step between slots (540 wide +
 // 20 gap) — matches the seeded positions in main/persistence/board.ts.
-const MOTHER_ROW_START_X = -1400;
 const MOTHER_ROW_STEP = 560;
 import { findAnalyticsMother, toggleAnalyticsShown } from '../../store/analyticsMother';
 import { FIT_NODES_EVENT, FOCUS_NODE_EVENT, REVEAL_ELEMENT_EVENT } from '../../store/scheduleActions';
@@ -603,8 +602,12 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // unaffected.
   useEffect(() => {
     const root = document.documentElement;
-    const hold = () => root.classList.add('krnl-pointer-held');
-    const release = () => root.classList.remove('krnl-pointer-held');
+    // Decision 65 — only when an embed is on the page: a class on <html>
+    // makes the browser walk the whole page for iframes, and React Flow reads
+    // the layout right after (a few ms at the start of every drag).
+    const iframes = document.getElementsByTagName('iframe');
+    const hold = () => { if (iframes.length > 0) root.classList.add('krnl-pointer-held'); };
+    const release = () => { if (root.classList.contains('krnl-pointer-held')) root.classList.remove('krnl-pointer-held'); };
     window.addEventListener('pointerdown', hold, true);
     window.addEventListener('pointerup', release, true);
     window.addEventListener('pointercancel', release, true);
@@ -1122,7 +1125,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       config: defaultConfigByKind[args.kind] ?? {},
       isMother: false,
     };
-    addNode(newNode);
+    // A spot the user pointed at is kept; the dock's default spot moves off windows and cards (task-node F23).
+    addNode(newNode, { clear: !args.at });
     const updated = useBoardStore.getState().board;
     if (updated) void saveBoard(updated);
 
@@ -1134,7 +1138,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       frame: { width: 360, height: 240 },
     };
     const sz = sizes[args.kind];
-    if (sz) ensureVisible({ x: pos.x, y: pos.y, width: sz.width, height: sz.height });
+    const at = useBoardStore.getState().board?.nodes.find((n) => n.id === newNode.id)?.position ?? pos;
+    if (sz) ensureVisible({ x: at.x, y: at.y, width: sz.width, height: sz.height });
   }, [addNode, defaultDockSpawnPos, ensureVisible, setCenter]);
 
   // ── Pane-ctx "+ Task" / "+ Habit" — submit handlers ─────────────────────
@@ -1420,7 +1425,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
     const event = isTaskFlow ? 'task.next' : 'link';
     // Easy mode: no task ↔ habit links (task chains still work).
     if (isTaskFlow && (srcIsHabitLane || tgtIsHabitLane) && isEasyBoard(board)) {
-      emit('sys.error', 'Task–habit links are an Advanced feature (Settings → Mode)', { severity: 'warn' });
+      emit('sys.error', 'Task–habit links are an Advanced feature', { severity: 'warn' });
       return;
     }
 
@@ -2002,23 +2007,36 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   // Pure module-level write — no React state, no Zustand, no re-renders.
   // Badges and swap-buttons call rfToScreen() inside their rAF read() slots
   // and see the updated numbers without triggering any component updates.
-  // Decision 61 — while the canvas pans or zooms, it moves as one picture
-  // (will-change on the viewport: scaled by the GPU, not redrawn every frame;
-  // a big Calendar made each zoom step redraw thousands of parts). It is
-  // drawn sharp again a moment after the gesture ends.
-  const movingTimer = useRef(0);
+  //
+  // Decision 65 — the viewport is ONE GPU layer all the time (reactflow-
+  // theme.css): a pan only slides it, nothing is drawn again. Decision 61
+  // turned that layer on at the first pan frame and off 160 ms after the
+  // last one, so every pause in a pan rebuilt the whole canvas twice (a
+  // hitch) and text flipped between two kinds of smoothing (the flicker).
+  // Its hint is opacity, not transform, so a zoom draws it again at the new
+  // size each step: sharp while zooming, no soft-then-sharp flicker.
+  //
+  // The layer also lands on whole screen pixels: a pan by a trackpad moves it
+  // by fractions of a pixel, and a picture drawn between pixels is blurred a
+  // little differently every frame, so text shimmered while it moved. The
+  // `translate` property adds the tiny correction on top of React Flow's own
+  // `transform` (under half a pixel, never seen as a shift).
+  const layer = useRef<CanvasLayer | null>(null);
+  if (!layer.current) layer.current = createCanvasLayer(() => canvasContainerRef.current);
   const onMove = useCallback(
     (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
       updateViewport(viewport.x, viewport.y, viewport.zoom);
+      layer.current?.moved(viewport.x, viewport.y, viewport.zoom);
       // A card carried toward a Calendar: the Calendars on the canvas moved.
       calendarGeometryMoved();
-      const el = canvasContainerRef.current;
-      if (el && !el.classList.contains('is-canvas-moving')) el.classList.add('is-canvas-moving');
-      window.clearTimeout(movingTimer.current);
-      movingTimer.current = window.setTimeout(() => canvasContainerRef.current?.classList.remove('is-canvas-moving'), 160);
     },
     []
   );
+  useEffect(() => () => layer.current?.dispose(), []);
+  useLayoutEffect(() => {
+    snapViewportToPixels(canvasContainerRef.current, initialViewport.x, initialViewport.y);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── onSelectionChange — mirror to store only when a single node is picked.
   // For marquee multi-select we leave the store's selectedNodeId as null so
@@ -2032,7 +2050,7 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
   );
 
   return (
-    <div ref={canvasContainerRef} style={{ width: '100%', height: '100%' }}>
+    <div ref={canvasContainerRef} className="krnl-canvas" style={{ width: '100%', height: '100%' }}>
     <BoldSetProvider>
     <ReactFlow
       nodes={nodes}
@@ -2138,24 +2156,8 @@ function CanvasFlowInner({ initialViewport }: CanvasFlowInnerProps) {
       style={{ background: 'var(--paper)' }}
     >
       {/* Dual-density dot grid — minor (32px, small dots) + major (160px,
-          larger dots). Both layers use a brighter shade than --grid-strong so
-          dots read clearly without dominating the canvas. */}
-      <Background
-        id="krnl-grid-minor"
-        variant={BackgroundVariant.Dots}
-        gap={32}
-        size={1.6}
-        color="var(--grid)"
-        offset={0}
-      />
-      <Background
-        id="krnl-grid-major"
-        variant={BackgroundVariant.Dots}
-        gap={160}
-        size={3.6}
-        color="var(--grid-strong)"
-        offset={0}
-      />
+          larger dots), drawn once per zoom and slid by the GPU (Decision 65). */}
+      <CanvasGrid />
 
       {/* Controls — zoom in/out, fit view. Moved to bottom-left so MiniMap
           can anchor bottom-right without overlap. */}
@@ -2370,7 +2372,9 @@ function BoldSetProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function CanvasFlow() {
-  const viewport = useBoardStore((s) => s.viewport);
+  // The saved viewport is only the canvas's starting point (React Flow owns
+  // the live one). Read once, not subscribed: a subscription re-rendered the
+  // whole canvas at the end of every pan and zoom (Decision 65).
   // Subscribe to a boolean, not the board reference, so this outer component
   // doesn't re-render every drag tick. CanvasFlowInner subscribes to s.board
   // internally — we only need the loaded/not-loaded gate here.
@@ -2396,7 +2400,7 @@ export function CanvasFlow() {
     );
   }
 
-  return <CanvasFlowInner initialViewport={viewport} />;
+  return <CanvasFlowInner initialViewport={useBoardStore.getState().viewport} />;
 }
 
 // PaneNamePrompt — small input portal anchored at viewport coords.

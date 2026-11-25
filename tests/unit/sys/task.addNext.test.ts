@@ -4,6 +4,7 @@
  * at the same layer, wires a task.next edge, and creates a linked TodoItem.
  */
 
+import { placeClear } from '../../../src/shared/spawnPlace';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -108,9 +109,15 @@ describe('sys task addNext', () => {
     const sourceX = source.position?.x ?? 0;
     const sourceY = source.position?.y ?? 0;
     await taskAddNext(ctx, source.id, 'next task');
-    const next = findTasks().find((t) => (t.state as TaskState).text === 'next task')!;
-    expect(next.position?.x).toBe(sourceX + 300);
-    expect(next.position?.y).toBe(sourceY);
+    const board = readBoard();
+    const next = board.nodes.find((n) => n.kind === 'todo.task' && (n.state as TaskState).text === 'next task')!;
+    // Beside the source when that spot is free; otherwise the nearest free
+    // spot (task-node F23: never on a window or another card).
+    const others = board.nodes.filter((n) => n.id !== next.id);
+    const want = placeClear(others, { ...next, position: { x: sourceX + 300, y: sourceY } });
+    expect(next.position).toEqual(want.position);
+    const free = placeClear(others.filter((n) => !n.isMother), { ...next, position: { x: sourceX + 300, y: sourceY } });
+    expect(free.position).toEqual({ x: sourceX + 300, y: sourceY });
   });
 
   it('creates a task.next edge from source to the new node', async () => {

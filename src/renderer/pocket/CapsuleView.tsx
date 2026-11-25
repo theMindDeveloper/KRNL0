@@ -22,14 +22,14 @@ function Pill({ m }: { m: PocketModel }) {
   const lead = m.observe
     ? (m.onBreak
       ? <span style={{ width: 14, height: 14, marginLeft: 10, borderRadius: '50%', boxShadow: `inset 0 0 0 1.5px ${MUTED}`, flexShrink: 0 }} />
-      : <span style={{ width: 8, height: 8, marginLeft: 14, borderRadius: '50%', background: ACID, boxShadow: '0 0 0 3px rgba(201,241,88,.18)', flexShrink: 0 }} />)
+      : <span style={{ width: 8, height: 8, marginLeft: 14, borderRadius: '50%', background: ACID, boxShadow: '0 0 0 3px color-mix(in srgb, var(--acid) 18%, transparent)', flexShrink: 0 }} />)
     : <Ring size={36} stroke={4} fraction={m.onBreak ? m.breakUsed : m.remaining} color={m.tone} />;
   return (
     <div style={{ ...base, boxShadow: `inset 0 0 0 1px ${m.paused ? '#5f5541' : EDGE}, ${POCKET_SHADOW}` }} data-testid="pocket-capsule">
       {lead}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
         <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 300, lineHeight: 1, color: m.paused ? INK3 : INK, fontVariantNumeric: 'tabular-nums' }}>
-          {m.time}{m.observe && !m.onBreak && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={ACID} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-label="counting up" style={{ marginLeft: 6, verticalAlign: '0.1em' }}><path d="M12 19V5M6 11l6-6 6 6" /></svg>}
+          {m.time}{m.observe && !m.onBreak && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-label="counting up" style={{ stroke: ACID, marginLeft: 6, verticalAlign: '0.1em' }}><path d="M12 19V5M6 11l6-6 6 6" /></svg>}
         </span>
         <span style={{ fontSize: 11, color: m.onBreak ? (m.observe ? INK3 : CYAN) : INK3, maxWidth: 170, overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</span>
       </div>

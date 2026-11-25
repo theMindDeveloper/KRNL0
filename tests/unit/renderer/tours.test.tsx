@@ -2,7 +2,7 @@
 /** Guided tours — one per part of the app; steps wait for Next or the real action. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
-import { TOURS, tourById, stepsFor } from '../../../src/renderer/components/Tour/tours';
+import { TOURS, tourById, stepsFor, toursIn } from '../../../src/renderer/components/Tour/tours';
 import { TourHost, startTour } from '../../../src/renderer/components/Tour/TourHost';
 import { SysParser } from '../../../src/sys/parser';
 import { useBoardStore } from '../../../src/renderer/store/boardStore';
@@ -13,40 +13,12 @@ vi.mock('../../../src/renderer/store/eventLog', async (orig) => ({
   saveBoard: vi.fn(async () => undefined),
 }));
 
-describe('Easy and Advanced tour — a live demo', () => {
-  afterEach(() => { cleanup(); document.body.innerHTML = ''; });
-  const seed = (): void => {
-    useBoardStore.setState({ board: { version: 1, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [], uiMode: 'easy' } as unknown as Board });
-  };
-  const mode = (): string | undefined => useBoardStore.getState().board?.uiMode;
-
-  it('switches the app to the mode each step talks about, and puts the user’s mode back on End', () => {
-    seed();
-    render(<TourHost />);
-    act(() => { startTour('modes'); });
-    // the intro names the user's own mode, highlighted
-    expect(screen.getByTestId('tour-text').querySelector('mark')?.textContent).toBe('two modes');
-    expect(screen.getByTestId('tour-text').textContent).toContain('Easy mode right now');
-    act(() => { fireEvent.click(screen.getByTestId('tour-next')); }); // where to switch (Settings → Mode)
-    expect(screen.getByTestId('tour-text').textContent).toContain('Settings → Mode');
-    act(() => { fireEvent.click(screen.getByTestId('tour-next')); }); // Easy step
-    expect(mode()).toBe('easy');
-    act(() => { fireEvent.click(screen.getByTestId('tour-next')); }); // the Pomo switch appears
-    expect(mode()).toBe('advanced');
-    act(() => { fireEvent.click(screen.getByTestId('tour-end')); });
-    expect(mode()).toBe('easy');
-  });
-
-  it('the last step chooses a mode, and that choice stays', () => {
-    seed();
-    render(<TourHost />);
-    act(() => { startTour('modes'); });
-    const n = tourById('modes')!.steps.length;
-    for (let k = 0; k < n - 1; k++) act(() => { fireEvent.click(screen.getByTestId('tour-next')); });
-    expect(screen.queryByTestId('tour-next')).toBeNull();
-    act(() => { fireEvent.click(screen.getByTestId('tour-choose-advanced')); });
-    expect(screen.queryByTestId('tour-card')).toBeNull();
-    expect(mode()).toBe('advanced');
+describe('Easy and Advanced tour — retired with Easy mode (Decision 66)', () => {
+  it('is never listed, and nothing switches a board into Easy', () => {
+    expect(toursIn('advanced').some((t) => t.id === 'modes')).toBe(false);
+    useBoardStore.setState({ board: { version: 1, savedAt: '', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [] } as unknown as Board });
+    useBoardStore.getState().setUiMode('easy');
+    expect(useBoardStore.getState().board?.uiMode).toBeUndefined();
   });
 });
 

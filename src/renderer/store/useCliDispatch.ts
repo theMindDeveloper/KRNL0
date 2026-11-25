@@ -9,6 +9,7 @@
  * are handled by SysFacade in main (via board.json direct writes + board:changed).
  */
 
+import { parseAccent, saveAccent } from '../themes/accent';
 import { useEffect } from 'react';
 import { useBoardStore, historyGroup } from './boardStore';
 import { emit, saveBoard } from './eventLog';
@@ -194,6 +195,20 @@ export function useCliDispatch(): void {
             } else {
               message = `Invalid theme: ${value}`;
             }
+            break;
+          }
+
+          // The accent colour (Settings → Appearance).
+          case 'theme.accent': {
+            const raw = String((args as { value?: unknown }).value ?? '').trim();
+            const reset = /^(reset|default)$/i.test(raw);
+            const hex = reset ? null : parseAccent(raw);
+            // No "#" in the hint: a shell reads "#..." after a space as a comment.
+            if (!reset && !hex) { message = `Not a colour: ${raw} (try 6aa8ff, blue or reset)`; break; }
+            const err = saveAccent(hex);
+            if (err) { message = err; break; }
+            ok = true;
+            message = reset ? 'Accent: KRNL0 green' : `Accent: ${hex}`;
             break;
           }
 
@@ -434,7 +449,7 @@ export function useCliDispatch(): void {
               state: { habitId },
               config: { days: 28 },
             };
-            addNode(lane);
+            addNode(lane, { clear: true });
             const finalBoard = store.getState().board;
             if (finalBoard) void saveBoard(finalBoard);
             emit('node.added', `habit.lane spawned for habit ${habitId.slice(0, 8)}`, { refId: lane.id });

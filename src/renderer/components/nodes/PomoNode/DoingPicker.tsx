@@ -1,17 +1,27 @@
 // Observe mode — "what am I doing?" in one row. Shows the current name
-// (with its category or ☑ task) and opens a list of recent names, your
-// tasks, and a field to type a new one. Picking sets what Start / Continue /
-// Back to work records; ✕ clears it so the next span is asked about.
+// (with its category or ☑ task) and opens the list below. Picking sets what
+// Start / Continue / Back to work records; ✕ clears it so the next span is
+// asked about.
+//
+// The list (DoingList) is the ONE "what was this time?" list of the app:
+// the Pomo, Log past time, "Time spent on" and Analytics' merge open it
+// (time-log F21, F22). It is a field and at most five lines, one fixed size:
+//   - opened: the names you used last, then your plans (five in all);
+//   - typing: the best matches ("aoe" finds "Age of Empires 2"), finished in
+//     grey inside the field (Tab or Enter takes it), and "New name";
+//   - a small kind pill in the field files a free name under a kind of work
+//     (the kind it had last time, else a guess from the name).
 
 import { LineGlyph } from '../../ui/LineGlyph';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { TagDef } from '../../../../shared/tags/classify';
 import { Popover } from '../../ui/Popover';
 import { CategoryIcon } from './CategoryIcon';
 import { useBoardStore } from '../../../store/boardStore';
-import { useShallow } from 'zustand/react/shallow';
 import { toneVarForTask } from '../../../utils/taskColor';
-import { toggleTaskDone } from '../../../store/scheduleActions';
+import { addKind, toggleTaskDone } from '../../../store/scheduleActions';
+import { spanTagFor } from '../../../store/spanTags';
+import { nameKey, nameScore, usedNames, type UsedName } from './nameMatch';
 
 export interface DoingChoice {
   label: string;
@@ -23,7 +33,6 @@ export interface DoingPickerProps {
   /** Word shown before the name: DOING while recording, NEXT when idle. */
   caption: string;
   current: DoingChoice | null;
-  recents: readonly DoingChoice[];
   /** Open tasks, then tasks done today (`done: true`, own group — #204). */
   tasks: ReadonlyArray<{ id: string; text: string; done?: boolean }>;
   library: readonly TagDef[];
@@ -31,81 +40,10 @@ export interface DoingPickerProps {
   onClear: () => void;
 }
 
-// Section names in the list: sentence case, the reading font (window-frame.md, cards).
-const mono: React.CSSProperties = { fontFamily: 'var(--font-read)', fontSize: 12.5, color: 'var(--ink-3)' };
-
-export function DoingPicker({ caption, current, recents, tasks, library, onPick, onClear }: DoingPickerProps) {
+export function DoingPicker({ caption, current, tasks, library, onPick, onClear }: DoingPickerProps) {
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const [typed, setTyped] = useState('');
-  // Typing filters the lists; done tasks show the newest 4 (search finds older).
-  const q = typed.trim().toLowerCase();
-  const hit = (t: { text: string }): boolean => !q || t.text.toLowerCase().includes(q);
-  const openTasks = tasks.filter((t) => !t.done && hit(t));
-  // Done tasks are hidden; to work on one it is reopened first (#207).
-  const [showDone, setShowDone] = useState(false);
-  const doneAll = tasks.filter((t) => t.done && hit(t));
-  const doneTasks = showDone || q ? doneAll.slice(0, 4) : [];
-  const cat = (tag: string | null) => (tag ? library.find((t) => t.id === tag) : undefined);
-  const curCat = current && !current.taskId ? cat(current.tag) : undefined;
-
-  const pick = (c: DoingChoice) => { setOpen(false); setTyped(''); onPick(c); };
-  // #207 — each task shows its tag, colour-coded; tasks keep their own colour dot.
-  const taskTag = useBoardStore(useShallow((st) => {
-    const out: Record<string, string> = {};
-    for (const n of st.board?.nodes ?? []) {
-      if (n.kind !== 'todo') continue;
-      for (const it of ((n.state as { items?: Array<{ taskNodeId?: string | null; tag?: string }> }).items ?? [])) {
-        if (it.taskNodeId && it.tag) out[it.taskNodeId] = it.tag;
-      }
-    }
-    return out;
-  }));
-  const pill = (tagId: string | null | undefined) => {
-    const t = cat(tagId ?? null);
-    if (!t) return null;
-    return (
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '1px 6px', borderRadius: 999,
-        fontSize: 11, color: t.color, background: `color-mix(in srgb, ${t.color} 16%, transparent)`, border: `1px solid color-mix(in srgb, ${t.color} 45%, transparent)`,
-      }}>
-        <CategoryIcon id={t.id} color={t.color} size={9} />{t.label}
-      </span>
-    );
-  };
-  const typedHit = q !== '' && (recents.some((c) => c.label.toLowerCase() === q) || tasks.some((t) => t.text.toLowerCase() === q));
-  // #207 — no "Recent" list (it repeated the tasks); just tasks and categories.
-  const shownOpen = openTasks.slice(0, 6);
-  const cats = library.filter((t) => !q || t.label.toLowerCase().includes(q) || q.length > 0);
-  const icon = (c: DoingChoice) => {
-    if (c.taskId) return <span aria-hidden style={{ color: 'var(--ink-3)', width: 12, textAlign: 'center', display: 'inline-flex', justifyContent: 'center' }}><LineGlyph name="task" size={11} /></span>;
-    const t = cat(c.tag);
-    return t ? <CategoryIcon id={t.id} color={t.color} size={12} /> : <span aria-hidden style={{ width: 12, textAlign: 'center', color: 'var(--ink-4)' }}>·</span>;
-  };
-  const row = (key: string, c: DoingChoice, testId: string, done = false) => {
-    const on = !!current && current.label === c.label && current.taskId === c.taskId;
-    const t = cat(c.tag);
-    return (
-      <button
-        key={key}
-        type="button"
-        data-testid={testId}
-        onClick={() => pick(c)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer',
-          minHeight: 34, padding: '0 10px', borderRadius: 8, border: 'none',
-          background: on ? 'color-mix(in srgb, var(--acid) 16%, transparent)' : 'transparent',
-          color: on ? 'var(--ink)' : 'var(--ink)', fontFamily: 'var(--font-read)', fontSize: 13.5,
-        }}
-      >
-        {c.taskId
-          ? <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(c.taskId), opacity: done ? 0.5 : 1 }} />
-          : t ? <CategoryIcon id={t.id} color={t.color} size={12} /> : <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, border: '1px solid var(--ink-4)' }} />}
-        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: done ? 'line-through' : 'none', textDecorationColor: 'var(--ink-4)' }}>{c.label}</span>
-        {pill(c.taskId ? taskTag[c.taskId] : c.tag)}
-      </button>
-    );
-  };
+  const curCat = current && !current.taskId && current.tag ? library.find((t) => t.id === current.tag) : undefined;
 
   return (
     <>
@@ -119,7 +57,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
           ref={anchor}
           type="button"
           data-testid="pomo-now-pick"
-          title="Pick what you're doing: a recent one, a task, or type a new name"
+          title="Pick what you're doing: a name you used, a task, or type a new name"
           onClick={() => setOpen((o) => !o)}
           style={{
             flex: '0 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: '100%', padding: 0,
@@ -127,7 +65,7 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
             fontFamily: 'var(--font-read)', fontSize: 13.5, fontWeight: current ? 600 : 400, color: current ? 'var(--ink)' : 'var(--ink-3)',
           }}
         >
-          {current && icon(current)}
+          {current && <ChoiceIcon choice={current} library={library} />}
           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {current ? current.label : 'What are you doing?'}
           </span>
@@ -149,65 +87,303 @@ export function DoingPicker({ caption, current, recents, tasks, library, onPick,
         )}
       </div>
 
-      <Popover anchor={anchor.current} open={open} onClose={() => setOpen(false)} minWidth={280}>
-        <div style={{ maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: 8, fontFamily: 'var(--font-read)' }}>
-          <input
-            data-testid="pomo-now-type"
-            autoFocus
-            value={typed}
-            placeholder="Search, or type something new"
-            onChange={(e) => setTyped(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' || !typed.trim()) return;
-              const only = shownOpen.length === 1 && shownOpen[0] ? { label: shownOpen[0].text, tag: null, taskId: shownOpen[0].id } : null;
-              pick(only ?? { label: typed.trim(), tag: null, taskId: null });
-            }}
-            style={{ margin: '0 0 6px', height: 36, padding: '0 12px', boxSizing: 'border-box', background: 'var(--paper-3)', border: 'none', borderRadius: 10, color: 'var(--ink)', fontFamily: 'var(--font-read)', fontSize: 13.5, outline: 'none' }}
-          />
-          {q && !typedHit && row('new', { label: typed.trim(), tag: null, taskId: null }, 'pomo-now-new')}
-          {shownOpen.length > 0 && <span style={{ ...mono, padding: '8px 10px 4px' }}>Your plans</span>}
-          {shownOpen.map((t) => row(`t-${t.id}`, { label: t.text, tag: null, taskId: t.id }, `pomo-now-task-${t.id}`))}
-          {openTasks.length > shownOpen.length && <span style={{ ...mono, padding: '2px 10px' }}>+{openTasks.length - shownOpen.length} more: keep typing</span>}
-          {doneAll.length > 0 && !q && (
-            <button type="button" data-testid="pomo-now-show-done" onClick={() => setShowDone((v) => !v)}
-              style={{ ...mono, alignSelf: 'flex-start', margin: '8px 10px 2px', padding: '5px 10px', background: 'var(--paper-2)', border: 'none', borderRadius: 8, cursor: 'pointer', textAlign: 'left' }}>
-              {showDone ? 'Hide done' : `Show done (${doneAll.length})`}
-            </button>
-          )}
-          {doneTasks.map((t) => (
-            <button key={`d-${t.id}`} type="button" data-testid={`pomo-now-reopen-${t.id}`}
-              title={`"${t.text}" is done — reopen it to work on it`}
-              onClick={() => { void toggleTaskDone(t.id).then(() => pick({ label: t.text, tag: null, taskId: t.id })); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', minHeight: 34, padding: '0 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--ink-3)', fontFamily: 'var(--font-read)', fontSize: 13.5 }}>
-              <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(t.id), opacity: 0.5 }} />
-              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'line-through' }}>{t.text}</span>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Reopen and record</span>
-            </button>
-          ))}
-          {cats.length > 0 && <span style={{ ...mono, padding: '10px 10px 6px' }}>{q ? `"${typed.trim()}" as a kind of work` : 'Or a kind of work'}</span>}
-          {cats.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6, padding: '0 2px 2px' }}>
-              {cats.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  data-testid={`pomo-now-cat-${t.id}`}
-                  title={q ? `"${typed.trim()}" as ${t.label}` : t.label}
-                  onClick={() => pick({ label: q ? typed.trim() : t.label, tag: t.id, taskId: null })}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0, cursor: 'pointer', height: 34, padding: '0 10px', borderRadius: 10,
-                    fontFamily: 'var(--font-read)', fontSize: 13, color: 'var(--ink)',
-                    background: 'var(--paper-3)', border: 'none',
-                  }}
-                >
-                  <CategoryIcon id={t.id} color={t.color} size={13} />
-                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      <Popover anchor={anchor.current} open={open} onClose={() => setOpen(false)} minWidth={300}>
+        <DoingList current={current} tasks={tasks} library={library} onPick={(c) => { setOpen(false); onPick(c); }} onClose={() => setOpen(false)} />
       </Popover>
     </>
+  );
+}
+
+/** The small mark before a choice: a task's colour dot, a kind of work's icon, or an empty ring. */
+export function ChoiceIcon({ choice, library }: { choice: DoingChoice; library: readonly TagDef[] }): JSX.Element {
+  if (choice.taskId) return <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: toneVarForTask(choice.taskId) }} />;
+  const t = choice.tag ? library.find((x) => x.id === choice.tag) : undefined;
+  return t ? <CategoryIcon id={t.id} color={t.color} size={12} /> : <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, border: '1.5px solid var(--ink-4)', boxSizing: 'border-box' }} />;
+}
+
+/** Names used in recorded time on this board, newest first (time-log F22). */
+export function useUsedNames(): UsedName[] {
+  const history = useBoardStore((s) => (s.board?.nodes.find((n) => n.kind === 'pomo')?.state as { history?: unknown[] } | undefined)?.history);
+  return useMemo(() => usedNames((history ?? []) as Parameters<typeof usedNames>[0]), [history]);
+}
+
+export interface DoingListProps {
+  current: DoingChoice | null;
+  tasks: ReadonlyArray<{ id: string; text: string; done?: boolean }>;
+  library: readonly TagDef[];
+  onPick: (choice: DoingChoice) => void;
+  /**
+   * Time already recorded (Log past time, "Time spent on"): a done task is
+   * picked as it is. While recording, a done task is reopened first (#207).
+   */
+  pastTime?: boolean;
+  /** Adds "Leave it unnamed" (no name, no task). */
+  onNone?: () => void;
+  /** Names only (Analytics' merge): no plans, no kind pill. */
+  namesOnly?: boolean;
+  /** Names to leave out (Analytics' merge: the name being merged). */
+  exclude?: readonly string[];
+  /** Escape. */
+  onClose?: () => void;
+  /** Test ids: `${prefix}-type`, `-new`, `-task-<id>`, `-name-<n>`, `-kind`, `-kind-<id>`, `-none`. */
+  testIdPrefix?: string;
+  /** Its width (300 in a popover of its own; '100%' inside a card that already has one). */
+  width?: number | string;
+}
+
+const ROWS = 5;
+const ROW_H = 30;
+
+type Row =
+  | { key: string; kind: 'name'; choice: DoingChoice; done: boolean }
+  | { key: string; kind: 'new'; label: string }
+  | { key: string; kind: 'none' };
+
+/** Test id part for a free name: "Age of Empires 2" → "age-of-empires-2". */
+export const nameTestId = (label: string): string => nameKey(label).replace(/[^a-z0-9]+/g, '-');
+
+/**
+ * The list behind "What are you doing?" (time-log F22, draft C): a field and
+ * at most five lines; the box fits its lines, never taller than five.
+ */
+export function DoingList({ current, tasks, library, onPick, pastTime = false, onNone, namesOnly = false, exclude, onClose, testIdPrefix = 'pomo-now', width = 300 }: DoingListProps): JSX.Element {
+  const id = (s: string): string => `${testIdPrefix}-${s}`;
+  const [typed, setTyped] = useState('');
+  const [active, setActive] = useState(0);
+  // undefined = not set by hand; null = "No kind" picked.
+  const [kindPick, setKindPick] = useState<string | null | undefined>(undefined);
+  const [kindOpen, setKindOpen] = useState(false);
+  // "+ New kind": the name being typed for a kind of work that does not exist yet (Play).
+  const [newKind, setNewKind] = useState<string | null>(null);
+  const used = useUsedNames();
+  const q = typed.trim();
+  const excludeKey = (exclude ?? []).map(nameKey).join('\n');
+  const excluded = useMemo(() => new Set(excludeKey ? excludeKey.split('\n') : []), [excludeKey]);
+
+  // Every name you can pick: names you used (newest first), then plans.
+  const pool = useMemo(() => {
+    const taskById = new Map(tasks.map((t) => [t.id, t]));
+    const out: Array<{ choice: DoingChoice; done: boolean }> = [];
+    const seen = new Set<string>();
+    for (const u of used) {
+      if (u.taskId) {
+        if (namesOnly) continue;
+        const t = taskById.get(u.taskId);
+        if (!t || seen.has(`t:${t.id}`)) continue; // a deleted task is not offered
+        seen.add(`t:${t.id}`);
+        out.push({ choice: { label: t.text, tag: null, taskId: t.id }, done: !!t.done });
+      } else {
+        const k = nameKey(u.label);
+        if (excluded.has(k) || seen.has(`n:${k}`)) continue;
+        seen.add(`n:${k}`);
+        out.push({ choice: { label: u.label, tag: u.tag, taskId: null }, done: false });
+      }
+    }
+    if (!namesOnly) {
+      for (const t of tasks) {
+        if (seen.has(`t:${t.id}`)) continue;
+        seen.add(`t:${t.id}`);
+        out.push({ choice: { label: t.text, tag: null, taskId: t.id }, done: !!t.done });
+      }
+    }
+    return out;
+  }, [used, tasks, namesOnly, excluded]);
+
+  const rows: Row[] = useMemo(() => {
+    const out: Row[] = [];
+    if (!q) {
+      // Opened: your last names, then plans (done ones only come up by typing).
+      const slots = onNone && current ? ROWS - 1 : ROWS;
+      pool.filter((p) => !p.done).slice(0, slots).forEach((p, i) => out.push({ key: `p-${i}`, kind: 'name', choice: p.choice, done: false }));
+      if (onNone && current) out.push({ key: 'none', kind: 'none' });
+      return out;
+    }
+    const scored = pool
+      .map((p, i) => ({ p, i, s: nameScore(q, p.choice.label) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s || a.i - b.i);
+    // No "New name" when the typed name already exists as a free name.
+    const exact = scored.some((x) => x.s === 100 && !x.p.choice.taskId);
+    const room = exact ? ROWS : ROWS - 1;
+    scored.slice(0, room).forEach((x) => out.push({ key: `m-${x.i}`, kind: 'name', choice: x.p.choice, done: x.p.done }));
+    if (!exact) out.push({ key: 'new', kind: 'new', label: q });
+    return out;
+  }, [q, pool, onNone, current]);
+
+  // The grey completion and the kind pill follow the best match / the row in focus.
+  const top = q ? rows.find((r): r is Extract<Row, { kind: 'name' }> => r.kind === 'name') : undefined;
+  const ghost = top && nameKey(top.choice.label) !== nameKey(q) ? top.choice.label : '';
+  const target = rows[active] ?? rows[0];
+  const targetIsTask = target?.kind === 'name' && !!target.choice.taskId;
+  const autoKind = target?.kind === 'name' ? target.choice.tag
+    : target?.kind === 'new' ? spanTagFor(useBoardStore.getState().board ?? null, target.label, null)
+    : null;
+  const kindId = kindPick === undefined ? autoKind : kindPick;
+  const kind = kindId ? library.find((t) => t.id === kindId) : undefined;
+  const showPill = !namesOnly && !!q && !targetIsTask && target?.kind !== 'none';
+
+  const finish = (c: DoingChoice): void => { setTyped(''); setActive(0); setKindPick(undefined); setKindOpen(false); onPick(c); };
+  const choose = (r: Row | undefined): void => {
+    if (!r) return;
+    if (r.kind === 'none') { setTyped(''); onNone?.(); return; }
+    if (r.kind === 'new') { finish({ label: r.label, tag: namesOnly ? null : kindId ?? null, taskId: null }); return; }
+    const c = r.choice;
+    if (c.taskId) {
+      // While recording, a done task is reopened first; past time takes it as it is.
+      if (r.done && !pastTime) { const taskId = c.taskId; void toggleTaskDone(taskId).then(() => finish(c)); return; }
+      finish(c);
+      return;
+    }
+    finish({ label: c.label, tag: namesOnly ? c.tag : kindPick === undefined ? c.tag : kindPick, taskId: null });
+  };
+
+  const rowStyle = (on: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: ROW_H, flexShrink: 0, padding: '0 10px', boxSizing: 'border-box',
+    border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+    background: on ? 'var(--paper-3)' : 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-read)', fontSize: 13,
+  });
+  const kindOf = (tag: string | null) => (tag ? library.find((t) => t.id === tag) : undefined);
+  const field: React.CSSProperties = { fontFamily: 'var(--font-read)', fontSize: 13, lineHeight: '34px', padding: '0 10px', whiteSpace: 'pre' };
+
+  return (
+    <div
+      data-testid={testIdPrefix === 'pomo-now' ? undefined : testIdPrefix}
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{ width, boxSizing: 'border-box', padding: 6, display: 'flex', flexDirection: 'column', gap: 2, fontFamily: 'var(--font-read)' }}
+    >
+      {/* The field: what you typed, the rest of the best match in grey, the kind pill. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, borderRadius: 8, background: 'var(--paper-2)', paddingRight: showPill ? 5 : 0 }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 0, height: 34, overflow: 'hidden' }}>
+          <div aria-hidden style={{ ...field, position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ visibility: 'hidden' }}>{typed}</span>
+            {ghost && <span data-testid={id('ghost')} style={{ color: 'var(--ink-4)' }}>{' · '}{ghost}</span>}
+          </div>
+          <input
+            data-testid={id('type')}
+            aria-label="What was it"
+            autoFocus
+            value={typed}
+            placeholder={namesOnly ? 'Find or type a name' : 'What was it?'}
+            onChange={(e) => { setTyped(e.target.value); setActive(0); setKindOpen(false); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { onClose?.(); return; }
+              e.stopPropagation();
+              if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(rows.length - 1, a + 1)); }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
+              else if (e.key === 'Enter') { e.preventDefault(); choose(rows[active]); }
+              else if (e.key === 'Tab' && q && top) { e.preventDefault(); choose(top); }
+            }}
+            style={{ ...field, position: 'relative', width: '100%', height: 34, boxSizing: 'border-box', background: 'transparent', border: 'none', outline: 'none', color: 'var(--ink)' }}
+          />
+        </div>
+        {showPill && (
+          <button
+            type="button"
+            data-testid={id('kind')}
+            title="Kind of work this time counts under"
+            onClick={() => { setKindOpen((o) => !o); setNewKind(null); }}
+            style={{
+              flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 8px', borderRadius: 999, cursor: 'pointer',
+              fontFamily: 'var(--font-read)', fontSize: 11.5,
+              border: `1px solid ${kind ? `color-mix(in srgb, ${kind.color} 45%, transparent)` : 'var(--paper-3)'}`,
+              background: kind ? `color-mix(in srgb, ${kind.color} 14%, transparent)` : 'transparent',
+              color: kind ? kind.color : 'var(--ink-3)',
+            }}
+          >
+            {kind ? kind.label : 'Kind'}
+            <LineGlyph name="caretDown" size={7} />
+          </button>
+        )}
+      </div>
+
+      {/* At most five lines, the box as tall as what it shows: names, or the kinds while the pill is open. */}
+      <div data-testid={id('rows')} style={{ maxHeight: ROWS * ROW_H + (ROWS - 1), display: 'flex', flexDirection: 'column', gap: 1, overflow: 'hidden' }}>
+        {kindOpen ? (
+          <div role="listbox" aria-label="Kind of work" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 2, alignContent: 'start', maxHeight: ROWS * ROW_H + (ROWS - 1), overflowY: 'auto', scrollbarWidth: 'thin' }}>
+            {[...library.map((t) => ({ id: t.id as string | null, label: t.label, color: t.color })), { id: null as string | null, label: 'No kind', color: 'var(--ink-4)' }].map((t) => (
+              <button
+                key={t.id ?? 'none'}
+                type="button"
+                role="option"
+                aria-selected={kindId === t.id}
+                data-testid={id(`kind-${t.id ?? 'none'}`)}
+                onClick={() => { setKindPick(t.id); setKindOpen(false); }}
+                style={{ ...rowStyle(kindId === t.id), height: 28, padding: '0 8px', gap: 6, fontSize: 12.5 }}
+              >
+                <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, flexShrink: 0, background: t.id ? t.color : 'transparent', border: t.id ? 'none' : '1.5px solid var(--ink-4)', boxSizing: 'border-box' }} />
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.label}</span>
+              </button>
+            ))}
+            {/* A kind that does not exist yet (Play): typed here, made at once, filed under it. */}
+            {newKind === null ? (
+              <button type="button" data-testid={id('kind-new')} onClick={() => setNewKind('')}
+                style={{ ...rowStyle(false), height: 28, padding: '0 8px', gap: 6, fontSize: 12.5, color: 'var(--ink-3)' }}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
+                <span style={{ whiteSpace: 'nowrap' }}>New kind</span>
+              </button>
+            ) : (
+              <input
+                data-testid={id('kind-new-name')}
+                aria-label="New kind of work"
+                autoFocus
+                value={newKind}
+                placeholder="Name the kind (Play…)"
+                onChange={(e) => setNewKind(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { e.stopPropagation(); setNewKind(null); return; }
+                  e.stopPropagation();
+                  if (e.key !== 'Enter' || !newKind.trim()) return;
+                  e.preventDefault();
+                  const made = addKind(newKind);
+                  setNewKind(null);
+                  if (made) { setKindPick(made); setKindOpen(false); }
+                }}
+                style={{ gridColumn: '1 / -1', height: 28, boxSizing: 'border-box', padding: '0 8px', borderRadius: 7, border: '1px solid var(--paper-3)', background: 'var(--paper-2)', color: 'var(--ink)', fontFamily: 'var(--font-read)', fontSize: 12.5, outline: 'none' }}
+              />
+            )}
+          </div>
+        ) : rows.map((r, i) => {
+          const on = i === active && !!q;
+          if (r.kind === 'none') {
+            return (
+              <button key={r.key} type="button" data-testid={id('none')} onMouseEnter={() => setActive(i)} onClick={() => choose(r)} style={{ ...rowStyle(on), color: 'var(--ink-3)' }}>
+                <span aria-hidden style={{ display: 'inline-flex', width: 8, justifyContent: 'center' }}><LineGlyph name="close" size={9} /></span>
+                <span>Leave it unnamed</span>
+              </button>
+            );
+          }
+          if (r.kind === 'new') {
+            return (
+              <button key={r.key} type="button" data-testid={id('new')} onMouseEnter={() => setActive(i)} onClick={() => choose(r)} style={{ ...rowStyle(on), color: 'var(--ink-2)' }}>
+                <span aria-hidden style={{ display: 'inline-flex', width: 8, justifyContent: 'center' }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{namesOnly ? 'Rename to' : 'New name'} “{r.label}”</span>
+              </button>
+            );
+          }
+          const c = r.choice;
+          const k = c.taskId ? undefined : kindOf(c.tag);
+          const isCurrent = !!current && current.taskId === c.taskId && nameKey(current.label) === nameKey(c.label);
+          return (
+            <button
+              key={r.key}
+              type="button"
+              data-testid={c.taskId ? id(`task-${c.taskId}`) : id(`name-${nameTestId(c.label)}`)}
+              title={r.done ? (pastTime ? `"${c.label}" is done` : `"${c.label}" is done: picking it reopens it`) : c.label}
+              onMouseEnter={() => setActive(i)}
+              onClick={() => choose(r)}
+              style={{ ...rowStyle(on), background: on ? 'var(--paper-3)' : isCurrent ? 'color-mix(in srgb, var(--acid) 12%, transparent)' : 'transparent' }}
+            >
+              {c.taskId
+                ? <span aria-hidden style={{ width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: toneVarForTask(c.taskId), opacity: r.done ? 0.5 : 1 }} />
+                : <span aria-hidden style={{ width: 8, height: 8, borderRadius: 99, flexShrink: 0, border: `1.5px solid ${k ? k.color : 'var(--ink-4)'}`, boxSizing: 'border-box' }} />}
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: r.done ? 'var(--ink-3)' : 'var(--ink)', textDecoration: r.done ? 'line-through' : 'none', textDecorationColor: 'var(--ink-4)' }}>{c.label}</span>
+              {k && <span style={{ flexShrink: 0, fontSize: 11.5, color: k.color }}>{k.label}</span>}
+              {c.taskId && <span style={{ flexShrink: 0, fontSize: 11.5, color: 'var(--ink-4)' }}>plan</span>}
+              {on && <span aria-hidden style={{ flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-4)' }}>{i === 0 ? 'tab' : '↵'}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

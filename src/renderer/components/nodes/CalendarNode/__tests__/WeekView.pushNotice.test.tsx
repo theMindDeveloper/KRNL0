@@ -55,7 +55,7 @@ describe('WeekView — push notice', () => {
     const restore = mockCalendarLayout();
     try {
       // Tuesday (2026-05-12), 09:00.
-      await act(async () => { await carryIn(planItem('b', 60), { x: 150, y: 9 * 40 + 5 }); });
+      await act(async () => { await carryIn(planItem('b', 60), { x: 150, y: 9 * 40 + 1 }); });
     } finally { restore(); }
     expect(document.querySelector('[data-testid="calendar-push-notice"]')).toBeNull();
     const b = useBoardStore.getState().board!.nodes.find((n) => n.id === 'b')!;

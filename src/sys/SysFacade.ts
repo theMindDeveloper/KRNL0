@@ -34,7 +34,7 @@ import { drawList, drawClear, drawDelete, drawStroke } from './commands/draw';
 import { canvasList, canvasAdd, canvasSwitch, canvasRename, canvasDelete } from './commands/canvas';
 import { boardList, boardNew, boardSwitch, boardRename, boardDelete } from './commands/boards';
 import { mediaAdd, mediaList, mediaResize, mediaPage } from './commands/media';
-import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments, pomoEditSegmentCmd, pomoAddSegmentCmd } from './commands/pomo';
+import { pomoStart, pomoStop, pomoStatus, pomoBreak, pomoExtend, pomoConfig, pomoPause, pomoResume, pomoDiscard, pomoTag, pomoRetag, pomoDeleteSegmentCmd, pomoSegments, pomoEditSegmentCmd, pomoAddSegmentCmd, pomoRenameNameCmd } from './commands/pomo';
 import {
   imageAdd,
   imageReplace,
@@ -121,6 +121,8 @@ const TIME_READS = new Set(['pomo status', 'pomo segments', 'pomo config', 'task
  * board swap is not a history of corrections).
  */
 function changesTime(command: SysCommand): boolean {
+  // `time rename` renames recorded spans: the log must hear it (Analytics reads the log).
+  if (command.kind === 'time') return command.sub === 'rename';
   if (command.kind !== 'pomo' && command.kind !== 'task' && command.kind !== 'todo') return false;
   return !TIME_READS.has(`${command.kind} ${command.sub}`);
 }
@@ -547,6 +549,14 @@ export class SysFacade {
       if (command.sub === 'frames') {
         return themeFrames(command.json);
       }
+      if (command.sub === 'accent') {
+        // A per-window preference like the frame style: the open window applies it.
+        // A shell drops "#6aa8ff" after a space (a comment), so an empty value
+        // most often means that: say to type it without "#".
+        if (!command.value) return { ok: false, message: 'theme accent requires a colour: rrggbb without "#" (e.g. 6aa8ff), a name (green, cyan, blue, violet, pink, red, orange, amber) or reset' };
+        if (!this.deps.cliDispatch) return { ok: false, message: 'theme accent requires an open renderer window', data: { exitCode: 2 } };
+        return this.deps.cliDispatch('theme.accent', { value: command.value });
+      }
       if (command.sub === 'frame') {
         // Id or shown name: "Paper" is 'classic', "Nuclear" is 'krnl-dock'.
         const frameId = resolveFrameStyleId(command.value);
@@ -787,7 +797,7 @@ export class SysFacade {
           };
           return command.sub === 'segment'
             ? pomoEditSegmentCmd(editCtx, command.segmentId, command.start, command.end)
-            : pomoAddSegmentCmd(editCtx, command.start, command.end, command.ref, command.text);
+            : pomoAddSegmentCmd(editCtx, command.start, command.end, command.ref, command.text, command.tag);
         }
         case 'segments': {
           const segOpts: Parameters<typeof pomoSegments>[1] = { json: command.json };
@@ -1040,6 +1050,12 @@ export class SysFacade {
     // ── Decision 35 — durable time log reads (time-log F13) ──────────────────
     if (command.kind === 'time') {
       const tCtx = { boardPath: this.deps.boardPath };
+      if (command.sub === 'rename') {
+        return pomoRenameNameCmd({
+          boardPath: this.deps.boardPath,
+          ...(this.deps.onBoardChanged ? { onBoardChanged: this.deps.onBoardChanged } : {}),
+        }, command.from, command.to, command.tag);
+      }
       return command.sub === 'log'
         ? timeLog(tCtx, { from: command.from, to: command.to, json: command.json })
         : timeReport(tCtx, { month: command.month, by: command.by, json: command.json });

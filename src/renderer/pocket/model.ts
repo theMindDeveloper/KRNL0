@@ -71,7 +71,8 @@ export function buildModel(snap: PocketSnapshot, now: number): PocketModel {
 
 // The floating looks float over any app, so they keep the dark palette of the
 // designs in every theme.
-export const ACID = '#c9f158';
+/** The accent (Settings → Appearance; KRNL0 green by default). */
+export const ACID = 'var(--acid, #c9f158)';
 export const CYAN = '#22d3ee';
 export const RUST = '#ee8466';
 export const MUTED = '#8f8572';

@@ -1,31 +1,28 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useBoardStore } from './boardStore';
 
 const DEBOUNCE_MS = 500;
 
 // Mirrors viewport changes into board.json with a 500ms debounce so a pointer-drag
 // does not thrash the disk (Decision #7).
+//
+// A plain store subscription, not a React selector: the component that runs
+// this hook is the whole canvas, and a selector on the viewport re-rendered
+// all of it at the end of every pan and zoom (Decision 65).
 export function useViewportPersistence(): void {
-  const viewport = useBoardStore((s) => s.viewport);
-  // Only depend on whether a board exists, not on its reference. Subscribing
-  // to s.board re-fired this effect every drag tick (board ref churns 60fps),
-  // thrashing setTimeout. The persistence target itself is fetched fresh
-  // inside the effect when the debounce actually fires.
-  const hasBoard = useBoardStore((s) => s.board !== null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
-    if (!hasBoard) return;
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      window.krnl?.boardSaveViewport?.(viewport);
-      timer.current = null;
-    }, DEBOUNCE_MS);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = useBoardStore.subscribe((s, prev) => {
+      if (s.viewport === prev.viewport || s.board === null) return;
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        window.krnl?.boardSaveViewport?.(useBoardStore.getState().viewport);
+      }, DEBOUNCE_MS);
+    });
     return () => {
-      if (timer.current !== null) {
-        clearTimeout(timer.current);
-        timer.current = null;
-      }
+      unsubscribe();
+      if (timer !== null) clearTimeout(timer);
     };
-  }, [viewport, hasBoard]);
+  }, []);
 }

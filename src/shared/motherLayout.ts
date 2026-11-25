@@ -15,6 +15,8 @@
 
 export const MOTHER_SIZE = 540;
 export const MOTHER_GAP = 20;
+/** The row never starts right of this x (CanvasFlow draws it from here at the latest). */
+export const MOTHER_ROW_START_X = -1400;
 /** Which windows can be resized (the owner: "at least the calendar"). */
 export const RESIZABLE_MOTHERS: ReadonlySet<string> = new Set(['calendar']);
 export const MOTHER_MIN = { width: MOTHER_SIZE, height: MOTHER_SIZE } as const;
